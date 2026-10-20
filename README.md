@@ -1,7 +1,7 @@
 ---
-title: ihki
-emoji: 🗣️
-colorFrom: green
+title: mathly
+emoji: ➗
+colorFrom: blue
 colorTo: gray
 sdk: docker
 app_port: 7860
