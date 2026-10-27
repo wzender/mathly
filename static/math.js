@@ -1,13 +1,17 @@
-/* The math path, on /math only: after the opening screen it takes the whole screen in place of the Arabic path.
+/* The Mathly path.
    The skill graph comes from /api/math/skills (app/math_skills.py). A skill is open once every skill it needs is
    done, and the first open one is where the student goes on. A student may still open a locked skill: without a
    placement test, one who already knows the foundations should not have to answer them first.
-   For now each skill has one sample question, and answering it right marks the skill done. Progress is kept on
-   this device, per account (ihki.math.v1:<email>), until the server keeps attempts. */
+   Each skill has one sample question, and answering it correctly marks the skill done. Progress is kept on
+   this device, per account (mathly.progress.v1:<email>). */
 (()=>{
-if(document.documentElement.dataset.subject!=="math") return;
 const css=document.createElement("link"); css.rel="stylesheet"; css.href=document.currentScript.src.replace("math.js","math.css");
 document.head.append(css);
+
+const CFG=window.MATHLY||{}, AUTH_URL=CFG.supabaseUrl||"";
+let ME_EMAIL="", MY_CLASSES=[], MY_CLASS=null, client=null;
+const can=permission=>CFG.permissions.includes("*")||CFG.permissions.includes(permission);
+const api=(url,options={})=>fetch(url,{...options,headers:{...(options.headers||{}),...(CFG.token?{Authorization:`Bearer ${CFG.token}`}:{})}});
 
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=s=>esc(s).replace(/\$([^$]+)\$/g,'<span class="m">$1</span>');   // $…$ is math: set left to right
@@ -15,7 +19,7 @@ const plain=s=>String(s).replace(/\$/g,"");
 // the model's text: as fmt, and a signed number it left outside $…$ is set left to right too, or its minus lands after it
 const fmtLoose=s=>String(s??"").split("$").map((part,i)=>i%2?`<span class="m">${esc(part)}</span>`
   :esc(part).replace(/(^|[\s(־])([−-]\d+(?:[.,]\d+)?)/g,'$1<span class="m">$2</span>')).join("");
-const key=()=>"ihki.math.v1:"+(ME_EMAIL||"guest");
+const key=()=>"mathly.progress.v1:"+(ME_EMAIL||"guest");
 const load=()=>{ try{ return JSON.parse(localStorage.getItem(key())||"{}"); }catch{ return {}; } };
 const save=()=>{ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} };
 
@@ -67,7 +71,7 @@ function draw(){
   const UNITS=G.units.filter(u=>SHOWN.has(u.id)), mine=G.skills.filter(s=>SHOWN.has(s.unit));
   const total=mine.length, doneN=mine.filter(s=>P.done[s.id]).length, nxt=next();
   const cls=typeof MY_CLASS!=="undefined"&&MY_CLASS?` · כיתת ${esc(MY_CLASS.name)}`:"";
-  const manage=AUTH_URL&&can("management.access"), pct=Math.round(100*doneN/total);
+  const manage=false, pct=Math.round(100*doneN/total);
   const units=UNITS.map(u=>{
     const ids=ORDER.filter(id=>BY[id].unit===u.id), d=ids.filter(id=>P.done[id]).length;
     return `<div class="mx-su u-${u.id}"><b>${esc(u.name)}</b><span class="mx-bar"><i style="width:${Math.round(100*d/ids.length)}%"></i></span><small>${d} מתוך ${ids.length}</small></div>`;
@@ -147,8 +151,7 @@ function onClick(e){
     case "work": PH.works.add(+t.dataset.i); return drawPhoto();
     case "all": PH.all=true; return drawPhoto();
     case "close": return closeSheet();
-    case "manage": hide(); return showManage();
-    case "out": return document.getElementById("logoutBtn").click();
+    case "out": return client?.auth.signOut().then(()=>location.reload());
   }
 }
 
@@ -228,38 +231,25 @@ function plot(g){
     ${ticks}<path class="c" d="${line}"/>${dots}</svg></div>`;
 }
 
-// the start button (and a teacher's "תרגול") opens the math path once the opening screen is gone
-const arabicEnter=enter;
-const enterMath=()=>{ arabicEnter(); if(!AUTH_URL||can("path.use")) show(); };
-document.getElementById("startBtn").onclick=document.getElementById("practiceBtn").onclick=enterMath;
-
-// the manage panel: "לתרגול" goes to the math path, and "תוכן" lists the math path (units and their skills) in
-// place of the Arabic levels. The graph is a file in the repo (app/math_algebra9.json), so here it is only shown.
-const toPractice=document.getElementById("mPractice"), arabicPractice=toPractice.onclick;
-const practice=async id=>{ arabicPractice(); await show(); if(id&&G) open(id); };
-toPractice.onclick=()=>practice();
-const contentTab=document.querySelector('#mModes [data-mode="content"] small'); if(contentTab) contentTab.textContent="יחידות ומיומנויות";
-async function drawContent(){
-  const box=document.getElementById("mContent");
-  if(!G){
-    box.innerHTML='<p class="mx-note">טוענים את המסלול…</p>';
-    try{ const r=await fetch("/api/math/skills"); if(!r.ok) throw new Error(`השרת ענה ${r.status}`); index(await r.json()); }
-    catch(e){ box.innerHTML=`<p>לא הצלחנו לטעון את המסלול: ${esc(e.message)}. לחצו „רענון” ונסו שוב.</p>`; return; }
+async function boot(){
+  const state=document.getElementById("bootState"), login=document.getElementById("loginBtn");
+  if(AUTH_URL){
+    if(!window.supabase){ state.className="error"; state.textContent="לא ניתן לטעון את שירות הכניסה."; return; }
+    client=window.supabase.createClient(AUTH_URL,CFG.supabaseKey);
+    const {data}=await client.auth.getSession(), session=data.session;
+    if(!session){
+      state.textContent="יש להיכנס כדי לפתוח את מסלול המתמטיקה."; login.hidden=false;
+      login.onclick=()=>client.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
+      return;
+    }
+    CFG.token=session.access_token;
+    const response=await api("/api/me");
+    if(!response.ok){ state.className="error"; state.textContent=response.status===403?"החשבון אינו משויך לכיתת מתמטיקה.":"לא ניתן להשלים את הכניסה."; return; }
+    const me=await response.json(); ME_EMAIL=me.email||""; MY_CLASSES=me.classes||[]; MY_CLASS=MY_CLASSES.length===1?MY_CLASSES[0]:null;
+    CFG.permissions=me.permissions||[];
   }
-  const wide=(()=>{ try{ return JSON.parse(localStorage.getItem("ihki.math.copen")||"{}"); }catch{ return {}; } })();
-  box.innerHTML=`<p class="sub">המסלול של כיתה ט׳, 5 יח״ל: ${G.skills.length} מיומנויות ב־${G.units.length} יחידות, לפי סדר המסלול. לכל מיומנות שאלה לדוגמה, וכל תשובה שגויה בה היא טעות מוכרת עם הסבר. ב„תרגול” רואים את השאלה כמו שהתלמידים רואים אותה.</p>`+
-    G.units.map(u=>{
-      const mine=ORDER.filter(id=>BY[id].unit===u.id).map(id=>BY[id]);
-      const rows=mine.map((s,k)=>{
-        const needs=s.prereqs.map(p=>plain(BY[p].short)).join(", "), wrong=s.sample.choices.filter(c=>!c.correct).length;
-        const meta=[needs?`דורשת: ${esc(needs)}`:"בלי דרישות קודמות",s.month?`בפריסה: ${esc(s.month)}`:"",s.core?"ליבה 5 יח״ל":"",`${wrong} טעויות מוכרות`].filter(Boolean).join(" · ");
-        return `<li class="crow"><i>${k+1}</i><div class="two"><b>${fmt(s.name)}</b><small>${meta}</small></div><div class="acts"><button class="btn" data-mxpractice="${s.id}">תרגול</button></div></li>`;
-      }).join("");
-      return `<details class="csec" data-unit="${u.id}"${wide[u.id]?" open":""}><summary class="clevel">${esc(u.name)}<small>${mine.length} מיומנויות${u.when?` · ${esc(u.when)}`:""}</small></summary>
-        <div class="card"><div class="chead"><h2>${esc(u.name)}<small>${esc(u.source||"")}</small></h2></div><ol class="clist">${rows}</ol></div></details>`;
-    }).join("");
-  box.querySelectorAll("details.csec").forEach(d=>d.ontoggle=()=>{ wide[d.dataset.unit]=d.open?1:0; try{ localStorage.setItem("ihki.math.copen",JSON.stringify(wide)); }catch{} });
-  box.querySelectorAll("[data-mxpractice]").forEach(b=>b.onclick=()=>practice(b.dataset.mxpractice));
+  document.getElementById("boot").hidden=true;
+  show();
 }
-window.drawContent=drawContent;
+boot().catch(error=>{ const state=document.getElementById("bootState"); state.className="error"; state.textContent=`לא הצלחנו לפתוח את המסלול: ${error.message}`; });
 })();

@@ -5,8 +5,8 @@ the problem as it read it (so the student can check the reading), the solution a
 not give the step away and the step itself, the final answer, and the path's skill the problem practises. The page
 shows the hints one by one, and the steps and the answer only when the student asks for them.
 
-Runs on the server's Anthropic key (the tutor's, ANTHROPIC_API_KEY or the panel's), on MATH_MODEL (default
-DEFAULT_MODEL). The photo is sent to the API and not kept.
+Runs on the server's ``ANTHROPIC_API_KEY``, using ``MATH_MODEL`` (or ``DEFAULT_MODEL``).
+The photo is sent to the API and is not retained.
 """
 from __future__ import annotations
 

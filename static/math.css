@@ -1,7 +1,4 @@
-/* The math path (static/math.js). Layout: one narrow column like the Arabic path: progress, "go on here", then each
-   unit's skills as a winding trail of circles; a skill opens in a bottom sheet. It sits over the Arabic page, which
-   stays loaded underneath. The math class is black in either system theme, as its opening screen is: the path sets
-   the app's colour tokens itself, with a blue accent and a colour per unit. */
+/* Mathly's narrow practice path: progress, the next skill, and each unit's winding trail. */
 @import url("https://fonts.googleapis.com/css2?family=STIX+Two+Text:wght@400;600&display=swap");
 #mathView{
   color-scheme:dark;
