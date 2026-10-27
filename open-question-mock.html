@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mathly — Open question phone scan</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080a09;
+      --panel: #121513;
+      --panel-2: #191d1a;
+      --line: #303632;
+      --text: #f5f2ea;
+      --muted: #9ba49e;
+      --blue: #83aaf5;
+      --blue-soft: #19253c;
+      --green: #79c991;
+      --purple: #b99bed;
+      --yellow: #e2bb63;
+      --shadow: 0 24px 80px rgba(0,0,0,.42);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 16% 12%, rgba(131,170,245,.12), transparent 27rem),
+        radial-gradient(circle at 88% 90%, rgba(185,155,237,.09), transparent 24rem),
+        var(--bg);
+    }
+    button { font: inherit; }
+    .page { width: min(1180px, calc(100% - 36px)); margin: 0 auto; padding: 34px 0 46px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 760; letter-spacing: -.02em; }
+    .brand-mark { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--blue); color: #09111f; font: 800 23px Georgia, serif; transform: rotate(-3deg); }
+    .prototype { padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, .7fr); align-items: center; gap: clamp(32px, 6vw, 82px); }
+    .browser { border: 1px solid var(--line); border-radius: 22px; overflow: hidden; background: var(--panel); box-shadow: var(--shadow); }
+    .browser-bar { height: 48px; display: flex; align-items: center; gap: 7px; padding: 0 16px; background: #0e100f; border-bottom: 1px solid var(--line); }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #444a46; }
+    .url { margin: auto; width: min(280px, 56%); padding: 6px 12px; background: #171a18; color: #68716b; border-radius: 7px; text-align: center; font-size: 11px; }
+    .desktop { min-height: 570px; padding: clamp(24px, 5vw, 48px); display: flex; flex-direction: column; }
+    .lesson-meta { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .lesson-meta span:first-child { color: var(--purple); border: 1px solid var(--purple); border-radius: 99px; padding: 4px 9px; font-weight: 650; }
+    .progress { margin-left: auto; }
+    h1 { margin: 28px 0 8px; font: 500 clamp(24px, 4vw, 36px)/1.16 Georgia, "Times New Roman", serif; letter-spacing: -.025em; }
+    .instruction { color: var(--muted); margin: 0 0 25px; font-size: 14px; }
+    .problem { display: grid; grid-template-columns: 1fr 210px; gap: 28px; align-items: center; padding: 23px; background: #0d0f0e; border: 1px solid var(--line); border-radius: 16px; }
+    .problem p { margin: 0; line-height: 1.65; }
+    .problem strong { color: var(--yellow); }
+    .diagram { width: 100%; height: auto; }
+    .answer-area { margin-top: 18px; border: 1.5px dashed #46504a; border-radius: 16px; min-height: 138px; display: grid; place-items: center; padding: 18px; text-align: center; transition: .25s ease; }
+    .answer-area.received { border-style: solid; border-color: var(--green); background: rgba(121,201,145,.06); grid-template-columns: 100px 1fr; text-align: left; gap: 18px; }
+    .answer-area .empty-icon { font-size: 25px; color: var(--muted); }
+    .answer-area p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+    .answer-preview { display: none; width: 100px; height: 94px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); background: #efe8db; }
+    .received .answer-preview { display: block; }
+    .received .empty-icon { display: none; }
+    .answer-copy strong { display: block; color: var(--green); margin-bottom: 4px; }
+    .actions { margin-top: auto; padding-top: 22px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    .status { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+    .status i { width: 8px; height: 8px; background: var(--muted); border-radius: 50%; }
+    .status.waiting i { background: var(--yellow); box-shadow: 0 0 0 5px rgba(226,187,99,.1); animation: pulse 1.5s infinite; }
+    .status.done i { background: var(--green); }
+    .primary, .secondary, .phone-button { border: 0; border-radius: 999px; cursor: pointer; font-weight: 720; transition: transform .15s, opacity .15s, background .15s; }
+    .primary { padding: 13px 20px; background: var(--blue); color: #07111f; }
+    .primary:hover, .phone-button:hover { transform: translateY(-1px); }
+    .primary:disabled { opacity: .45; cursor: default; transform: none; }
+    .phone-wrap { display: flex; flex-direction: column; align-items: center; }
+    .phone-label { margin: 0 0 13px; color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+    .phone { width: min(310px, 100%); aspect-ratio: 9 / 18.3; border: 7px solid #333834; border-radius: 42px; padding: 7px; background: #050605; box-shadow: var(--shadow); position: relative; }
+    .phone::before { content: ""; position: absolute; z-index: 3; top: 12px; left: 50%; transform: translateX(-50%); width: 82px; height: 22px; border-radius: 999px; background: #050605; }
+    .screen { height: 100%; border-radius: 30px; overflow: hidden; background: var(--panel); position: relative; }
+    .phone-head { height: 66px; padding: 27px 16px 10px; display: flex; justify-content: space-between; font-size: 11px; background: #0d0f0e; }
+    .phone-content { height: calc(100% - 66px); padding: 22px 19px 18px; display: flex; flex-direction: column; text-align: center; }
+    .phone-logo { width: 45px; height: 45px; margin: 0 auto 18px; display: grid; place-items: center; border-radius: 14px; background: var(--blue); color: #07111f; font: 800 27px Georgia, serif; }
+    .phone h2 { margin: 0 0 10px; font-size: 21px; line-height: 1.2; }
+    .phone-copy { margin: 0; color: var(--muted); line-height: 1.5; font-size: 13px; }
+    .request-card { margin-top: 22px; padding: 15px; border: 1px solid var(--line); background: #0c0e0d; border-radius: 14px; text-align: left; }
+    .request-card small { color: var(--purple); font-weight: 700; }
+    .request-card b { display: block; margin-top: 6px; font-size: 14px; }
+    .request-card span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .phone-actions { margin-top: auto; display: grid; gap: 9px; }
+    .phone-button { padding: 13px 16px; background: var(--blue); color: #07111f; width: 100%; }
+    .secondary { padding: 11px 16px; background: transparent; color: var(--muted); }
+    .camera { position: absolute; inset: 0; display: none; flex-direction: column; background: #101310; z-index: 2; }
+    .camera.show { display: flex; }
+    .viewfinder { flex: 1; position: relative; overflow: hidden; background: linear-gradient(135deg, #d7d0c2, #f4efe5); }
+    .paper { position: absolute; width: 82%; height: 63%; left: 9%; top: 17%; background: #fffdf7; color: #26231f; transform: rotate(-3deg); padding: 25px 20px; box-shadow: 0 7px 25px rgba(0,0,0,.25); font: 17px/1.8 "Comic Sans MS", cursive; text-align: left; }
+    .paper svg { width: 90%; height: 120px; display: block; margin: 4px auto; }
+    .corners::before, .corners::after { content: ""; position: absolute; inset: 12%; border: solid rgba(255,255,255,.92); border-width: 2px 0; pointer-events: none; }
+    .camera-top { position: absolute; inset: 0 0 auto; z-index: 2; display: flex; justify-content: space-between; padding: 30px 18px 12px; background: linear-gradient(#080a09bb, transparent); }
+    .camera-top button { border: 0; color: white; background: transparent; font-size: 22px; cursor: pointer; }
+    .camera-controls { height: 118px; display: flex; align-items: center; justify-content: space-around; background: #080a09; }
+    .shutter { width: 60px; height: 60px; border: 4px solid white; background: transparent; border-radius: 50%; padding: 5px; cursor: pointer; }
+    .shutter::after { content: ""; display: block; width: 100%; height: 100%; border-radius: 50%; background: white; }
+    .camera-tip { color: var(--muted); font-size: 11px; width: 68px; }
+    .review { position: absolute; inset: 0; z-index: 4; display: none; flex-direction: column; background: #0d0f0e; padding: 34px 18px 20px; text-align: center; }
+    .review.show { display: flex; }
+    .photo { height: 68%; border-radius: 13px; overflow: hidden; background: #e9e3d8; padding: 18px; transform: rotate(-1deg); color: #25221e; font: 16px/1.7 "Comic Sans MS", cursive; text-align: left; }
+    .photo svg { display: block; width: 90%; height: 135px; margin: 8px auto; }
+    .review p { color: var(--muted); font-size: 12px; margin: 13px 0; }
+    .review-actions { display: grid; grid-template-columns: .75fr 1.25fr; gap: 8px; margin-top: auto; }
+    .review-actions button { padding: 12px 8px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text); cursor: pointer; }
+    .review-actions .send { background: var(--blue); color: #07111f; border-color: var(--blue); font-weight: 750; }
+    .toast { position: absolute; left: 14px; right: 14px; bottom: 18px; z-index: 6; padding: 12px; border-radius: 12px; color: var(--green); background: #13271a; border: 1px solid #285637; font-size: 12px; text-align: center; opacity: 0; transform: translateY(12px); pointer-events: none; transition: .25s; }
+    .toast.show { opacity: 1; transform: none; }
+    .helper { margin-top: 16px; max-width: 310px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    @keyframes pulse { 50% { transform: scale(.65); } }
+    @media (max-width: 850px) {
+      .layout { grid-template-columns: 1fr; }
+      .phone-wrap { order: -1; }
+      .phone { width: 290px; }
+      .browser { max-width: 680px; margin: auto; }
+    }
+    @media (max-width: 560px) {
+      .page { width: min(100% - 20px, 1180px); padding-top: 18px; }
+      .problem { grid-template-columns: 1fr; }
+      .diagram { max-width: 220px; margin: auto; }
+      .desktop { padding: 22px 18px; }
+      .actions { align-items: stretch; flex-direction: column; }
+      .primary { width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">M</span><span>Mathly</span></div>
+      <span class="prototype">Interactive mock</span>
+    </header>
+
+    <div class="layout">
+      <section class="browser" aria-label="Student computer">
+        <div class="browser-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="url">app.mathly.com/practice</span></div>
+        <div class="desktop">
+          <div class="lesson-meta"><span>Geometry</span><span>Triangles & angles</span><span class="progress">4 of 8</span></div>
+          <h1>Find the value of <em>x</em>.</h1>
+          <p class="instruction">Show your reasoning. You can solve this question on paper and scan your answer.</p>
+          <div class="problem">
+            <p>In triangle <strong>ABC</strong>, angle A is 48° and angle B is 67°. Find angle C and explain how you know.</p>
+            <svg class="diagram" viewBox="0 0 240 170" role="img" aria-label="Triangle ABC with two labelled angles">
+              <path d="M28 143 L203 143 L126 25 Z" fill="none" stroke="#b99bed" stroke-width="3"/>
+              <path d="M47 143 A20 20 0 0 1 39 127" fill="none" stroke="#e2bb63" stroke-width="2"/>
+              <path d="M185 143 A20 20 0 0 0 193 127" fill="none" stroke="#e2bb63" stroke-width="2"/>
+              <text x="17" y="160" fill="#f5f2ea">A</text><text x="205" y="160" fill="#f5f2ea">B</text><text x="121" y="18" fill="#f5f2ea">C</text>
+              <text x="48" y="129" fill="#e2bb63" font-size="14">48°</text><text x="165" y="129" fill="#e2bb63" font-size="14">67°</text><text x="116" y="53" fill="#9ba49e">x</text>
+            </svg>
+          </div>
+          <div class="answer-area" id="answerArea" aria-live="polite">
+            <div class="empty-icon">⌁<p id="answerText">Your scanned work will appear here</p></div>
+            <svg class="answer-preview" viewBox="0 0 100 94" aria-label="Preview of scanned handwritten solution">
+              <rect width="100" height="94" fill="#fffdf7"/><path d="M18 64 L50 18 L82 64 Z" fill="none" stroke="#2b2925" stroke-width="2"/><text x="12" y="82" fill="#2b2925" font-size="9">x = 180−115 = 65°</text>
+            </svg>
+            <div class="answer-copy"><strong>Answer received</strong><p>Your handwritten solution was attached successfully.</p></div>
+          </div>
+          <div class="actions">
+            <div class="status" id="desktopStatus"><i></i><span>Not started</span></div>
+            <button class="primary" id="scanButton">Scan my answer with my phone</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="phone-wrap" aria-label="Student phone">
+        <p class="phone-label">Your phone</p>
+        <div class="phone">
+          <div class="screen">
+            <div class="phone-head"><span>9:41</span><span>● Wi-Fi ▰</span></div>
+            <div class="phone-content">
+              <div class="phone-logo">M</div>
+              <h2 id="phoneTitle">Ready when you are</h2>
+              <p class="phone-copy" id="phoneCopy">Start a scan request on your computer. It will appear here automatically.</p>
+              <div class="request-card" id="requestCard" hidden><small>Scan request</small><b>Geometry · Question 4</b><span>Requested by you just now</span></div>
+              <div class="phone-actions" id="phoneActions" hidden>
+                <button class="phone-button" id="approveButton">Approve & open camera</button>
+                <button class="secondary" id="declineButton">Not now</button>
+              </div>
+            </div>
+
+            <div class="camera" id="camera">
+              <div class="camera-top"><button id="closeCamera" aria-label="Close camera">×</button><span>Answer scan</span><span>⚡</span></div>
+              <div class="viewfinder"><div class="corners"></div><div class="paper">∠A + ∠B + ∠C = 180°<br><svg viewBox="0 0 180 100"><path d="M18 80 L91 14 L163 80 Z" fill="none" stroke="#34312d" stroke-width="2"/><text x="70" y="95" font-size="12">x = 65°</text></svg>180 − 48 − 67 = 65°</div></div>
+              <div class="camera-controls"><span class="camera-tip">Fit the whole answer in frame</span><button class="shutter" id="shutter" aria-label="Take photo"></button><span class="camera-tip">Auto</span></div>
+            </div>
+
+            <div class="review" id="review">
+              <h2>Review your answer</h2>
+              <div class="photo">∠A + ∠B + ∠C = 180°<svg viewBox="0 0 180 110"><path d="M15 90 L91 15 L165 90 Z" fill="none" stroke="#34312d" stroke-width="2"/><text x="65" y="106" font-size="13">x = 65°</text></svg>180 − 48 − 67 = 65°</div>
+              <p>Make sure your full solution is clear and readable.</p>
+              <div class="review-actions"><button id="retake">Retake</button><button class="send" id="send">Use this photo</button></div>
+            </div>
+            <div class="toast" id="toast">✓ Answer sent to your computer</div>
+          </div>
+        </div>
+        <p class="helper" id="helper">Click the scan button on the computer to begin the prototype.</p>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    const scanButton = document.querySelector('#scanButton');
+    const approveButton = document.querySelector('#approveButton');
+    const declineButton = document.querySelector('#declineButton');
+    const requestCard = document.querySelector('#requestCard');
+    const phoneActions = document.querySelector('#phoneActions');
+    const phoneTitle = document.querySelector('#phoneTitle');
+    const phoneCopy = document.querySelector('#phoneCopy');
+    const desktopStatus = document.querySelector('#desktopStatus');
+    const camera = document.querySelector('#camera');
+    const review = document.querySelector('#review');
+    const answerArea = document.querySelector('#answerArea');
+    const helper = document.querySelector('#helper');
+    const toast = document.querySelector('#toast');
+
+    function status(text, className = '') {
+      desktopStatus.className = `status ${className}`;
+      desktopStatus.querySelector('span').textContent = text;
+    }
+    function openRequest() {
+      requestCard.hidden = false;
+      phoneActions.hidden = false;
+      phoneTitle.textContent = 'Scan your answer?';
+      phoneCopy.textContent = 'Your computer is waiting for a photo of your handwritten solution.';
+      scanButton.textContent = 'Waiting for phone…';
+      scanButton.disabled = true;
+      status('Waiting for your phone', 'waiting');
+      helper.textContent = 'The request is securely matched to the same signed-in student.';
+    }
+    function cancelRequest() {
+      requestCard.hidden = true;
+      phoneActions.hidden = true;
+      phoneTitle.textContent = 'Request dismissed';
+      phoneCopy.textContent = 'You can send another scan request from your computer.';
+      scanButton.textContent = 'Scan my answer with my phone';
+      scanButton.disabled = false;
+      status('Scan cancelled');
+      helper.textContent = 'Click the scan button to try again.';
+    }
+    function showCamera() { camera.classList.add('show'); helper.textContent = 'Camera access approved. Take a clear photo of the full solution.'; }
+    function resetMock() {
+      answerArea.classList.remove('received');
+      toast.classList.remove('show');
+      review.classList.remove('show');
+      camera.classList.remove('show');
+      requestCard.hidden = true;
+      phoneActions.hidden = true;
+      phoneTitle.textContent = 'Ready when you are';
+      phoneCopy.textContent = 'Start a scan request on your computer. It will appear here automatically.';
+      scanButton.textContent = 'Scan my answer with my phone';
+      scanButton.disabled = false;
+      status('Not started');
+      helper.textContent = 'Click the scan button on the computer to begin the prototype.';
+    }
+
+    scanButton.addEventListener('click', () => scanButton.dataset.done ? (delete scanButton.dataset.done, resetMock()) : openRequest());
+    approveButton.addEventListener('click', showCamera);
+    declineButton.addEventListener('click', cancelRequest);
+    document.querySelector('#closeCamera').addEventListener('click', () => camera.classList.remove('show'));
+    document.querySelector('#shutter').addEventListener('click', () => review.classList.add('show'));
+    document.querySelector('#retake').addEventListener('click', () => review.classList.remove('show'));
+    document.querySelector('#send').addEventListener('click', () => {
+      review.classList.remove('show');
+      camera.classList.remove('show');
+      answerArea.classList.add('received');
+      toast.classList.add('show');
+      phoneTitle.textContent = 'Answer sent';
+      phoneCopy.textContent = 'Your scanned work is now attached to the open question.';
+      requestCard.hidden = true;
+      phoneActions.hidden = true;
+      scanButton.disabled = false;
+      scanButton.textContent = 'Reset prototype';
+      scanButton.dataset.done = 'true';
+      status('Answer received', 'done');
+      helper.textContent = 'Success — the computer and phone are now in sync.';
+      setTimeout(() => toast.classList.remove('show'), 2800);
+    });
+  </script>
+</body>
+</html>
