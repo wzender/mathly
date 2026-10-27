@@ -1,3 +1,13 @@
+---
+title: Mathly
+emoji: 🧮
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Mathly
 
 Mathly is a Hebrew ninth-grade algebra practice path. It contains 56 linked skills across six units, immediate feedback for known mistakes, and optional photographed-problem help.
