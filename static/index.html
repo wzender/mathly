@@ -1774,7 +1774,7 @@ html.a11y-reduce-motion *,html.a11y-reduce-motion *::before,html.a11y-reduce-mot
     <div class="roundbar"><h1 class="mtitle" id="labTitle">מעבדה</h1><span class="sep"></span><button class="btn" id="labManage">ניהול</button><button class="btn primary" id="labPractice">לתרגול</button></div>
     <p class="sub">רשימה קבועה של הברות ומילים קצרות, שכל אחת בודקת הגה אחד. כל דובר מקריא אותה פעם אחת. אומרים נכון, או בוחרים מראש את ההגה שבו תיעשה טעות מכוונת. כל הקלטה נשמרת עם התווית שלה, ומהן נמדד זיהוי הפונמות: כמה פעמים הגה שנאמר נכון סומן כטעות, וכמה טעויות מכוונות לא נתפסו.</p>
     <div class="sub" id="labState" aria-live="polite"></div>
-    <div class="modes" id="labModes" role="tablist" aria-label="מעבדה"><button role="tab" data-mode="quick">בדיקה<small>10 שאלות · 3 מודלים</small></button><button role="tab" data-mode="test">מבחן מלא<small>הקלטת כל הרשימה</small></button><button role="tab" data-mode="record">הקלטה<small>פריט בודד, עם טעויות</small></button><button role="tab" data-mode="flags">דיווחים<small>הרצה מחדש של דיווחי ציון</small></button><button role="tab" data-mode="minerva">מינרווה<small>סרטונים ודיבור ילידי</small></button><button role="tab" data-mode="results">תוצאות<small>זיהוי לפי הגה</small></button></div>
+    <div class="modes" id="labModes" role="tablist" aria-label="מעבדה"><button role="tab" data-mode="quick">בדיקה<small>10 שאלות · 3 מודלים</small></button><button role="tab" data-mode="test">מבחן מלא<small>הקלטת כל הרשימה</small></button><button role="tab" data-mode="record">הקלטה<small>פריט בודד, עם טעויות</small></button><button role="tab" data-mode="flags">דיווחים<small>הרצה מחדש של דיווחי ציון</small></button><button role="tab" data-mode="results">תוצאות<small>זיהוי לפי הגה</small></button></div>
     <div id="labQuick">
       <div class="card wz-head">
         <h2>בדיקה מהירה לדוברי עברית</h2>
@@ -7547,14 +7547,13 @@ async function showLab(){
   labMode(store.get("ihki.labMode","test"));
 }
 function labMode(mode){
-  if(!["quick","test","record","flags","minerva","results"].includes(mode)) mode="quick";
+  if(!["quick","test","record","flags","results"].includes(mode)) mode="quick";
   store.set("ihki.labMode",mode);
   for(const b of $("labModes").children) b.setAttribute("aria-selected",b.dataset.mode===mode?"true":"false");
   for(const m of ["quick","test","record","flags","minerva","results"]) $("lab").classList.toggle(m,m===mode);
   if(mode==="quick") drawQuickQuiz();
   if(mode==="test"){ drawWizard(); loadTtsVoices(); }
   if(mode==="flags"&&!labFlags) loadLabFlags();
-  if(mode==="minerva") loadMinerva();
   if(mode==="results") loadLabResults();
 }
 for(const b of $("labModes").children) b.onclick=()=>labMode(b.dataset.mode);
