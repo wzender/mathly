@@ -1,7 +1,8 @@
 """HTTP service: serves the practice page and scores recordings.
 
 Run:  uvicorn app.main:app --host 0.0.0.0 --port 7860
-Env:  MODEL_ID  (default facebook/wav2vec2-xlsr-53-espeak-cv-ft, or a path to a fine-tuned checkpoint)
+Env:  MODEL_ID  (default facebook/wav2vec2-xlsr-53-espeak-cv-ft, or a path to a fine-tuned checkpoint;
+                 a POWSM fine-tune's .pt file or powsm:<ara> loads POWSM-CTC, see app/powsm.py)
       SAWTAK_API_KEY  (model-answer playback with the Raef voice, see app/tts.py)
       SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY  (Google sign-in, see app/auth.py)
       TEACHER_EMAILS, SUPABASE_SECRET_KEY  (the teacher's management panel, its classes and the lesson videos, see app/auth.py)
@@ -13,46 +14,65 @@ A local .env file is loaded if present; real environment variables win over it.
 from __future__ import annotations
 
 import hashlib
+import csv
 import io
+import asyncio
 import json
 import logging
 import os
 import re
+import shutil
+import tempfile
 import subprocess
+import threading
 import time
 import urllib.parse
 import uuid
 import zipfile
 from contextlib import asynccontextmanager
+from dataclasses import replace as dc_replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from queue import Queue
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Body, Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .arabic_diacritics import point_arabic
+from .arabic_diacritics import point_arabic, tts_arabic
 from . import lab
-from .auth import AuthUnavailable, ClassConflict, SupabaseAuth, load_auth
+from .auth import AuthUnavailable, ClassConflict, MAX_MONITOR_ATTEMPTS, SupabaseAuth, load_auth
 from .keystore import (CREATE_APP_SECRETS, MAX_LEN as MAX_KEY_LEN, MIGRATE_APP_SECRETS, NAMES as KEY_NAMES, KeyRefused,
                        check as check_key, load_keys)
 from .live import LiveConflict, LiveStore
 from .math_photo import (DAILY_PHOTOS, MAX_PHOTO, MEDIA_TYPES as PHOTO_TYPES, PhotoSolver, PhotoUnavailable, math_model,
                          photo_client)
 from .math_skills import algebra9
+from . import push as pushes
 from .phrases import CATEGORIES, GAMES, LESSONS, LEVELS, PHRASES, public_phrases
 from .prompt_tts import ENGINES, PromptTTSUnavailable, hebrew_mp3
+from .model_settings import CREATE_MODEL_SETTINGS, build as build_model_config, clean as clean_model_settings, describe as describe_model_settings
+from .models import (POWSM_ONNX_REPO, availability as model_availability, catalog as model_catalog,
+                     known as model_known)
 from .reference import References
 from .rules import TOGGLES, check_detectable
-from .scorer import SAMPLE_RATE, Scorer, decode_audio, decode_audio_with_timing, frame_energy, load_scorer
+from .archi import archify
+from .scorer import SAMPLE_RATE, Scorer, decode_audio, decode_audio_with_timing, frame_energy, load_scorer, tokenize
 from .speech_evaluation import SpeechEvaluationService
 from .texts import read_line, text_phrases
-from .tts import LINE_VOICES, RAEF_VOICE_ID, VOICES, SawtakTTS, TTSUnavailable, load_tts
+from .tts import (BASELINE_VOICES, LINE_VOICES, RAEF_VOICE_ID, VOICES, SawtakTTS, TTSUnavailable, load_tts,
+                  playback_voices, voice_name)
 from .tutor import (BY_ID, DAILY_LIMIT, MAX_TEXT, MAX_TURNS, SCENARIOS, Tutor, TutorLimit,
                     DEFAULT_MODEL as DEFAULT_TUTOR_MODEL, TutorUnavailable, load_tutor, tutor_client)
 from .verb_game import VerbExerciseGenerator
+from .grok_mcp import build as build_grok_mcp, oauth_urls
+from . import library as video_library
+from .access import (DEFAULT_ENTITLEMENTS, DEFAULT_ROLES, ENTITLEMENTS, ENTITLEMENT_PERMISSIONS,
+                     ROLES, ROLE_PERMISSIONS, has_permission, resolve_access)
+from .class_management import (ClassManagementError, normalize_class_name, parse_roster,
+                               visible_classes)
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("ihki")
@@ -62,9 +82,11 @@ load_dotenv(STATIC.parent / ".env")
 SUBJECTS = {
     "arabic": {"__TITLE__": "אהלא וסהלא", "__SPLASH_LOGO__": "/static/logo-intro.svg",
                "__SPLASH_ALT__": "אהלא וסהלא, בית הספר ללימוד השפה הערבית", "__START_LABEL__": "יאללה נבלש",
+               "__TAGLINE__": "מדברים ערבית, ומקבלים משוב על כל צליל",
                "__APP_NAME__": "אהלא  וסהלא", "__THEME_COLOR__": "#4B6A2C", "__MANIFEST__": "/static/manifest.webmanifest"},
     "math": {"__TITLE__": "מתמטיקה בכיף", "__SPLASH_LOGO__": "/static/logo-math.svg",
              "__SPLASH_ALT__": "מתמטיקה בכיף, המורה הפרטי למתמטיקה", "__START_LABEL__": "יאללה נתחיל",
+             "__TAGLINE__": "מתרגלים מתמטיקה, ומקבלים עזרה בכל צעד",
              "__APP_NAME__": "מתמטיקה בכיף", "__THEME_COLOR__": "#000000", "__MANIFEST__": "/math/manifest.webmanifest"},
 }
 # A subject as an admin and a class keep it (in Hebrew, as the panel shows it), by the path its pages are served at.
@@ -80,7 +102,9 @@ def subject_code(label: object) -> str:
     label = " ".join(str(label or "").split())
     return next((code for code, name in SUBJECT_LABELS.items() if name == label), "")
 MODEL_ID = os.environ.get("MODEL_ID", "facebook/wav2vec2-xlsr-53-espeak-cv-ft")
+ENV_MODEL_ID = MODEL_ID  # the one the server starts with; the panel's "מודלים" tab can switch until a restart
 LOCAL_TZ = ZoneInfo("Asia/Jerusalem")  # a day of practice is the students' calendar day
+WARM_WORKERS = 3  # Sawtak requests the cache-warm sweep runs at once (tts.MAX_CONCURRENT and its pace apply)
 MAX_UPLOAD = 2_000_000  # bytes; 15 s of opus is ~100 KB
 MAX_BACKUP_UPLOAD = 250_000_000
 EMAIL = re.compile(r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+")
@@ -189,7 +213,7 @@ CREATE_SCORING_RULES = ("create table public.scoring_rules (id text primary key,
 CREATE_TUTORS = ("create table public.tutors (email text primary key, granted_by text not null default '', "
                  "created_at timestamptz not null default now()); alter table public.tutors enable row level security;")
 CREATE_USER_ACCESS = ("create table public.user_access (user_id uuid primary key references auth.users(id) on delete cascade, "
-                      "email text not null, roles text[] not null default array['student']::text[], "
+                      "email text not null, roles text[] not null default array['student','flagger']::text[], "
                       "entitlements text[] not null default '{}'::text[], subject text not null default '', "
                       "updated_at timestamptz not null default now(), "
                       "updated_by uuid references auth.users(id), "
@@ -201,7 +225,6 @@ CREATE_USER_ACCESS = ("create table public.user_access (user_id uuid primary key
                       "target_user_id uuid not null, changed_by uuid not null, old_access jsonb not null, "
                       "new_access jsonb not null, created_at timestamptz not null default now()); "
                       "alter table public.access_audit enable row level security;")
-ROLES = frozenset({"student", "teacher", "flagger", "admin", "developer"})
 CREATE_SYSTEM_EVENTS = ("create table public.system_events (id bigint generated always as identity primary key, "
                         "kind text not null check (kind in ('exercise','game','permission','content')), "
                         "actor_id uuid references auth.users(id) on delete set null, actor_email text not null default '', "
@@ -211,23 +234,11 @@ CREATE_SYSTEM_EVENTS = ("create table public.system_events (id bigint generated 
                         "alter table public.system_events enable row level security;")
 MIGRATE_USER_ACCESS = ("alter table public.user_access add column if not exists subject text not null default ''; "
                        "alter table public.user_access drop constraint if exists valid_entitlements; "
+                       "alter table public.user_access alter column roles set default array['student','flagger']::text[]; "
                        "update public.user_access set entitlements = array_append(entitlements, 'practice') "
                        "where 'path' = any(entitlements) and not ('practice' = any(entitlements)); "
                        "alter table public.user_access add constraint valid_entitlements check "
                        "(entitlements <@ array['practice','games','tutor','path','library']::text[]);")
-ENTITLEMENTS = frozenset({"practice", "games", "tutor", "path", "library"})
-DEFAULT_ENTITLEMENTS = ENTITLEMENTS - {"tutor"}  # the paid AI tutor is always an explicit grant
-ROLE_PERMISSIONS = {
-    "student": frozenset(),
-    "teacher": frozenset({"exercises.use_all", "students.view", "games.use", "path.use", "exercises.use", "library.view"}),
-    "flagger": frozenset({"flags.create"}),
-    "admin": frozenset({"exercises.use_all", "students.view", "management.access", "users.manage",
-                        "classes.manage", "content.manage", "flags.review", "games.use", "path.use",
-                        "exercises.use", "library.view"}),
-    "developer": frozenset({"*"}),
-}
-ENTITLEMENT_PERMISSIONS = {"practice": {"practice.use", "exercises.use"}, "games": {"games.use"},
-                           "tutor": {"tutor.use"}, "path": {"path.use"}, "library": {"library.view"}}
 MAX_NOTE = 500
 MIGRATE_ATTEMPT_ISSUES = ("alter table public.attempts add column if not exists issues jsonb not null default '[]'::jsonb, "
                           "add column if not exists model text not null default '', "
@@ -279,6 +290,22 @@ def units_of(c: dict) -> list[str]:
 def class_lessons(c: dict) -> list[str]:
     """What a class studies, as the page gets it: math units for a math class, Arabic lessons for any other."""
     return units_of(c) if is_math(c) else lessons_of(c)
+
+
+def class_level(c: dict) -> str | None:
+    """The one course level an Arabic class studies, which its current lesson is chosen from. None for a math class
+    (its path has no lessons to choose) and for a class whose lessons span several levels, or that names none and so
+    studies every lesson: that class's configuration has to be corrected before a current lesson can be chosen."""
+    if is_math(c):
+        return None
+    levels = {LESSON_LEVEL[l] for l in c.get("lessons") or [] if l in LESSON_LEVEL}
+    return next(iter(levels)) if len(levels) == 1 else None
+
+
+def saved_lesson(c: dict, saved: dict[int, str]) -> str | None:
+    """The current lesson the student keeps for this class, when it is still one of the class's lessons."""
+    lesson = saved.get(c.get("id"))
+    return lesson if lesson and class_level(c) and lesson in lessons_of(c) else None
 
 
 def homework_of(c: dict, topics: dict[str, str] = TOPIC_LESSON) -> dict:
@@ -343,17 +370,7 @@ def class_members(text: str) -> tuple[list[str], dict[str, str]]:
     """The panel's student list: a line per student, "email nickname" (the nickname is optional). A line with
     several addresses and nothing else, e.g. pasted "a@x.com, b@x.com", is those students without nicknames.
     Gives the emails (lower-case, sorted) and {email: nickname}; text that is not an address raises ValueError."""
-    emails, nicks = set(), {}
-    for line in re.split(r"[\r\n]+", text):
-        found = EMAIL.findall(line)
-        rest = re.sub(r"\s+", " ", EMAIL.sub(" ", line)).strip(" ,;:-–<>()\t")
-        if not found and rest or len(found) > 1 and rest.strip(" ,;"):
-            raise ValueError(line.strip())
-        for e in found:
-            emails.add(e.lower())
-        if len(found) == 1 and rest:
-            nicks[found[0].lower()] = rest[:MAX_NICKNAME]
-    return sorted(emails), nicks
+    return parse_roster(text)
 
 
 def build_version() -> str:
@@ -444,28 +461,45 @@ def weekly_practice_days(rows: list[dict]) -> int:
                 if monday <= utc(r["created_at"]).astimezone(LOCAL_TZ).date() <= today})
 
 
+CLASS_WEEK_GOAL = 25   # sentences a student, for the class's shared goal of the week
+CLASS_WEEK_TTL = 300   # seconds a class's week totals are kept before they are read again
+FREEZE_DAYS = 7   # a missed day is forgiven once in this many days (the streak's "יום חופש")
+
+
 def practice_streak(rows: list[dict]) -> dict:
     """Current and longest runs of consecutive Jerusalem calendar days.
 
     Yesterday may anchor the current run: a student does not lose the visible streak
-    before they have had a chance to practise today.
+    before they have had a chance to practise today. One missed day between two practice
+    days is forgiven once every FREEZE_DAYS days (a streak freeze), so a single slip does
+    not wipe out weeks of practice. `frozen` is the last forgiven day; `freeze_ready` says
+    whether a missed yesterday would be forgiven now.
     """
     days = sorted({utc(r["created_at"]).astimezone(LOCAL_TZ).date() for r in rows})
-    if not days:
-        return {"current": 0, "best": 0, "last": None}
-    longest = run = 1
-    for previous, day in zip(days, days[1:]):
-        run = run + 1 if day == previous + timedelta(days=1) else 1
-        longest = max(longest, run)
     today = datetime.now(LOCAL_TZ).date()
-    current = 0
-    if days[-1] >= today - timedelta(days=1):
-        current = 1
-        for i in range(len(days) - 1, 0, -1):
-            if days[i - 1] != days[i] - timedelta(days=1):
-                break
-            current += 1
-    return {"current": current, "best": longest, "last": days[-1].isoformat()}
+    if not days:
+        return {"current": 0, "best": 0, "last": None, "frozen": None, "freeze_ready": True}
+    longest = run = 1
+    frozen = None
+
+    def can_forgive(missed):
+        return frozen is None or (missed - frozen).days >= FREEZE_DAYS
+
+    for previous, day in zip(days, days[1:]):
+        gap = (day - previous).days
+        if gap == 1:
+            run += 1
+        elif gap == 2 and can_forgive(day - timedelta(days=1)):
+            run += 1
+            frozen = day - timedelta(days=1)
+        else:
+            run = 1
+        longest = max(longest, run)
+    ready = can_forgive(today - timedelta(days=1))
+    since = (today - days[-1]).days
+    alive = since <= 1 or (since == 2 and ready)
+    return {"current": run if alive else 0, "best": longest, "last": days[-1].isoformat(),
+            "frozen": frozen.isoformat() if frozen else None, "freeze_ready": ready}
 
 
 def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
@@ -473,28 +507,50 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.scorer = scorer or load_scorer(MODEL_ID)
-        app.state.auth = auth or load_auth()
+        if app.state.auth and hasattr(app.state.auth, "migrate_legacy_audio"):
+            app.state.auth.migrate_legacy_audio()
         app.state.keys = load_keys(app.state.auth)   # the API keys a developer set in the panel, else the environment's
         app.state.tts = tts or load_tts(app.state.keys.get("SAWTAK_API_KEY"))
+        app.state.tts_warm = {"running": False, "voice_id": "", "total": 0, "done": 0, "generated": 0,
+                              "skipped": 0, "failed": 0, "current": "", "waiting": 0, "error": "",
+                              "bucket": "", "uploaded": 0, "upload_failed": 0, "upload_error": "", "stopped": False,
+                              "started_at": 0, "phase": "", "to_generate": 0}
+        app.state.tts_warm_lock = threading.Lock()
+        app.state.tts_warm_stop = threading.Event()  # set by POST /api/tts-cache/warm/stop
         app.state.tutor = tutor or load_tutor(app.state.keys.get("ANTHROPIC_API_KEY"), app.state.keys.get("TUTOR_MODEL"))
-        # the playback voices double as the native baseline of the scores (see reference.py)
-        app.state.refs = References(app.state.scorer, app.state.tts, list(VOICES.values())) if app.state.tts else None
+        # Baselines deliberately stay fixed; SAWTAK_VOICE_ID changes playback only (see tts.load_tts).
+        app.state.refs = References(app.state.scorer, app.state.tts, list(BASELINE_VOICES.values())) if app.state.tts else None
         if app.state.auth and hasattr(app.state.auth, "calibrations"):
             try:
                 rows = app.state.auth.calibrations("applied")
                 app.state.scorer.set_calibrations([r for r in rows if not r.get("model") or r.get("model") == MODEL_ID])
             except AuthUnavailable as e:
                 log.warning("calibrations not loaded: %s", e)
+        apply_model_settings(app.state.scorer, MODEL_ID)
         if app.state.auth and hasattr(app.state.auth, "scoring_rules"):
             try:
                 reload_scoring_rules(app.state.auth)
             except AuthUnavailable as e:   # no table yet: every rule stays on
                 log.warning("scoring rule switches not loaded: %s", e)
-        yield
+        app.state.push = pushes.load_push(app.state.auth)
+        reminders = (asyncio.create_task(pushes.loop(app.state.push, daily_today, lambda: datetime.now(LOCAL_TZ)))
+                     if app.state.push and app.state.push.on else None)
+        async with app.state.mcp_server.session_manager.run():
+            yield
+        if reminders:
+            reminders.cancel()
 
     app = FastAPI(title="ihki", lifespan=lifespan)
+    app.state.auth = auth or load_auth()
     app.state.verb_game = VerbExerciseGenerator()
     app.state.live = LiveStore()
+    app.state.video_link = video_link
+    app.state.initial_class_lessons = {SUBJECT_LABELS["arabic"]: READY_LESSONS[0],
+                                       SUBJECT_LABELS["math"]: algebra9()["units"][0]["id"]}
+    metadata = build_metadata()
+    app.state.mcp_build_info = {"version": metadata["version"], "revision": metadata["commit"][:40]}
+    app.state.mcp_server, mcp_app, app.state.mcp_http = build_grok_mcp(app)
+    app.mount("/mcp", mcp_app, name="mcp")
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     def signed_in(request: Request) -> dict | None:
@@ -504,56 +560,20 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
             return None
         scheme, _, token = request.headers.get("authorization", "").partition(" ")
         try:
-            user = a.user(token.strip()) if scheme.lower() == "bearer" and token.strip() else None
+            user = resolve_access(a, token.strip()) if scheme.lower() == "bearer" and token.strip() else None
         except AuthUnavailable as e:
             raise HTTPException(503, f"sign-in check failed: {e}")
         if user is None:
             raise HTTPException(401, "sign in required")
-        email = user["email"].lower()
-        try:
-            classes = a.classes()
-        except AuthUnavailable as e:
-            raise HTTPException(503, f"class list not available: {e}")
-        mine = [c for c in classes if email in c["emails"]]   # a student may be in several classes
-        teaches = [c for c in classes if email in (c.get("teachers") or [])]
-        roles, entitlements, assigned = {"student"}, set(DEFAULT_ENTITLEMENTS), None
-        if hasattr(a, "access_for"):
-            try:
-                assigned = a.access_for(user["id"])
-            except AuthUnavailable as e:
-                raise HTTPException(503, f"permissions not available: {e}")
-            if assigned:
-                roles = set(assigned.get("roles") or ["student"]) & ROLES
-                entitlements = set(assigned.get("entitlements") or []) & ENTITLEMENTS
-        # Legacy environment assignments retain their old abilities while deployments move to user_access.
-        if email in getattr(a, "teachers", ()):
-            roles.update({"teacher", "admin", "flagger"})
-        if email in getattr(a, "tutors", ()):
-            roles.add("flagger")
-        if email in getattr(a, "developers", ()):
-            roles.add("developer")
-        if "flagger" not in roles:
-            try:
-                if email in (a.ranked() or ()):
-                    roles.add("flagger")
-            except AuthUnavailable as e:
-                log.warning("tutors not read: %s", e)
-        privileged = roles - {"student"}
-        if classes and not mine and not privileged and not entitlements:
+        if user.get("denied"):
             raise HTTPException(403, "this account is not on the list")
-        permissions = set().union(*(ROLE_PERMISSIONS[r] for r in roles))
-        permissions.update(*[ENTITLEMENT_PERMISSIONS[e] for e in entitlements])
-        return {**user, "token": token.strip(), "roles": sorted(roles), "entitlements": sorted(entitlements),
-                "subject": str((assigned or {}).get("subject") or ""),
-                "permissions": sorted(permissions), "teacher": bool(roles & {"teacher", "admin", "developer"}),
-                "tutor": "flags.create" in permissions or "*" in permissions, "classes": mine, "teaches": teaches}
+        return user
 
     def require(permission: str):
         def allowed(user: dict | None = Depends(signed_in)) -> SupabaseAuth:
             if app.state.auth is None:  # authentication is optional in local/open deployments
                 return app.state.auth
-            permissions = set(user.get("permissions", ())) if user else set()
-            if "*" not in permissions and permission not in permissions:
+            if not has_permission(user, permission):
                 raise HTTPException(403, f"missing permission: {permission}")
             return app.state.auth
         return allowed
@@ -564,13 +584,30 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
 
     members = [Depends(signed_in)]
 
+    @app.get("/.well-known/oauth-protected-resource/mcp/", include_in_schema=False)
+    @app.get("/.well-known/oauth-protected-resource/mcp", include_in_schema=False)
+    def mcp_oauth_metadata():
+        resource, issuer = oauth_urls(app)
+        return JSONResponse({"resource": resource, "authorization_servers": [issuer],
+                             "scopes_supported": ["openid", "email"],
+                             "bearer_methods_supported": ["header"],
+                             "resource_name": "ihki digital library"})
+
+    @app.get("/api/oauth/eligibility", include_in_schema=False)
+    def oauth_eligibility(user: dict | None = Depends(signed_in)):
+        return {"eligible": has_permission(user, "management.access")}
+
+    @app.get("/oauth/consent", response_class=HTMLResponse, include_in_schema=False)
+    def oauth_consent():
+        html = (STATIC / "oauth-consent.html").read_text(encoding="utf-8")
+        a: SupabaseAuth | None = app.state.auth
+        html = html.replace("__SUPABASE_URL_JSON__", json.dumps(a.url if a else ""))
+        html = html.replace("__SUPABASE_KEY_JSON__", json.dumps(a.key if a else ""))
+        return HTMLResponse(html, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
     def managed_classes(a: SupabaseAuth, actor: dict | None, fresh: bool = False) -> list[dict]:
         """Classes visible in management: developers see all; admins only their own subject."""
-        classes = a.classes(fresh=fresh)
-        if not actor or "developer" in actor.get("roles", ()) or not hasattr(a, "access_for"):
-            return classes
-        subject = str(actor.get("subject") or "").strip()
-        return [c for c in classes if subject and str(c.get("subject") or "").strip() == subject]
+        return visible_classes(a, actor, fresh=fresh)
 
     def text_rows() -> list[dict]:
         """The teacher's texts in the lessons the path shows. None without sign-in, or when they cannot be read."""
@@ -597,6 +634,19 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         except AuthUnavailable as e:
             log.warning("daily videos not read: %s", e)
             return []
+
+    def daily_today(email: str, every_class: bool) -> list[dict]:
+        """The daily videos an account has today: its classes' (as a student or as their teacher), or every class's."""
+        a: SupabaseAuth | None = app.state.auth
+        if a is None:
+            return []
+        day, email, library, found = datetime.now(LOCAL_TZ).date().isoformat(), email.lower(), daily_rows(), {}
+        for c in a.classes():
+            if every_class or email in c["emails"] or email in (c.get("teachers") or []):
+                for v in dailies_of(c, library):
+                    if v["date"] == day:
+                        found.setdefault(v["id"], v)
+        return list(found.values())
 
     def phrase_of(phrase_id: int) -> dict:
         """A phrase of the bank, or a line of a teacher's text; 404 for any other id."""
@@ -649,7 +699,9 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
     def me(user: dict | None = Depends(signed_in)):
         """Who is signed in, their classes (each with its lessons, its homework, see `homework_of`, and its daily
         videos with their days, see `dailies_of`: a student in
-        several chooses one to practise in), for a teacher "dailies" (the daily videos of every class), and the lessons of all of them together (every lesson for a teacher, and for an account in no class). The page
+        several chooses one to practise in; each also has its "id", its one "level" (None when its lessons span several,
+        see `class_level`), the "current_lesson" the student chose in it (None before they choose), and "teacher" when
+        the account teaches it), for a teacher "dailies" (the daily videos of every class), and the lessons of all of them together (every lesson for a teacher, and for an account in no class). The page
         asks this right after sign-in to learn whether the account is let in."""
         mine = user["classes"] if user else []
         can_all = bool(user and ({"*", "exercises.use_all"} & set(user.get("permissions", ()))))
@@ -664,18 +716,50 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         # the subject whose pages the account belongs on: an admin's own, else their class's (a student has one)
         subject = subject_code(user.get("subject")) if user else ""
         subject = subject or next((s for c in mine if (s := subject_code(c.get("subject")))), "")
+        # the current lesson the student chose in each class; unreadable, the page keeps its own choice on the device
+        email, saved = (user["email"].lower() if user else ""), {}
+        if user and mine and hasattr(app.state.auth, "current_lessons"):
+            try:
+                got = app.state.auth.current_lessons(email)
+                saved = got if isinstance(got, dict) else {}
+            except AuthUnavailable as e:
+                log.warning("current lessons not read: %s", e)
         return {"email": user["email"] if user else "", "teacher": bool(user and user["teacher"]),
                 **({"subject": subject} if subject else {}),
                 **({"tutor": True} if user and user["tutor"] else {}),   # the page shows them the flag under a score
                 "roles": user.get("roles", []) if user else [], "entitlements": user.get("entitlements", []) if user else [],
                 "permissions": user.get("permissions", []) if user else ["*"],
                 **({"dailies": sorted(every.values(), key=lambda d: (d["date"], d["id"]))} if can_all else {}),
-                "classes": [{"name": c["name"], "lessons": class_lessons(c), **homework_of(c, topics()),
-                             "dailies": dailies_of(c, daily_rows()),
+                "classes": [{"id": c.get("id"), "name": c["name"], "lessons": class_lessons(c), **homework_of(c, topics()),
+                             "dailies": dailies_of(c, daily_rows()), "level": class_level(c),
+                             "current_lesson": saved_lesson(c, saved),
+                             **({"teacher": True} if email in (c.get("teachers") or []) else {}),
                              **({"subject": s} if (s := subject_code(c.get("subject"))) else {})} for c in mine],
                 **({"teaches": [{"id": c["id"], "name": c["name"], "lessons": class_lessons(c)}
                                   for c in user.get("teaches", [])]} if user and user.get("teaches") else {}),
                 "lessons": lessons}
+
+    @app.put("/api/me/classes/{class_id}/current-lesson")
+    def set_current_lesson(class_id: int, body: dict = Body(...), user: dict | None = Depends(signed_in)):
+        """The lesson a student's class is on now ({"lesson": a lesson id}), kept for that student and class only. The
+        class must be one the caller studies in (not one they teach), of one level, and the lesson one of its lessons."""
+        a: SupabaseAuth | None = app.state.auth
+        if a is None or user is None:
+            raise HTTPException(401, "sign in required")
+        email = user["email"].lower()
+        course = next((c for c in user["classes"] if c.get("id") == class_id), None)
+        if course is None or email in (course.get("teachers") or []):
+            raise HTTPException(403, "רק תלמיד/ה בכיתה יכול/ה לבחור את השיעור הנוכחי שלה")
+        if class_level(course) is None:
+            raise HTTPException(409, "בכיתה הזאת אין שלב אחד, ולכן אי אפשר לבחור שיעור. צריך לתקן את הגדרות הכיתה.")
+        lesson = str(body.get("lesson") or "").strip()
+        if lesson not in lessons_of(course):
+            raise HTTPException(400, "השיעור הזה אינו מהשיעורים של הכיתה")
+        try:
+            a.set_current_lesson(email, class_id, lesson)
+        except AuthUnavailable as e:
+            raise HTTPException(503, f"current lesson not saved: {e}")
+        return {"class_id": class_id, "current_lesson": lesson}
 
     def live_course(class_id: int) -> dict:
         course = next((c for c in app.state.auth.classes() if c["id"] == class_id), None)
@@ -848,8 +932,8 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         """The teacher's panel: the classes (with their lessons and homework), and every student's summary (see `summary`) with
         "written", their written homework ({topic id: its lines}), with
         "tutor" (the teacher gave them the tutor's rank, see `set_tutor`; "tutor_fixed" when TEACHER_EMAILS or TUTORS_EMAIL gives it, which the panel cannot change),
-        their classes ({name: nickname}) and, as "since", the same summary for each class ({name: summary}) of the attempts
-        made since the class was opened: a new class starts clean, whatever its students practised before. The students are the classes' accounts, or every account that signed in
+        and their classes ({name: nickname}). The summary is the student's whole history, so what they practised in one class
+        still counts in another class with the same lessons (moving class keeps progress). The students are the classes' accounts, or every account that signed in
         when there is no class yet; one that never signed in has joined = false."""
         try:
             classes, users, rows, wrote = managed_classes(a, actor, fresh=True), a.users(), a.all_attempts(), a.all_writings()
@@ -867,16 +951,14 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         for c in classes:
             for e in c["emails"]:
                 member.setdefault(e, {})[c["name"]] = c["nicknames"].get(e, "")
-        opened = {c["name"]: utc(c["created_at"]) for c in classes if c.get("created_at")}
         bank, lesson_of = text_bank(text_rows()), topics()
 
         def student(email: str, name: str, joined: bool, mine: list[dict], wrote: dict | None = None) -> dict:
             into = member.get(email.lower(), {})
-            since = {n: summary([r for r in mine if n not in opened or utc(r["created_at"]) >= opened[n]], bank) for n in into}
             fixed = email.lower() in a.teachers | a.tutors
-            return {"email": email, "name": name, "joined": joined, "classes": into, "since": since, "written": wrote or {},
+            return {"email": email, "name": name, "joined": joined, "classes": into, "written": wrote or {},
                     "tutor": fixed or email.lower() in (ranked or ()), **({"tutor_fixed": True} if fixed else {}),
-                    **summary(mine, bank)}
+                    "streak": practice_streak(mine), **summary(mine, bank)}
 
         subject_scoped = bool(actor and "developer" not in actor.get("roles", ()) and hasattr(a, "access_for"))
         students = [student(u["email"], u["name"], True, by.get(u["id"], []), written.get(u["id"]))
@@ -897,18 +979,42 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
     @app.get("/api/activity")
     def activity(hours: int = Query(24, ge=1, le=168), bucket_minutes: int = Query(15, ge=1, le=60),
                  window_minutes: int | None = Query(None, ge=1, le=60),
+                 period: str | None = Query(None, pattern="^(5m|hour|day|week|month|all)$"),
                  a: SupabaseAuth = Depends(teacher_only), actor: dict | None = Depends(signed_in)):
         """Anonymous, aggregated practice activity for the teacher's monitoring graph."""
         try:
             scoped = bool(actor and "developer" not in actor.get("roles", ()) and hasattr(a, "access_for"))
-            if scoped or window_minutes is not None:
-                ids = None
+            if period:
+                slots, bucket_minutes = {"5m": (5, 1), "hour": (12, 5), "day": (96, 15),
+                                         "week": (168, 60), "month": (720, 60),
+                                         "all": (None, 60)}[period]
+                now = datetime.now(timezone.utc)
+                if slots is None:
+                    start, hours = now - timedelta(days=365 * 30), 365 * 30 * 24
+                else:
+                    seconds = bucket_minutes * 60
+                    end = datetime.fromtimestamp(int(now.timestamp()) // seconds * seconds, timezone.utc)
+                    start, hours = end - timedelta(seconds=(slots - 1) * seconds), slots * bucket_minutes / 60
+                users = a.users()
                 if scoped:
-                    classes, users = managed_classes(a, actor, fresh=True), a.users()
+                    classes = managed_classes(a, actor, fresh=True)
                     emails = {email for c in classes for email in c.get("emails", ())}
                     ids = {u["id"] for u in users if u["email"].lower() in emails}
+                else:
+                    ids = {u["id"] for u in users}
+                data = a.scoped_activity(ids, start, bucket_minutes)
+                return {"period": period, "hours": hours,
+                        "bucket_minutes": bucket_minutes, **data}
+            if scoped:
+                classes, users = managed_classes(a, actor, fresh=True), a.users()
+                emails = {email for c in classes for email in c.get("emails", ())}
+                ids = {u["id"] for u in users if u["email"].lower() in emails}
                 start = datetime.now(timezone.utc) - (timedelta(minutes=window_minutes) if window_minutes else timedelta(hours=hours))
-                rows = [r for r in a.all_attempts()
+                data = a.scoped_activity(ids, start, bucket_minutes)
+            elif window_minutes is not None:
+                ids = None
+                start = datetime.now(timezone.utc) - timedelta(minutes=window_minutes)
+                rows = [r for r in a.all_attempts(limit=MAX_MONITOR_ATTEMPTS)
                         if (ids is None or r.get("user_id") in ids) and utc(r["created_at"]) >= start]
                 seconds, buckets = bucket_minutes * 60, {}
                 for row in rows:
@@ -982,7 +1088,7 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         for account in users:
             row = assigned.get(account["id"], {})
             email = account["email"].lower()
-            roles = set(row.get("roles") or ["student"])
+            roles = set(row.get("roles") or ["student"]) if row else set(DEFAULT_ROLES)
             fixed = []
             if email in getattr(a, "teachers", ()):
                 roles.update({"teacher", "admin", "flagger"}); fixed += ["teacher", "admin", "flagger"]
@@ -1285,7 +1391,8 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
             label = r["label"] if r["label"] in ("correct", "mistake") else "correct"
             for tally in (counts, mine) if who and (r.get("speaker") or "") == who else (counts,):
                 tally.setdefault(r["item"], {"correct": 0, "mistake": 0})[label] += 1
-        return {"items": lab.public_items(), "groups": lab.GROUPS, "counts": counts, "mine": mine, "setup": setup}
+        return {"items": lab.public_items(), "quick_quiz": lab.public_quick_quiz(), "groups": lab.GROUPS,
+                "counts": counts, "mine": mine, "setup": setup}
 
     @app.post("/api/lab/score")
     def lab_score(request: Request, item: str = Form(...), audio: UploadFile = File(...),
@@ -1342,7 +1449,7 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         if app.state.tts is None:
             raise HTTPException(503, "אין TTS בשרת הזה (SAWTAK_API_KEY לא מוגדר)")
         try:
-            data, _ = app.state.tts.wav(point_arabic(*found["variants"][0]), LAB_TTS_VOICES[voice])
+            data, _ = app.state.tts.wav(tts_arabic(*found["variants"][0]), LAB_TTS_VOICES[voice])
         except TTSUnavailable as e:
             raise HTTPException(503, f"ה-TTS לא זמין: {e}")
         return found, data
@@ -1555,12 +1662,12 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         if refs is None:
             return []
         refs.get(phrase["key"], phrase)
-        text, out = point_arabic(*phrase["variants"][0]), []
+        text, out = tts_arabic(*phrase["variants"][0]), []
         for voice in refs.voices:
             try:
                 if not refs.tts.cached(text, voice):
                     continue
-                data, _ = refs.tts.wav(text, voice)
+                data, _ = refs.tts.wav_for_voice(text, voice, source="baseline")
             except Exception as e:   # provider down: score without this voice, as References does
                 log.warning("sweep: no %s voice for %r: %s", voice, text, e)
                 continue
@@ -1574,7 +1681,8 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
             key = (*emitted, phrase["key"], setting, scorer.disabled)
             if key not in sweep_refs:
                 logp, energy = sweep_emits[emitted]
-                sweep_refs[key] = scorer.reference_logp(logp, phrase, energy)
+                ref = scorer.reference_logp(logp, phrase, energy)
+                sweep_refs[key] = dc_replace(ref, voice=voice_name(voice)) if ref is not None else None
             if sweep_refs[key] is not None:
                 out.append(sweep_refs[key])
         return out
@@ -1876,9 +1984,10 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         before a class could have several, "homework" and "due" for a single one; "dailies": [{"video": the id of
         a daily video, "date": the ISO date the class watches it, or "" for none}], each video once; without it
         the class's daily videos stay as they are) and stores it. A student may be in several classes, e.g. a beginners' class and an advanced one."""
-        name = " ".join(str(body.get("name", "")).split())   # one space between words, none around
-        if not name or len(name) > 80:
-            raise HTTPException(400, "לכיתה צריך שם (עד 80 תווים)")
+        try:
+            name = normalize_class_name(body.get("name"))
+        except ClassManagementError as e:
+            raise HTTPException(400, str(e))
         try:
             emails, nicks = class_members(str(body.get("emails", "")))
         except ValueError as e:
@@ -2148,6 +2257,116 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         return {"dailies": [{"id": v["id"], "level": v["level"], "title": v["title"], "url": v["url"],
                              "embed": video_embed(v["url"])} for v in rows if v["level"] in LEVEL_IDS]}
 
+    def push_on():
+        p = getattr(app.state, "push", None)
+        if not p or not p.on:
+            raise HTTPException(503, f"push reminders are off: {p.why if p else 'no sign-in'}")
+        return p
+
+    @app.get("/api/push", dependencies=members)
+    def push_info():
+        """The server's push key, for the page to subscribe with; empty when the reminders are off."""
+        p = getattr(app.state, "push", None)
+        return {"key": p.public if p and p.on else "", "hour": p.hour if p else None}
+
+    @app.post("/api/push/subscribe")
+    def push_subscribe(body: dict = Body(...), user: dict | None = Depends(signed_in)):
+        """Keeps this browser's subscription ({"endpoint", "keys": {"p256dh", "auth"}}) for the daily video's reminder."""
+        p = push_on()
+        try:
+            p.save(user["email"], body, bool(user.get("teacher")))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except AuthUnavailable as e:
+            raise HTTPException(503, str(e))
+        return {"ok": True}
+
+    @app.post("/api/push/unsubscribe")
+    def push_unsubscribe(body: dict = Body(...), user: dict | None = Depends(signed_in)):
+        p = push_on()
+        try:
+            p.delete(str(body.get("endpoint") or ""), user["email"])
+        except AuthUnavailable as e:
+            raise HTTPException(503, str(e))
+        return {"ok": True}
+
+    @app.post("/api/push/test")
+    def push_test(user: dict | None = Depends(signed_in)):
+        """Sends the caller's devices a notification now: today's daily video, or a sample when there is none."""
+        p = push_on()
+        try:
+            rows = p.mine(user["email"])
+            videos = daily_today(user["email"], bool(user.get("teacher")))
+        except AuthUnavailable as e:
+            raise HTTPException(503, str(e))
+        message = pushes.payload(videos) if videos else {**pushes.payload([{"title": "ככה תיראה התזכורת לסרטון היומי"}]),
+                                                       "title": "🔔 התזכורות פועלות"}
+        return {"devices": len(rows), "sent": sum(p.send(r, message) for r in rows)}
+
+    def push_audience(a: SupabaseAuth, actor: dict | None, rows: list[dict]) -> tuple[dict[str, list[dict]], list[dict]]:
+        """An admin's reach: the subscriptions of each class they manage (its students and teachers), and those of
+        "everyone": every subscription for a developer, else those of their classes together."""
+        by_class = {}
+        for c in managed_classes(a, actor, fresh=True):
+            people = set(c["emails"]) | {e.lower() for e in c.get("teachers") or []}
+            by_class[c["name"]] = [r for r in rows if r["email"] in people]
+        developer = not actor or "developer" in actor.get("roles", ()) or not hasattr(a, "access_for")
+        everyone = rows if developer else list({r["endpoint"]: r for v in by_class.values() for r in v}.values())
+        return by_class, everyone
+
+    @app.get("/api/push/audience")
+    def push_audience_counts(a: SupabaseAuth = Depends(admin_only), actor: dict | None = Depends(signed_in)):
+        """How many devices get an admin's message: {"all": n, "classes": {name: n}, "outside": the devices of "all" whose
+        account is in none of the classes (a developer's "all" has every subscription, also of teachers and accounts in no class)}."""
+        p = push_on()
+        try:
+            by_class, everyone = push_audience(a, actor, p.every())
+        except AuthUnavailable as e:
+            raise HTTPException(503, str(e))
+        inside = {r["endpoint"] for v in by_class.values() for r in v}
+        return {"all": len(everyone), "classes": {name: len(v) for name, v in by_class.items()},
+                "outside": sum(r["endpoint"] not in inside for r in everyone),
+                "people": push_people(a, actor, everyone)}
+
+    def push_people(a: SupabaseAuth, actor: dict | None, rows: list[dict]) -> list[dict]:
+        """Who turned the notifications on: [{"email", "name" (a class's nickname, else the Google name), "devices",
+        "classes": the names of the admin's classes they are in}], by name."""
+        classes = managed_classes(a, actor, fresh=True)
+        try:
+            google = {u["email"].lower(): u["name"] for u in a.users()}
+        except (AuthUnavailable, AttributeError):
+            google = {}
+        devices: dict[str, int] = {}
+        for r in rows:
+            devices[r["email"]] = devices.get(r["email"], 0) + 1
+        people = []
+        for email, n in devices.items():
+            mine = [c for c in classes if email in c["emails"] or email in (c.get("teachers") or [])]
+            nick = next((c.get("nicknames", {}).get(email) for c in mine if c.get("nicknames", {}).get(email)), "")
+            people.append({"email": email, "name": nick or google.get(email, ""), "devices": n,
+                           "classes": [c["name"] for c in mine]})
+        return sorted(people, key=lambda x: ((x["name"] or x["email"]).lower(), x["email"]))
+
+    @app.post("/api/push/broadcast")
+    def push_broadcast(body: dict = Body(...), a: SupabaseAuth = Depends(admin_only), actor: dict | None = Depends(signed_in)):
+        """An admin's notification ({"title", "body", "class": a class's name, or "" for everyone}) sent now."""
+        p = push_on()
+        try:
+            msg = pushes.message(str(body.get("title") or ""), str(body.get("body") or ""))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        target = str(body.get("class") or "")
+        try:
+            by_class, everyone = push_audience(a, actor, p.every())
+        except AuthUnavailable as e:
+            raise HTTPException(503, str(e))
+        if target and target not in by_class:
+            raise HTTPException(404, "no such class")
+        rows = by_class[target] if target else everyone
+        sent = p.send_many(rows, msg)
+        a.log_event("push", actor, f"{msg['title']} → {target or 'כולם'}", {"class": target, "devices": len(rows), "sent": sent})
+        return {"devices": len(rows), "sent": sent}
+
     @app.get("/api/library", dependencies=[Depends(require("library.view"))])
     def library(user: dict | None = Depends(signed_in)):
         """The video library, which stands outside the path and is one for every level and class: id, title, url
@@ -2200,7 +2419,19 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
     def add_library(body: dict = Body(...), a: SupabaseAuth = Depends(teacher_only),
                     user: dict | None = Depends(signed_in)):
         """Adds a video to the library: {"title", "url": a Vimeo or YouTube link}."""
-        return add_level_video("library", body, a, user)
+        try:
+            title = video_library.normalize_title(body.get("title", ""))
+            url = video_library.normalize_url(body.get("url", ""), video_link)
+            video_library.add(a, title, url, reject_duplicate=False)
+        except video_library.LibraryError as e:
+            if isinstance(e, video_library.LibraryUnavailable):
+                raise HTTPException(503, level_store_error("library", AuthUnavailable(str(e))))
+            detail = str(e)
+            if detail == "זה לא קישור לסרטון ב-Vimeo או ב-YouTube":
+                detail += ". הדביקו קישור כמו https://vimeo.com/1233611297/d46ac373c8 או https://youtu.be/dQw4w9WgXcQ"
+            raise HTTPException(400, detail)
+        a.log_event("content", user, title, {"type": "library", "level": ""})
+        return {"ok": True}
 
     @app.delete("/api/library/{video_id}")
     def delete_library(video_id: int, a: SupabaseAuth = Depends(teacher_only)):
@@ -2223,15 +2454,15 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
     @app.put("/api/library/{video_id}")
     def rename_library(video_id: int, body: dict = Body(...), a: SupabaseAuth = Depends(teacher_only)):
         """Gives a video of the library another name: {"title"}."""
-        title = " ".join(str(body.get("title", "")).split())
-        if not title or len(title) > MAX_TITLE:
-            raise HTTPException(400, f"לסרטון צריך שם (עד {MAX_TITLE} תווים)")
         try:
-            if all(v["id"] != video_id for v in a.level_videos("library", fresh=True)):
+            title = video_library.normalize_title(body.get("title", ""))
+            video_library.rename(a, video_id, title)
+        except video_library.LibraryUnavailable as e:
+            raise HTTPException(503, level_store_error("library", AuthUnavailable(str(e))))
+        except video_library.LibraryError as e:
+            if str(e) == "הסרטון אינו נמצא בספרייה":
                 raise HTTPException(404, "הסרטון כבר לא בספריה. רעננו ונסו שוב")
-            a.rename_level_video("library", video_id, title)
-        except AuthUnavailable as e:
-            raise HTTPException(503, level_store_error("library", e))
+            raise HTTPException(400, str(e))
         return {"ok": True}
 
     @app.get("/api/classmates")
@@ -2251,6 +2482,47 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
             named = [{"name": c["nicknames"].get(e) or google.get(e, ""), "me": e == me} for e in c["emails"]]
             students = sorted((s for s in named if s["name"]), key=lambda s: s["name"])
             out.append({"name": c["name"], "students": students, "unnamed": len(named) - len(students)})
+        return {"classes": out}
+
+    class_weeks: dict[tuple, tuple[float, dict]] = {}   # (class id, week) -> (when read, totals): a few minutes old at most
+
+    @app.get("/api/class/week")
+    def class_week(user: dict | None = Depends(signed_in)):
+        """This week (from Monday, Jerusalem time) in each of the signed-in student's classes, as totals only: how many
+        sentences its students said, how many of them practised, a goal for the class (CLASS_WEEK_GOAL a student),
+        and how many the student said. Nobody else's own numbers, and no names."""
+        if not user or not user["classes"]:
+            return {"classes": []}
+        a = app.state.auth
+        today = datetime.now(LOCAL_TZ).date()
+        monday = today - timedelta(days=today.weekday())
+        since = datetime(monday.year, monday.month, monday.day, tzinfo=LOCAL_TZ)
+        try:
+            ids = {u["email"].lower(): u["id"] for u in a.users()}
+        except AuthUnavailable as e:
+            raise HTTPException(503, f"class week not available: {e}")
+        me = user["email"].lower()
+        out = []
+        for c in user["classes"]:
+            teachers = {e.lower() for e in c.get("teachers") or []}
+            students = [e.lower() for e in c["emails"] if e.lower() not in teachers]
+            key, now = (c["id"], monday.isoformat()), datetime.now().timestamp()
+            cached = class_weeks.get(key)
+            if cached and now - cached[0] < CLASS_WEEK_TTL:
+                totals = cached[1]
+            else:
+                try:
+                    summary = a.scoped_activity({ids[e] for e in students if e in ids}, since)["summary"] or {}
+                except AuthUnavailable as e:
+                    raise HTTPException(503, f"class week not available: {e}")
+                totals = {"said": int(summary.get("attempts") or 0), "active": int(summary.get("active_students") or 0)}
+                class_weeks[key] = (now, totals)
+            try:
+                mine = (a.scoped_activity({ids[me]}, since)["summary"] or {}).get("attempts", 0) if me in ids else 0
+            except AuthUnavailable:
+                mine = 0
+            out.append({"name": c["name"], "students": len(students), **totals, "mine": int(mine or 0),
+                        "goal": CLASS_WEEK_GOAL * max(1, len(students))})
         return {"classes": out}
 
     @app.get("/api/math/skills")
@@ -2297,7 +2569,7 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
     @app.get("/api/phrases")
     def phrases():
         return {"levels": LEVELS, "lessons": LESSONS, "categories": CATEGORIES, "games": GAMES, "phrases": public_phrases(),
-                "voices": [{"id": i, "name": n} for n, i in VOICES.items()]}
+                "voices": [{"id": i, "name": n} for n, i in playback_voices().items()]}
 
     def verb_lessons(user: dict | None) -> list[str]:
         """Lessons available to this learner, using the existing class rules."""
@@ -2309,7 +2581,10 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
     @app.get("/api/verb-game", dependencies=[Depends(require("games.use"))])
     def verb_game(user: dict | None = Depends(signed_in)):
         """Configuration for "פועל יוצא" and the complete paradigms currently unlocked."""
-        return app.state.verb_game.metadata(verb_lessons(user))
+        meta = app.state.verb_game.metadata(verb_lessons(user))
+        if not (user and user["teacher"]):   # draft verbs are teachers' only
+            meta["eitan_verbs"] = [v for v in meta["eitan_verbs"] if not v["draft"]]
+        return meta
 
     @app.post("/api/verb-game/question", dependencies=[Depends(require("games.use"))])
     def verb_question(body: dict = Body(...), user: dict | None = Depends(signed_in)):
@@ -2318,7 +2593,8 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
             level = int(body.get("level", 1))
             mastery = body.get("mastery") if isinstance(body.get("mastery"), dict) else {}
             recent = body.get("recent") if isinstance(body.get("recent"), list) else []
-            return app.state.verb_game.question(level, verb_lessons(user), mastery, list(map(str, recent[-10:])))
+            return app.state.verb_game.question(level, verb_lessons(user), mastery, list(map(str, recent[-10:])),
+                                                drafts=bool(user and user["teacher"]))
         except (TypeError, ValueError) as e:
             raise HTTPException(400, str(e))
         except LookupError as e:
@@ -2469,10 +2745,11 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
 
     @app.get("/api/tts/{phrase_id}", dependencies=[Depends(require("practice.use"))])
     def tts_phrase(phrase_id: int):
-        """The model answer spoken by Raef, or by a dialogue line's own voice. 503 tells the page to use the device voice."""
-        names = {i: n for n, i in {**VOICES, **LINE_VOICES}.items()}
+        """The model answer in the playback voice (SAWTAK_VOICE_ID, else Raef), or a dialogue line's own voice.
+        503 tells the page to use the device voice."""
+        names = {i: n for n, i in {**playback_voices(), **LINE_VOICES}.items()}
         phrase = phrase_of(phrase_id)
-        text = point_arabic(*phrase["variants"][0])
+        text = tts_arabic(*phrase["variants"][0])
         if app.state.tts is None:
             raise HTTPException(503, "tts not configured")
         try:
@@ -2491,7 +2768,10 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         if app.state.tts is None:
             return {"available": False, "files": 0, "bytes": 0, "hits": 0, "misses": 0, "hit_rate": None}
         try:
-            return {"available": True, **app.state.tts.cache_stats()}
+            with app.state.tts_warm_lock:
+                warm = dict(app.state.tts_warm)
+            return {"available": True, "voice_id": getattr(app.state.tts, "voice_id", RAEF_VOICE_ID),
+                    **app.state.tts.cache_stats(), "warm": warm}
         except TTSUnavailable as e:
             raise HTTPException(503, str(e))
 
@@ -2500,6 +2780,9 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         """Delete generated Sawtak recordings; the next playback generates them again."""
         if app.state.tts is None:
             raise HTTPException(503, "tts not configured")
+        with app.state.tts_warm_lock:
+            if app.state.tts_warm["running"]:
+                raise HTTPException(409, "cache warm is running")
         try:
             removed = app.state.tts.clear_cache()
         except TTSUnavailable as e:
@@ -2507,6 +2790,324 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         if app.state.refs:
             app.state.refs.invalidate()
         return {"ok": True, "removed": removed}
+
+    @app.get("/api/tts-cache/activity")
+    def tts_cache_activity(_a: SupabaseAuth = Depends(teacher_only)):
+        """What the voice cache is doing: Sawtak requests and bucket uploads in flight and the latest results."""
+        tts = app.state.tts
+        if tts is None or not hasattr(tts, "activity"):
+            return {"now": time.time(), "active": [], "events": [], "pace": None}
+        from .tts import MAX_CONCURRENT, MIN_REQUEST_INTERVAL
+        return {**tts.activity.snapshot(),
+                "pace": {"per_minute": round(60 / MIN_REQUEST_INTERVAL) if MIN_REQUEST_INTERVAL else None,
+                         "max_concurrent": MAX_CONCURRENT,
+                         "sweep_workers": WARM_WORKERS}}
+
+    @app.post("/api/tts-cache/import")
+    def import_tts_cache(archive: UploadFile = File(...), _a: SupabaseAuth = Depends(teacher_only)):
+        """Load an offline copy (a zip from GET /api/tts-cache/download) back into the cache: each WAV that is not
+        cached yet is kept, then uploaded to the bucket in the background. manifest.csv and anything else is ignored.
+
+        Answers {"added", "skipped", "invalid", "uploading"}."""
+        tts = app.state.tts
+        if tts is None:
+            raise HTTPException(503, "tts not configured")
+        part = r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}"
+        name_ok = re.compile(rf"(?:ihki-tts/)?((?:{part}/)?[0-9a-f]{{40}}\.wav)")
+        added: list[tuple[Path, str]] = []
+        skipped = invalid = 0
+        spool = tempfile.TemporaryFile()  # a plain file: zipfile seeks, and Python 3.10's spooled upload cannot
+        try:
+            shutil.copyfileobj(archive.file, spool, 1024 * 1024)
+            spool.seek(0)
+            with zipfile.ZipFile(spool) as zf:
+                for info in zf.infolist():
+                    if info.is_dir() or info.filename == "manifest.csv":
+                        continue
+                    m = name_ok.fullmatch(info.filename)
+                    if not m or ".." in info.filename or info.file_size > 20 * 1024 * 1024:
+                        invalid += 1
+                        continue
+                    rel = m.group(1)
+                    existing = tts.has(rel)
+                    if existing is not None and existing.stat().st_size == info.file_size:
+                        skipped += 1
+                        continue
+                    data = zf.read(info)
+                    if data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+                        invalid += 1
+                        continue
+                    added.append((tts.store(rel, data), rel))
+        except zipfile.BadZipFile:
+            raise HTTPException(400, "זה לא קובץ zip של עותק אופליין")
+        except OSError as e:
+            raise HTTPException(503, f"could not write the voice cache: {e}")
+        finally:
+            spool.close()
+        mirror = getattr(tts, "mirror", None)
+        if mirror is not None and added:
+            def upload() -> None:
+                for i in range(0, len(added), 25):
+                    batch = added[i:i + 25]
+                    try:
+                        mirror.upload([(path, mirror.remote_path(rel)) for path, rel in batch], source="import")
+                    except Exception as e:  # the next cache-warm sweep uploads what is still missing
+                        log.warning("tts import: bucket upload of %d files failed: %s", len(batch), e)
+            threading.Thread(target=upload, name="ihki-tts-import", daemon=True).start()
+        if app.state.refs and added:
+            app.state.refs.invalidate()
+        return {"added": len(added), "skipped": skipped, "invalid": invalid,
+                "uploading": bool(mirror is not None and added)}
+
+    @app.get("/api/tts-cache/download")
+    def download_tts_cache(_a: SupabaseAuth = Depends(teacher_only)):
+        """An offline copy of the Sawtak recordings: every cached WAV, plus manifest.csv naming each file's phrase.
+
+        The zip is streamed (stored, not compressed: WAV barely compresses), so the whole cache never sits in memory."""
+        tts = app.state.tts
+        if tts is None:
+            raise HTTPException(503, "tts not configured")
+        try:
+            files = tts.cached_files()
+        except OSError as e:
+            raise HTTPException(503, f"could not read the voice cache: {e}")
+        names = {i: n for n, i in {**VOICES, **LINE_VOICES}.items()}
+        known: dict[str, dict] = {}  # file name (sha1 of version, voice and text) -> what it says
+        for phrase_id, phrase in enumerate(PHRASES):
+            text = tts_arabic(*phrase["variants"][0])
+            for voice in names:
+                info = known.setdefault(Path(tts.cache_key(text, voice)).name,
+                                        {"voice_id": voice, "voice": names[voice], "text": text,
+                                         "he": phrase.get("he", ""), "tr": phrase.get("tr", ""), "phrase_ids": []})
+                info["phrase_ids"].append(str(phrase_id))
+
+        def chunks():
+            class Sink(io.RawIOBase):  # unseekable: zipfile writes data descriptors instead of seeking back
+                def __init__(self): self.parts: list[bytes] = []
+                def writable(self): return True
+                def write(self, b): self.parts.append(bytes(b)); return len(b)
+            sink = Sink()
+
+            def drain() -> bytes:
+                out = b"".join(sink.parts); sink.parts.clear(); return out
+
+            rows = io.StringIO()
+            writer = csv.writer(rows)
+            writer.writerow(["file", "voice_id", "voice", "phrase_ids", "arabic", "hebrew", "transliteration"])
+            with zipfile.ZipFile(sink, "w", zipfile.ZIP_STORED, allowZip64=True) as zf:
+                for path, rel in files:
+                    try:
+                        zf.write(path, f"ihki-tts/{rel}")
+                    except OSError as e:  # removed or unreadable meanwhile: leave it out, keep the rest
+                        log.warning("tts download skipped %s: %s", rel, e)
+                        continue
+                    info = known.get(path.name, {})
+                    writer.writerow([f"ihki-tts/{rel}", info.get("voice_id", rel.split("/")[0] if "/" in rel else ""),
+                                     info.get("voice", ""), " ".join(info.get("phrase_ids", [])), info.get("text", ""),
+                                     info.get("he", ""), info.get("tr", "")])
+                    yield drain()
+                zf.writestr("manifest.csv", "\ufeff" + rows.getvalue())  # BOM: Excel opens the Hebrew/Arabic right
+            yield drain()
+
+        name = f"ihki-tts-{datetime.now(timezone.utc):%Y-%m-%d_%H-%M}.zip"
+        return StreamingResponse(chunks(), media_type="application/zip", headers={
+            "Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store",
+            "X-File-Count": str(len(files))})
+
+    @app.post("/api/tts-cache/warm")
+    def warm_tts_cache(body: dict = Body(...), _a: SupabaseAuth = Depends(teacher_only)):
+        """Generate the finite phrase bank for a selected voice, one request at a time."""
+        tts = app.state.tts
+        if tts is None:
+            raise HTTPException(503, "tts not configured")
+        try:
+            voice = str(uuid.UUID(str(body.get("voice_id") or "")))
+        except (ValueError, AttributeError, TypeError):
+            raise HTTPException(400, "invalid Sawtak voice id")
+        with app.state.tts_warm_lock:
+            if app.state.tts_warm["running"]:
+                return dict(app.state.tts_warm)
+            jobs, seen = [], set()
+            for phrase in PHRASES:
+                text = tts_arabic(*phrase["variants"][0])
+                if text not in seen:
+                    seen.add(text); jobs.append(text)
+            mirror = getattr(tts, "mirror", None)
+            app.state.tts_warm = {"running": True, "voice_id": voice, "total": len(jobs), "done": 0, "generated": 0,
+                                  "skipped": 0, "failed": 0, "current": "", "waiting": 0, "error": "",
+                                  "bucket": mirror.bucket_id if mirror else "", "uploaded": 0, "upload_failed": 0,
+                                  "upload_error": "", "stopped": False, "started_at": time.time(),
+                                  "phase": "scanning", "to_generate": 0}
+            stop = app.state.tts_warm_stop
+            stop.clear()
+
+        # Every WAV is also uploaded to the Storage Bucket through its API (see tts.BucketMirror): writes to the
+        # mounted /data folder alone did not reach the bucket. Files already there with the same size are not resent.
+        remote: dict[str, int] = {}
+        pending: list[tuple[Path | bytes, str, int]] = []
+        oldest = [0.0]  # when the oldest pending file was queued: a batch waits at most 30 s for its 25th file
+        uploads = threading.Lock()  # guards remote, pending and oldest: the workers queue at the same time
+
+        def flush() -> None:
+            with uploads:
+                batch = pending[:]
+                pending.clear()
+            if not batch:
+                return
+            try:
+                mirror.upload([(src, dest) for src, dest, _size in batch], source="sweep")
+                with uploads:
+                    remote.update({dest: size for _src, dest, size in batch})
+                with app.state.tts_warm_lock:
+                    app.state.tts_warm["uploaded"] += len(batch)
+            except Exception as e:
+                log.warning("tts bucket upload of %d files failed: %s", len(batch), e)
+                with app.state.tts_warm_lock:
+                    app.state.tts_warm["upload_failed"] += len(batch)
+                    app.state.tts_warm["upload_error"] = str(e)[:300]
+
+        def queue_upload(src: Path | bytes, rel: str) -> None:
+            if mirror is None:
+                return
+            try:
+                size = src.stat().st_size if isinstance(src, Path) else len(src)
+            except OSError:
+                return
+            dest = mirror.remote_path(rel)
+            with uploads:
+                if remote.get(dest) == size or any(d == dest for _s, d, _z in pending):
+                    return
+                if not pending:
+                    oldest[0] = time.monotonic()
+                pending.append((src, dest, size))
+                due = len(pending) >= 25 or time.monotonic() - oldest[0] > 30
+            if due:
+                flush()
+
+        def bump(**counts: int) -> None:
+            with app.state.tts_warm_lock:
+                for name, n in counts.items():
+                    app.state.tts_warm[name] += n
+
+        halted = threading.Event()  # a phrase failed for good: no worker starts another
+
+        def generate(text: str) -> bool:
+            """One phrase, retried on a rate limit, a provider 5xx or a dropped connection. False: stopped."""
+            for attempt in range(5):
+                if stop.is_set() or halted.is_set():
+                    return False
+                try:
+                    data, _used = tts.wav_for_voice(text, voice)
+                    if mirror is not None:  # the disk copy if it was kept, else the bytes themselves
+                        queue_upload(tts.cache_file(text, voice) or data, tts.cache_key(text, voice))
+                    return True
+                except TTSUnavailable as e:
+                    if not e.transient or attempt == 4:
+                        raise
+                    delay = max(.2, min(e.retry_after or 2 ** (attempt + 1), 60))
+                    if e.status == 429 and hasattr(tts, "hold"):
+                        tts.hold(delay)  # the other workers wait too, instead of hitting the limit again
+                    with app.state.tts_warm_lock:
+                        app.state.tts_warm["waiting"] = round(delay, 1)
+                    interrupted = stop.wait(delay)  # a stop request ends the wait at once
+                    with app.state.tts_warm_lock:
+                        app.state.tts_warm["waiting"] = 0
+                    if interrupted:
+                        return False
+            return False
+
+        def run() -> None:
+            listed = False
+            if mirror is not None:
+                try:
+                    remote.update(mirror.remote_sizes())
+                    listed = True
+                except Exception as e:  # listing failed: upload everything; the uploads report their own errors
+                    log.warning("tts bucket listing failed: %s", e)
+                    with app.state.tts_warm_lock:
+                        app.state.tts_warm["upload_error"] = f"listing failed: {str(e)[:300]}"
+
+            def is_cached(text: str) -> bool:
+                """With a bucket listing: the local staging folder or the listing, both instant. Asking the bucket
+                mount instead costs a network lookup per missing file, minutes for the whole bank."""
+                if not listed or getattr(tts, "staging_dir", None) is None:
+                    return tts.cached(text, voice)
+                rel = tts.cache_key(text, voice)
+                return ((tts.staging_dir / rel).is_file() or mirror.remote_path(rel) in remote
+                        or mirror.remote_path(rel.rsplit("/", 1)[-1]) in remote)
+
+            # Already cached: skip without reading it. The upload pass at the end still sends it if the bucket
+            # lacks it. Workers start on the missing phrases while the scan goes on.
+            work: Queue = Queue()
+
+            def worker() -> None:
+                while not (stop.is_set() or halted.is_set()):
+                    text = work.get()
+                    if text is None:
+                        return
+                    with app.state.tts_warm_lock:
+                        app.state.tts_warm["current"] = text
+                    try:
+                        if generate(text):
+                            bump(generated=1, done=1)
+                    except Exception as e:
+                        log.warning("tts cache warm stopped at %r: %s", text, e)
+                        halted.set()
+                        with app.state.tts_warm_lock:
+                            app.state.tts_warm["failed"] += 1
+                            app.state.tts_warm["error"] = str(e)
+
+            workers = [threading.Thread(target=worker, name=f"ihki-tts-warm-{i}", daemon=True)
+                       for i in range(WARM_WORKERS)]
+            for w in workers:
+                w.start()
+            for text in jobs:
+                if stop.is_set() or halted.is_set():
+                    break
+                try:
+                    cached = is_cached(text)
+                except OSError:
+                    cached = False
+                if cached:
+                    bump(skipped=1, done=1)
+                else:
+                    bump(to_generate=1)
+                    work.put(text)
+            with app.state.tts_warm_lock:
+                app.state.tts_warm["phase"] = "generating"
+            for _ in workers:
+                work.put(None)
+            for w in workers:
+                w.join()
+            if mirror is not None and (stop.is_set() or halted.is_set()):
+                flush()  # what was generated still reaches the bucket; the full pass waits for the next run
+            elif mirror is not None:
+                # also everything cached earlier: other voices, playback misses, the legacy flat layout
+                with app.state.tts_warm_lock:
+                    app.state.tts_warm["current"] = "uploading cached files"
+                    app.state.tts_warm["phase"] = "uploading"
+                try:
+                    for path, rel in tts.cached_files():
+                        queue_upload(path, rel)
+                except OSError as e:
+                    log.warning("tts cache listing failed: %s", e)
+                flush()
+            with app.state.tts_warm_lock:
+                app.state.tts_warm["running"] = False
+                app.state.tts_warm["current"] = ""
+                app.state.tts_warm["phase"] = ""
+                app.state.tts_warm["stopped"] = stop.is_set()
+
+        threading.Thread(target=run, name="ihki-tts-warm", daemon=True).start()
+        with app.state.tts_warm_lock:
+            return dict(app.state.tts_warm)
+
+    @app.post("/api/tts-cache/warm/stop")
+    def stop_tts_cache_warm(_a: SupabaseAuth = Depends(teacher_only)):
+        """Ask the running sweep to stop after its current phrase. Nothing is lost: the next run resumes."""
+        app.state.tts_warm_stop.set()
+        with app.state.tts_warm_lock:
+            return dict(app.state.tts_warm)
 
     def keys_only(user: dict | None = Depends(signed_in)) -> SupabaseAuth:
         """Only developers ("*"): a key decides where the bills go. Unlike require(), an open deployment (no sign-in)
@@ -2534,7 +3135,7 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
                 app.state.tts.api_key = value
             else:
                 app.state.tts = load_tts(value)
-                app.state.refs = References(app.state.scorer, app.state.tts, list(VOICES.values())) if app.state.tts else None
+                app.state.refs = References(app.state.scorer, app.state.tts, list(BASELINE_VOICES.values())) if app.state.tts else None
         elif app.state.tutor is not None and value:
             app.state.tutor.client = tutor_client(value)
         else:
@@ -2592,6 +3193,278 @@ def create_app(scorer: Scorer | None = None, tts: SawtakTTS | None = None,
         if app.state.auth:
             app.state.auth.log_event("permission", user, f"מפתח API: {name}", {"key": name, "action": "clear"})
         return keys_status(response)
+
+    # ---- the phoneme model: which one scores, switched from the panel's "מודלים" tab ----
+    app.state.model_switch = {"state": "idle", "target": "", "error": "", "started_at": 0.0, "by": ""}
+    model_lock = threading.Lock()
+
+    def models_only(user: dict | None = Depends(signed_in)) -> SupabaseAuth:
+        """Only developers ("*") switch the model: every learner's score changes with it. Like keys_only, an open
+        deployment (no sign-in) is refused too."""
+        permissions = set((user or {}).get("permissions", ()))
+        if app.state.auth is None or ("*" not in permissions and "models.manage" not in permissions):
+            raise HTTPException(403, "missing permission: models.manage")
+        return app.state.auth
+
+    def models_status(user: dict | None) -> dict:
+        permissions = set((user or {}).get("permissions", ()))
+        return {"active": MODEL_ID, "default": ENV_MODEL_ID, "switch": dict(app.state.model_switch),
+                "can_switch": app.state.auth is not None and bool(permissions & {"*", "models.manage"}),
+                "models": model_catalog(MODEL_ID)}
+
+    def prepare_scorer(model_id: str) -> Scorer:
+        """A scorer for `model_id` set up as the running one would be: its stored settings, the calibrations made for
+        it and the rules switched off in ניטור."""
+        scorer = load_scorer(model_id)
+        apply_model_settings(scorer, model_id)
+        if app.state.auth and hasattr(app.state.auth, "calibrations"):
+            try:
+                rows = app.state.auth.calibrations("applied")
+                scorer.set_calibrations([r for r in rows if not r.get("model") or r.get("model") == model_id])
+            except AuthUnavailable as e:
+                log.warning("calibrations not loaded for %s: %s", model_id, e)
+        if app.state.auth and hasattr(app.state.auth, "scoring_rules"):
+            try:
+                scorer.set_disabled(r["id"] for r in app.state.auth.scoring_rules() if not r.get("active", True))
+            except AuthUnavailable as e:
+                log.warning("scoring rules not loaded for %s: %s", model_id, e)
+        return scorer
+
+    def use_model(model_id: str, user: dict | None) -> None:
+        """Loads `model_id` beside the running one, then swaps it in: requests in flight finish on the old one.
+        The swap carries over what belongs to the scoring, not to the model: the switched-off rules, the native
+        baseline (rebuilt from the cached voices, scored by the new model) and the calibrations made for it."""
+        global MODEL_ID
+        try:
+            scorer = prepare_scorer(model_id)
+            app.state.compare.pop(model_id, None)   # the comparison's own copy, if it had one, is this one now
+            old = app.state.scorer
+            app.state.scorer, MODEL_ID = scorer, model_id
+            if app.state.tts:
+                app.state.refs = References(scorer, app.state.tts, list(BASELINE_VOICES.values()))
+            del old
+            try:   # hand the old model's memory back (the GPU has room for one model at a time)
+                import gc
+                import torch
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except ImportError:
+                pass
+            app.state.model_switch.update(state="idle", error="")
+            log.info("phoneme model switched to %s by %s", model_id, (user or {}).get("email", "?"))
+            if app.state.auth:
+                app.state.auth.log_event("permission", user, f"מודל: {model_id}", {"model": model_id, "action": "switch"})
+        except Exception as e:  # the running model stays; the panel shows why
+            log.exception("loading the model %s failed", model_id)
+            app.state.model_switch.update(state="error", error=f"{type(e).__name__}: {e}"[:400])
+
+    @app.get("/api/admin/models")
+    def models(response: Response, _a: SupabaseAuth = Depends(admin_only), user: dict | None = Depends(signed_in)):
+        """The models this server can score with, what each was measured to do, and which one is scoring now."""
+        response.headers["Cache-Control"] = "no-store"
+        return models_status(user)
+
+    @app.put("/api/admin/models/active")
+    def switch_model(response: Response, body: dict = Body(...), _a: SupabaseAuth = Depends(models_only),
+                     user: dict | None = Depends(signed_in)):
+        """Starts loading another model in the background; GET /api/admin/models shows when it took over.
+        The choice lasts until the server restarts (MODEL_ID decides the one it starts with)."""
+        response.headers["Cache-Control"] = "no-store"
+        model_id = body.get("model_id")
+        if not isinstance(model_id, str) or not (model_known(model_id) or model_id == ENV_MODEL_ID):
+            raise HTTPException(400, "unknown model")
+        ok, why = model_availability(model_id)
+        if not ok:
+            raise HTTPException(409, why)
+        with model_lock:
+            if app.state.model_switch["state"] == "loading":
+                raise HTTPException(409, "מודל אחר נטען כרגע")
+            if model_id == MODEL_ID:
+                return models_status(user)
+            app.state.model_switch = {"state": "loading", "target": model_id, "error": "", "started_at": time.time(),
+                                      "by": (user or {}).get("email", "")}
+        threading.Thread(target=use_model, args=(model_id, user), daemon=True, name="model-switch").start()
+        return models_status(user)
+
+    # ---- debugging: one recording scored by several models side by side (the practice page's 🔬 button) ----
+    app.state.compare = {}   # model id -> (scorer, References or None), loaded on first use and kept
+    compare_lock = threading.Lock()
+
+    def compare_ids() -> list[str]:
+        """COMPARE_MODELS (comma-separated), else the base model, the wav2vec2 fine-tune and POWSM (the local
+        export, or the Hub one). The model scoring now always comes first; models this server can't load are left out."""
+        raw = os.environ.get("COMPARE_MODELS", "").strip()
+        if raw:
+            ids = [m.strip() for m in raw.split(",") if m.strip()]
+        else:
+            local = "exports/powsm-ft-shortpad"
+            ids = ["facebook/wav2vec2-xlsr-53-espeak-cv-ft", "checkpoints/ihki-ft-minerva",
+                   local if Path(local, "powsm_onnx.json").is_file() else f"powsm-onnx:{POWSM_ONNX_REPO}"]
+        ids = [MODEL_ID] + [m for m in ids if m != MODEL_ID]
+        return [m for m in ids if m == MODEL_ID or model_availability(m)[0]]
+
+    def quick_compare_ids() -> list[str]:
+        """The stable three columns promised by the lab's quick Hebrew-speaker benchmark."""
+        local = "exports/powsm-ft-shortpad"
+        ids = ["facebook/wav2vec2-xlsr-53-espeak-cv-ft", "checkpoints/ihki-ft-minerva",
+               local if Path(local, "powsm_onnx.json").is_file() else f"powsm-onnx:{POWSM_ONNX_REPO}"]
+        return [model_id for model_id in ids if model_id == MODEL_ID or model_availability(model_id)[0]]
+
+    def compare_scorer(model_id: str):
+        """(scorer, native baselines) for a model: the running ones for the active model, else loaded once."""
+        if model_id == MODEL_ID:
+            return app.state.scorer, app.state.refs
+        with compare_lock:
+            if model_id not in app.state.compare:
+                scorer = prepare_scorer(model_id)
+                refs = References(scorer, app.state.tts, list(BASELINE_VOICES.values())) if app.state.tts else None
+                app.state.compare[model_id] = (scorer, refs)
+            return app.state.compare[model_id]
+
+    def compare_view(result: dict) -> dict:
+        """What the comparison panel draws from a result: the verdict, what was heard, each word's sounds."""
+        words = [{"tr": w.get("tr", ""), "heard_tr": w.get("heard_tr", ""), "score": w.get("score"),
+                  "phonemes": [{"ipa": p.get("ipa", ""), "score": round(p.get("score", 0)), "flagged": bool(p.get("flagged")),
+                                "heard": p.get("heard") or ""} for p in w.get("phonemes", [])]}
+                 for w in result.get("words", [])]
+        return {"score": result.get("score"), "unrelated": bool(result.get("unrelated")),
+                "heard_tr": result.get("heard_tr", ""), "heard_ipa": result.get("heard_ipa", ""), "words": words,
+                "tips": [t.get("title", "") for t in result.get("tips", [])], "references": refs if isinstance(refs := result.get("references"), int) else len(refs or [])}
+
+    @app.post("/api/admin/compare-models")
+    def compare_models(phrase_id: int | None = Form(None), item: str = Form(""), audio: UploadFile = File(...),
+                       _a: SupabaseAuth = Depends(models_only), user: dict | None = Depends(signed_in)):
+        """One recording scored by each comparison model, as /api/score would score it with that model. Nothing is
+        saved. The first call loads the models that aren't running (several seconds each)."""
+        if item:
+            found = lab.QUICK_BY_ID.get(item)
+            if found is None:
+                raise HTTPException(404, "no such quick benchmark item")
+            phrase, reference_key = lab.phrase(found), f"quick:{item}"
+        elif phrase_id is not None:
+            phrase, reference_key = phrase_of(phrase_id), phrase_id
+        else:
+            raise HTTPException(400, "phrase_id or item is required")
+        data = audio.file.read(MAX_UPLOAD + 1)
+        if len(data) > MAX_UPLOAD:
+            raise HTTPException(413, "recording too long")
+        try:
+            wav = decode_audio(data)
+        except ValueError:
+            raise HTTPException(400, "could not decode audio")
+        names = {m["id"]: m["name"] for m in model_catalog(MODEL_ID)}
+        out = []
+        for model_id in (quick_compare_ids() if item else compare_ids()):
+            row = {"model": model_id, "name": names.get(model_id, model_id), "active": model_id == MODEL_ID}
+            try:
+                t0 = time.perf_counter()
+                scorer, refs = compare_scorer(model_id)
+                row["load_ms"] = round(1000 * (time.perf_counter() - t0))
+                t0 = time.perf_counter()
+                baselines = refs.get(reference_key, phrase) if refs else []
+                result = scorer.score(wav, phrase, baselines, diagnostics=False)
+                row["ms"] = round(1000 * (time.perf_counter() - t0))
+                row.update(compare_view(result))
+            except Exception as e:  # one model failing must not hide the others
+                log.exception("comparison with %s failed", model_id)
+                row["error"] = f"{type(e).__name__}: {e}"[:300]
+            out.append(row)
+        return {"phrase": phrase.get("key", phrase.get("he", "")), "models": out}
+
+    # ---- the scorer's settings per model (thresholds, floors, GOP), tuned in the "מודלים" tab ----
+    def model_settings_row(model_id: str) -> tuple[bool, dict | None]:
+        """(is the table there, the model's stored row or None). Raises AuthUnavailable on other failures."""
+        a = app.state.auth
+        if not a or not hasattr(a, "model_settings"):
+            return False, None
+        try:
+            rows = a.model_settings()
+        except AuthUnavailable as e:
+            if "answered 404" in str(e):
+                return False, None
+            raise
+        return True, next((r for r in rows if r.get("model") == model_id), None)
+
+    def apply_model_settings(scorer: Scorer, model_id: str) -> None:
+        """Puts a model's stored settings on its scorer. No row leaves the scorer as it was built."""
+        try:
+            _, row = model_settings_row(model_id)
+            if row:
+                scorer.cfg = build_model_config(model_id, row.get("settings") or {})
+        except (AuthUnavailable, ValueError, TypeError) as e:
+            log.warning("model settings for %s not applied: %s", model_id, e)
+
+    def sound_counts() -> dict[str, int]:
+        """How often each sound occurs in the phrase bank: the tab shows which thresholds matter most."""
+        if getattr(app.state, "sound_counts", None) is None:
+            counts: dict[str, int] = {}
+            vocab = app.state.scorer.vocab
+            for p in PHRASES:
+                for ar, ipa in p["variants"]:
+                    try:
+                        for t in tokenize(archify(ar, ipa), vocab):
+                            counts[t.sound] = counts.get(t.sound, 0) + 1
+                    except KeyError:
+                        pass
+            app.state.sound_counts = counts
+        return app.state.sound_counts
+
+    def model_settings_payload(model_id: str, user: dict | None) -> dict:
+        try:
+            stored, row = model_settings_row(model_id)
+        except AuthUnavailable as e:
+            raise HTTPException(503, f"Supabase לא זמין: {e}")
+        permissions = set((user or {}).get("permissions", ()))
+        row = row or {}
+        try:
+            described = describe_model_settings(model_id, row.get("settings") or {}, sound_counts())
+        except ValueError as e:   # a row written by hand that no longer validates: show the defaults and why
+            described = {**describe_model_settings(model_id, {}, sound_counts()), "error": str(e)}
+        return {"model": model_id, "active": model_id == MODEL_ID, "stored": stored,
+                "create_sql": None if stored else CREATE_MODEL_SETTINGS,
+                "can_edit": stored and app.state.auth is not None and bool(permissions & {"*", "models.manage"}),
+                "updated_by": row.get("updated_by", ""), "updated_at": row.get("updated_at"), **described}
+
+    def settings_model(model_id) -> str:
+        if not isinstance(model_id, str) or not (model_known(model_id) or model_id in (MODEL_ID, ENV_MODEL_ID)):
+            raise HTTPException(400, "unknown model")
+        return model_id
+
+    @app.get("/api/admin/model-settings")
+    def model_settings(response: Response, model: str = Query(""), _a: SupabaseAuth = Depends(admin_only),
+                       user: dict | None = Depends(signed_in)):
+        """One model's scorer settings: each with its default, its value now and whether it was changed."""
+        response.headers["Cache-Control"] = "no-store"
+        return model_settings_payload(settings_model(model or MODEL_ID), user)
+
+    @app.put("/api/admin/model-settings")
+    def save_model_settings(response: Response, body: dict = Body(...), _a: SupabaseAuth = Depends(models_only),
+                            user: dict | None = Depends(signed_in)):
+        """Replaces a model's settings (an empty object: back to the defaults). For the model scoring now they take
+        effect at once, and the native baselines are scored again under them."""
+        response.headers["Cache-Control"] = "no-store"
+        model_id = settings_model(body.get("model"))
+        try:
+            settings = clean_model_settings(body.get("settings", {}))
+            cfg = build_model_config(model_id, settings)
+        except (ValueError, TypeError) as e:
+            raise HTTPException(400, str(e))
+        stored, _ = model_settings_row(model_id)
+        if not stored:
+            raise HTTPException(503, f"הטבלה model_settings לא קיימת. הריצו ב-SQL Editor: {CREATE_MODEL_SETTINGS}")
+        try:
+            app.state.auth.set_model_settings(model_id, settings, (user or {}).get("email", "").lower())
+        except AuthUnavailable as e:
+            raise HTTPException(503, f"Supabase לא זמין: {e}")
+        if model_id == MODEL_ID:
+            app.state.scorer.cfg = cfg
+            if app.state.refs is not None:
+                app.state.refs.invalidate()
+        log.info("model settings for %s replaced by %s: %s", model_id, (user or {}).get("email", "?"), settings)
+        app.state.auth.log_event("permission", user, f"הגדרות מודל: {model_id}",
+                                 {"model": model_id, "action": "settings", "settings": settings})
+        return model_settings_payload(model_id, user)
 
     @app.get("/api/prompt-audio/{phrase_id}", dependencies=[Depends(require("practice.use"))])
     def prompt_audio(phrase_id: int, engine: str = "gtts"):

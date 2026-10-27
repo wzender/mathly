@@ -60,6 +60,10 @@ class Rules:
     insertion: dict | None = None
     # short vowels a rule flags although short vowels are not flagged (6.3 #7): vowel -> rule id (3.11: u)
     flag_vowels: dict[str, str] = field(default_factory=dict)
+    # a long vowel said short, judged by its duration (3.8): rule, severity, min_ratio, prior_frames, ..., feedback
+    length: dict | None = None
+    # (target, heard) pairs a native reference never forgives (scoring.baseline_protected, 6.4)
+    baseline_protected: set[tuple[str, str]] = field(default_factory=set)
 
     def members(self, symbol: str, written: str | None = None) -> list[str]:
         """The correct realisations of an abstract symbol, in base() names, first the dialects' own.
@@ -104,6 +108,11 @@ class Rules:
                 return m
         return default
 
+    def protected(self, targets: str | list[str], heard: str | None) -> bool:
+        """Is (target, heard) a pair a native reference never forgives? The target as an abstract symbol or written."""
+        return heard is not None and any((norm(t), norm(heard)) in self.baseline_protected
+                                         for t in ([targets] if isinstance(targets, str) else targets))
+
     def label(self, heard: str | None) -> str | None:
         """The Hebrew name of a heard symbol, as section 8 gives it."""
         if heard is None:
@@ -128,8 +137,10 @@ def parse(text: str) -> Rules:
     archi, dialects, optional, scoring, labels = {}, ["urban", "rural"], False, {}, {}
     checks: dict[tuple[str, str], Check] = {}
     titles: dict[str, str] = {}
-    insertion, flag_vowels = None, {}
+    insertion, flag_vowels, length = None, {}, None
     for doc in _blocks(text):
+        if "duration" in doc:
+            length = {"rule": doc["id"], **doc["duration"]}
         if "insertion" in doc:
             titles[doc["id"]] = doc.get("title", doc["id"])
             insertion = {"rule": doc["id"], **doc["insertion"]}
@@ -151,12 +162,14 @@ def parse(text: str) -> Rules:
                     key = (norm(str(c["target"])), norm(str(heard)))
                     # two spellings of one sound (ʁ and ɣ) meet here: the first rule written wins
                     checks.setdefault(key, Check(doc["id"], key[0], key[1], int(c["severity"]), str(c["feedback"])))
-    rules = Rules(archi, dialects, optional, scoring, checks, titles, labels, insertion=insertion, flag_vowels=flag_vowels)
+    rules = Rules(archi, dialects, optional, scoring, checks, titles, labels, insertion=insertion, flag_vowels=flag_vowels,
+                  length=length)
     for m in scoring.get("margins", []):
         # base() drops vowel length, so a margin for long vowels would land on quality pairs (a / i) it was not meant for
         for t in (t for t in m["target"] if "ː" not in str(t)):
             for h in m["heard"]:
                 rules.margins[(norm(str(t)), norm(str(h)))] = float(m["margin"])
+    rules.baseline_protected = {(norm(str(p["target"])), norm(str(p["heard"]))) for p in scoring.get("baseline_protected", [])}
     return rules
 
 
@@ -173,6 +186,8 @@ def undetectable(check: Check, rules: Rules, in_model: Callable[[str], bool],
     as the same symbol cannot be told apart."""
     same = (lambda a, b: a == b or (heard_as(a) is not None and heard_as(a) == heard_as(b))) if heard_as \
         else (lambda a, b: a == b)
+    if rules.length and check.rule == rules.length["rule"]:
+        return None                         # a long vowel said short is measured by its duration, not its symbol
     if same(check.target, check.heard):
         return "same_sound"                 # the two collapse to one sound (aː / a: length is not modelled)
     accepted = rules.members(check.target) if check.target.isupper() else [check.target]
@@ -276,6 +291,16 @@ def _final_b_devoicing(toks, i, sc, heard, ar_words):
     return following.word == toks[i].word + 1 and base(following.phoneme) in _VOICELESS_ONSETS
 
 
+# Rule 32: plain t heard as d, or d heard as t. Hebrew has the same contrast (ת / ד), so a learner hardly ever swaps
+# them, while the multilingual model often does: a t after n (انتي) or between vowels (فتح) gets some voicing in
+# natural speech and is labelled d. Emphatics (tˤ, dˤ) are not covered: their plain counterparts are rule 3.3.
+_VOICING_PAIR = {("t", "d"), ("d", "t")}
+
+
+def _t_d_voicing(toks, i, sc, heard, ar_words):
+    return not sc.deleted and (base(toks[i].phoneme), base(heard or "")) in _VOICING_PAIR
+
+
 # Rule 29: in connected speech, a word-final short vowel flows into a vowel-initial next word.  The next word is
 # commonly represented with an initial ʔ token, so accept either V or ʔ+V as the hiatus context.  CTC may assign the
 # transition to only one side and call the final vowel deleted even in native speech (على إيدك).
@@ -300,6 +325,7 @@ EXEMPTIONS = [
     ("article_vowel_elided", _article_vowel_elided, None),
     ("near_vowel", _near_vowel, "near_vowel_floor"),
     ("final_b_devoicing", _final_b_devoicing, None),
+    ("t_d_voicing", _t_d_voicing, None),
     ("word_final_vowel_linking", _word_final_vowel_linking, "near_vowel_floor"),
     ("unmarked_short_vowel", _unmarked_short_vowel, "near_vowel_floor"),
 ]
@@ -348,6 +374,9 @@ def _toggles() -> list[Toggle]:
         Toggle("final_b_devoicing", "judge", "6.3 #28", "b סופית לפני עיצור אטום",
                "b בסוף מילה שהמודל שמע כ־p לפני עיצור אטום במילה הבאה מקבלת ציון מלא; "
                "באמצע מילה או לפני עיצור קולי אין פטור."),
+        Toggle("t_d_voicing", "judge", "6.3 #32", "t ו־d לא מתחלפות",
+               "t שהמודל שמע כ־d, או d שנשמעה כ־t, מקבלת ציון מלא: דוברי עברית מבחינים בין ת ל־ד, "
+               "והמודל טועה בזוג הזה (אחרי n, בין תנועות). עיצורים מודגשים (ط, ض) נבדקים כרגיל."),
         Toggle("word_final_vowel_linking", "judge", "6.3 #29", "תנועה סופית שמתחברת לתנועה הבאה",
                "תנועה קצרה בסוף מילה שהמודל רואה כמחוקה לפני מילה שמתחילה בתנועה מקבלת לפחות 90; "
                "באמצע מילה או לפני עיצור אין פטור."),
@@ -361,6 +390,9 @@ def _toggles() -> list[Toggle]:
                "טעות שמשנה משמעות (ח, ע) מוצגת לפני מבטא, ואחריה הציון הנמוך. כבוי: לפי הציון בלבד, עד 4."),
     ]
     own = {
+        "vowel_length": "המודל לא מבחין בין a ל־aː, ולכן האורך נמדד בזמן: תנועה ארוכה בין שני עיצורים שקצרה בבירור "
+                        "ביחס לתנועות הקצרות של אותו דובר יורדת לכל היותר ל־60, עם טיפ בחומרה 1. "
+                        "כבוי: אורך התנועה לא נבדק.",
         "cluster": "תנועה שהמודל שומע בבירור בין שני עיצורים של אותה מילה (katiir במקום ktiir) מורידה את העיצור השני "
                    "לכל היותר ל־60, עם טיפ בחומרה 1. לא בצרור שפותח את המשפט, ולא ליד w או j. כבוי: תנועה שנוספה לא נבדקת.",
         "kubutz": "u אחרי עיצור היא התנועה הקצרה היחידה שמסומנת: כשנשמטה, או נשמעה כ־e, i או שווא. "

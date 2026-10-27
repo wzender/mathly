@@ -196,6 +196,8 @@ checks:
 
 הכלל משנה משמעות, אבל מקבל חומרה 1 כי מודל ההגאים מבחין באורך תנועה פחות טוב. ראו חלק 7.
 
+המודל לא מבחין בין a ל־aː, ולכן ה־scorer מודד זמן: כמה פריימים רועשים יש בין העיצור שלפני התנועה לעיצור שאחריה, ביחס לאותו מרווח סביב התנועות הקצרות של אותו דובר. aː, iː ו־uː בלבד, ורק בין שני עיצורים. תנועה ארוכה שקצרה בבירור מקבלת לכל היותר 60 וטיפ. הפטור של 6.3 #7 (תנועות קרובות) עדיין חל על שאר הבלבולים באורך.
+
 ```yaml
 id: vowel_length
 title: תנועה קצרה ותנועה ארוכה
@@ -205,6 +207,17 @@ checks:
   - {target: uː, heard: [u], severity: 1, feedback: "התנועה הארוכה נהגתה קצרה. החזיקו אותה בערך כפול."}
   - {target: eː, heard: [e, i], severity: 1, feedback: "התנועה הארוכה נהגתה קצרה. החזיקו אותה בערך כפול."}
   - {target: oː, heard: [o, u], severity: 1, feedback: "התנועה הארוכה נהגתה קצרה. החזיקו אותה בערך כפול."}
+duration:            # the model pools a and aː, so the scorer times the vowel instead (scorer.Scorer._shortened)
+  severity: 1
+  # a long vowel whose span is under this share of the speaker's short-vowel span is said short. Set on the native
+  # minerva train clips so that about 10% of native long vowels fall under it (dev: 10% aː, 9% iː, 13% uː);
+  # about half of short vowels do. eː and oː are not timed: natives often say them no longer than e and o.
+  min_ratio: {aː: 1.0, iː: 0.8, uː: 1.0}
+  prior_frames: 4        # a short vowel's span in loud frames (native median), for sentences with few of their own
+  prior_frames_plain: 6  # the same counting every frame, when there is no audio energy
+  prior_weight: 2        # worth this many of the sentence's own short vowels
+  score_cap: 60          # the long vowel scores at most this
+  feedback: "התנועה הארוכה נהגתה קצרה. החזיקו אותה בערך כפול."
 ```
 
 ### 3.9 ג' ולא g · דיוק
@@ -322,10 +335,12 @@ optional_realisations_enabled: false   # true -> Bedouin g for Q
 
 לזוגות שהמודל מבלבל גם אצל דוברים ילידיים יש מרווח גדול יותר, כדי לא להעניש תלמיד על חולשה של המודל.
 
+**ראיה להחלפה.** המתחרה נקרא בשמו (טיפ, ו"נשמעה כמו" באות) רק כשיש עליו ראיה בהקלטה: הוא גובר על ההגה הנכון לפחות בפריים אחד, או מגיע להסתברות 0.3. מתחרה שרק קצת סביר יותר ממטרה חלשה, ולא גובר באף פריים, אינו ממצא: הציון נשאר, אבל אין טיפ, והאות אומרת רק שההגה "לא נשמעה בבירור".
+
 ```yaml
 scoring:
   flag_below: 50            # phoneme score 0..100
-  unrelated_ratio: 0.65     # normalised edit distance of greedy decode vs target -> "different sentence?"
+  unrelated_ratio: 0.5      # weighted edit distance of greedy decode vs target (grading-pipeline §8) -> "different sentence?"
   accept_alt_min_post: 0.20 # an accepted realisation counts if its peak posterior >= this
   accepted_score_floor: 90  # score given to a phoneme realised as an accepted alternative
   deletion: {target_peak_max: 0.05, competitor_peak_max: 0.20}
@@ -343,6 +358,10 @@ scoring:
     - {target: [h], heard: ["_"], margin: 0.7}                            # h is short and quiet, natives reduce it too
     - {target: [aː, iː, uː, eː, oː], heard: [a, i, u, e, o], margin: 1.1} # ~3x: length is unreliable from CTC posteriors
     - {target: [ħ], heard: [h], margin: 0.4}
+  # pairs the model tells apart in native speech (lab, 2026-10-19: natives' ح heard as خ 2%, a real خ caught 64%):
+  # a native reference never forgives them, since a TTS voice can say them the learner's way (see 6.4)
+  baseline_protected:
+    - {target: ħ, heard: x}
 ```
 
 ### 6.3 מקרים מיוחדים: לא מסמנים שגיאה
@@ -369,8 +388,16 @@ scoring:
 | 29 | תנועה קצרה בסוף מילה נראית מחוקה לפני תנועה בתחילת המילה הבאה | בדיבור מחובר המעבר שייך אקוסטית לשתי המילים, אבל CTC עשוי לשייך אותו רק לאחת: `ʕala ʔiidak` | תנועה קצרה מחוקה בסוף מילה לפני V או ʔ+V מקבלת לפחות 90. באמצע מילה או לפני עיצור אין פטור |
 | 30 | תנועה קצרה אינה מסומנת אך ציון אקוסטי נמוך שלה מוריד את המילה | הצגה וחישוב חייבים ליישם אותה מדיניות; אין היגיון ב„לא סומן” עם ציון 1 | תנועה קצרה שאינה נבדקת מקבלת לפחות 90. `u` אחרי עיצור באותה מילה נשארת נבדקת לפי 3.11 |
 | 31 | העיצור הראשון במשפט חלש, ומתחרה מופיע לפניו בפריים אחד בלבד | פוצץ בתחילת מבע (סגר שקט ופיצוץ קצר) נשמע חלש למודל, ונשימה או רעש מיקרופון בפריים בודד גוברים עליו בשם שרירותי: `طاولتنا`, tˤ שנשמעה כ־j | עיצור ראשון שנשמע (לא מחוק, שיא ≥ 5%) ומתחרה בפריים אחד בלבד: לפחות 90, לא מסומן. השמטה, או מתחרה בשני פריימים ומעלה, נבדקים כרגיל. ʔ מטופלת בכללים 1–2 |
+| 32 | t נשמעה כ־d, או d כ־t | בעברית יש אותה הבחנה (ת / ד), ולומדים כמעט לא מחליפים ביניהן. המודל הרב־לשוני כן: t אחרי n (`انتي`) או בין תנועות (`فتح`) מקבלת קוליות חלקית בדיבור טבעי ונשמעת לו d | `t→d` ו־`d→t` מקבלות 100. עיצורים מודגשים (tˤ, dˤ) לא בכלל הזה ונבדקים לפי 3.3 |
 
 במאגר התרגול `انا` מיוצגת במפורש בשני וריאנטים תקינים, `ʔ a n a` ו־`a n a`. כך השמטה טבעית נבחרת כווריאנט מלא במקום ליישר בכוח את תחילת ההקלטה מול ʔ ולפרש רעש נשימה כ־`h`.
+
+### 6.4 קו בסיס ילידי
+אותו מודל מקשיב גם לקולות ילידיים (TTS) שאומרים את המשפט. הגה שהמודל לא מזהה גם אצלם הוא חולשה של המודל, לא של התלמיד, ולכן ציון ההגה של התלמיד נמדד מול הציון שהקול קיבל עליו.
+
+- **רק כשגם הקול איבד את ההגה.** קול מוחל על החלפה של התלמיד רק כשגם אצלו המודל לא זיהה את ההגה, בכל דרך שהיא (ע שנשמעת כמו ء, או ח שנשמעת כמו ה). כשהקול שמר על ההגה, ההחלפה של התלמיד נשארת.
+- **זוגות מוגנים** (`baseline_protected` בבלוק שב־6.2) לא נמחלים אף פעם. המודל מבחין בהם אצל דוברים ילידיים (בבדיקת המעבדה, ח נשמעה כמו ח' רק אצל 2% מהם, וח' אמיתית נתפסה ב־64%), ואילו קול TTS עלול להגות אותם בדיוק כמו התלמיד. מוסיפים זוג רק אחרי בדיקה מול הקלטות ילידיות.
+- **הגה חלש בלי החלפה** (התלמיד שמר עליו, רק חלש) נמדד מול הקול כמו קודם.
 
 ---
 

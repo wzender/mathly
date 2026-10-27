@@ -15,8 +15,9 @@ SYMS = ["<pad>", "w", "eː", "n", "i", "l", "ħ", "a", "m", "aː", "χ", "h", "k
 VOCAB = {s: i for i, s in enumerate(SYMS)}
 
 
-def emissions(phones, frames=3, gap=2, peak=0.9):
-    """Log-posteriors where each phone peaks for `frames` frames, separated by blanks."""
+def emissions(phones, frames=3, gap=2, peak=0.9, long_by=2):
+    """Log-posteriors where each phone peaks for `frames` frames (a long vowel `long_by` times as many), separated
+    by blanks."""
     V = len(SYMS)
     rows = []
 
@@ -28,7 +29,7 @@ def emissions(phones, frames=3, gap=2, peak=0.9):
     for _ in range(gap):
         rows.append(row("<pad>", 0.95))
     for ph in phones:
-        for _ in range(frames):
+        for _ in range(frames * long_by if "ː" in ph else frames):   # a long vowel is held longer (3.8)
             rows.append(row(ph, peak))
         for _ in range(gap):
             rows.append(row("<pad>", 0.95))
@@ -150,8 +151,8 @@ def test_k_for_qaf_is_rural_and_correct():
 
 # ---------- dialects and Hebrew-speaker rules (docs/scoring-dialects-plan.md) ----------
 
-def custom_scorer(extra, phones, frames=3, gap=2, peak=0.9):
-    """A scorer over SYMS plus `extra`, hearing `phones` cleanly."""
+def custom_scorer(extra, phones, frames=3, gap=2, peak=0.9, long_by=2):
+    """A scorer over SYMS plus `extra`, hearing `phones` cleanly (a long vowel held `long_by` times as long)."""
     syms = SYMS + [s for s in extra if s not in SYMS]
     vocab = {s: i for i, s in enumerate(syms)}
 
@@ -162,7 +163,7 @@ def custom_scorer(extra, phones, frames=3, gap=2, peak=0.9):
 
     rows = [row("<pad>", 0.95)] * gap
     for ph in phones:
-        rows += [row(ph, peak)] * frames + [row("<pad>", 0.95)] * gap
+        rows += [row(ph, peak)] * (frames * long_by if "ː" in ph else frames) + [row("<pad>", 0.95)] * gap
     return Scorer(lambda wav: np.log(np.array(rows)), Vocab(vocab))
 
 
@@ -249,7 +250,8 @@ def test_emphatic_heard_plain_is_a_mistake_with_the_rules_feedback():
 
 
 def margin_scorer(competitor_ratio):
-    """طين where tˤ is weak (p 0.07) and plain t is `competitor_ratio` times likelier in the same frames."""
+    """طين where tˤ is weak (p 0.12) and plain t is `competitor_ratio` times likelier in the same frames (from p 0.2 up:
+    enough evidence to be named, so the margin alone decides)."""
     syms = SYMS + ["tˤ", "t"]
     vocab = {s: i for i, s in enumerate(syms)}
     V = len(syms)
@@ -261,7 +263,7 @@ def margin_scorer(competitor_ratio):
         return r / r.sum()
 
     rows = [row({"<pad>": 0.95})] * 2
-    rows += [row({"tˤ": 0.07, "t": 0.07 * competitor_ratio, "<pad>": 0.8})] * 3 + [row({"<pad>": 0.95})] * 2
+    rows += [row({"tˤ": 0.12, "t": 0.12 * competitor_ratio, "<pad>": 0.55})] * 3 + [row({"<pad>": 0.95})] * 2
     for ph in ("i", "n"):
         rows += [row({ph: 0.9})] * 3 + [row({"<pad>": 0.95})] * 2
     return Scorer(lambda wav: np.log(np.array(rows)), Vocab(vocab))
@@ -269,11 +271,13 @@ def margin_scorer(competitor_ratio):
 
 def test_emphatic_needs_a_clear_win_before_it_is_flagged():
     phrase = {"variants": [("طين", "tˤ i n")]}
-    under = margin_scorer(1.8).score(None, phrase)        # plain t under twice as likely: the model's doubt
+    under = margin_scorer(1.8).score(None, phrase, diagnostics=True)   # plain t under twice as likely: the model's doubt
     p = under["words"][0]["phonemes"][0]
-    assert p["score"] < 50 and not p["flagged"] and not under["tips"]
-    over = margin_scorer(2.5).score(None, phrase)
+    assert p["score"] < 60 and not p["flagged"] and not under["tips"]
+    assert under["trace"]["tokens"][0]["margin"]["beyond"] is False     # the margin itself holds it back
+    over = margin_scorer(2.5).score(None, phrase, diagnostics=True)
     assert over["words"][0]["phonemes"][0]["flagged"] and [t["key"] for t in over["tips"]] == ["tˤ>t"]
+    assert over["trace"]["tokens"][0]["margin"]["beyond"] is True
 
 
 @pytest.mark.parametrize("ar,ipa,extra,said,key,heard_letter", [
@@ -310,6 +314,54 @@ def test_unrelated_sentence():
     logp = emissions(["ʃ", "a", "l", "a", "m"])
     r = scorer_for(logp).score(None, TOILET)
     assert r["unrelated"] and r["score"] <= 30
+
+
+SON = {"variants": [("ابننا", "ʔ i b i n n a")]}   # הבן שלנו
+SON_SYMS = ["b", "ə", "θ", "u"]
+
+
+def test_weighted_edit_distance_costs():
+    from app.align import weighted_edit_distance
+    one = lambda *_: 1.0
+    assert weighted_edit_distance(list("kitten"), list("sitting"), lambda x, j: float(x != "sitting"[j]), one, one) == 3
+    # an insertion after the last target sound gets the edge cost
+    edge = lambda x, j: 0.25 if j in (0, 3) else 1.0
+    assert weighted_edit_distance(list("abcz"), list("abc"), lambda x, j: float(x != "abc"[j]), one, edge) == 0.25
+
+
+def test_exempted_differences_do_not_make_a_word_unrelated():
+    # the reported attempt: ʔ dropped, i heard as e and as ə, a breath (θ) at the end. All four are forgiven sounds,
+    # plain edit distance was 4/6 > 0.65 and capped a 97 at 30
+    r = custom_scorer(SON_SYMS, ["e", "b", "ə", "n", "a", "θ"]).score(None, SON, diagnostics=True)
+    u = r["trace"]["unrelated"]
+    assert u["raw_distance"] == 4 and u["distance"] <= 1
+    assert not r["unrelated"] and r["score"] >= 85
+
+
+def test_trailing_breath_costs_little():
+    clean = custom_scorer(SON_SYMS, ["ʔ", "i", "b", "i", "n", "a"]).score(None, SON, diagnostics=True)
+    noisy = custom_scorer(SON_SYMS, ["ʔ", "i", "b", "i", "n", "a", "θ"]).score(None, SON, diagnostics=True)
+    assert noisy["trace"]["unrelated"]["distance"] == 0.25
+    assert not noisy["unrelated"] and abs(noisy["score"] - clean["score"]) <= 5
+
+
+@pytest.mark.parametrize("phones", [["ʃ", "a", "l", "a", "m"], ["d", "a", "ʃ", "u", "m", "a"]])
+def test_another_word_with_forgivable_vowels_is_still_unrelated(phones):
+    # ابننا has three short vowels and a ʔ the scorer forgives: the gate must still look at its consonants
+    r = custom_scorer(SON_SYMS, phones).score(None, SON)
+    assert r["unrelated"] and r["score"] <= 30
+
+
+def test_confident_consonants_veto_the_unrelated_gate():
+    # every vowel replaced by ʃ, the consonants clean. A strict gate calls it unrelated unless the alignment veto,
+    # which sees the consonants peaking where the sentence has them, overrules it
+    logp = emissions(["w", "ʃ", "n", "ʃ", "l", "ħ", "ʃ", "m", "ʃ", "m"])
+    strict = scorer_for(logp)
+    strict.cfg = replace(strict.cfg, unrelated_ratio=0.1)
+    r = strict.score(None, TOILET, diagnostics=True)
+    assert r["trace"]["unrelated"]["veto"] and not r["unrelated"]
+    strict.cfg = replace(strict.cfg, unrelated_veto_share=1.01)
+    assert strict.score(None, TOILET)["unrelated"]
 
 
 @pytest.mark.parametrize("p", PHRASES, ids=lambda p: p["he"])
@@ -416,7 +468,7 @@ def onset_logp(lead, competitor_frames=1, target_peak=.10, competitor="j"):
         rows += [row(ph, .9)] * 3 + [row("<pad>", .95)] * 2
     rows += [row(competitor, .23)] * competitor_frames + [row("tˤ", target_peak), row("<pad>", .95)]
     for ph in ["aː", "w", "l", "i", "t", "n", "a"]:
-        rows += [row(ph, .9)] * 3 + [row("<pad>", .95)] * 2
+        rows += [row(ph, .9)] * (6 if ph == "aː" else 3) + [row("<pad>", .95)] * 2
     logp = np.log(np.array(rows))
     return Scorer(lambda wav: logp, Vocab(vocab)), logp
 
@@ -469,7 +521,8 @@ def test_ana_explicitly_accepts_the_natural_vowell_initial_form():
     assert not r["tips"] and not r["issues"]
 
 
-def test_tts_endpoint_serves_phrase_audio_and_503_without_key():
+def test_tts_endpoint_serves_phrase_audio_and_503_without_key(monkeypatch):
+    monkeypatch.delenv("SAWTAK_VOICE_ID", raising=False)   # a developer's .env may set a playback voice
     from fastapi.testclient import TestClient
 
     from app.main import create_app
@@ -489,13 +542,90 @@ def test_tts_endpoint_serves_phrase_audio_and_503_without_key():
         assert r.status_code == 200 and r.headers["content-type"] == "audio/wav" and r.content == b"RIFFfake"
         assert r.headers["x-tts-provider"] == "sawtakarabi.ai" and r.headers["x-tts-voice-id"] == FakeTTS.voice_id
 
-        from app.tts import VOICES
+        from app.tts import playback_voices
         voices = c.get("/api/phrases").json()["voices"]
-        assert [v["name"] for v in voices] == list(VOICES)
+        assert [v["name"] for v in voices] == list(playback_voices())
         assert voices == [{"id": FakeTTS.voice_id, "name": "רַאאִף"}]
         assert c.get("/api/tts/9999").status_code == 404
         health = c.get("/api/health").json()
         assert health["tts"] is True and health["rules"]["pharyngeal_h"]["detectable"]
+
+
+def test_monitoring_can_warm_the_unique_tts_bank(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import app.main
+    from app.main import create_app
+    from app.tts import RAEF_VOICE_ID
+
+    phrases = [
+        {"variants": [("مرحبا", "m a r ħ a b a")]},
+        {"variants": [("مرحبا", "m a r ħ a b a")]},  # duplicate text and voice is generated once
+        {"variants": [("اهلا", "ʔ a h l a")], "voice": "חנאן"},
+    ]
+    monkeypatch.setattr(app.main, "PHRASES", phrases)
+    monkeypatch.setattr(app.main, "load_auth", lambda: None)
+
+    class FakeTTS:
+        def __init__(self): self.calls = []
+        def cached(self, text, voice): return text.startswith("مَ")
+        def wav_for_voice(self, text, voice): self.calls.append((text, voice)); return b"RIFF", voice
+        def cache_stats(self): return {"files": len(self.calls), "bytes": 0, "hits": 0, "misses": 0, "hit_rate": None}
+
+    tts = FakeTTS()
+    with TestClient(create_app(scorer_for(emissions(["w"])), tts, tutor=object())) as c:
+        started = c.post("/api/tts-cache/warm", json={"voice_id": RAEF_VOICE_ID})
+        assert started.status_code == 200 and started.json()["total"] == 2
+        for _ in range(100):
+            state = c.get("/api/tts-cache").json()["warm"]
+            if not state["running"]: break
+            import time; time.sleep(.01)
+        assert state.pop("started_at") > 0
+        assert state == {"running": False, "voice_id": RAEF_VOICE_ID, "total": 2, "done": 2, "generated": 1,
+                         "skipped": 1, "failed": 0, "current": "", "waiting": 0, "error": "",
+                         "bucket": "", "uploaded": 0, "upload_failed": 0, "upload_error": "", "stopped": False,
+                         "phase": "", "to_generate": 1}
+        assert [voice for _text, voice in tts.calls] == [RAEF_VOICE_ID]  # the cached one is not read again
+
+
+def test_warm_sweep_uploads_every_cached_wav_to_the_bucket(monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+
+    import app.main
+    import app.tts
+    from app.main import create_app
+    from app.tts import RAEF_VOICE_ID, BucketMirror, SawtakTTS
+
+    phrases = [{"variants": [("مرحبا", "m a r ħ a b a")]}, {"variants": [("اهلا", "ʔ a h l a")]}]
+    monkeypatch.setattr(app.main, "PHRASES", phrases)
+    monkeypatch.setattr(app.main, "load_auth", lambda: None)
+
+    tts = SawtakTTS("key", cache_dir=tmp_path)
+    monkeypatch.setattr(tts, "_generate", lambda text, voice, *_: b"RIFF" + text.encode())
+    (tmp_path / "legacy.wav").write_bytes(b"old")            # cached before the per-voice layout
+    other = tmp_path / "other-voice"; other.mkdir(); (other / "x.wav").write_bytes(b"xx")
+
+    class FakeMirror(BucketMirror):
+        def __init__(self):
+            super().__init__("user/bucket", "ihki-tts")
+            self.uploads = []
+        def remote_sizes(self):
+            return {"ihki-tts/other-voice/x.wav": 2}           # already in the bucket: not sent again
+        def upload(self, files, source=""):
+            self.uploads += [(src if isinstance(src, bytes) else src.read_bytes(), dest) for src, dest in files]
+
+    tts.mirror = mirror = FakeMirror()
+    with TestClient(create_app(scorer_for(emissions(["w"])), tts, tutor=object())) as c:
+        assert c.post("/api/tts-cache/warm", json={"voice_id": RAEF_VOICE_ID}).status_code == 200
+        for _ in range(200):
+            state = c.get("/api/tts-cache").json()["warm"]
+            if not state["running"]: break
+            import time; time.sleep(.01)
+    dests = sorted(dest for _data, dest in mirror.uploads)
+    keys = sorted(f"ihki-tts/{tts.cache_key(app.main.point_arabic(*ph['variants'][0]), RAEF_VOICE_ID)}" for ph in phrases)
+    assert dests == sorted(keys + ["ihki-tts/legacy.wav"])
+    assert all(dest.startswith(f"ihki-tts/{RAEF_VOICE_ID}/") for dest in keys)
+    assert state["bucket"] == "user/bucket" and state["uploaded"] == 3 and state["upload_failed"] == 0
 
 
 def test_spelling_variants_of_a_sound_are_not_errors():
@@ -633,6 +763,27 @@ def test_rule_28_exempts_final_b_heard_as_p_only_before_a_voiceless_onset():
     assert no_exemption["words"][0]["phonemes"][-1]["score"] < 50
 
 
+def test_rule_32_exempts_t_heard_as_d_and_d_heard_as_t():
+    phrase = {"variants": [("انتي فتحتي", "i n t i | f a t a ħ t i")]}
+    scorer = custom_scorer(["d", "f", "t", "ħ"], ["i", "n", "d", "i", "f", "a", "t", "a", "ħ", "t", "i"])
+    result = scorer.score(None, phrase, diagnostics=True)
+    t = next(tok for tok in result["trace"]["tokens"] if tok["ipa"] == "t")
+    assert t["competitor"] == "d"
+    assert next(s for s in t["stages"] if s["stage"] == "exemption")["applied"] == "t_d_voicing"
+    assert result["words"][0]["phonemes"][2]["score"] == 100 and not result["tips"]
+
+    scorer.set_disabled({"t_d_voicing"})
+    assert scorer.score(None, phrase)["words"][0]["phonemes"][2]["score"] < 50
+
+    # d heard as t is covered too
+    dar = custom_scorer(["d", "t", "aː", "r"], ["t", "aː", "r"]).score(None, {"variants": [("دار", "d aː r")]})
+    assert dar["words"][0]["phonemes"][0]["score"] == 100
+
+    # ... but not an emphatic: ط heard as plain d is still judged
+    emph = custom_scorer(["d", "tˤ", "aː", "r"], ["d", "aː", "r"]).score(None, {"variants": [("طار", "tˤ aː r")]})
+    assert emph["words"][0]["phonemes"][0]["score"] < 50
+
+
 def test_rule_29_floors_a_deleted_final_short_vowel_before_a_vowel_initial_word():
     phrase = {"variants": [("على إيدك", "ʕ a l a | ʔ iː d e k")]}
     scorer = custom_scorer(["iː"], ["ʕ", "a", "l", "ʔ", "iː", "d", "e", "k"])
@@ -697,6 +848,116 @@ def test_native_reference_keeps_real_errors():
     assert scorer_for(emissions(["ʕ", "χ", "l", "χ", "i", "l", "χ", "a", "χ", "aː", "χ"])).reference(None, ALA) is None
 
 
+def h_as(sym):   # على الحمام with its ħ said as `sym`
+    return ["ʕ", "a", "l", "a", "i", "l", sym, "a", "m", "aː", "m"]
+
+
+def weakened(phones, at, p):
+    """emissions(phones) with phone `at` held at posterior p and nothing else standing out: kept, but weak."""
+    logp = np.exp(emissions(phones))
+    start = 2 + sum((3 * 2 if "ː" in ph else 3) + 2 for ph in phones[:at])
+    for f in range(start, start + 3):
+        logp[f] = (1 - p) / (len(SYMS) - 1)
+        logp[f, VOCAB[phones[at]]] = p
+    return np.log(logp)
+
+
+def test_reference_that_lost_the_sound_another_way_still_forgives():
+    ref = scorer_for(emissions(h_as("χ"))).reference(None, ALA)      # the voice's ħ heard as x
+    r = scorer_for(emissions(h_as("h"))).score(None, ALA, [ref])      # the learner's as h: not a protected pair
+    assert r["words"][1]["phonemes"][2]["score"] == 100 and not r["tips"]
+
+
+def test_reference_that_kept_the_sound_does_not_forgive():
+    ref = scorer_for(emissions(h_as("ħ"))).reference(None, ALA)      # the voice says ħ, and it is heard
+    dropped = [ph for k, ph in enumerate(h_as("ħ")) if k != 6]        # the learner leaves ħ out altogether
+    r = scorer_for(emissions(dropped)).score(None, ALA, [ref], diagnostics=True)
+    assert "ħ>_" in [t["key"] for t in r["tips"]] and r["words"][1]["phonemes"][2]["score"] < 50
+    stage = next(s for s in r["trace"]["tokens"][6]["stages"] if s["stage"] == "baseline")
+    assert stage["refused"] in ("kept", None) and not stage["applied"]
+
+
+def test_protected_pair_is_not_forgiven_even_when_the_voice_says_it_that_way():
+    ref = scorer_for(emissions(h_as("χ"))).reference(None, ALA)      # the TTS voice itself says خ for ح
+    assert ref is not None and ref.heard[6] in ("x", "χ")
+    r = scorer_for(emissions(h_as("χ"))).score(None, ALA, [ref], diagnostics=True)
+    assert "ħ>x" in [t["key"] for t in r["tips"]] and r["words"][1]["phonemes"][2]["score"] < 50
+    stage = next(s for s in r["trace"]["tokens"][6]["stages"] if s["stage"] == "baseline")
+    assert stage["refused"] == "protected" and stage["heard"] == ["x"]
+
+
+def test_weak_but_correct_sound_is_still_compensated():
+    weak = weakened(h_as("ħ"), 6, 0.12)                               # ħ faint in the voice and the learner alike
+    ref = scorer_for(weak).reference(None, ALA)
+    assert ref.heard[6] is None and ref.scores[6] < 100
+    plain = scorer_for(weak).score(None, ALA)["words"][1]["phonemes"][2]["score"]
+    r = scorer_for(weak).score(None, ALA, [ref])
+    assert plain < 100 and r["words"][1]["phonemes"][2]["score"] == 100 and not r["tips"]
+
+
+def onset_scorer(p_target, p_comp):
+    """احنا whose opening ʔ is faint (p_target) with b at p_comp in the same frames, under the blank."""
+    syms = SYMS + ["b"]
+    vocab = {s: i for i, s in enumerate(syms)}
+
+    def row(probs):
+        r = np.full(len(syms), 1e-4)
+        for sym, p in probs.items():
+            r[vocab[sym]] = p
+        return r / r.sum()
+
+    rows = [row({"<pad>": 0.95})] * 2
+    rows += [row({"ʔ": p_target, "b": p_comp, "<pad>": 1 - p_target - p_comp})] * 3 + [row({"<pad>": 0.95})] * 2
+    for ph in ("i", "ħ", "n", "a"):
+        rows += [row({ph: 0.9})] * 3 + [row({"<pad>": 0.95})] * 2
+    return Scorer(lambda wav: np.log(np.array(rows)), Vocab(vocab))
+
+
+ONSET = {"variants": [("احنا", "ʔ i ħ n a")]}
+
+
+def test_no_substitution_tip_without_evidence():
+    r = onset_scorer(0.06, 0.08).score(None, ONSET, diagnostics=True)   # b barely likelier, never winning a frame
+    tok = r["trace"]["tokens"][0]
+    assert tok["competitor_frames"] == 0 and tok["p_competitor"] < 0.3
+    assert not r["tips"] and not r["words"][0]["phonemes"][0]["flagged"]
+    letter = r["words"][0]["letters"][0]
+    assert letter["score"] == tok["final"] < 75 and "כמו" not in letter.get("why", "") and "tip" not in letter
+
+
+def test_substitution_tip_with_evidence():
+    r = onset_scorer(0.05, 0.6).score(None, ONSET)                      # b wins the frames
+    assert r["words"][0]["phonemes"][0]["flagged"] and r["tips"]
+    assert "נשמעה כמו ב" in r["words"][0]["letters"][0]["why"]
+
+
+def test_reference_records_what_took_each_sounds_place():
+    ref = scorer_for(emissions(MISHEARD)).reference(None, ALA)   # the voice's ʕ heard as a glottal stop
+    assert ref.heard[0] == "ʔ"
+    assert all(h is None for h in ref.heard[1:])
+
+
+def test_baseline_voices_are_raef_then_fadwa_by_name():
+    from app.tts import BASELINE_VOICES, FADWA_VOICE_ID, RAEF_VOICE_ID, voice_name
+    assert list(BASELINE_VOICES.values()) == [RAEF_VOICE_ID, FADWA_VOICE_ID]   # Raef first: the one generated
+    assert voice_name(RAEF_VOICE_ID) == "ראאף" and voice_name(FADWA_VOICE_ID) == "פדוא" and voice_name("x") == "x"
+
+
+def test_trace_keeps_every_voices_score_and_measures_against_the_lowest():
+    from app.scorer import Reference
+    s = scorer_for(emissions(MISHEARD))
+    toks = s._variants(ALA)[0][3]
+    weak = lambda score_on: Reference([(t.word, t.sound) for t in toks], [score_on.get(t.sound, 100.0) for t in toks])
+    a, b = replace(weak({"l": 40.0}), voice="A"), replace(weak({"l": 60.0, "ʕ": 70.0}), voice="B")
+    r = s.score_logp(s.emit(None), ALA, [a, b], diagnostics=True)
+    assert [x["voice"] for x in r["trace"]["references"]] == ["A", "B"]
+    for t in r["trace"]["tokens"]:
+        st = next(x for x in t["stages"] if x["stage"] == "baseline")
+        assert len(st["refs"]) == 2 and st["ref"] == min(x for x in st["refs"] if x is not None)
+        if t["sound"] == "ʕ":
+            assert st["refs"] == [100.0, 70.0]
+
+
 def test_references_use_one_generated_voice_and_any_cached_one():
     from app.reference import References
     from app.tts import TTSUnavailable
@@ -709,7 +970,7 @@ def test_references_use_one_generated_voice_and_any_cached_one():
         def cached(self, text, voice):
             return voice == "played"
 
-        def wav(self, text, voice=""):
+        def wav_for_voice(self, text, voice, source="", upload=False):   # keeps the voice id (wav() would not)
             calls.append(voice)
             if self.down:
                 raise TTSUnavailable("down")
@@ -721,6 +982,7 @@ def test_references_use_one_generated_voice_and_any_cached_one():
     try:
         refs = References(s, tts, ["first", "never-played", "played"])
         assert len(refs.get(7, ALA)) == 2 and calls == ["first", "played"]
+        assert [r.voice for r in refs.get(7, ALA)] == ["first", "played"]   # named for the trace dashboard
         assert len(refs.get(7, ALA)) == 2 and len(calls) == 2            # kept in memory
         assert refs.invalidate(7, "first") == 1
         assert len(refs.get(7, ALA)) == 2 and calls == ["first", "played", "first"]
@@ -796,10 +1058,10 @@ def test_levels_plan_every_lesson():
     from app.workbook import LESSONS as WRITTEN, LEVELS as PLAN, lesson_id
 
     # every lesson names its level, and each level lists all of its planned lessons, the unwritten ones as soon
-    assert [v["id"] for v in LEVELS] == ["1", "2"] and len(LESSONS) == 20
+    assert [v["id"] for v in LEVELS] == ["1", "2"] and len(LESSONS) == 19   # level 2 ends at שיעור 18
     assert all(isinstance(key, tuple) and key[0] in PLAN for key in WRITTEN)
     # level 2's workbook goes on counting from level 1's: its first lesson is shown as the tenth, and keeps the id "2.1"
-    assert [(l["level"], l["n"]) for l in LESSONS] == [("1", n) for n in range(1, 11)] + [("2", n) for n in range(10, 20)]
+    assert [(l["level"], l["n"]) for l in LESSONS] == [("1", n) for n in range(1, 11)] + [("2", n) for n in range(10, 19)]
     assert [l["name"] for l in LESSONS if l["level"] == "2"][:2] == ["שיעור 10", "שיעור 11"] and LESSONS[0]["name"] == "שיעור 1"
     assert [l["id"] for l in LESSONS if l["level"] == "2"][:2] == ["2.1", "2.2"]   # level 1 keeps "1", "2": attempts name them
     assert {l["id"] for l in LESSONS if not l.get("soon")} == {lesson_id(*k) for k in WRITTEN} == {c["lesson"] for c in CATEGORIES}
@@ -978,6 +1240,7 @@ def test_workbook_lesson_7():
     assert all(p["read"] == (p["cat"] == "l7-read") and "#" not in p["ar"] for p in pub if p["cat"].startswith("l7-"))
     by = {(p["cat"], p["he"]): p for p in PHRASES}
     assert by["l7-fem", "רווק, רווקה"]["tr"] == "עַזַّאבִּי, עַזַّאבִּיֵّה" and by["l7-dual", "מיטה, שתי מיטות"]["tr"] == "תַחְ'ת, תַחְ'תֵין"
+    assert by["l7-fem", "רווק, רווקה"]["he_say"].startswith("רַוָּק")
     assert by["l7-nums", "מאה שבעים וחמש (175)"]["tr"] == "מִיֵّה חַ'מְסֵה וּסַבְּעִין"   # units before tens
     # 3-10: the noun in the plural and the number without its ة; from 11: the noun in the singular, and 11-19 with a ר
     assert by["l7-count", "שבעה ילדים"]["tr"] == "סַבְּע אַוְלַאד" and by["l7-count", "שתים עשרה בנות"]["tr"] == "תְנַעְשַר בִּנְת"
@@ -1096,6 +1359,7 @@ def test_workbook_level_2_lesson_1():
     by = {(p["cat"], p["he"]): p for p in PHRASES}
     # a verb is said in the past and the future together
     assert by["l2.1-verbs", "רץ (עבר, עתיד)"]["tr"] == "רַכַּדֿ, יֻרְכֹּדֿ" and by["l2.1-verbs", "שלח (עבר, עתיד)"]["tr"] == "בַּעַת', יִבְּעַת'"
+    assert by["l2.1-verbs", "שלח (עבר, עתיד)"]["variants"] == [("بعث، يبعث", "b a ʕ a t | j i b ʕ a t")]
     assert by["l2.1-past", "אני רצתי"]["tr"] == "אַנַא רַכַּדֵֿת" and by["l2.1-past", "היא שילמה"]["tr"] == "הִיֵّ דַפְעַת"
     assert by["l2.1-past", "הם קשרו"]["variants"][0][1] == "h u m m e | r a b a tˤ u"
     # لازم and رح stay as they are; the verb after them is in the future
@@ -1450,8 +1714,8 @@ def test_sign_in_guards_the_practice_endpoints():
             return [{"id": "u1", "email": "A@b.c", "name": "Alef"}, {"id": "u2", "email": "s@b.c", "name": ""},
                     {"id": "u3", "email": "out@b.c", "name": ""}]
 
-        def all_attempts(self):
-            return [{**r, "user_id": "u2"} for r in self.attempts("")[:2]]
+        def all_attempts(self, limit=200_000):
+            return [{**r, "user_id": "u2"} for r in self.attempts("")[:2]][:limit]
 
         def activity(self, hours=24, bucket_minutes=15):
             self.activity_args = hours, bucket_minutes
@@ -1703,23 +1967,19 @@ def test_sign_in_guards_the_practice_endpoints():
         assert [k["written"] for k in c.get("/api/class", headers=good).json()["students"][:2]] == [{"l1-hw": ["הִיֵّ פַתְחַת"]}, {}]
         assert (student["classes"], new["classes"]) == ({"October 2026": ""}, {"October 2026": "דנה"})
         assert x["classes"] == {"October 2026": "", "September 2026": ""} and y["classes"] == {"September 2026": ""}
-        # a class counts what was practised since it was opened: a new one starts clean (the student's own summary stays whole)
-        assert student["since"]["October 2026"]["recordings"] == 2   # a class without its opening time counts everything
-        c.app.state.auth.cls[0]["created_at"] = "2026-10-09T00:00:00.123+00:00"   # between the student's two tries
+        # progress is the student's, not the class's: a class opened after they practised still shows it all,
+        # so a student moved to another class with the same lessons keeps their progress
+        c.app.state.auth.cls[0]["created_at"] = "2026-10-10T00:00:00+00:00"   # opened after both tries
         student = c.get("/api/class", headers=good).json()["students"][0]
-        assert student["recordings"] == 2 and student["since"] == {"October 2026": {
-            "best": {str(PHRASES.index(VERB)): 88}, "tries": {str(PHRASES.index(VERB)): 1}, "missed": {}, "unmatched": 0,
-            "recordings": 1, "days": 1,
-            "week": student["since"]["October 2026"]["week"], "last": "2026-10-09T10:00:00+00:00"}}
+        assert "since" not in student and student["classes"] == {"October 2026": ""}
+        assert (student["best"], student["recordings"], student["last"]) == (
+            {str(PHRASES.index(VERB)): 88}, 2, "2026-10-09T10:00:00+00:00")
         # a recording with speech completes the exercise even when it did not match; it is also counted diagnostically
         from app.main import summary
         off = summary([{"cat": VERB["cat"], "phrase": VERB["he"], "score": 12, "unrelated": True, "created_at": "2026-10-09T11:00:00+00:00"},
                        {"cat": VERB["cat"], "phrase": VERB["he"], "score": 70, "unrelated": False, "created_at": "2026-10-09T10:00:00+00:00"}])
         assert (off["best"], off["tries"], off["missed"]) == ({PHRASES.index(VERB): 70}, {PHRASES.index(VERB): 2}, {PHRASES.index(VERB): 1})
         assert (off["unmatched"], off["recordings"], off["last"]) == (1, 2, "2026-10-09T11:00:00+00:00")
-        c.app.state.auth.cls[0]["created_at"] = "2026-10-10T00:00:00+00:00"   # opened after both
-        since = c.get("/api/class", headers=good).json()["students"][0]["since"]["October 2026"]
-        assert (since["best"], since["recordings"], since["last"]) == ({}, 0, None)
         assert c.delete("/api/classes/1", headers=good).status_code == 200 and len(c.app.state.auth.cls) == 1
         # a student sees each of their classes: by nickname, else the Google name; one with neither is only counted
         c.app.state.auth.cls[0]["emails"].append("a@b.c")
@@ -1748,7 +2008,7 @@ def test_sign_in_guards_the_practice_endpoints():
         assert {k: progress[k] for k in ("best", "tries", "recordings", "days")} == {
             "best": {str(PHRASES.index(VERB)): 88}, "tries": {str(PHRASES.index(VERB)): 2}, "recordings": 3, "days": 2}
         assert 0 <= progress["week_days"] <= 7
-        assert set(progress["streak"]) == {"current", "best", "last"}
+        assert set(progress["streak"]) == {"current", "best", "last", "frozen", "freeze_ready"}
     with TestClient(create_app(scorer_for(emissions(["w"])))) as c:   # no sign-in: nothing to show
         assert c.get("/api/progress").json() == {"best": {}, "tries": {}, "recordings": 0, "days": 0,
                                                   "week_days": 0, "streak": {"current": 0, "best": 0, "last": None}}
@@ -1881,9 +2141,12 @@ def test_a_tutor_flags_a_recording_scored_wrong(monkeypatch):
     with TestClient(create_app(scorer_for(emissions(["w", "eː", "n", "i", "l", "χ", "a", "m", "aː", "m"])), auth=FakeAuth())) as c:
         a = c.app.state.auth
         assert c.get("/api/me", headers={"Authorization": "Bearer t"}).json()["tutor"] is True
+        assert c.get("/api/me", headers={"Authorization": "Bearer s"}).json()["tutor"] is True   # everyone reports by default
+        a.access_for = {"u2": {"roles": ["student"], "entitlements": ["practice"]}}.get   # unless a manager took it away
         assert "tutor" not in c.get("/api/me", headers={"Authorization": "Bearer s"}).json()
         assert c.post("/api/flags", data={"phrase_id": pid}, files={"audio": ("rec", b"x", "audio/wav")}).status_code == 401
         assert send(c, "s").status_code == 403 and not a.flags   # tutors only
+        del a.access_for
         r = send(c, "t", note="  אמרתי  ח נכונה ")
         row, = a.flags
         assert r.status_code == 200 and r.json() == {"ok": True, "audio": True, "flag": row}, r.text
@@ -1952,13 +2215,19 @@ def test_a_tutor_flags_a_recording_scored_wrong(monkeypatch):
         a.users, a.all_attempts, a.all_writings = lambda: [{"id": "u2", "email": "s@b.c", "name": ""}], lambda: [], lambda: []
         assert rank("s", email="s@b.c", tutor=True).status_code == 403   # teachers only (s is not in a class either)
         a.cls[0]["emails"].append("s@b.c"); a.teachers = frozenset({"t@b.c"})
+        no_report = lambda: setattr(a, "access_for", {"u2": {"roles": ["student"], "entitlements": ["practice"]}}.get)
+        no_report()   # the rank matters once a manager removed the default
         assert rank("s", email="s@b.c", tutor=True).status_code == 403 and "tutor" not in c.get("/api/me", headers=tok("s")).json()
+        del a.access_for
         assert rank("t", email="nobody", tutor=True).status_code == 400 and rank("t", email="s@b.c", tutor="yes").status_code == 400
         assert rank("t", email=" S@b.c ", tutor=True).status_code == 200 and a.rank == {"s@b.c"} and a.by == "t@b.c"
+        no_report()
         assert c.get("/api/me", headers=tok("s")).json()["tutor"] is True and send(c, "s").status_code == 503   # may flag (the table is still missing)
+        del a.access_for
         panel = c.get("/api/class", headers=tok("t")).json()
         assert [(s["email"], s["tutor"], s.get("tutor_fixed")) for s in panel["students"]] == [("s@b.c", True, None), ("other@b.c", False, None)]
-        assert rank("t", email="s@b.c", tutor=False).status_code == 200 and "tutor" not in c.get("/api/me", headers=tok("s")).json()
+        assert rank("t", email="s@b.c", tutor=False).status_code == 200
+        no_report(); assert "tutor" not in c.get("/api/me", headers=tok("s")).json(); del a.access_for
         a.rank = frozenset({"out@b.c"})   # ranked, but in no class: not let in
         known = a.user
         a.user = lambda token: {"id": "u3", "email": "out@b.c"} if token == "x" else known(token)
@@ -1979,9 +2248,9 @@ def test_switched_off_rules_bring_back_the_old_behaviour():
     # the emphatic margin: off, plain t winning by less than twice is a mistake again
     phrase = {"variants": [("طين", "tˤ i n")]}
     s = margin_scorer(1.8)
-    assert not s.score(None, phrase)["tips"]
+    assert s.score(None, phrase, diagnostics=True)["trace"]["tokens"][0]["margin"]["beyond"] is False
     s.set_disabled({"margins"})
-    assert [t["key"] for t in s.score(None, phrase)["tips"]] == ["tˤ>t"]
+    assert s.score(None, phrase, diagnostics=True)["trace"]["tokens"][0]["margin"]["beyond"] is True
     # a section-3 rule off: the general tip and severity instead of the document's
     s = custom_scorer(["p", "f", "dʒ"], ["p", "i", "n", "dʒ", "aː", "n"])
     fin = {"variants": [("فنجان", "f i n dʒ aː n")]}
@@ -2061,8 +2330,8 @@ def test_teacher_trace_follows_every_stage():
     assert t["config"]["flag_below"] == 50 and t["config"]["leniency"] == 0.35 and t["variants"][0]["chosen"]
     assert t["config"]["word_min_weight"] == 0.35
     h = next(x for x in t["tokens"] if x["ipa"] == "ħ")
-    assert [s["stage"] for s in h["stages"]] == ["gop", "exemption", "insertion", "baseline", "calibration"]
-    assert h["stages"][0]["score"] < 50 and h["stages"][4]["applied"] and h["final"] == 60
+    assert [s["stage"] for s in h["stages"]] == ["gop", "exemption", "insertion", "length", "baseline", "calibration"]
+    assert h["stages"][0]["score"] < 50 and h["stages"][5]["applied"] and h["final"] == 60
     assert h["competitor"] == "χ" and h["rule"]["severity"] == 3 and not h["flagged"]
     assert t["sentence"]["final"] == round(0.5 * t["sentence"]["phone_mean"] + 0.5 * t["sentence"]["word_mean"])
 
@@ -2182,3 +2451,457 @@ def test_an_account_is_sent_to_its_subjects_pages():
         assert put("חשבון").status_code == 400 and auth.access["u2"]["subject"] == "מתמטיקה"
         assert put(" ערבית ").json() == {"ok": True, "subject": "ערבית"} and auth.access["u2"]["subject"] == "ערבית"
         assert c.get("/api/me", headers=tok("t")).json()["subject"] == "arabic"
+
+
+def test_the_tts_cache_downloads_as_an_offline_zip_with_a_manifest(monkeypatch, tmp_path):
+    import io
+    import zipfile
+
+    from fastapi.testclient import TestClient
+
+    import app.main
+    from app.main import create_app
+    from app.tts import RAEF_VOICE_ID, SawtakTTS
+
+    phrases = [{"he": "שלום", "tr": "מרחבא", "variants": [("مرحبا", "m a r ħ a b a")]}]
+    monkeypatch.setattr(app.main, "PHRASES", phrases)
+    monkeypatch.setattr(app.main, "load_auth", lambda: None)
+    tts = SawtakTTS("key", cache_dir=tmp_path)
+    monkeypatch.setattr(tts, "_generate", lambda text, voice, *_: b"RIFF-" + text.encode())
+    tts.wav(app.main.point_arabic(*phrases[0]["variants"][0]))
+    (tmp_path / "stray.wav").write_bytes(b"old")  # a file no phrase names is still included
+    with TestClient(create_app(scorer_for(emissions(["w"])), tts, tutor=object())) as c:
+        res = c.get("/api/tts-cache/download")
+    assert res.status_code == 200 and res.headers["x-file-count"] == "2"
+    zf = zipfile.ZipFile(io.BytesIO(res.content))
+    names = sorted(zf.namelist())
+    key = "ihki-tts/" + tts.cache_key(app.main.point_arabic(*phrases[0]["variants"][0]), RAEF_VOICE_ID)
+    assert names == sorted([key, "ihki-tts/stray.wav", "manifest.csv"])
+    assert zf.read(key).startswith(b"RIFF-")
+    manifest = zf.read("manifest.csv").decode("utf-8-sig")
+    assert "שלום" in manifest and RAEF_VOICE_ID in manifest and "ihki-tts/stray.wav" in manifest
+
+
+def test_the_warm_sweep_stops_on_request_and_keeps_what_it_made(monkeypatch):
+    import threading
+    import time
+
+    from fastapi.testclient import TestClient
+
+    import app.main
+    from app.main import create_app
+    from app.tts import RAEF_VOICE_ID
+
+    phrases = [{"variants": [(word, "a")]} for word in ("واحد", "اثنين", "ثلاثة", "اربعة", "خمسة")]
+    monkeypatch.setattr(app.main, "PHRASES", phrases)
+    monkeypatch.setattr(app.main, "load_auth", lambda: None)
+    first_started, release = threading.Event(), threading.Event()
+
+    class SlowTTS:
+        def __init__(self): self.calls = []
+        def cached(self, text, voice): return False
+        def wav_for_voice(self, text, voice):
+            self.calls.append(text)
+            if len(self.calls) == app.main.WARM_WORKERS: first_started.set()
+            release.wait(5); return b"RIFF", voice
+        def cache_stats(self): return {"files": 0, "bytes": 0, "hits": 0, "misses": 0, "hit_rate": None}
+
+    tts = SlowTTS()
+    with TestClient(create_app(scorer_for(emissions(["w"])), tts, tutor=object())) as c:
+        assert c.post("/api/tts-cache/warm", json={"voice_id": RAEF_VOICE_ID}).json()["total"] == 5
+        assert first_started.wait(5)
+        assert c.post("/api/tts-cache/warm/stop").status_code == 200
+        release.set()  # the phrases in progress (one per worker) finish and are kept; no further phrase starts
+        for _ in range(200):
+            state = c.get("/api/tts-cache").json()["warm"]
+            if not state["running"]: break
+            time.sleep(.01)
+    workers = app.main.WARM_WORKERS
+    assert state["stopped"] is True and state["done"] == state["generated"] == workers == len(tts.calls) < 5
+
+
+def test_with_a_bucket_new_recordings_are_staged_locally_not_written_to_the_mount(monkeypatch, tmp_path):
+    from app.tts import RAEF_VOICE_ID, BucketMirror, SawtakTTS
+
+    mount, staging = tmp_path / "mount", tmp_path / "staging"
+    tts = SawtakTTS("key", cache_dir=mount)
+    tts.staging_dir = staging
+    monkeypatch.setattr(tts, "_generate", lambda text, voice, *_: b"RIFF-" + text.encode())
+    uploaded = []
+
+    class Mirror(BucketMirror):
+        def upload(self, files, source=""): uploaded.extend(dest for _src, dest in files)
+    tts.mirror = Mirror("user/bucket", "ihki-tts")
+
+    data, _ = tts.wav("مرحبا")
+    key = tts.cache_key("مرحبا", RAEF_VOICE_ID)
+    assert (staging / key).read_bytes() == data and not mount.exists()   # the slow mount is not written
+    assert tts.cached("مرحبا", RAEF_VOICE_ID) and tts.cache_file("مرحبا", RAEF_VOICE_ID) == staging / key
+    import time
+    for _ in range(100):
+        if uploaded: break
+        time.sleep(.01)
+    assert uploaded == [f"ihki-tts/{key}"]                                # playback uploads in the background
+    (mount / RAEF_VOICE_ID).mkdir(parents=True)                          # the bucket's copy appears in the mount
+    (mount / key).write_bytes(data)
+    assert [rel for _p, rel in tts.cached_files()] == [key]              # counted once
+    assert tts.cache_stats(wait=True)["files"] == 1
+    assert tts.wav("مرحبا")[0] == data and tts.cache_stats()["hits"] == 1
+    assert tts.clear_cache() == 2 and not tts.cached("مرحبا", RAEF_VOICE_ID)
+
+
+def test_an_offline_copy_loads_back_into_the_cache_and_the_bucket(monkeypatch, tmp_path):
+    import io
+    import time
+    import zipfile
+
+    from fastapi.testclient import TestClient
+
+    import app.main
+    from app.main import create_app
+    from app.tts import RAEF_VOICE_ID, BucketMirror, SawtakTTS
+
+    monkeypatch.setattr(app.main, "load_auth", lambda: None)
+    tts = SawtakTTS("key", cache_dir=tmp_path / "mount")
+    tts.staging_dir = tmp_path / "staging"
+    uploaded = []
+
+    class Mirror(BucketMirror):
+        def upload(self, files, source=""): uploaded.extend(dest for _src, dest in files)
+    tts.mirror = Mirror("user/bucket", "ihki-tts")
+    wav = b"RIFF\0\0\0\0WAVEfmt " + b"\0" * 40
+    new, old, legacy = f"{RAEF_VOICE_ID}/{'a' * 40}.wav", f"{RAEF_VOICE_ID}/{'b' * 40}.wav", f"{'c' * 40}.wav"
+    tts.store(old, wav)                                          # already cached: skipped
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(f"ihki-tts/{new}", wav)
+        zf.writestr(f"ihki-tts/{old}", wav)
+        zf.writestr(f"ihki-tts/{legacy}", wav)
+        zf.writestr("manifest.csv", "file\n")                   # ignored
+        zf.writestr("ihki-tts/../../evil.wav", wav)              # refused: outside the cache
+        zf.writestr(f"ihki-tts/{RAEF_VOICE_ID}/{'d' * 40}.wav", b"not audio")   # refused: not a WAV
+    with TestClient(create_app(scorer_for(emissions(["w"])), tts, tutor=object())) as c:
+        res = c.post("/api/tts-cache/import", files={"archive": ("copy.zip", buf.getvalue(), "application/zip")})
+        assert res.status_code == 200, res.text
+        assert res.json() == {"added": 2, "skipped": 1, "invalid": 2, "uploading": True}
+        assert c.post("/api/tts-cache/import", files={"archive": ("x.zip", b"nope", "application/zip")}).status_code == 400
+    assert tts.has(new) == tts.staging_dir / new and tts.has(legacy) and not (tmp_path / "evil.wav").exists()
+    for _ in range(100):
+        if len(uploaded) == 2: break
+        time.sleep(.01)
+    assert sorted(uploaded) == sorted([f"ihki-tts/{new}", f"ihki-tts/{legacy}"])
+
+
+def test_the_sweep_runs_sawtak_requests_in_parallel_within_the_pace(monkeypatch, tmp_path):
+    import threading
+    import time
+
+    import app.tts as tts_module
+    from app.tts import RAEF_VOICE_ID, SawtakTTS
+
+    monkeypatch.setattr(tts_module, "MIN_REQUEST_INTERVAL", .05)
+    tts = SawtakTTS("key", cache_dir=tmp_path)
+    active, peak, starts, guard = [0], [0], [], threading.Lock()
+
+    def slow(text, voice):
+        with guard:
+            active[0] += 1; peak[0] = max(peak[0], active[0]); starts.append(time.monotonic())
+        time.sleep(.3)
+        with guard:
+            active[0] -= 1
+        return b"RIFF" + text.encode()
+    monkeypatch.setattr(tts, "_generate_now", slow)
+    threads = [threading.Thread(target=tts.wav_for_voice, args=(f"نص {i}", RAEF_VOICE_ID)) for i in range(6)]
+    t0 = time.monotonic()
+    for t in threads: t.start()
+    for t in threads: t.join()
+    assert peak[0] == tts_module.MAX_CONCURRENT                      # several at once, never more than allowed
+    gaps = [b - a for a, b in zip(sorted(starts), sorted(starts)[1:])]
+    assert min(gaps) >= .045 and time.monotonic() - t0 < 6 * .3      # paced, yet faster than one at a time
+    # the same phrase asked twice at once is generated once
+    calls = []
+    monkeypatch.setattr(tts, "_generate_now", lambda text, voice: (calls.append(text), time.sleep(.1), b"RIFF")[2])
+    pair = [threading.Thread(target=tts.wav_for_voice, args=("مرة", RAEF_VOICE_ID)) for _ in range(2)]
+    for t in pair: t.start()
+    for t in pair: t.join()
+    assert calls == ["مرة"]
+
+
+def test_the_activity_log_shows_each_sawtak_request_and_upload(monkeypatch, tmp_path):
+    import io
+    import wave
+
+    from fastapi.testclient import TestClient
+
+    import app.main
+    import app.tts as tts_module
+    from app.main import create_app
+    from app.tts import RAEF_VOICE_ID, BucketMirror, SawtakTTS, TTSUnavailable
+
+    monkeypatch.setattr(app.main, "load_auth", lambda: None)
+    monkeypatch.setattr(tts_module, "MIN_REQUEST_INTERVAL", 0)
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000); w.writeframes(b"\0" * 48000)
+    tts = SawtakTTS("key", cache_dir=tmp_path)
+
+    def fake(text, voice):
+        if text == "خطأ":
+            raise TTSUnavailable("tts provider error 429: slow down", 429)
+        return buf.getvalue()
+    monkeypatch.setattr(tts, "_generate_now", fake)
+
+    class Mirror(BucketMirror):
+        pass
+    import huggingface_hub
+    monkeypatch.setattr(huggingface_hub, "batch_bucket_files", lambda *a, **k: None)
+    tts.mirror = Mirror("user/bucket")
+    tts.wav_for_voice("مرحبا", RAEF_VOICE_ID)
+    try:
+        tts.wav("خطأ")
+    except TTSUnavailable:
+        pass
+    tts.mirror.upload([(b"RIFF", "ihki-tts/x.wav")], source="sweep")
+    with TestClient(create_app(scorer_for(emissions(["w"])), tts, tutor=object())) as c:
+        data = c.get("/api/tts-cache/activity").json()
+    assert data["active"] == [] and data["pace"]["max_concurrent"] == tts_module.MAX_CONCURRENT
+    upload, failed, ok = data["events"]                         # newest first
+    assert upload["kind"] == "upload" and upload["status"] == "ok" and upload["files"] == 1
+    assert failed["status"] == 429 and failed["source"] == "playback" and "slow down" in failed["message"]
+    assert ok["kind"] == "sawtak" and ok["status"] == 200 and ok["source"] == "sweep" and ok["audio_s"] == 1.0
+    assert ok["text"] == "مرحبا" and ok["ms"] >= 0 and ok["waited_ms"] >= 0
+
+
+def test_the_sweep_decides_what_exists_from_the_bucket_listing_not_the_mount(monkeypatch, tmp_path):
+    import time
+
+    from fastapi.testclient import TestClient
+
+    import app.main
+    import app.tts as tts_module
+    from app.main import create_app
+    from app.tts import RAEF_VOICE_ID, BucketMirror, SawtakTTS
+
+    monkeypatch.setattr(tts_module, "MIN_REQUEST_INTERVAL", 0)
+    words = ["واحد", "اثنين", "ثلاثة"]
+    monkeypatch.setattr(app.main, "PHRASES", [{"variants": [(w, "a")]} for w in words])
+    monkeypatch.setattr(app.main, "load_auth", lambda: None)
+    tts = SawtakTTS("key", cache_dir=tmp_path / "mount")
+    tts.staging_dir = tmp_path / "staging"
+    monkeypatch.setattr(tts, "cached", lambda *a: (_ for _ in ()).throw(AssertionError("asked the slow mount")))
+    monkeypatch.setattr(tts, "_generate_now", lambda text, voice: b"RIFF" + text.encode())
+    keys = [tts.cache_key(app.main.point_arabic(w, "a"), RAEF_VOICE_ID) for w in words]
+
+    class Mirror(BucketMirror):
+        def remote_sizes(self):  # the first in the per-voice layout, the second in the legacy flat one
+            return {f"ihki-tts/{keys[0]}": 10, f"ihki-tts/{keys[1].rsplit('/', 1)[-1]}": 10}
+        def upload(self, files, source=""): pass
+    tts.mirror = Mirror("user/bucket")
+    with TestClient(create_app(scorer_for(emissions(["w"])), tts, tutor=object())) as c:
+        c.post("/api/tts-cache/warm", json={"voice_id": RAEF_VOICE_ID})
+        for _ in range(300):
+            state = c.get("/api/tts-cache").json()["warm"]
+            if not state["running"]: break
+            time.sleep(.01)
+    assert (state["skipped"], state["generated"], state["to_generate"], state["failed"]) == (2, 1, 1, 0)
+
+
+def test_a_slow_cache_count_does_not_hold_up_generation(monkeypatch, tmp_path):
+    import threading
+    import time
+
+    import app.tts as tts_module
+    from app.tts import RAEF_VOICE_ID, SawtakTTS
+
+    monkeypatch.setattr(tts_module, "MIN_REQUEST_INTERVAL", 0)
+    tts = SawtakTTS("key", cache_dir=tmp_path)
+    monkeypatch.setattr(tts, "_generate_now", lambda text, voice: b"RIFF" + text.encode())
+    walking = threading.Event()
+
+    def slow_walk():  # a bucket mount: tens of seconds for the whole folder
+        walking.set(); time.sleep(1); return []
+    monkeypatch.setattr(tts, "cached_files", slow_walk)
+    t0 = time.monotonic()
+    stats = tts.cache_stats()                                        # no count yet: answers at once, counts behind
+    assert time.monotonic() - t0 < .5 and stats["files"] is None
+    assert walking.wait(2)
+    for _ in range(300):                                             # wait for that background count to end
+        if tts._disk: break
+        time.sleep(.01)
+    walking.clear()
+    tts._disk = None
+    counter = threading.Thread(target=tts.cache_stats, kwargs={"wait": True}); counter.start()
+    assert walking.wait(2)
+    t0 = time.monotonic()
+    tts.wav_for_voice("مرحبا", RAEF_VOICE_ID)
+    assert time.monotonic() - t0 < .5                                # not behind the walk
+    counter.join()
+    walking.clear()
+    tts._disk = (time.monotonic() - 60, 7, 70)                       # a stale count: the next call walks again
+    counter = threading.Thread(target=tts.cache_stats, kwargs={"wait": True}); counter.start()
+    assert walking.wait(2)
+    t0 = time.monotonic()
+    stats = tts.cache_stats()                                        # meanwhile a panel refresh gets the last count
+    assert time.monotonic() - t0 < .5 and stats["files"] == 7 and stats["misses"] == 1
+    counter.join()
+
+
+# ---------- 3.8: a long vowel said short, measured by its duration ----------
+
+ZAMAN = {"variants": [("زمان", "z a m aː n")]}
+
+
+def timed_scorer(extra, timed, gap=2, peak=0.9):
+    """A scorer over SYMS plus `extra`, hearing each (phone, frames) of `timed` cleanly, `gap` blanks apart."""
+    syms = SYMS + [s for s in extra if s not in SYMS]
+    vocab = {s: i for i, s in enumerate(syms)}
+
+    def row(sym, p):
+        r = np.full(len(syms), (1 - p) / (len(syms) - 1))
+        r[vocab[sym]] = p
+        return r
+
+    rows = [row("<pad>", 0.95)] * gap
+    for ph, n in timed:
+        rows += [row(ph, peak)] * n + [row("<pad>", 0.95)] * gap
+    return Scorer(lambda wav: np.log(np.array(rows)), Vocab(vocab))
+
+
+def zaman(long_frames):
+    return timed_scorer(["z"], [("z", 3), ("a", 3), ("m", 3), ("aː", long_frames), ("n", 3)])
+
+
+def test_long_vowel_said_short_is_a_mistake():
+    held = zaman(8).score(None, ZAMAN)
+    assert not held["tips"] and held["score"] >= 95
+    r = zaman(2).score(None, ZAMAN)                   # zaman: the alef no longer than the short a
+    p = r["words"][0]["phonemes"][3]
+    assert p["ipa"] == "aː" and p["flagged"] and p["score"] <= 60 and p["heard"] == "a" and p["shortened"] < 1
+    assert [t["key"] for t in r["tips"]] == ["vowel_length"] and r["tips"][0]["severity"] == 1
+    assert "החזיקו" in r["tips"][0]["text"] and r["score"] < held["score"] - 10
+    letter = next(l for l in r["words"][0]["letters"] if "א" in l["t"])
+    assert letter["score"] <= 60 and "החזיקו" in letter["tip"]
+
+
+def test_vowel_length_check_spares_short_vowels_edges_and_can_be_switched_off():
+    # a short vowel is never judged by length, however short; nor a long vowel that ends the recording
+    assert not timed_scorer(["z"], [("z", 3), ("a", 1), ("m", 3), ("aː", 8), ("n", 3)]).score(None, ZAMAN)["tips"]
+    r = timed_scorer([], [("l", 3), ("a", 3), ("aː", 1)]).score(None, {"variants": [("لا", "l a aː")]})
+    assert not any(t["key"] == "vowel_length" for t in r["tips"])
+    s = zaman(2)
+    s.set_disabled({"rule_vowel_length"})
+    r = s.score(None, ZAMAN)
+    assert not r["tips"] and r["words"][0]["phonemes"][3]["score"] >= 90
+
+
+def test_vowel_length_stage_is_in_the_trace():
+    tr = zaman(2).score(None, ZAMAN, diagnostics=True)["trace"]
+    stage = next(s for s in tr["tokens"][3]["stages"] if s["stage"] == "length")
+    assert stage["applied"]["ratio"] < stage["applied"]["min_ratio"] and stage["score"] <= 60
+    assert tr["config"]["vowel_length"]["score_cap"] == 60
+
+
+def test_long_vowel_as_short_in_the_native_reference_is_forgiven():
+    ref = zaman(2).reference(None, ZAMAN)                 # the native voice says it as short
+    r = zaman(2).score(None, ZAMAN, [ref])
+    assert not r["tips"] and r["words"][0]["phonemes"][3]["score"] == 100
+    assert "shortened" not in r["words"][0]["phonemes"][3]
+
+
+# احنا رحنا, the reported attempt: said right, but the model hears ح as ç and ʃ (in the native voices too), a
+# trilled r as "r a r" and a vowel after ح. The unrelated gate capped an 83 at 30 with no tip.
+WENT = {"variants": [("احنا رحنا", "ʔ i ħ n a | r u ħ n a")]}
+WENT_SYMS = ["ç", "r", "o", "u"]
+WENT_HEARD = ["i", "ç", "n", "a", "r", "a", "r", "o", "ʃ", "u", "n", "a"]
+WENT_VOICE = ["ʔ", "i", "ç", "n", "a", "r", "u", "ʃ", "n", "a"]   # the native voice: ح lost the same way
+
+
+def went_learner():
+    """The learner's attempt, its r as faint as in the recording (0.40): only the two n clearly peak."""
+    s = custom_scorer(WENT_SYMS, WENT_HEARD)
+    p = np.exp(s.emit(None))
+    r = s.vocab.sound_id("r")
+    for f in np.where(p.argmax(axis=1) == r)[0]:
+        p[f] = 0.6 / (p.shape[1] - 1)
+        p[f, r] = 0.4
+    logp = np.log(p)
+    return Scorer(lambda wav: logp, s.vocab)
+
+
+def test_a_sound_the_reference_lost_too_does_not_make_the_sentence_unrelated():
+    learner = went_learner()
+    assert learner.score(None, WENT)["unrelated"]                      # without a reference the gate still fires
+    ref = custom_scorer(WENT_SYMS, WENT_VOICE).reference(None, WENT)
+    assert ref is not None and ref.scores[2] < 10 and ref.scores[7] < 10
+    r = learner.score(None, WENT, [ref], diagnostics=True)
+    assert not r["unrelated"] and not r["trace"]["sentence"]["capped"] and r["score"] >= 75
+    assert [p["score"] for w in r["words"] for p in w["phonemes"] if p["ipa"] == "ħ"] == [100, 100]
+
+
+def test_another_sentence_is_unrelated_even_with_a_reference_that_lost_a_sound():
+    ref = custom_scorer(WENT_SYMS, WENT_VOICE).reference(None, WENT)
+    r = custom_scorer(WENT_SYMS, ["ʃ", "a", "l", "a", "m", "u", "k", "o", "m"]).score(None, WENT, [ref])
+    assert r["unrelated"] and r["score"] <= 30
+
+
+def test_reference_under_the_noise_floor_gives_the_score_back():
+    # learner 0.3 against a reference 0.2: the ratio was capped to 100 * 0.3 / 1 = 30
+    from app.scorer import Reference
+    s = scorer_for(emissions(h_as("ħ")))
+    toks = s._variants(ALA)[0][3]
+    weak = weakened(h_as("ħ"), 6, 0.01)
+    s = scorer_for(weak)
+    ref = Reference([(t.word, t.sound) for t in toks], [0.2 if t.sound == "ħ" else 100.0 for t in toks])
+    plain = s.score(None, ALA)["words"][1]["phonemes"][2]["score"]
+    r = s.score(None, ALA, [ref])
+    assert plain < 50 and r["words"][1]["phonemes"][2]["score"] == 100
+
+
+def test_tone_numbers_are_the_same_sound():
+    from app.phones import base
+    assert base("i5") == base("iː1") == base("i.5") == base("i̪2") == "i"
+    assert base("a5") == base("ɑ1") == "a" and base("u4") == "u"
+    assert base("ai5") == "ai" and base("1") == "1"
+
+
+HIYYE = {"variants": [("هيّ", "h iː")]}
+
+
+def split_vowel_scorer(vowel, toned, p_toned, p_vowel=0.10):
+    """هيّ with its vowel's posterior split: p_toned on `toned`, p_vowel on `vowel`, the rest blank."""
+    syms = SYMS + ["iː", "u", toned]
+    vocab = {s: i for i, s in enumerate(syms)}
+
+    def row(probs):
+        r = np.full(len(syms), 1e-4)
+        for sym, p in probs.items():
+            r[vocab[sym]] = p
+        return r / r.sum()
+
+    rows = [row({"<pad>": 0.95})] * 2 + [row({"h": 0.9})] * 3 + [row({"<pad>": 0.95})] * 2
+    rows += [row({toned: p_toned, vowel: p_vowel, "<pad>": 1 - p_toned - p_vowel})] * 8 + [row({"<pad>": 0.95})] * 2
+    return Scorer(lambda wav: np.log(np.array(rows)), Vocab(vocab))
+
+
+def test_a_vowel_heard_with_a_tone_number_is_the_vowel():
+    # the reported attempt: the model heard ي as i5 (0.39) and as iː only at 0.10; the vowel scored 36
+    r = split_vowel_scorer("iː", "i5", 0.45).score(None, HIYYE, diagnostics=True)
+    v = r["words"][0]["phonemes"][1]
+    assert v["score"] >= 90 and not r["issues"] and not r["unrelated"]
+    assert r["trace"]["unrelated"]["ratio"] < 0.5
+    assert "י" in r["words"][0]["heard_tr"] or r["words"][0]["heard_tr"] == r["words"][0]["tr"]
+
+
+def test_another_vowel_with_a_tone_number_is_still_wrong():
+    r = split_vowel_scorer("u", "u5", 0.45).score(None, HIYYE)
+    assert r["words"][0]["phonemes"][1]["score"] < 50
+
+
+def test_the_sawtak_voice_id_is_offered_for_playback_by_name(monkeypatch):
+    from app.tts import BASELINE_VOICES, VOICES, playback_voices, voice_name
+    monkeypatch.setenv("SAWTAK_VOICE_ID", "amir-voice-id")
+    monkeypatch.delenv("SAWTAK_VOICE_NAME", raising=False)
+    voices = playback_voices()
+    assert list(voices)[: len(VOICES)] == list(VOICES) and voices["אַמִיר"] == "amir-voice-id"
+    assert voice_name("amir-voice-id") == "אמיר"
+    assert "amir-voice-id" not in BASELINE_VOICES.values()   # playback only: scores keep their baseline

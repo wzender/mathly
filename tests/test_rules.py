@@ -37,7 +37,15 @@ def test_undetectable_rules_are_reported():
     assert undetectable(Check("x", "ħ", "ǀ", 1, ""), r, lambda p: p != "ǀ") == "heard_not_in_model"
     report = check_detectable(r, everything)
     assert report["pharyngeal_h"]["detectable"]
-    # vowel length is not modelled (base() drops ː): the long/short checks are listed as undetectable
-    assert {m["why"] for m in report["vowel_length"]["missing"]} == {"same_sound"}
+    # base() drops ː, but a long vowel said short is measured by its duration (3.8)
+    assert report["vowel_length"]["detectable"] and not report["vowel_length"]["missing"]
     bad = parse("```yaml\nid: bad\ntitle: bad\nchecks:\n  - {target: aː, heard: [a], severity: 1, feedback: x}\n```\n")
     assert not check_detectable(bad, everything)["bad"]["detectable"]
+
+
+def test_baseline_protected_pairs_come_from_the_scoring_block():
+    r = load()
+    assert r.protected("ħ", "x") and r.protected(["ħ"], "χ")   # χ is stored by its base() name x
+    assert not r.protected("ħ", "h") and not r.protected("ħ", None)
+    bare = parse("```yaml\nscoring:\n  margin_default: 0.0\n```\n")
+    assert bare.baseline_protected == set() and not bare.protected("ħ", "x")

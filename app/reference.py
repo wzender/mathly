@@ -14,10 +14,12 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from dataclasses import replace
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 
-from .arabic_diacritics import point_arabic
+from .arabic_diacritics import tts_arabic
 from .scorer import Reference, Scorer, decode_audio
+from .tts import voice_name
 
 log = logging.getLogger("ihki.reference")
 
@@ -32,15 +34,17 @@ class References:
         self._lock = threading.Lock()
 
     def _build(self, phrase: dict, text: str, voice: str) -> Reference | None:
-        data, _ = self.tts.wav(text, voice)
+        # wav() would turn a voice it does not offer for playback (فدوى) into Raef's
+        data, _ = self.tts.wav_for_voice(text, voice, source="baseline", upload=True)
         ref = self.scorer.reference(decode_audio(data), phrase)
         if ref is None:
             log.info("reference not usable: %r by voice %s", text, voice)
-        return ref
+            return None
+        return replace(ref, voice=voice_name(voice))
 
     def get(self, phrase_id: int, phrase: dict) -> list[Reference]:
         """The references of a phrase that are ready within the wait."""
-        text = point_arabic(*phrase["variants"][0])
+        text = tts_arabic(*phrase["variants"][0])
         jobs: list[tuple[tuple[int, str], Future]] = []
         with self._lock:
             for n, voice in enumerate(self.voices):

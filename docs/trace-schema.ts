@@ -75,7 +75,8 @@ export interface Trace {
   frames: TraceFrames;
   aipa: string;                   // the chosen reading with archi symbols
   unrelated: TraceUnrelated;
-  references: { mean: number; sounds: number }[];
+  /** The native baselines, one per TTS voice; each sound is measured against the lowest of them (Stage "baseline"). */
+  references: { voice: string; mean: number; sounds: number }[];
   /** Stages 1–5 per sound, in order: gop → exemption → insertion → baseline → calibration → final. */
   tokens: TraceToken[];
   words: TraceWord[];
@@ -101,6 +102,7 @@ export interface TraceConfig {
   max_tips: number;
   max_issues: number;
   ref_min_mean: number;
+  ref_noise_floor: number;   // a reference under this on a sound: the model cannot measure it, the score is given back
   margin_default: number;
   ayin_deleted_floor: number;
   margins: { target: Ipa; heard: Heard; margin: number }[];   // the pairs that need a clearer win (rules 6.2)
@@ -137,7 +139,13 @@ export type Stage =
   | { stage: "gop"; score: number }
   | { stage: "exemption"; score: number; applied: TraceConfig["exemptions"][number] | null }
   | { stage: "insertion"; score: number; applied: Ipa | null }   // the vowel heard inside the cluster
-  | { stage: "baseline"; score: number; ref: number | null; applied: boolean }   // ref: the native voice's score
+  | { stage: "baseline"; score: number; ref: number | null; refs: (number | null)[]; applied: boolean;
+      heard?: (string | null)[]; refused?: "protected" | "kept" | null }
+    // heard: per voice, what took the sound's place in it ("_" nothing, null kept or no such sound);
+    // refused: why no voice counted although some have the sound. "protected": the learner's substitution is a pair the
+    // rules protect (ħ heard as x); "kept": every voice that has the sound kept it, while the learner's was replaced.
+    // ref: the lowest native score on this sound (what it is measured against); refs: each voice's, in
+    // Trace.references order (null: that voice's reading has no such sound)
   | { stage: "calibration"; score: number; floor: number | null; applied: boolean };
 
 export interface TraceToken {

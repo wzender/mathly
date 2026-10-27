@@ -30,6 +30,10 @@ students get a reminder above the path to watch it.
 Library: other videos (a title and a link each), in the Supabase table `library`, one for every level. Every student
 browses them from the tab at the screen's foot, whatever their level and class.
 
+Current lessons: a student tells, once for each class, which lesson the class is on now; the focused home of the page
+starts from it. It is the student's own, kept by email and class id in the Supabase table `learner_class_state`,
+read and written with the secret key only (the server takes the email from the session, never from the request).
+
 Tutors: the teacher gives a student the tutor's rank in the panel, in the list of all the students above the classes' tabs. It is the student's,
 whatever classes they are in, so it is kept by email in the Supabase table `tutors`.
 
@@ -59,16 +63,20 @@ Without them the service is open, as before.
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import mimetypes
 import os
 import re
+import tempfile
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 log = logging.getLogger("ihki.auth")
 TIMEOUT = 10
@@ -77,16 +85,28 @@ CACHE_MAX = 2000
 PAGE = 1000  # rows per request: Supabase's default ceiling
 MAX_ATTEMPTS = 20_000  # of one student, read for their progress
 MAX_CLASS_ATTEMPTS = 200_000  # of all students, read for the teacher's panel
+MAX_MONITOR_ATTEMPTS = 5_000  # newest compact attempts sampled for pronunciation patterns; never audio
+MAX_DIFFICULTY_ATTEMPTS = 50_000  # bounded scoped metadata; refuse rather than rank a partial sample
 CLASSES_TTL = 60  # seconds the class list is trusted without reading it again (each sign-in check uses it)
+# One-time migration boundary requested on 24 Oct 2026: the then-current seven days remain in Supabase forever.
+DEFAULT_AUDIO_MIGRATION_CUTOFF = "2026-10-17T00:00:00+03:00"
+CREATE_LEARNER_CLASS_STATE = (
+    "create table public.learner_class_state (email text not null, "
+    "class_id bigint not null references public.classes (id) on delete cascade, current_lesson text not null, "
+    "created_at timestamptz not null default now(), updated_at timestamptz not null default now(), "
+    "primary key (email, class_id)); "
+    "alter table public.learner_class_state enable row level security; "
+    "revoke all on public.learner_class_state from anon, authenticated;")
 
 # Application-owned data. Supabase's auth users and managed schemas are deliberately not copied.
 BACKUP_TABLES = (
     "dailies", "library", "videos", "texts", "classes", "writings", "tutors", "flags",
     "lab_samples", "calibrations", "scoring_rules", "user_access", "access_audit", "app_secrets",
-    "system_events", "tutor_chats",
+    "system_events", "tutor_chats", "model_settings",
 )
 BACKUP_NATURAL_KEYS = {"writings": "user_id,topic", "tutors": "email", "scoring_rules": "id",
-                       "user_access": "user_id", "app_secrets": "name", "tutor_chats": "id"}
+                       "user_access": "user_id", "app_secrets": "name", "tutor_chats": "id",
+                       "model_settings": "model"}
 
 
 class AuthUnavailable(RuntimeError):
@@ -97,14 +117,46 @@ class ClassConflict(ValueError):
     """Supabase refused a class: its name is taken."""
 
 
+class HFAudioStore:
+    """Private durable audio storage in a Hugging Face Storage Bucket."""
+
+    def __init__(self, bucket_id: str, prefix: str = "ihki-audio", token: str | None = None):
+        self.bucket_id, self.prefix, self.token = bucket_id, prefix.strip("/"), token
+
+    def path(self, bucket: str, name: str) -> str:
+        rel = f"{bucket}/{name.lstrip('/')}"
+        return f"{self.prefix}/{rel}" if self.prefix else rel
+
+    def put(self, bucket: str, name: str, data: bytes) -> None:
+        from huggingface_hub import batch_bucket_files
+        batch_bucket_files(self.bucket_id, add=[(data, self.path(bucket, name))], token=self.token)
+
+    def get(self, bucket: str, name: str) -> bytes:
+        from huggingface_hub import download_bucket_files
+        with tempfile.TemporaryDirectory(prefix="ihki-audio-") as directory:
+            target = Path(directory) / Path(name).name
+            download_bucket_files(self.bucket_id, [(self.path(bucket, name), target)],
+                                  raise_on_missing_files=True, token=self.token)
+            return target.read_bytes()
+
+    def delete(self, bucket: str, names: list[str]) -> None:
+        if not names:
+            return
+        from huggingface_hub import batch_bucket_files
+        batch_bucket_files(self.bucket_id, delete=[self.path(bucket, name) for name in names], token=self.token)
+
+
 class SupabaseAuth:
     def __init__(self, url: str, key: str, teachers: frozenset[str] = frozenset(), secret: str = "",
-                 tutors: frozenset[str] = frozenset(), developers: frozenset[str] = frozenset()):
+                 tutors: frozenset[str] = frozenset(), developers: frozenset[str] = frozenset(),
+                 audio_store: HFAudioStore | None = None, audio_migrate_before: str = ""):
         self.url, self.key = url.rstrip("/"), key
         self.teachers = teachers  # lower-case emails of the accounts with the management panel
         self.tutors = tutors  # lower-case emails of the accounts that flag a wrong score, besides the teachers
         self.developers = developers  # bootstrap accounts; only developers may use the lab
         self.secret = secret  # reads every student's rows and the classes; empty = the panel has no data
+        self.audio_store = audio_store
+        self.audio_migrate_before = audio_migrate_before
         self._cache: dict[str, tuple[float, dict]] = {}
         self._classes: tuple[float, list[dict]] | None = None
         self._videos: tuple[float, list[dict]] | None = None
@@ -391,6 +443,17 @@ class SupabaseAuth:
             self._classes = (now + CLASSES_TTL, rows)
         return rows
 
+    def database_health(self) -> bool:
+        """Perform one bounded, read-only PostgREST probe without returning table data."""
+        if not self.secret:
+            return False
+        try:
+            self._admin("/rest/v1/classes?select=id&limit=1")
+        except AuthUnavailable as exc:
+            if "answered 404" not in str(exc):
+                raise
+        return True
+
     def save_class(self, id: int | None, name: str, emails: list[str], nicknames: dict[str, str],
                    lessons: list[str], homeworks: list[dict] = (), dailies: list[dict] | None = None,
                    subject: str = "", teachers: list[str] | None = None) -> None:
@@ -574,6 +637,35 @@ class SupabaseAuth:
         finally:
             self._ranked = None
 
+    def current_lessons(self, email: str) -> dict[int, str]:
+        """The current lesson this account chose in each of its classes: {class id: lesson id}. Empty without the
+        secret key or before the table is created (the page then keeps the choice on the device); other failures raise."""
+        if not self.secret:
+            return {}
+        q = urllib.parse.urlencode({"select": "class_id,current_lesson", "email": f"eq.{email.strip().lower()}"})
+        try:
+            rows = self._admin(f"/rest/v1/learner_class_state?{q}") or []
+        except AuthUnavailable as e:
+            if "answered 404" not in str(e):
+                raise
+            log.warning("the table `learner_class_state` is missing (see the README): current lessons stay on the device")
+            return {}
+        return {int(r["class_id"]): str(r["current_lesson"]) for r in rows if r.get("current_lesson")}
+
+    def set_current_lesson(self, email: str, class_id: int, lesson: str) -> None:
+        """Keeps this account's current lesson in one class, replacing the one it had there. Only the account's own row:
+        the caller passes the session's email. A missing table raises with the command that creates it."""
+        row = {"email": email.strip().lower(), "class_id": int(class_id), "current_lesson": str(lesson).strip(),
+               "updated_at": datetime.now(timezone.utc).isoformat()}
+        try:
+            self._admin("/rest/v1/learner_class_state?on_conflict=email,class_id", "POST", row,
+                        prefer="resolution=merge-duplicates,return=minimal")
+        except AuthUnavailable as e:
+            if "answered 404" in str(e):
+                raise AuthUnavailable("the table learner_class_state is missing; run in Supabase's SQL editor: "
+                                      f"{CREATE_LEARNER_CLASS_STATE}") from e
+            raise
+
     def _put_object(self, bucket: str, name: str, data: bytes, mime: str) -> bool:
         """Stores a recording in a private storage bucket; False (logged) when it cannot be stored."""
         if not self.secret:
@@ -620,6 +712,83 @@ class SupabaseAuth:
             media_type = mimetypes.guess_type(name)[0] or media_type
         return data, media_type
 
+    def _put_audio(self, bucket: str, name: str, data: bytes, mime: str) -> bool:
+        """Keep audio in HF when configured; Supabase is the legacy/default store only."""
+        if self.audio_store:
+            try:
+                self.audio_store.put(bucket, name, data)
+                return True
+            except Exception as e:
+                log.warning("%s audio not stored in Hugging Face bucket: %s", bucket, e)
+                return False
+        return self._put_object(bucket, name, data, mime)
+
+    def _get_audio(self, bucket: str, name: str, created_at: str = "") -> tuple[bytes, str]:
+        """Read new HF audio first, then fall back to legacy Supabase recordings."""
+        sources = ("hf", "supabase") if self.audio_store else ("supabase",)
+        errors = []
+        for source in sources:
+            if source == "hf":
+                if not self.audio_store:
+                    continue
+                try:
+                    return self.audio_store.get(bucket, name), mimetypes.guess_type(name)[0] or "application/octet-stream"
+                except Exception as e:
+                    errors.append(f"Hugging Face: {e}")
+            else:
+                try:
+                    return self._get_object(bucket, name)
+                except AuthUnavailable as e:
+                    errors.append(f"Supabase: {e}")
+        raise AuthUnavailable(f"{bucket} audio unavailable ({'; '.join(errors)})")
+
+    def migrate_legacy_audio(self) -> None:
+        """One-way migration before a fixed cutoff; newer legacy Supabase files remain indefinitely."""
+        if not self.audio_store or not self.secret or not self.audio_migrate_before:
+            return
+        threading.Thread(target=self._migrate_legacy_audio, name="ihki-audio-migration", daemon=True).start()
+
+    def _migrate_legacy_audio(self) -> None:
+        """Copy pre-cutoff audio to HF, then remove only the successfully copied Supabase objects."""
+        cutoff = self.audio_migrate_before
+        marker = hashlib.sha256(cutoff.encode()).hexdigest()[:16] + ".complete"
+        try:
+            self.audio_store.get("_migration", marker)
+            return
+        except Exception:
+            pass
+        complete = True
+        try:
+            for table, bucket in (("flags", "flags"), ("lab_samples", "lab")):
+                rows = []
+                for offset in range(0, 10_000_000, PAGE):
+                    query = urllib.parse.urlencode({"select": "audio,created_at", "audio": "not.is.null",
+                                                    "created_at": f"lt.{cutoff}", "order": "created_at.asc",
+                                                    "limit": PAGE, "offset": offset})
+                    batch = self._admin(f"/rest/v1/{table}?{query}") or []
+                    rows.extend(batch)
+                    if len(batch) < PAGE:
+                        break
+                copied = []
+                for row in rows:
+                    name = row.get("audio")
+                    if not name:
+                        continue
+                    try:
+                        data, _mime = self._get_object(bucket, name)
+                        self.audio_store.put(bucket, name, data)
+                        copied.append(name)
+                    except Exception as e:
+                        complete = False
+                        log.warning("old %s audio %s not migrated; Supabase copy retained: %s", bucket, name, e)
+                if copied and self._delete_objects(bucket, copied):
+                    log.info("migrated %d old %s recordings to Hugging Face and removed Supabase copies",
+                             len(copied), bucket)
+            if complete:
+                self.audio_store.put("_migration", marker, cutoff.encode())
+        except Exception as e:
+            log.warning("legacy audio migration failed: %s", e)
+
     def ensure_backup_bucket(self) -> None:
         """Create the private application-backup bucket on first use."""
         try:
@@ -651,8 +820,8 @@ class SupabaseAuth:
         return [r for r in (rows or []) if str(r.get("name", "")).endswith(".zip")]
 
     def add_flag(self, row: dict, audio: bytes, mime: str, name: str) -> bool:
-        """Keeps a flagged score and its recording in the private `flags` bucket."""
-        kept = self._put_object("flags", name, audio, mime)
+        """Keeps a flagged score and its recording in HF, or Supabase when HF is not configured."""
+        kept = self._put_audio("flags", name, audio, mime)
         self._admin("/rest/v1/flags", "POST", {**row, "audio": name if kept else None})
         return kept
 
@@ -672,10 +841,10 @@ class SupabaseAuth:
 
     def flag_audio(self, flag_id: int) -> tuple[bytes, str] | None:
         """Returns one private flag recording and its media type, or None when it was not stored."""
-        query = urllib.parse.urlencode({"select": "audio", "id": f"eq.{int(flag_id)}", "limit": 1})
+        query = urllib.parse.urlencode({"select": "audio,created_at", "id": f"eq.{int(flag_id)}", "limit": 1})
         rows = self._admin(f"/rest/v1/flags?{query}")
         name = rows[0].get("audio") if rows else None
-        return self._get_object("flags", name) if name else None
+        return self._get_audio("flags", name, rows[0].get("created_at", "")) if name else None
 
     def add_lab_sample(self, row: dict, audio: bytes, mime: str, name: str, attempts: int = 1) -> bool:
         """Keeps a lab recording (see lab.py): the recording in the storage bucket `lab`, the row in the table
@@ -685,7 +854,7 @@ class SupabaseAuth:
         for attempt in range(max(1, attempts)):
             if attempt:
                 time.sleep(2 * attempt)
-            kept = self._put_object("lab", name, audio, mime)
+            kept = self._put_audio("lab", name, audio, mime)
             if kept:
                 break
         self._admin("/rest/v1/lab_samples", "POST", {**row, "audio": name if kept else None}, prefer="return=minimal")
@@ -714,7 +883,7 @@ class SupabaseAuth:
     def lab_audio(self, sample_id: int) -> tuple[bytes, str] | None:
         """One lab recording and its media type, or None when it was not stored."""
         row = self.lab_sample(sample_id)
-        return self._get_object("lab", row["audio"]) if row and row.get("audio") else None
+        return self._get_audio("lab", row["audio"], row.get("created_at", "")) if row and row.get("audio") else None
 
     def update_lab_result(self, sample_id: int, result: dict) -> None:
         """Updates a lab result's review metadata (the original scoring fields remain in the same JSON document)."""
@@ -729,6 +898,11 @@ class SupabaseAuth:
         names = [r["audio"] for r in rows if r.get("audio")]
         if names:
             self._delete_objects("lab", names)
+            if self.audio_store:
+                try:
+                    self.audio_store.delete("lab", names)
+                except Exception as e:
+                    log.warning("lab recordings not deleted from Hugging Face bucket: %s", e)
         return len(rows)
 
     def calibrations(self, status: str | None = None) -> list[dict]:
@@ -762,6 +936,16 @@ class SupabaseAuth:
                                                        "updated_at": datetime.now(timezone.utc).isoformat()},
                     prefer="resolution=merge-duplicates,return=minimal")
 
+    def model_settings(self) -> list[dict]:
+        """The scorer settings tuned per model in the panel's "מודלים" tab: model, settings, updated_by, updated_at."""
+        return self._admin("/rest/v1/model_settings?select=*") or []
+
+    def set_model_settings(self, model: str, settings: dict, by: str) -> None:
+        """Replaces one model's settings (an upsert on the model id)."""
+        self._admin("/rest/v1/model_settings", "POST", {"model": model, "settings": settings, "updated_by": by,
+                                                        "updated_at": datetime.now(timezone.utc).isoformat()},
+                    prefer="resolution=merge-duplicates,return=minimal")
+
     def users(self) -> list[dict]:
         """Every account that has signed in: id, email, name (as Google gave it; empty for one who signed in by email)."""
         users: list[dict] = []
@@ -773,12 +957,12 @@ class SupabaseAuth:
                 break
         return users
 
-    def access_for(self, user_id: str) -> dict | None:
+    def access_for(self, user_id: str, fresh: bool = False) -> dict | None:
         """The roles and student entitlements assigned to an account. None also means the migration table is absent."""
         now = time.monotonic()
         with self._lock:
             hit = self._access.get(user_id)
-        if hit and hit[0] > now:
+        if not fresh and hit and hit[0] > now:
             return hit[1]
         try:
             rows = self._admin("/rest/v1/user_access?" + urllib.parse.urlencode({
@@ -831,7 +1015,7 @@ class SupabaseAuth:
         """Set an admin's subject without changing their access assignment."""
         old = self.access_for(target["id"]) or {}
         row = {"user_id": target["id"], "email": target["email"].lower(),
-               "roles": old.get("roles") or ["student"], "entitlements": old.get("entitlements") or [],
+               "roles": old.get("roles") or ["student", "flagger"], "entitlements": old.get("entitlements") or [],
                "subject": subject, "updated_at": datetime.now(timezone.utc).isoformat(),
                "updated_by": actor["id"]}
         self._admin("/rest/v1/user_access?on_conflict=user_id", "POST", row,
@@ -858,18 +1042,57 @@ class SupabaseAuth:
         self._admin("/rest/v1/app_secrets?" + urllib.parse.urlencode({"name": f"eq.{name}"}), "DELETE",
                     prefer="return=minimal")
 
-    def all_attempts(self) -> list[dict]:
+    def all_attempts(self, limit: int = MAX_CLASS_ATTEMPTS) -> list[dict]:
         """Every student's attempts, as `attempts` gives one student's, each with its user_id. "Different sentence"
         rows remain marked as unrelated for diagnostics, but count toward progress like every non-empty recording."""
+        limit = max(1, min(int(limit), MAX_CLASS_ATTEMPTS))
         rows: list[dict] = []
-        while len(rows) < MAX_CLASS_ATTEMPTS:
+        while len(rows) < limit:
+            page = min(PAGE, limit - len(rows))
             query = urllib.parse.urlencode({"select": "user_id,cat,phrase,score,unrelated,created_at",
-                                            "order": "id.desc", "limit": PAGE, "offset": len(rows)})
+                                            "order": "id.desc", "limit": page, "offset": len(rows)})
             batch = self._admin(f"/rest/v1/attempts?{query}")
             rows += batch
-            if len(batch) < PAGE:
+            if len(batch) < page:
                 break
         return rows
+
+    def scoped_attempts(self, user_ids: set[str], since: datetime, until: datetime,
+                        limit: int = MAX_DIFFICULTY_ATTEMPTS, *,
+                        include_diagnostics: bool = False) -> tuple[list[dict], bool] | tuple[list[dict], bool, bool]:
+        """Bounded attempt metadata for authorized users and ``since <= created_at < until``.
+
+        The caller gets at most ``limit`` rows plus a truncation signal. Audio, diagnostics,
+        answers, and attempts from other users are never requested.
+        """
+        ids = sorted({str(user_id) for user_id in user_ids if str(user_id)})
+        if not ids:
+            return ([], False, True) if include_diagnostics else ([], False)
+        limit = max(1, min(int(limit), MAX_DIFFICULTY_ATTEMPTS))
+        wanted, rows = limit + 1, []
+        while len(rows) < wanted:
+            page = min(PAGE, wanted - len(rows))
+            fields = "id,user_id,cat,phrase,score,unrelated,created_at"
+            if include_diagnostics:
+                fields += ",issues,model,version"
+            query = urllib.parse.urlencode([
+                ("select", fields),
+                ("user_id", f"in.({','.join(ids)})"),
+                ("created_at", f"gte.{since.astimezone(timezone.utc).isoformat()}"),
+                ("created_at", f"lt.{until.astimezone(timezone.utc).isoformat()}"),
+                ("order", "created_at.asc,id.asc"), ("limit", page), ("offset", len(rows)),
+            ])
+            try:
+                batch = self._admin(f"/rest/v1/attempts?{query}") or []
+            except AuthUnavailable as exc:
+                if include_diagnostics and any(name in str(exc) for name in ("issues", "model", "version")):
+                    return [], False, False
+                raise
+            rows += batch
+            if len(batch) < page:
+                break
+        result = (rows[:limit], len(rows) > limit)
+        return (*result, True) if include_diagnostics else result
 
     def activity(self, hours: int = 24, bucket_minutes: int = 15) -> dict:
         """Aggregated attempt counts for monitoring, without returning student identities.
@@ -887,6 +1110,49 @@ class SupabaseAuth:
             if "answered 404" not in str(e):
                 raise
         return {"buckets": buckets, "summary": summary}
+
+    def scoped_activity(self, user_ids: set[str], since: datetime, bucket_minutes: int = 15) -> dict:
+        """Aggregated monitoring data for one admin's students, calculated in Postgres without downloading attempts."""
+        if not user_ids:
+            return {"buckets": [], "summary": {"attempts": 0, "active_students": 0,
+                                                 "returning_students": 0, "active_days": 0}}
+        body = {"p_user_ids": sorted(user_ids), "p_since": since.isoformat()}
+        try:
+            buckets = self._admin("/rest/v1/rpc/activity_buckets_scoped", "POST",
+                                  {**body, "p_bucket_minutes": bucket_minutes})
+            rows = self._admin("/rest/v1/rpc/activity_summary_scoped", "POST", body) or []
+            return {"buckets": buckets or [], "summary": rows[0] if rows else None}
+        except AuthUnavailable as e:
+            if "answered 404" not in str(e):
+                raise
+            log.warning("scoped activity RPCs are missing; using the paged timestamp fallback")
+            return self._scoped_activity_fallback(user_ids, since, bucket_minutes)
+
+    def _scoped_activity_fallback(self, user_ids: set[str], since: datetime, bucket_minutes: int) -> dict:
+        """Accurate compatibility path until the scoped aggregate RPC migration is installed."""
+        rows: list[dict] = []
+        for offset in range(0, MAX_CLASS_ATTEMPTS, PAGE):
+            query = urllib.parse.urlencode({"select": "user_id,created_at", "user_id": f"in.({','.join(sorted(user_ids))})",
+                                            "created_at": f"gte.{since.isoformat()}", "order": "created_at.desc",
+                                            "limit": PAGE, "offset": offset})
+            batch = self._admin(f"/rest/v1/attempts?{query}") or []
+            rows += batch
+            if len(batch) < PAGE:
+                break
+        seconds, buckets, per_user = max(1, min(bucket_minutes, 60)) * 60, {}, {}
+        local = ZoneInfo("Asia/Jerusalem")
+        for row in rows:
+            stamp = datetime.strptime(row["created_at"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+            slot = int(stamp.timestamp()) // seconds * seconds
+            item = buckets.setdefault(slot, {"users": set(), "attempts": 0})
+            item["attempts"] += 1; item["users"].add(row["user_id"])
+            per_user.setdefault(row["user_id"], set()).add(stamp.astimezone(local).date())
+        return {"buckets": [{"bucket": datetime.fromtimestamp(slot, timezone.utc).isoformat(),
+                              "attempts": item["attempts"], "active_students": len(item["users"])}
+                             for slot, item in sorted(buckets.items())],
+                "summary": {"attempts": len(rows), "active_students": len(per_user),
+                            "returning_students": sum(len(days) >= 2 for days in per_user.values()),
+                            "active_days": len({day for days in per_user.values() for day in days})}}
 
     def log_event(self, kind: str, user: dict | None, label: str = "", details: dict | None = None) -> None:
         """Best-effort append to the management activity feed; a missing audit table never blocks the action."""
@@ -929,12 +1195,17 @@ class SupabaseAuth:
             return 0
 
     def all_attempt_issues(self) -> list[dict] | None:
-        """Compact phoneme issues from all attempts. None means the diagnostic columns have not been migrated yet."""
+        """Compact phoneme issues from recent attempts. None means the diagnostic columns have not been migrated.
+
+        Monitoring only needs a useful recent sample; bounding this query keeps opening the panel independent of the
+        full, ever-growing attempt history. Rows are requested newest first.
+        """
         rows: list[dict] = []
-        while len(rows) < MAX_CLASS_ATTEMPTS:
+        while len(rows) < MAX_MONITOR_ATTEMPTS:
+            limit = min(PAGE, MAX_MONITOR_ATTEMPTS - len(rows))
             query = urllib.parse.urlencode({"select": "user_id,phrase,score,issues,model,version",
                                             "unrelated": "is.false", "order": "id.desc",
-                                            "limit": PAGE, "offset": len(rows)})
+                                            "limit": limit, "offset": len(rows)})
             try:
                 batch = self._admin(f"/rest/v1/attempts?{query}")
             except AuthUnavailable as e:
@@ -942,7 +1213,7 @@ class SupabaseAuth:
                     return None
                 raise
             rows += batch
-            if len(batch) < PAGE:
+            if len(batch) < limit:
                 break
         return rows
 
@@ -966,4 +1237,10 @@ def load_auth() -> SupabaseAuth | None:
         log.warning("TEACHER_EMAILS is set without SUPABASE_SECRET_KEY: the management panel has no data to show")
     if tutors and not secret:
         log.warning("TUTORS_EMAIL is set without SUPABASE_SECRET_KEY: a flag cannot be saved")
-    return SupabaseAuth(url, key, teachers, secret, tutors, developers)
+    audio_store = None
+    if bucket := os.environ.get("AUDIO_BUCKET", "").strip():
+        audio_store = HFAudioStore(bucket, os.environ.get("AUDIO_BUCKET_PREFIX", "ihki-audio"),
+                                   os.environ.get("HF_TOKEN", "").strip() or None)
+        log.info("voice reports use Hugging Face bucket %s", bucket)
+    cutoff = os.environ.get("AUDIO_MIGRATE_BEFORE", DEFAULT_AUDIO_MIGRATION_CUTOFF).strip()
+    return SupabaseAuth(url, key, teachers, secret, tutors, developers, audio_store, cutoff)

@@ -61,6 +61,14 @@ Tests (no model needed):
 pip install -r requirements-dev.txt && pytest -q
 ```
 
+### Browse OpenSpec requirements locally
+
+Run [OpenSpec WebUI](https://github.com/oioi555/openspec-webui) from the project root (needs Node 20.19+), then open http://127.0.0.1:3001:
+
+```bash
+openspec-webui
+```
+
 ## פועל יוצא (Switch & Speak)
 
 The Games tab contains an RTL, touch-first conjugation drill with two paths: learning new verbs and a daily retrieval workout. Levels 1–3 implement recognition, pronoun matching, and timed switching. Level 4 records a spoken conjugation; Level 5 starts with a controlled Palestinian-Arabic prompt and evaluates the target conjugation in the response.
@@ -152,6 +160,41 @@ $$;
 revoke execute on function public.activity_summary(integer) from public, anon, authenticated;
 grant execute on function public.activity_summary(integer) to service_role;
 
+-- The same aggregates, limited to the students visible to a subject admin. Keeping this in PostgreSQL avoids
+-- downloading and truncating a busy class's attempts in the monitoring page.
+create or replace function public.activity_buckets_scoped(
+  p_user_ids uuid[], p_since timestamptz, p_bucket_minutes integer default 15
+)
+returns table (bucket timestamptz, attempts bigint, active_students bigint)
+language sql stable security invoker set search_path = '' as $$
+  select date_bin(make_interval(mins => greatest(1, least(p_bucket_minutes, 60))), a.created_at,
+                  timestamptz '2000-01-01 00:00:00+00'),
+         count(*)::bigint, count(distinct a.user_id)::bigint
+  from public.attempts a
+  where a.created_at >= p_since and a.user_id = any(p_user_ids)
+  group by 1 order by 1
+$$;
+revoke execute on function public.activity_buckets_scoped(uuid[], timestamptz, integer) from public, anon, authenticated;
+grant execute on function public.activity_buckets_scoped(uuid[], timestamptz, integer) to service_role;
+
+create or replace function public.activity_summary_scoped(p_user_ids uuid[], p_since timestamptz)
+returns table (attempts bigint, active_students bigint, returning_students bigint, active_days bigint)
+language sql stable security invoker set search_path = '' as $$
+  with windowed as (
+    select a.user_id, (a.created_at at time zone 'Asia/Jerusalem')::date as practice_day
+    from public.attempts a
+    where a.created_at >= p_since and a.user_id = any(p_user_ids)
+  ), per_user as (
+    select user_id, count(distinct practice_day) as days from windowed group by user_id
+  )
+  select (select count(*) from windowed)::bigint,
+         (select count(*) from per_user)::bigint,
+         (select count(*) from per_user where days >= 2)::bigint,
+         (select count(distinct practice_day) from windowed)::bigint
+$$;
+revoke execute on function public.activity_summary_scoped(uuid[], timestamptz) from public, anon, authenticated;
+grant execute on function public.activity_summary_scoped(uuid[], timestamptz) to service_role;
+
 -- Recent system activity shown only in the management panel. The backend writes with the service-role key;
 -- no browser role gets direct table access.
 create table public.system_events (
@@ -198,7 +241,7 @@ alter table public.attempts
   add column if not exists version text not null default '';
 ```
 
-The page reads these rows back through `GET /api/progress` (best score and tries per phrase, recordings, days practised, distinct practice days in the current week, and current/longest consecutive-day streaks); the best scores then follow the student between devices. Above the path, **הערבית שכבר שלכם** turns every practised phrase into a bead, except that a story or dialogue is represented by one bead for the whole topic. A phrase turns gold at 75 or more; a story's bead turns gold only when all of its lines do. It also shows a four-day weekly practice ring and a 🔥 consecutive-day streak; yesterday keeps a streak alive until the student has had today to continue it. New beads, gold mastery, meaningful personal bests, streaks and completed topics are celebrated on the practice card. The teacher's **דיווחים** tab aggregates `issues` without returning student identities. It shows a candidate when the same judgement occurred in at least five attempts, for at least three students and 30% of the students who attempted that phrase. These are investigation candidates, not proof of a scoring error; a teacher must explicitly turn one into a calibration draft and apply it.
+The page reads these rows back through `GET /api/progress` (best score and tries per phrase, recordings, days practised, distinct practice days in the current week, and current/longest consecutive-day streaks); the best scores then follow the student between devices. Above the path, **הערבית שכבר שלכם** turns every practised phrase into a bead, except that a story or dialogue is represented by one bead for the whole topic. A phrase turns gold at 75 or more; a story's bead turns gold only when all of its lines do. Completing every listed spoken phrase in a lesson awards one **מסבחה**. The prominent collection card separately counts regular beads, gold beads, and מסבחות; its detail view marks each completed lesson's מסבחה. A compact collector at the top of the exercise card opens the same collection. When a new exercise bead is earned, its regular or gold bead flies from the microphone into that collector instead of showing a text popup. It also shows a four-day weekly practice ring and a 🔥 consecutive-day streak; yesterday keeps a streak alive until the student has had today to continue it. Gold upgrades, a newly completed lesson's מסבחה, meaningful personal bests, streaks and completed topics are celebrated on the practice card. Moving past a topic's last sentence once every sentence was practised opens the topic's end: a bead per sentence (gold 75+, red under 60). With no red bead it is a medal, stars, confetti and a chime, and the button goes on to the next topic (the lesson's next, or the next lesson's first). With red beads it offers a short round of just those sentences, after which the dialog comes back showing what improved; the student can also go on regardless. A bead opens its sentence. Hands-free driving mode skips the dialog. The teacher's **דיווחים** tab aggregates `issues` without returning student identities. It shows a candidate when the same judgement occurred in at least five attempts, for at least three students and 30% of the students who attempted that phrase. These are investigation candidates, not proof of a scoring error; a teacher must explicitly turn one into a calibration draft and apply it.
 
 ### The teacher
 
@@ -264,7 +307,7 @@ create table public.tutors (
 alter table public.tutors enable row level security;   -- no policy: only the secret key reads and writes it
 ```
 
-Under each score a teacher or a tutor gets an optional note and the button "🚩 אמרתי נכון, המערכת טעתה". Pressing it sends the recording to `POST /api/flags` (teachers and tutors only), which keeps the recording in the private `flags` Storage bucket and the structured diagnosis in the table `flags`, written with `SUPABASE_SECRET_KEY`. The row holds:
+Under each score a teacher or a tutor gets an optional note and the button "🚩 אמרתי נכון, המערכת טעתה". Pressing it sends the recording to `POST /api/flags` (teachers and tutors only), which keeps the structured diagnosis in the table `flags`, written with `SUPABASE_SECRET_KEY`. By default the recording is kept in the private Supabase `flags` Storage bucket. When `AUDIO_BUCKET` names a private Hugging Face Storage Bucket (and the `HF_TOKEN` Space secret can write it), new recordings go only below `AUDIO_BUCKET_PREFIX/flags`. Reads fall back to Supabase for existing recordings. Once, recordings older than the fixed `AUDIO_MIGRATE_BEFORE` boundary are copied to HF and only successfully copied objects are deleted from Supabase; a completion marker prevents later startup scans. Its default is `2026-10-17T00:00:00+03:00`, preserving the seven days that were current when this migration was introduced; that boundary does not move. The row holds:
 
 - who and what: `email`, `cat`, `phrase`, `he`, `note`;
 - the answer the scorer matched (`ar`, `ipa`), its free decode (`heard_ipa`), `score` and `unrelated`;
@@ -337,7 +380,7 @@ The lab opens on **מבחן**, a test that walks one speaker through the whole l
 
 The lab has two more tabs. **דיווחים** runs the confirmed score reports through the current scorer, and shows for each sound a teacher marked in ניטור as wrongly flagged whether it is still flagged. **תוצאות** is the benchmark of the lab's recordings as they were scored, per sound: how often a sound said right was flagged (false rejections), how often a planted mistake was caught (detection), the mean score, what was heard instead, and how many confirmed reports name the sound. To rescore everything with the current model and rules and compare against the stored numbers, run `python scripts/bench.py` (`--flags` adds the confirmed reports, `--no-baseline` scores without the TTS baseline, `--speaker` keeps one speaker). Run it before shipping a scoring or model change: false rejections should go down without detection going down with them.
 
-Recordings go to the table `lab_samples` and the private storage bucket `lab`, written with `SUPABASE_SECRET_KEY`. Until the table exists, the lab still scores but keeps nothing, and shows this SQL to run once:
+Recordings go to the table `lab_samples` and, by default, the private Supabase storage bucket `lab`, written with `SUPABASE_SECRET_KEY`. With `AUDIO_BUCKET`, new recordings go only below `AUDIO_BUCKET_PREFIX/lab`; the optional fixed-cutoff migration first copies older recordings to Hugging Face and only then removes their Supabase copies. Until the table exists, the lab still scores but keeps nothing, and shows this SQL to run once:
 
 ```sql
 create table public.lab_samples (
@@ -361,7 +404,7 @@ insert into storage.buckets (id, name) values ('lab', 'lab') on conflict (id) do
 1. the frames around the sound: target, competitor and neighbour posteriors, frame energy, and the window it was read from (the end of the sound before to the start of the one after)
 2. its score stage by stage: raw GOP → exemptions → cluster cap → native baseline → teacher floor → final
 3. the readings the audio was aligned to, with the winning CTC path, and the edit-distance gauge for a different sentence
-4. the sentence by word and sound, coloured by score, with how sounds add up to words and words to the sentence
+4. the sentence by word and sound, coloured by score, with how sounds add up to words and words to the sentence. When the recording was scored against native baselines, each TTS voice gets a row of its own scores under the sounds; the voice a sound was measured against (the lowest) is in bold. The waterfall marks every voice on the baseline step, and the table has a column per voice
 
 The data's schema is [docs/trace-schema.ts](docs/trace-schema.ts). `python scripts/mock_trace.py` regenerates the example (`static/assets/trace-mock.json`, the "דוגמה" button) by running the real scorer on synthetic posteriors, with a substitution, a teacher floor, a native baseline and a noise spike beside a short vowel planted in it (the spike shows how a sound's window takes in its neighbours' blank frames). `?src=mock` opens the example, `?i=6` pins a sound.
 
@@ -483,6 +526,28 @@ create table public.dailies (
 alter table public.dailies enable row level security;
 ```
 
+### The daily video's morning reminder
+
+On the "סרטון יומי" screen a student taps "🔔 הזכירו לי כל בוקר" to get a push notification on that device each morning that one of their classes has a daily video (a teacher's account: any class's). It goes at `PUSH_HOUR` (default 8) Jerusalem time, once a day per device, and opens the daily videos' screen. On an iPhone it works only from the app added to the home screen (iOS 16.4+). See `app/push.py`.
+
+Set the Space secret `VAPID_PRIVATE_KEY` (make one with `python -m app.push`; changing it drops every device's subscription), and create the table once:
+
+```sql
+create table public.push_subs (
+  endpoint    text primary key,                   -- the browser's push address
+  email       text not null,
+  p256dh      text not null,
+  auth        text not null,
+  every_class boolean not null default false,     -- a teacher's: every class's daily videos
+  last_daily  date,                               -- the day it was last reminded
+  created_at  timestamptz not null default now()
+);
+alter table public.push_subs enable row level security;
+revoke all on public.push_subs from anon, authenticated;
+```
+
+The Space must be awake at that hour for the reminder to go.
+
 ### Video library
 
 Apart from those there is one library of videos for the whole course: they are not part of the path, need no date, and are the same for every level and class. In **תוכן** the card "ספריה דיגיטלית" comes first, above the levels; the teacher adds a video (a name and a link), renames one, moves one up or down the list with its arrows, and deletes one there. A permitted student enters it from the "ספרייה דיגיטלית" button on the opening screen: a list appears, and a video plays in the same box as the path's videos. The ones opened are marked (on that device). Create the table once (its `level` column stays empty):
@@ -509,6 +574,159 @@ notify pgrst, 'reload schema';
 For the video to play inside the page, its Vimeo privacy setting has to allow embedding (on this site's domain, or anywhere); a YouTube video has to allow embedding too (it does unless its owner turned that off), and plays from `youtube-nocookie.com`.
 
 Keeping the link from being passed on is done in Vimeo, not here: the page has to give the browser the player's address, so a student who looks for it finds it (the server only keeps the link itself, `url`, for teachers). In the video's privacy settings on Vimeo, hide it from vimeo.com and allow embedding on specific domains only, naming the app's own domain (on Hugging Face, `<owner>-<space>.hf.space`). The video then plays inside the app and nowhere else: its link, opened or embedded anywhere else, shows nothing. Domain-level privacy needs a paid Vimeo plan.
+
+#### Managing the library and class rosters from Grok
+
+The app can expose a restricted [Model Context Protocol](https://modelcontextprotocol.io/) connector so a teacher can manage the digital library and basic class rosters, and read privacy-preserving monitoring data, from Grok Business without receiving a Supabase secret, Hugging Face token, or general administrator access. It exposes fifteen tools: four library tools, three class tools, and eight read-only monitoring/analytics tools: `get_activity_timeseries`, `get_current_activity`, `get_system_health`, `get_exercise_difficulty`, `get_pronunciation_difficulties`, `get_learning_progress`, `compare_class_difficulties`, and `get_learning_bottlenecks`. Class changes are limited to creating or renaming a class and adding or removing one student at a time.
+
+The connector uses the teacher's existing Supabase account through OAuth 2.1. Grok receives revocable user tokens; it never receives `SUPABASE_SECRET_KEY`. On every MCP request the app asks Supabase who the token belongs to and freshly checks that the account still has `management.access`, so removing the admin/developer role stops the connector even if Grok still has a token.
+
+Configure Supabase first:
+
+1. In **Authentication → Signing Keys**, migrate to an asymmetric signing key such as ES256 or RS256 if the project still uses HS256.
+2. In **Authentication → URL Configuration**, set **Site URL** to the public app origin, for example `https://<owner>-<space>.hf.space`.
+3. In **Authentication → OAuth Server**, enable the OAuth 2.1 server and **Dynamic Client Registration**. Set **Authorization Path** to `/oauth/consent`.
+4. Keep explicit user approval enabled. Dynamic registration lets compatible MCP clients register their exact callback URL, so periodically review OAuth applications and grants in Supabase.
+
+In Hugging Face **Settings → Variables and secrets**, keep `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` configured as described above. `SUPABASE_SECRET_KEY` remains a Space secret. `MCP_PUBLIC_URL` is normally inferred from `SPACE_HOST`; for a custom domain set it to the exact final URL:
+
+```text
+https://<your-domain>/mcp/
+```
+
+Restart the Space, then check these URLs in a browser:
+
+- `https://<host>/.well-known/oauth-protected-resource/mcp/` names the MCP resource and the Supabase authorization server.
+- `https://<project-ref>.supabase.co/.well-known/oauth-authorization-server/auth/v1` is Supabase's OAuth discovery document.
+- `https://<host>/oauth/consent` shows an error without an active `authorization_id`; that is expected because Supabase supplies it during sign-in.
+
+In Grok Business, add a Custom MCP connector whose final Streamable HTTP URL is:
+
+```text
+https://<owner>-<space>.hf.space/mcp/
+```
+
+Only the name and Server URL are needed. Grok should discover Supabase OAuth and display **Sign in**. Sign in with an account that currently has the app's admin or developer role, review the client name, callback and scopes on the Hebrew consent screen, then approve. A student or a user without `management.access` cannot approve or call MCP tools.
+
+Grok must first call `prepare_library_video`; the app returns the normalized title, URL and a single-use approval that expires after ten minutes. Only after the teacher explicitly confirms those details should Grok call `publish_library_video`. Pending approvals disappear safely when the Space restarts.
+
+Class mutations use the same two-step rule. Useful prompts include:
+
+```text
+הצג את הכיתות והתלמידים שאני רשאי/ת לנהל.
+הכן יצירת כיתה בשם "מתחילים נובמבר" עם התלמיד dana@example.com. אל תבצע עדיין.
+הכן הוספת התלמיד noam@example.com לכיתה 12 עם הכינוי נועם. אל תבצע עדיין.
+הכן הסרת התלמיד old@example.com מכיתה 12. אל תבצע עדיין.
+```
+
+Grok calls `prepare_class_change` with one of `create_class`, `rename_class`, `add_student`, or `remove_student`, then displays the normalized class and email details. After the teacher checks them and explicitly confirms, Grok calls `publish_class_change` with the returned approval id. The approval lasts ten minutes, is single-use, is bound to that signed-in manager, and is refused if the class or the manager's subject scope changed meanwhile.
+
+Class listing returns only class id, name, subject, student emails, and optional class-local nicknames. The connector cannot delete a class or account, create a login account, change roles or entitlements, assign teachers, edit lessons/homework/daily videos, or read individual progress, grades, raw attempts, or recordings. Those operations remain in the browser management screen where applicable. Adding an email to a class does not create a Supabase user; that student still signs in normally.
+
+The eight monitoring and analytics tools are read-only and do not use the prepare/publish flow. `get_activity_timeseries` accepts `from_date` and `to_date` as `YYYY-MM-DD`, an `interval` of `day` or `week`, and an optional `class_id`. The inclusive range is limited to 90 non-future days. With a class id it returns only that authorized class; without one it combines only classes currently visible to the signed-in manager. The response contains aggregate attempts, the peak simultaneously active learners reported by the source buckets, and a range summary. It never contains student names, emails, ids, individual scores, answers, recordings, or exact login events.
+
+`get_current_activity` accepts `window_minutes` equal to `5` or `15` (default `5`) and an optional `class_id`. `recent_practice` counts distinct learners and stored attempts in that window but explicitly sets `presence_claim: false`: a recent attempt does not prove that the learner is still connected. `live_presence` is available only during an explicit live-class session and defines active as a heartbeat within 20 seconds of `checked_at`; this process-local state disappears when the session ends or the service restarts. Combined class scopes deduplicate learners enrolled in more than one class.
+
+Attempt-derived counts and timestamps require at least three learners and five attempts. Live counts of one or two are suppressed. The result distinguishes `no_activity` (a successful window query with no events), `no_data` (no observation establishes a last time), `unavailable` (the source does not apply or cannot be read), and `suppressed` (data exists but privacy prevents display). Stored attempts are current as of the database read, not real-time telemetry. Timestamps use UTC ISO 8601 and include an `Asia/Jerusalem` rendering. The app stores no durable general application-activity event, so `last_application_activity` is `unavailable`; lack of practice does not mean the app was unused. No new tracking or retention policy is introduced.
+
+Example current-activity response (shortened):
+
+```json
+{
+  "ok": true,
+  "class_id": 12,
+  "checked_at": "2026-10-27T10:10:00Z",
+  "timezone": "Asia/Jerusalem",
+  "privacy_threshold": {"minimum_students": 3, "minimum_attempts": 5},
+  "recent_practice": {
+    "status": "complete",
+    "source": "persisted_attempts",
+    "window_minutes": 5,
+    "students_with_activity": 4,
+    "attempts": 7,
+    "presence_claim": false,
+    "update_semantics": "current_as_of_database_read"
+  },
+  "live_presence": {
+    "status": "complete",
+    "source": "live_session_heartbeat",
+    "active_users": 3,
+    "heartbeat_ttl_seconds": 20,
+    "ephemeral": true
+  },
+  "last_practice_activity": {
+    "status": "complete",
+    "event_type": "practice_attempt",
+    "timestamp": "2026-10-27T10:09:40Z",
+    "local_timestamp": "2026-10-27T12:09:40+02:00",
+    "timezone": "Asia/Jerusalem",
+    "elapsed_seconds": 20
+  },
+  "last_application_activity": {"status": "unavailable", "reason_code": "not_collected"}
+}
+```
+
+`get_system_health` returns only `healthy`, `degraded`, `unavailable`, or `not_configured` for the application, authentication, database, model, and text-to-speech components. `not_configured` for an optional component such as text-to-speech does not by itself make the service unhealthy. A developer may also see a non-sensitive build version and revision. No caller receives raw logs, stack traces, database queries, internal URLs, paths, environment variables, tokens, credentials, or secret-presence values.
+
+`get_exercise_difficulty` accepts `from_date`, `to_date`, optional `class_id` and `exercise_type`, `limit` from 1 through 20 (default 20), and `min_attempts` (default 10). Exercise types are `pronunciation`, `verb`, `game`, and `other`. It returns stable exercise metadata, attempts, students, successes, success rate, attempts per student, average score, retry metrics, and rank. Existing aliases such as `exercise`, `category`, `attempt_count`, and `student_count` remain available.
+
+`get_pronunciation_difficulties` uses only stored, actually flagged phoneme diagnostics. It returns a phoneme, safe example words, error attempts, affected students, average diagnostic score, and weekly trend. Stored `issues` do not contain every correctly pronounced exposure, so `pronunciation_error_rate` is currently `null` rather than a fabricated denominator. Missing optional diagnostic columns produce `status: "insufficient_data"`.
+
+`get_learning_progress` returns `day`, `week`, or `month` buckets with attempts, students, success and average score, first-observed-attempt success, retry success, and an aggregate score trend. Its optional stable `exercise_id` restricts the report. “First” means first persisted attempt inside the requested range, not lifetime first.
+
+`compare_class_difficulties` applies the same definitions to optional `class_ids` and normalizes by participating students and observed exercise exposure. Overlapping enrollment is disclosed because class populations may not be mutually exclusive.
+
+`get_learning_bottlenecks` returns qualifying exercise/topic aggregates for affected students, repeated-failure rate, attempts until success, improvement rate, and severity. Measured `observed_metrics` remain separate from `suggested_intervention`, which is labeled `recommendation` and lists its measured basis.
+
+Across analytics, success means `score >= 75` and `unrelated = false`. A group requires at least three students and `max(5, min_attempts)` attempts. Sparse groups are suppressed or marked `insufficient_data`; missing metrics are `null`. Dates use ISO 8601 and Asia/Jerusalem calendar boundaries.
+
+An exercise is omitted unless at least three students made at least five attempts in the selected scope and period. Suppressed exercise names and counts are not revealed. “Did not reach success” is not called abandonment because attempt data cannot show whether somebody quit. The report never returns student identities, individual scores or sequences, timestamps, answers, recordings, or pronunciation traces. If the bounded attempt safety cap is reached, the tool refuses partial analysis and asks for a narrower date range or one class.
+
+Example difficulty response (shortened):
+
+```json
+{
+  "ok": true,
+  "status": "complete",
+  "from_date": "2026-10-01",
+  "to_date": "2026-10-26",
+  "privacy_threshold": {"minimum_students": 3, "minimum_attempts": 10},
+  "exercises": [{
+    "exercise_id": "a1b2c3d4e5f6",
+    "exercise_name": "תרגיל לדוגמה",
+    "exercise_type": "pronunciation",
+    "topic": "הגופים",
+    "total_attempts": 18,
+    "unique_students": 6,
+    "successful_attempts": 7,
+    "success_rate": 38.9,
+    "average_attempts_per_student": 3.0,
+    "average_score": 61.4,
+    "difficulty_rank": 1
+  }]
+}
+```
+
+Persisted data has no reliable session boundaries, abandoned or incomplete exercise event, unanswered exposure, or item-level correctness for every non-spoken game. The tools therefore do not report sessions or abandonment and return `insufficient_data` for untracked answers. Trends describe association; they do not prove that practice caused learning.
+
+Useful read-only prompts include:
+
+```text
+הצג גרף פעילות יומי של כיתה 12 בין 2026-10-01 ל-2026-10-26. אל תציג מידע אישי.
+הצג פעילות שבועית בכל הכיתות שאני מורשה/ית לראות ב-30 הימים האחרונים.
+הצג פעילות עדכנית בכיתה 12 בחמש הדקות האחרונות, והפרד בין נוכחות חיה לבין תרגול שנשמר.
+מתי היה ניסיון התרגול האחרון בכל הכיתות שאני מורשה/ית לראות? ציין UTC וגם שעון ישראל ואל תציג מידע אישי.
+בדוק את מצב המערכת והסבר בעברית פשוטה אם רכיב כלשהו אינו זמין.
+הצג את 10 התרגילים הקשים ביותר בכל הכיתות שאני מורשה/ית לראות בין 2026-10-01 ל-2026-10-26. הסבר את המדדים ואל תציג מידע אישי.
+אילו פונמות ערביות גרמו לשגיאות הגייה מדודות בכיתה 12 בחודש האחרון? הצג רק קבוצות שעוברות את סף הפרטיות.
+הצג התקדמות שבועית בכיתה 12, כולל הצלחה בניסיון הראשון לעומת ניסיונות חוזרים.
+השווה בין כיתות 12 ו-15 לפי הצלחה, השתתפות וחשיפה לתרגילים. ציין אם יש תלמידים החופפים בין הכיתות.
+מצא צווארי בקבוק בלמידה בכל הכיתות המורשות. הפרד בבירור בין המדדים שנמדדו לבין המלצות הוראה.
+```
+
+The connector does not make calls to the xAI API, so an xAI developer API key and API credits are not required. Grok Business plan or connector charges, if any, are handled by xAI. To revoke one connector, revoke its grant or OAuth application in Supabase. To revoke the teacher immediately, remove their admin/developer role in the management screen; the next MCP request is refused. Existing videos and ordinary management-screen access are otherwise unaffected. Connector mutations appear in the existing management activity log when its optional `system_events` table is installed; application logs are the fallback and never contain OAuth tokens.
+
+If Grok does not show sign-in, confirm that both discovery URLs return JSON, dynamic registration is enabled, `MCP_PUBLIC_URL` matches Grok's URL including `/mcp/`, and the Space uses HTTPS. A registration 403/404 usually means dynamic registration is disabled. `invalid_grant` usually means the authorization code expired, its PKCE verifier differs, or the registered callback does not match exactly; remove and recreate the connector. A consent-page configuration error means the Site URL, Authorization Path, or Supabase public settings are missing. OAuth configuration failures never fall back to public or shared-secret access.
 
 ### Texts
 
@@ -564,7 +782,7 @@ A sentence translated from Arabic to Hebrew (the topics named "... ערבית �
 
 ### The story quiz
 
-A story topic (a conversation, all its lines on the card) has a "בוחן" button: the student says the whole conversation in one go. Each line is recorded by itself, once; its score appears beside the line, its Arabic under it, and the next line is recorded, with no answer played and no second try. A line that was not heard waits for the microphone button; one that was skipped comes back after the last line. At the end the card shows the grade (the average of the lines' scores, and how many were said) and the three mistakes made most often across the lines, each with its tip and the words it was heard in (`QUIZ` in `static/index.html`). "סיום הבוחן" ends it early on the lines said so far. The lines are recorded as attempts like any other, so a quiz counts in the student's progress and in the panel.
+A story topic (a conversation, all its lines on the card) has a "בוחן" button: the student says the whole conversation in one go. Each line is recorded by itself, once; its score appears beside the line, its Arabic under it, and the next line is recorded, with no answer played and no second try. A line that was not heard waits for the microphone button; one that was skipped comes back after the last line. At the end the card shows the grade (the average of the lines' scores, and how many were said) and the three mistakes made most often across the lines, each with its tip and the words it was heard in (`QUIZ` in `static/index.html`). "סיום הבוחן" ends it early on the lines said so far. The lines are recorded as attempts like any other, so a quiz counts in the student's progress and in the panel. Story driving mode is listening-only and asks how to play the conversation: **Arabic only** plays every Arabic line with a three-second pause between lines; **Hebrew then Arabic** reads each Hebrew sentence followed by its Arabic line. Throughout driving mode, the screen shows the Hebrew meaning and the spoken Arabic in Hebrew transliteration together.
 
 The classes are kept in Supabase and read and written with `SUPABASE_SECRET_KEY` only, so the table has row-level security and no policy. Create it once:
 
@@ -608,6 +826,34 @@ A subject is one of a fixed list, `SUBJECT_LABELS` in `app/main.py`: ערבית 
 
 The server keeps the list for a minute, so a change in the SQL editor (rather than the panel) applies within that time.
 
+### Current lesson and the focused home
+
+The first time a student enters an Arabic class, the page asks which lesson the class is on now, offering only that class's lessons. A class must study lessons of exactly one level for this: a class whose lessons span several levels, or that names no lessons (and so studies every one), shows a message asking to correct the class instead. Math classes keep their own path and are not asked. After the choice the student lands on a focused home of at most three actions, the first three that apply of: the nearest-due homework, today's daily video when not yet watched on that device, continuing the current lesson, and a short review of up to five sentences. The full path is one button away and opens at the current lesson. "שינוי" next to the lesson changes it; no progress is lost. Teachers, and the open service without sign-in, keep the path as their first screen.
+
+Each student's choice is kept for each class in the table `learner_class_state`, read and written with `SUPABASE_SECRET_KEY` only. Create it once:
+
+```sql
+create table public.learner_class_state (
+  email          text   not null,                  -- the student's sign-in email, lower-case
+  class_id       bigint not null references public.classes (id) on delete cascade,
+  current_lesson text   not null,                  -- a lesson id of the class, e.g. 5 or 2.3
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+  primary key (email, class_id)                    -- one current lesson per student and class
+);
+alter table public.learner_class_state enable row level security;
+revoke all on public.learner_class_state from anon, authenticated;
+```
+
+`/api/me` gives each of the student's classes its `id`, its `level` (`null` when it is not one level), the `current_lesson` the student chose (`null` before a choice, or when the class no longer has that lesson) and `teacher: true` for a class the account teaches. The page saves a choice with:
+
+```
+PUT /api/me/classes/{class_id}/current-lesson
+{"lesson": "5"}
+```
+
+The server takes the email from the session, never from the body. It answers 401 without sign-in, 403 for a class the caller does not study in (or teaches), 409 for a class that is not one level, 400 for a lesson that is not the class's, and 503 when Supabase cannot save it. Until the table exists, or while Supabase is unreachable, the page keeps the choice on the device under `ihki.lesson.v1:<subject>:<email>:<class id>`, so another account on the same device does not get it, and sends it again on a later sign-in. A choice the server has wins over the device's.
+
 ### Live lessons
 
 An admin can choose several class teachers from the class's own student list. The assignment is scoped to that class:
@@ -625,7 +871,7 @@ recordings may be retried because they never became a scored attempt. Session st
 the application process: ending a session, restarting the server, or two hours without a teacher heartbeat erases them.
 No live-session audio or result history is stored.
 
-The **ניטור** activity dashboard can switch between the last 5 minutes, 24 hours and 7 days. It also reports Sawtak cache usage: cached WAV count, disk size, cache hits, generated misses, and the hit rate since the current server process started. `GET /api/tts-cache` returns only these aggregate figures; clearing the cache resets the process counters.
+The **ניטור** activity dashboard can switch between the last 5 minutes, 24 hours and 7 days. It also reports Sawtak cache usage: cached WAV count, disk size, cache hits, generated misses, and the hit rate since the current server process started. **הכנת כל ההקלטות** asks for a Sawtak voice id and starts a resumable, sequential background pass over every unique phrase for that voice; existing files are skipped and progress is returned by `GET /api/tts-cache`. Recordings are stored below `TTS_CACHE_DIR/<voice-id>/`. When `TTS_BUCKET` is set (a Hugging Face Storage Bucket id, e.g. `wzender/ihki-storage`, with an `HF_TOKEN` secret that can write to it), the sweep also uploads every WAV through the Bucket API to `TTS_BUCKET_PREFIX/<voice-id>/` (default prefix `ihki-tts`), and at the end uploads every other WAV already on disk; files already in the bucket with the same size are skipped. Writing to a mounted `/data` folder alone was not reaching the bucket, and was slow (the mount flushes a few files every ~30 s), so with `TTS_BUCKET` set new recordings are written to a local staging folder (`TTS_STAGING_DIR`, default `/tmp/ihki-tts-staging`) and uploaded through the API: the sweep in batches of 25 (at least every 30 s), playback misses one by one in the background. Lookups check the staging folder first, then `TTS_CACHE_DIR`. Clearing the cache resets the process counters and leaves the bucket untouched.
 
 The panel reads through `GET /api/class`, which answers teachers only. Row-level security hides other students' rows from the teacher's own token, so the server reads them with `SUPABASE_SECRET_KEY` (Supabase → Project Settings → API Keys → secret key). Unlike the publishable key it must stay private: set it as a Space **secret**. Without it the panel opens and says the data is not available.
 
@@ -656,6 +902,29 @@ MODEL_ID=checkpoints/ihki-ft uvicorn app.main:app --host 0.0.0.0 --port 7860
 
 The script reports phoneme error rate (PER) before and after training. A GPU is advisable. A free Colab T4 handles a few hundred clips in minutes.
 
+### POWSM on the Space
+
+The most accurate model so far is POWSM-CTC fine-tuned on the Minerva lines with short padding (`train/finetune_powsm.py --pad random`). On the test lines it reaches 16.5% PER, against 38% for the base model, at 0.57 s a recording on 2 CPU threads. See [docs/zero-shot-phone-models.md](docs/zero-shot-phone-models.md). The Space runs it as an ONNX export, with `onnxruntime` and torch only. ESPnet, which training needs, stays on the training machine.
+
+1. **Export it.** Do this once per fine-tune, on the training machine, after running `scripts/setup_zero_shot_deps.sh`:
+   ```bash
+   python scripts/export_powsm_onnx.py checkpoints/powsm-ft-shortpad/powsm_ft.pt exports/powsm-ft-shortpad \
+       --check data/minerva/dev.csv   # each frame's best phone should match ESPnet's 100%
+   ```
+2. **Upload the folder to a Hub model repo.** Use `--private` if the model should not be public: it was trained on the copyrighted Minerva clips.
+   ```bash
+   hf repo create wzender/ihki-powsm-ft --repo-type model --private
+   hf upload wzender/ihki-powsm-ft exports/powsm-ft-shortpad .
+   ```
+3. **Point the Space at it.** In the Space settings, set the variable `MODEL_ID=powsm-onnx:wzender/ihki-powsm-ft`, and `POWSM_ONNX_THREADS=2` to match the free hardware. For a private repo, also add a secret `HF_TOKEN` with read access. The Docker build passes that secret only to the step that downloads the model, which is then baked into the image. Saving the settings rebuilds the Space. `/api/health` and the panel's פרטי המערכת show the model.
+
+Settings:
+- `POWSM_ONNX_PRECISION=int8` loads the int8 copy: 0.38 s a recording, but ط and ص drop by 5–6 points.
+- `POWSM_PAD_SECONDS` overrides the padding (default: what the export was trained for, none here).
+- `POWSM_ONNX_REPO` names the repo the panel's "מודלים" tab offers.
+
+To roll back, delete `MODEL_ID`. The Space rebuilds onto the base model.
+
 ## Calibration knobs
 
 - `ScorerConfig.flag_below` (50): the phoneme score under which a consonant gets a tip.
@@ -670,9 +939,9 @@ Tune them on a handful of labelled learner recordings. A useful target is that n
 
 - Local: `cp .env.example .env` and set `SAWTAK_API_KEY` (`.env` is git-ignored and excluded from the Docker image).
 - Hugging Face: add `SAWTAK_API_KEY` as a Space **secret** (Settings → Variables and secrets). It is injected as an environment variable at runtime.
-- Playback, candidate generation and score calibration all use the Palestinian voice רַאאִף.
+- Model-answer playback uses `SAWTAK_VOICE_ID`, or the Palestinian voice רַאאִף when it is unset.
 - Without a key the endpoint answers 503 and the page falls back to the device's Arabic voice.
-- The same רַאאִף voice calibrates the scores (step 5 above), once for every phrase that gets scored, also when the learner never presses "השמע". The first score of a phrase waits up to 8 s for it. Without a key the scores are not calibrated; `/api/health` reports this as `references`.
+- Score calibration keeps its fixed native baseline voices; it does not use `SAWTAK_VOICE_ID`. A baseline is prepared once for every phrase that gets scored, also when the learner never presses "השמע". The first score of a phrase waits up to 8 s for it. Without a key the scores are not calibrated; `/api/health` reports this as `references`.
 
 ## Cost estimate (API keys)
 
