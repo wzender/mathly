@@ -25,6 +25,8 @@ const save=()=>{ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} };
 
 let G=null, BY={}, POST={}, DEPTH={}, ORDER=[], P={done:{},tries:{}}, root=null, path=null, sheet=null, cur=null, back=null;
 let picker=null, PH=null;   // the photo file picker, and the photographed problem on the sheet (see photo())
+let advanceTimer=null;
+function cancelAdvance(){ clearTimeout(advanceTimer); advanceTimer=null; }
 
 function index(graph){
   G=graph; BY=Object.fromEntries(G.skills.map(s=>[s.id,s])); POST=Object.fromEntries(G.skills.map(s=>[s.id,[]]));
@@ -65,7 +67,7 @@ async function show(){
   }
   P=Object.assign({done:{},tries:{}},load()); SHOWN=new Set(shownUnits().map(u=>u.id)); draw();
 }
-function hide(){ if(root) root.hidden=true; document.documentElement.classList.remove("math-on"); }
+function hide(){ cancelAdvance(); if(root) root.hidden=true; document.documentElement.classList.remove("math-on"); }
 
 function draw(){
   const UNITS=G.units.filter(u=>SHOWN.has(u.id)), mine=G.skills.filter(s=>SHOWN.has(s.unit));
@@ -101,6 +103,7 @@ function chips(ids){
   return ids.length?ids.map(id=>`<button class="mx-chip u-${BY[id].unit}${P.done[id]?" is-done":""}" data-id="${id}">${P.done[id]?"✓ ":""}${esc(BY[id].short)}</button>`).join(""):'<em>אין</em>';
 }
 function open(id){
+  cancelAdvance();
   const s=BY[id], st=status(id), unit=G.units.find(u=>u.id===s.unit), rot=ORDER.indexOf(id)%s.sample.choices.length;
   const choices=s.sample.choices.slice(rot).concat(s.sample.choices.slice(0,rot)), missing=s.prereqs.filter(p=>!P.done[p]&&SHOWN.has(BY[p].unit));
   if(!cur) back=document.activeElement;
@@ -121,9 +124,10 @@ function open(id){
   sheet.hidden=false; sheet.querySelector(".mx-sheet").scrollTop=0;
   sheet.querySelector(".mx-x").focus({preventScroll:true});
 }
-function closeSheet(){ sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
+function closeSheet(){ cancelAdvance(); sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
 
 function answer(btn){
+  if(btn.disabled) return;
   const id=cur, m=btn.dataset.m, fb=sheet.querySelector(".mx-fb");
   sheet.querySelectorAll("[data-choice]").forEach(b=>b.classList.remove("right","wrong"));
   btn.classList.add(m?"wrong":"right");
@@ -131,8 +135,21 @@ function answer(btn){
   if(!m){
     const first=!P.done[id]; P.done[id]=P.done[id]||new Date().toISOString(); save(); draw();
     const nxt=next();
+    sheet.querySelectorAll("[data-choice]").forEach(b=>b.disabled=true);
     fb.innerHTML=`<div class="mx-ok"><b>נכון!</b>${first?"<span>המיומנות סומנה כהושלמה.</span>":""}
-      ${nxt&&nxt!==id?`<button class="mx-btn solid" data-id="${nxt}">למיומנות הבאה: ${esc(BY[nxt].short)}</button>`:""}</div>`;
+      ${nxt&&nxt!==id?`<span class="mx-countdown"></span><button class="mx-btn solid" data-id="${nxt}">המשך עכשיו: ${esc(BY[nxt].short)}</button>`:"<span>סיימתם את כל המסלול. כל הכבוד!</span>"}</div>`;
+    if(nxt&&nxt!==id){
+      let seconds=3;
+      const countdown=fb.querySelector(".mx-countdown");
+      const tick=()=>{
+        if(cur!==id||sheet.hidden||root.hidden) return cancelAdvance();
+        if(seconds===0) return open(nxt);
+        countdown.textContent=`התרגיל הבא בעוד ${seconds}…`;
+        seconds--;
+        advanceTimer=setTimeout(tick,1000);
+      };
+      tick();
+    }
     return;
   }
   save();
@@ -165,6 +182,7 @@ async function shrink(file){   // a phone photo is several MB: about 1600 px on 
   return new Promise((ok,no)=>c.toBlob(b=>b?ok(b):no(new Error("toBlob")),"image/jpeg",.85));
 }
 async function photo(file){
+  cancelAdvance();
   let blob; try{ blob=await shrink(file); }catch{ blob=file; }   // a format the browser cannot draw goes as it is
   if(PH?.url) URL.revokeObjectURL(PH.url);
   if(cur!=="photo"){ if(!cur) back=document.activeElement; cur="photo"; }
