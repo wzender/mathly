@@ -3,5 +3,6 @@ uvicorn[standard]>=0.29
 anyio>=4.10,<4.11  # Python 3.10: newer releases can hang Starlette's worker-thread bridge
 python-multipart>=0.0.9
 python-dotenv>=1.0
+qrcode>=7.4,<9
 anthropic>=1.0  # photographed-problem hints and solutions
 tzdata>=2024.1

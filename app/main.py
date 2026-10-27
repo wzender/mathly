@@ -3,14 +3,18 @@ from __future__ import annotations
 
 import logging
 import os
+import io
+import secrets
+import time
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from .access import has_permission, resolve_access
 from .auth import AuthUnavailable, ClassConflict, SupabaseAuth, load_auth
@@ -74,6 +78,11 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
     @app.get("/math", response_class=HTMLResponse, include_in_schema=False)
     async def index():
         return page()
+
+    @app.get("/phone", response_class=HTMLResponse, include_in_schema=False)
+    async def phone():
+        return HTMLResponse((STATIC / "phone.html").read_text(encoding="utf-8"),
+                            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
     @app.get("/manifest.webmanifest", include_in_schema=False)
     async def manifest():
@@ -145,6 +154,47 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
         return {"ok": True}
 
     photo_counts: dict[tuple[str, str], int] = {}
+    photo_sessions: dict[str, dict] = {}
+
+    def session_for(token: str) -> dict:
+        session = photo_sessions.get(token)
+        if not session or session["expires"] <= time.monotonic():
+            photo_sessions.pop(token, None)
+            raise HTTPException(410, "הקישור פג. פתחו קישור חדש במחשב.")
+        return session
+
+    @app.post("/api/math/photo-sessions")
+    async def pair_phone(user: dict | None = Depends(signed_in)):
+        solver()  # Report missing configuration before asking the student to scan.
+        for token in list(photo_sessions):
+            if photo_sessions[token]["expires"] <= time.monotonic():
+                del photo_sessions[token]
+        if len(photo_sessions) >= 1000:
+            raise HTTPException(429, "נסו שוב מאוחר יותר.")
+        token = secrets.token_urlsafe(32)
+        photo_sessions[token] = {"expires": time.monotonic() + 900, "user": user,
+                                 "state": "waiting", "result": None, "error": ""}
+        return {"token": token, "expires_in": 900}
+
+    @app.get("/api/math/photo-sessions/{token}")
+    async def paired_result(token: str, user: dict | None = Depends(signed_in)):
+        session = session_for(token)
+        if (session["user"] or {}).get("email") != (user or {}).get("email"):
+            raise HTTPException(404, "session not found")
+        return JSONResponse({key: session[key] for key in ("state", "result", "error")},
+                            headers={"Cache-Control": "no-store"})
+
+    @app.post("/api/math/photo-qr")
+    async def photo_qr(request: Request, _user: dict | None = Depends(signed_in)):
+        import qrcode
+        import qrcode.image.svg
+        body = await request.json()
+        url = body.get("url", "")
+        if not isinstance(url, str) or len(url) > 2048 or not url.startswith(("https://", "http://")):
+            raise HTTPException(400, "invalid phone URL")
+        output = io.BytesIO()
+        qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, border=4).save(output)
+        return Response(output.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
 
     def solver() -> PhotoSolver:
         key = os.environ.get("ANTHROPIC_API_KEY", "").strip() or os.environ.get("CLAUDE_API_KEY", "").strip()
@@ -157,26 +207,54 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
 
     @app.post("/api/math/photo")
     async def solve_photo(photo: UploadFile = File(...), user: dict | None = Depends(signed_in)):
+        return await solve_upload(photo, user)
+
+    async def solve_upload(photo: UploadFile, user: dict | None):
         service = solver()
         email = (user or {}).get("email", "").lower()
         exempt = "developer" in (user or {}).get("roles", ())
         counter = (email, datetime.now(LOCAL_TZ).date().isoformat()) if email and not exempt else None
-        if counter and photo_counts.get(counter, 0) >= DAILY_PHOTOS:
-            raise HTTPException(429, "daily photo limit reached")
         if photo.content_type not in PHOTO_TYPES:
             raise HTTPException(415, "send a JPEG, PNG, or WebP image")
-        image = photo.file.read(MAX_PHOTO + 1)
+        image = await photo.read(MAX_PHOTO + 1)
         if not image:
             raise HTTPException(400, "the image is empty")
         if len(image) > MAX_PHOTO:
             raise HTTPException(413, "the image is too large")
-        try:
-            result = service.solve(image, photo.content_type)
-        except PhotoUnavailable as exc:
-            raise HTTPException(503, str(exc)) from exc
-        if counter and result.get("readable"):
+        if counter and photo_counts.get(counter, 0) >= DAILY_PHOTOS:
+            raise HTTPException(429, "daily photo limit reached")
+        if counter:
             photo_counts[counter] = photo_counts.get(counter, 0) + 1
+        try:
+            result = await run_in_threadpool(service.solve, image, photo.content_type)
+        except PhotoUnavailable as exc:
+            if counter:
+                photo_counts[counter] -= 1
+            raise HTTPException(503, str(exc)) from exc
+        except Exception:
+            if counter:
+                photo_counts[counter] -= 1
+            raise
+        if counter and not result.get("readable"):
+            photo_counts[counter] -= 1
         return {**result, "left": DAILY_PHOTOS - photo_counts.get(counter, 0) if counter else None}
+
+    @app.post("/api/math/phone-photo")
+    async def phone_photo(request: Request, photo: UploadFile = File(...)):
+        session = session_for(request.headers.get("x-photo-token", ""))
+        if session["state"] in ("solving", "done"):
+            raise HTTPException(409, "התמונה כבר נשלחה. פתחו קישור חדש במחשב לתרגיל נוסף.")
+        session.update(state="solving", error="")
+        try:
+            result = await solve_upload(photo, session["user"])
+        except HTTPException as exc:
+            session.update(state="error", error=str(exc.detail))
+            raise
+        except Exception:
+            session.update(state="error", error="לא הצלחנו לפתור. נסו שוב.")
+            raise
+        session.update(state="done", result=result)
+        return {"ok": True, "readable": result.get("readable", False)}
 
     return app
 

@@ -26,6 +26,10 @@ const save=()=>{ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} };
 let G=null, BY={}, POST={}, DEPTH={}, ORDER=[], P={done:{},tries:{}}, root=null, path=null, sheet=null, cur=null, back=null;
 let picker=null, PH=null;   // the photo file picker, and the photographed problem on the sheet (see photo())
 let advanceTimer=null;
+let phonePair=null;
+function stopPhone(){
+  if(phonePair){clearTimeout(phonePair.timer);if(phonePair.qr)URL.revokeObjectURL(phonePair.qr);phonePair=null;}
+}
 function cancelAdvance(){ clearTimeout(advanceTimer); advanceTimer=null; }
 
 function index(graph){
@@ -88,13 +92,14 @@ function draw(){
           <span class="mx-lbl"><b>${fmt(s.name)}</b><small>${s.core?'<span class="mx-core">ליבה 5 יח״ל</span>':""}${here?'<span class="mx-go">ממשיכים כאן</span>':""}</small></span></button>`;
       }).join("")}</div></section>`;
   }).join("");
-  path.innerHTML=`<header class="mx-top"><div><h1>המסלול שלי</h1><p class="mx-sub">אלגברה כיתה ט׳ · 5 יח״ל${cls}</p></div>
+  path.innerHTML=`<header class="mx-top"><div><h1>המסלול שלי</h1><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
       <div class="mx-acts">${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
     <section class="mx-progress" aria-label="ההתקדמות שלי">
       <div class="mx-ring" style="--p:${pct}"><b>${doneN}</b><small>מתוך ${total}</small></div>
       <div class="mx-units">${units}</div></section>
     ${nxt?`<button class="mx-next" data-id="${nxt}"><small>ממשיכים מכאן</small><b>${fmt(BY[nxt].name)}</b></button>`:'<p class="mx-note">סיימתם את כל המסלול. כל הכבוד!</p>'}
     <button class="mx-photo" data-act="photo"><b>צילום תרגיל</b><small>צלמו תרגיל מהמחברת או מהדף, ונעזור לכם לפתור אותו צעד אחר צעד</small></button>
+    <button class="mx-photo" data-act="phone"><b>צילום בטלפון, פתרון במחשב</b><small>סרקו קוד בטלפון, צלמו תרגיל וראו את התשובה כאן אוטומטית</small></button>
     ${trail}
     <p class="mx-note">בשלב הזה יש שאלה אחת לדוגמה לכל מיומנות. ההתקדמות נשמרת במכשיר הזה.</p>`;
 }
@@ -103,6 +108,7 @@ function chips(ids){
   return ids.length?ids.map(id=>`<button class="mx-chip u-${BY[id].unit}${P.done[id]?" is-done":""}" data-id="${id}">${P.done[id]?"✓ ":""}${esc(BY[id].short)}</button>`).join(""):'<em>אין</em>';
 }
 function open(id){
+  stopPhone();
   cancelAdvance();
   const s=BY[id], st=status(id), unit=G.units.find(u=>u.id===s.unit), rot=ORDER.indexOf(id)%s.sample.choices.length;
   const choices=s.sample.choices.slice(rot).concat(s.sample.choices.slice(0,rot)), missing=s.prereqs.filter(p=>!P.done[p]&&SHOWN.has(BY[p].unit));
@@ -115,7 +121,7 @@ function open(id){
         <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
       <p>${fmt(s.description)}</p>
       ${st==="locked"?`<div class="mx-hint">מומלץ לעבור קודם על: <span class="mx-chips">${chips(missing)}</span></div>`:""}
-      <div class="mx-q"><p>${fmt(s.sample.question)}</p>${s.sample.graph?plot(s.sample.graph):""}
+      <div class="mx-q"><p>${fmt(s.sample.question)}</p>${s.sample.graph?plot(s.sample.graph):""}${s.sample.diagram?geometryDiagram(s.sample.diagram):""}
         <div class="mx-choices">${choices.map((c,i)=>`<button data-choice="${i}" data-m="${c.correct?"":esc(c.mistake)}">${fmt(c.text)}</button>`).join("")}</div>
         <div class="mx-fb" aria-live="polite"></div></div>
       <div class="mx-sec"><h4>דורשת</h4><div class="mx-chips">${chips(s.prereqs)}</div></div>
@@ -124,7 +130,7 @@ function open(id){
   sheet.hidden=false; sheet.querySelector(".mx-sheet").scrollTop=0;
   sheet.querySelector(".mx-x").focus({preventScroll:true});
 }
-function closeSheet(){ cancelAdvance(); sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
+function closeSheet(){ stopPhone(); cancelAdvance(); sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
 
 function answer(btn){
   if(btn.disabled) return;
@@ -163,6 +169,8 @@ function onClick(e){
   if(t.dataset.choice!=null) return answer(t);
   if(t.dataset.id) return open(t.dataset.id);
   switch(t.dataset.act){
+    case "phone": return pairPhone();
+    case "copy-phone": return copyPhone(t);
     case "photo": case "retake": return picker.click();
     case "hint": PH.shown++; return drawPhoto();
     case "work": PH.works.add(+t.dataset.i); return drawPhoto();
@@ -182,6 +190,7 @@ async function shrink(file){   // a phone photo is several MB: about 1600 px on 
   return new Promise((ok,no)=>c.toBlob(b=>b?ok(b):no(new Error("toBlob")),"image/jpeg",.85));
 }
 async function photo(file){
+  stopPhone();
   cancelAdvance();
   let blob; try{ blob=await shrink(file); }catch{ blob=file; }   // a format the browser cannot draw goes as it is
   if(PH?.url) URL.revokeObjectURL(PH.url);
@@ -218,10 +227,89 @@ function drawPhoto(){
     <div class="mx-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
       <div class="mx-shtop"><div><h3 id="mxTitle">פתרון מתמונה</h3><small class="mx-src">קודם רמזים, והפתרון המלא כשתבקשו.</small></div>
         <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
-      <img class="mx-thumb" src="${PH.url}" alt="התמונה ששלחתם">
+      ${PH.url?`<img class="mx-thumb" src="${PH.url}" alt="התמונה ששלחתם">`:""}
       <div class="mx-pbody" aria-live="polite">${body}</div></div>`;
   sheet.hidden=false;
   if(PH.fresh){ PH.fresh=false; sheet.querySelector(".mx-x").focus({preventScroll:true}); }
+}
+
+async function copyPhone(button){
+  try{
+    await navigator.clipboard.writeText(phonePair?.url||"");
+    button.textContent="הקישור הועתק";
+  }catch{
+    const input=sheet.querySelector(".mx-phone-url");
+    input?.focus();input?.select();
+    button.textContent="בחרו והעתיקו את הקישור";
+  }
+}
+
+async function pairPhone(){
+  cancelAdvance();stopPhone();
+  if(!cur)back=document.activeElement;
+  cur="phone";
+  const pair=phonePair={timer:null,qr:null,url:""};
+  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div><div class="mx-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+    <div class="mx-shtop"><h3 id="mxTitle">צילום בטלפון, פתרון במחשב</h3><button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+    <div class="mx-pair-content"></div><p class="mx-pair-status" role="status" aria-live="polite">מכינים קישור לטלפון…</p></div>`;
+  sheet.hidden=false;sheet.querySelector(".mx-x").focus({preventScroll:true});
+  const content=sheet.querySelector(".mx-pair-content"),message=sheet.querySelector(".mx-pair-status");
+  try{
+    const response=await api("/api/math/photo-sessions",{method:"POST"}),data=await response.json();
+    if(!response.ok)throw Error(data.detail||"לא הצלחנו ליצור קישור.");
+    if(phonePair!==pair)return;
+    pair.url=`${location.origin}/phone#${data.token}`;
+    content.innerHTML=`<p>סרקו בטלפון וצלמו את התרגיל. התשובה והפתרון יופיעו כאן. הקישור תקף ל־15 דקות ולתרגיל אחד.</p>
+      <div class="mx-qr-slot"></div><label>אפשר גם לפתוח בטלפון את הקישור:<input class="mx-phone-url" readonly dir="ltr" value="${esc(pair.url)}" aria-label="קישור לצילום בטלפון"></label>
+      <button class="mx-btn" data-act="copy-phone">העתקת קישור</button>
+      ${["localhost","127.0.0.1","[::1]"].includes(location.hostname)?'<p class="mx-bad">כדי שהטלפון יתחבר, פתחו במחשב את האתר בכתובת רשת שנגישה גם מהטלפון, ואז צרו קישור חדש.</p>':""}`;
+    message.textContent="ממתינים לתמונה מהטלפון…";
+    // Start polling independently so a QR failure still leaves a working link.
+    const poll=async()=>{
+      if(phonePair!==pair)return;
+      try{
+        const res=await api(`/api/math/photo-sessions/${data.token}`,{cache:"no-store"}),result=await res.json();
+        if(phonePair!==pair)return;
+        if(!res.ok){
+          if(res.status>=400&&res.status<500){
+            message.textContent=result.detail||"החיבור הופסק. פתחו קישור חדש.";
+            stopPhone();return;
+          }
+          throw Error(result.detail||"החיבור נקטע לרגע. מנסים שוב…");
+        }
+        if(result.state==="done"){
+          stopPhone();cur="photo";
+          if(PH?.url)URL.revokeObjectURL(PH.url);
+          PH={url:null,data:result.result,error:"",busy:false,shown:1,works:new Set(),all:true,fresh:true};
+          drawPhoto();return;
+        }
+        message.textContent=result.state==="solving"?"התמונה התקבלה! קוראים ופותרים…":result.state==="error"?result.error+" אפשר לנסות שוב בטלפון.":"ממתינים לתמונה מהטלפון…";
+      }catch(error){
+        if(phonePair!==pair)return;
+        message.textContent="החיבור נקטע לרגע. מנסים שוב…";
+      }
+      pair.timer=setTimeout(poll,2000);
+    };
+    poll();
+    try{
+      const qr=await api("/api/math/photo-qr",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:pair.url})});
+      if(!qr.ok)throw Error("qr");
+      const blob=await qr.blob();if(phonePair!==pair)return;
+      pair.qr=URL.createObjectURL(blob);
+      content.querySelector(".mx-qr-slot").innerHTML=`<img class="mx-phone-qr" src="${pair.qr}" alt="סרקו בטלפון כדי לצלם תרגיל">`;
+    }catch{if(phonePair===pair)content.querySelector(".mx-qr-slot").textContent="הקוד לא נטען. אפשר להעתיק את הקישור לטלפון.";}
+  }catch(error){if(phonePair===pair)message.textContent=error.message;}
+}
+
+function geometryDiagram(diagram){
+  const triangle=diagram.type==="triangle";
+  return `<div class="mx-geometry"><svg viewBox="0 0 320 210" role="img" aria-label="${esc(diagram.alt)}">
+    <path d="${triangle?"M60 165 L260 165 L60 35 Z":"M60 50 H260 V165 H60 Z"}"/>
+    ${triangle?'<path class="mx-angle" d="M60 147 H78 V165"/>':""}
+    <text x="160" y="192" text-anchor="middle">${esc(diagram.base)}</text>
+    <text x="38" y="110" text-anchor="middle">${esc(diagram.height)}</text>
+    ${triangle?`<text x="180" y="90" text-anchor="middle">${esc(diagram.side||"")}</text>`:""}
+    </svg><small>השרטוט להמחשה ואינו בקנה מידה</small></div>`;
 }
 
 // a function's graph through the given points: monotone cubic (Fritsch-Carlson), so it never passes the marked extrema

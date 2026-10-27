@@ -10,8 +10,8 @@ from app.math_skills import algebra9, problems
 def test_the_algebra_graph_is_whole():
     graph = algebra9()
     assert problems(graph) == []
-    assert len(graph["skills"]) == 56
-    assert {unit["id"] for unit in graph["units"]} == {"f", "t", "n", "q", "p", "w"}
+    assert len(graph["skills"]) == 59
+    assert {unit["id"] for unit in graph["units"]} == {"f", "t", "n", "q", "p", "w", "g"}
 
 
 def test_a_broken_graph_is_named():

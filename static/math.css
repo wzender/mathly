@@ -134,3 +134,12 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-work{margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--mx-accent-soft)}
 .mx-row{display:flex;gap:8px;flex-wrap:wrap}
 @media (prefers-reduced-motion:no-preference){.mx-sheet{animation:mx-up .22s ease-out}@keyframes mx-up{from{transform:translateY(30px);opacity:.4}}}
+.u-g{--uc:#B89BEB}
+.mx-geometry{direction:ltr;align-self:center;width:100%;max-width:320px;text-align:center}
+.mx-geometry svg{display:block;width:100%;height:auto}
+.mx-geometry path{stroke:var(--uc);stroke-width:2;fill:none}
+.mx-geometry text{fill:var(--ink);font:16px var(--f-body)}
+.mx-geometry small{font-size:12px;color:var(--muted)}
+.mx-pair-content{display:flex;flex-direction:column;gap:14px;align-items:stretch}
+.mx-phone-qr{display:block;width:230px;max-width:100%;height:auto;background:white;margin:auto;border-radius:8px}
+.mx-phone-url{display:block;box-sizing:border-box;width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px;font:14px monospace}
