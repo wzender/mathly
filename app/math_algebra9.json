@@ -2429,6 +2429,7 @@
    "questions": [
     {
      "question": "איזה מרובע נקרא דלתון?",
+     "figure": "A=0,2; B=-2.6,0; C=0,-4.99; D=2.6,0; poly A B C D",
      "choices": [
       {
        "text": "מרובע שיש בו שני זוגות של צלעות סמוכות שוות",
@@ -2446,6 +2447,7 @@
     },
     {
      "question": "בדלתון $ABCD$: $AB = AD = 5$ ס״מ ו־$CB = CD = 8$ ס״מ. מה היקף הדלתון?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; len A B 5; len A D 5; len C B 8; len C D 8",
      "choices": [
       {
        "text": "$26$ ס״מ",
@@ -2463,6 +2465,7 @@
     },
     {
      "question": "היקף דלתון הוא $30$ ס״מ, ושתי צלעות סמוכות שוות בו באורך $6$ ס״מ כל אחת. מה אורך כל אחת משתי הצלעות האחרות?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; len A B 6; len A D 6; len C B ?; len C D ?",
      "choices": [
       {
        "text": "$9$ ס״מ",
@@ -2480,6 +2483,7 @@
     },
     {
      "question": "איזו טענה נכונה תמיד?",
+     "figure": "A=0,2; B=-2.6,0; C=0,-4.99; D=2.6,0; poly A B C D",
      "choices": [
       {
        "text": "כל מעוין הוא דלתון",
@@ -2497,6 +2501,7 @@
     },
     {
      "question": "בדלתון $ABCD$ נתון $AB = AD$. אילו צלעות שוות נוספות יש בו?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; tick A B 1; tick A D 1",
      "choices": [
       {
        "text": "$CB = CD$",
@@ -2514,6 +2519,7 @@
     },
     {
      "question": "במרובע $ABCD$: $AB = BC = 4$ ו־$CD = DA = 7$. האם הוא דלתון?",
+     "figure": "B=0,2.18; C=2.6,0; D=0,-4.5; A=-2.6,0; poly A B C D; len A B 4; len B C 4; len C D 7; len D A 7",
      "choices": [
       {
        "text": "כן, יש בו שני זוגות של צלעות סמוכות שוות",
@@ -2531,6 +2537,7 @@
     },
     {
      "question": "במרובע $ABCD$: $AB = CD = 5$ ו־$BC = DA = 9$. האם הוא דלתון?",
+     "figure": "A=0,0; D=9,0; C=11.35,4.41; B=2.35,4.41; poly A B C D; len A B 5; len C D 5; len B C 9; len D A 9",
      "choices": [
       {
        "text": "לא, הצלעות השוות נגדיות ולא סמוכות",
@@ -2544,6 +2551,7 @@
     },
     {
      "question": "מה נכון לגבי ריבוע?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; poly A B C D",
      "choices": [
       {
        "text": "הוא גם דלתון וגם מעוין",
@@ -2561,6 +2569,7 @@
     },
     {
      "question": "היקף דלתון $40$ ס״מ, ואחת מצלעותיו $12$ ס״מ. מה אורך צלע סמוכה לה שאינה שווה לה?",
+     "figure": "A=0,4.5; B=-2.6,0; C=0,-1.82; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; len A B 12; len C B ?",
      "choices": [
       {
        "text": "$8$ ס״מ",
@@ -2578,6 +2587,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$) נתון $AB = 2x$, $AD = x + 3$. מה $x$?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; len A B 2x; len A D x + 3",
      "choices": [
       {
        "text": "$x = 3$",
@@ -2608,6 +2618,7 @@
    "questions": [
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$): $∢A = 80°$, $∢C = 60°$. מה גודל $∢B$?",
+     "figure": "A=0,3.1; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; ang D A B 80°; ang B C D 60°; ang C B A ?",
      "choices": [
       {
        "text": "$110°$",
@@ -2625,6 +2636,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$): $∢A = 100°$, $∢C = 50°$. מה גודל $∢B$?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-5.58; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; ang D A B 100°; ang B C D 50°; ang C B A ?",
      "choices": [
       {
        "text": "$105°$",
@@ -2642,6 +2654,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$): $∢A = 70°$, $∢C = 40°$. מה גודל $∢B$?",
+     "figure": "A=0,3.71; B=-2.6,0; C=0,-7.14; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; ang D A B 70°; ang B C D 40°; ang C B A ?",
      "choices": [
       {
        "text": "$125°$",
@@ -2659,6 +2672,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$): $∢A = 110°$, $∢C = 90°$. מה גודל $∢B$?",
+     "figure": "A=0,1.82; B=-2.6,0; C=0,-2.6; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; ang D A B 110°; ang B C D 90°; ang C B A ?",
      "choices": [
       {
        "text": "$80°$",
@@ -2676,6 +2690,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$): $∢A = 130°$, $∢C = 50°$. מה גודל $∢B$?",
+     "figure": "A=0,1.21; B=-2.6,0; C=0,-5.58; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; ang D A B 130°; ang B C D 50°; ang C B A ?",
      "choices": [
       {
        "text": "$90°$",
@@ -2693,6 +2708,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$): $∢B = 115°$, $∢A = 70°$. מה גודל $∢C$?",
+     "figure": "A=0,3.71; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; ang D A B 70°; ang C B A 115°; ang B C D ?",
      "choices": [
       {
        "text": "$60°$",
@@ -2710,6 +2726,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$): $∢B = 95°$, $∢A = 110°$. מה גודל $∢C$?",
+     "figure": "A=0,1.82; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; ang D A B 110°; ang C B A 95°; ang B C D ?",
      "choices": [
       {
        "text": "$60°$",
@@ -2727,6 +2744,7 @@
     },
     {
      "question": "בדלתון $ABCD$ שבו $AB = AD$ ו־$CB = CD$, אילו זוויות שוות?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2",
      "choices": [
       {
        "text": "$∢B = ∢D$",
@@ -2744,6 +2762,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$) האלכסון $AC$ חוצה את $∢A = 80°$. מה גודל $∢BAC$?",
+     "figure": "A=0,3.1; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; line A C; ang D A B 80°",
      "choices": [
       {
        "text": "$40°$",
@@ -2761,6 +2780,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$): $∢A = 2 · ∢C$ ו־$∢B = 120°$. מה גודל $∢A$?",
+     "figure": "A=0,3.1; B=-2.6,0; C=0,-7.14; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; ang C B A 120°; ang D A B ?",
      "choices": [
       {
        "text": "$80°$",
@@ -2791,6 +2811,7 @@
    "questions": [
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$) האלכסונים נחתכים בנקודה $E$, ו־$BD = 10$. מה $BE$?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-4.5; D=2.6,0; E=0,0@se; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; line A C; line B D; dot E; len B E ?; note BD = 10",
      "choices": [
       {
        "text": "$5$",
@@ -2808,6 +2829,7 @@
     },
     {
      "question": "מה הזווית בין האלכסונים של דלתון?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-4.5; D=2.6,0; E=0,0@se; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; line A C; line B D; dot E; ang D E A ?",
      "choices": [
       {
        "text": "$90°$",
@@ -2825,6 +2847,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$) האלכסונים נחתכים ב־$E$: $AE = 12$, $BE = 5$. מה $AB$?",
+     "figure": "A=0,6.24; B=-2.6,0; C=0,-2.6; D=2.6,0; E=0,0@se; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; line A C; line B D; dot E; lenx A E 12; lenx B E 5; len A B ?",
      "choices": [
       {
        "text": "$13$",
@@ -2842,6 +2865,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$), איזו טענה נכונה?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-4.5; D=2.6,0; E=0,0@se; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; line A C; line B D; dot E",
      "choices": [
       {
        "text": "האלכסון $AC$ חוצה את האלכסון $BD$",
@@ -2859,6 +2883,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$) האלכסונים נחתכים ב־$E$, ו־$∢ABD = 35°$. מה גודל $∢BAC$?",
+     "figure": "A=0,1.82; B=-2.6,0; C=0,-4.5; D=2.6,0; E=0,0@se; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; line A C; line B D; dot E; ang A B D 35°; ang B A C ?",
      "choices": [
       {
        "text": "$55°$",
@@ -2876,6 +2901,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$): $∢BAD = 70°$. מה גודל $∢ABD$?",
+     "figure": "A=0,3.71; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; line B D; ang B A D 70°; ang A B D ?",
      "choices": [
       {
        "text": "$55°$",
@@ -2893,6 +2919,7 @@
     },
     {
      "question": "אורכי האלכסונים של דלתון הם $10$ ס״מ ו־$16$ ס״מ. מה שטחו?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; line A C; line B D; note BD = 10, AC = 16",
      "choices": [
       {
        "text": "$80$ סמ״ר",
@@ -2910,6 +2937,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$): $AC = 20$, $AE = 8$, כאשר $E$ נקודת חיתוך האלכסונים. מה $CE$?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-5.58; D=2.6,0; E=0,0@se; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; line A C; line B D; dot E; lenx A E 8; lenx E C ?; note AC = 20",
      "choices": [
       {
        "text": "$12$",
@@ -2927,6 +2955,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$): $∢BCD = 50°$. מה גודל $∢BCA$?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-5.58; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; line A C; ang B C D 50°",
      "choices": [
       {
        "text": "$25°$",
@@ -2944,6 +2973,7 @@
     },
     {
      "question": "היכן האלכסון הראשי $AC$ של הדלתון חותך את האלכסון $BD$?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; line A C; line B D",
      "choices": [
       {
        "text": "באמצע $BD$, בזווית ישרה",
@@ -2974,6 +3004,7 @@
    "questions": [
     {
      "question": "נתונות הנקודות $A(0, 5)$, $B(3, 1)$, $C(0, −1)$. איזו נקודה $D$ משלימה דלתון $ABCD$ שהאלכסון הראשי שלו $AC$?",
+     "figure": "A=0,5; B=3,1; C=0,-1; grid; line A B; line B C",
      "choices": [
       {
        "text": "$(−3, 1)$",
@@ -2991,6 +3022,7 @@
     },
     {
      "question": "בדלתון $A(0, 5)$, $B(3, 1)$, $C(0, −1)$, $D(−3, 1)$, מה אורך האלכסון $BD$?",
+     "figure": "A=0,5; B=3,1; C=0,-1; D=-3,1; poly A B C D; grid; dash B D",
      "choices": [
       {
        "text": "$6$",
@@ -3008,6 +3040,7 @@
     },
     {
      "question": "בדלתון $A(0, 5)$, $B(3, 1)$, $C(0, −1)$, $D(−3, 1)$, מה אורך הצלע $AB$?",
+     "figure": "A=0,5; B=3,1; C=0,-1; D=-3,1; poly A B C D; grid",
      "choices": [
       {
        "text": "$5$",
@@ -3025,6 +3058,7 @@
     },
     {
      "question": "בדלתון $A(0, 5)$, $B(3, 1)$, $C(0, −1)$, $D(−3, 1)$, היכן נחתכים האלכסונים?",
+     "figure": "A=0,5; B=3,1; C=0,-1; D=-3,1; poly A B C D; grid; dash A C; dash B D",
      "choices": [
       {
        "text": "$(0, 1)$",
@@ -3042,6 +3076,7 @@
     },
     {
      "question": "מה שטח הדלתון $A(0, 5)$, $B(3, 1)$, $C(0, −1)$, $D(−3, 1)$?",
+     "figure": "A=0,5; B=3,1; C=0,-1; D=-3,1; poly A B C D; grid",
      "choices": [
       {
        "text": "$18$",
@@ -3059,6 +3094,7 @@
     },
     {
      "question": "בדלתון $A(−4, 0)$, $B(0, 2)$, $C(2, 0)$, $D(0, −2)$, איזה אלכסון הוא האלכסון הראשי?",
+     "figure": "A=-4,0; B=0,2; C=2,0; D=0,-2; poly A B C D; grid; dash A C; dash B D",
      "choices": [
       {
        "text": "$AC$",
@@ -3072,6 +3108,7 @@
     },
     {
      "question": "בדלתון $A(−4, 0)$, $B(0, 2)$, $C(2, 0)$, $D(0, −2)$, היכן נחתכים האלכסונים?",
+     "figure": "A=-4,0; B=0,2; C=2,0; D=0,-2; poly A B C D; grid; dash A C; dash B D",
      "choices": [
       {
        "text": "$(0, 0)$",
@@ -3089,6 +3126,7 @@
     },
     {
      "question": "בדלתון $A(2, 7)$, $B(5, 4)$, $C(2, −2)$, $D(−1, 4)$, מה אורך האלכסון $AC$?",
+     "figure": "A=2,7; B=5,4; C=2,-2; D=-1,4; poly A B C D; grid; dash A C",
      "choices": [
       {
        "text": "$9$",
@@ -3106,6 +3144,7 @@
     },
     {
      "question": "בדלתון $A(2, 7)$, $B(5, 4)$, $C(2, −2)$, $D(−1, 4)$, מה אורך האלכסון $BD$?",
+     "figure": "A=2,7; B=5,4; C=2,-2; D=-1,4; poly A B C D; grid; dash B D",
      "choices": [
       {
        "text": "$6$",
@@ -3123,6 +3162,7 @@
     },
     {
      "question": "מה שטח הדלתון $A(2, 7)$, $B(5, 4)$, $C(2, −2)$, $D(−1, 4)$?",
+     "figure": "A=2,7; B=5,4; C=2,-2; D=-1,4; poly A B C D; grid",
      "choices": [
       {
        "text": "$27$",
@@ -3151,6 +3191,7 @@
    "questions": [
     {
      "question": "במשולש $ABC$: $AB = AC$ ו־$∢A = 40°$. מה גודל $∢B$?",
+     "figure": "A=0,7.14; B=-2.6,0; C=2.6,0; poly A B C; tick A B 1; tick A C 1; ang B A C 40°; ang A B C ?",
      "choices": [
       {
        "text": "$70°$",
@@ -3168,6 +3209,7 @@
     },
     {
      "question": "במשולש $ABC$: $AB = AC$ ו־$∢B = 65°$. מה גודל $∢A$?",
+     "figure": "A=0,5.58; B=-2.6,0; C=2.6,0; poly A B C; tick A B 1; tick A C 1; ang C B A 65°; ang B A C ?",
      "choices": [
       {
        "text": "$50°$",
@@ -3185,6 +3227,7 @@
     },
     {
      "question": "במשולש $ABC$ ($AB = AC$) $AD$ תיכון לבסיס, ו־$∢BAD = 25°$. מה גודל $∢BAC$?",
+     "figure": "A=0,5.58; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; tick A B 1; tick A C 1; line A D; tick B D 2; tick D C 2; ang B A D 25°",
      "choices": [
       {
        "text": "$50°$",
@@ -3202,6 +3245,7 @@
     },
     {
      "question": "במשולש $ABC$ ($AB = AC$) $AD$ תיכון לבסיס. מה גודל $∢ADB$?",
+     "figure": "A=0,5.58; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; tick A B 1; tick A C 1; line A D; tick B D 2; tick D C 2; ang A D B ?",
      "choices": [
       {
        "text": "$90°$",
@@ -3219,6 +3263,7 @@
     },
     {
      "question": "במשולש $ABC$ ($AB = AC$) $AD$ גובה לבסיס, ו־$BC = 10$. מה $BD$?",
+     "figure": "A=0,5.58; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; tick A B 1; tick A C 1; line A D; right A D C; len B D ?; note BC = 10",
      "choices": [
       {
        "text": "$5$",
@@ -3236,6 +3281,7 @@
     },
     {
      "question": "במשולש $ABC$: $AB = AC$ ו־$∢A = 100°$. מה גודל $∢C$?",
+     "figure": "A=0,2.18; B=-2.6,0; C=2.6,0; poly A B C; tick A B 1; tick A C 1; ang B A C 100°; ang A C B ?",
      "choices": [
       {
        "text": "$40°$",
@@ -3253,6 +3299,7 @@
     },
     {
      "question": "במשולש $ABC$: $AB = AC = 13$, $BC = 10$. מה אורך הגובה לבסיס?",
+     "figure": "A=0,6.24; B=-2.6,0; C=2.6,0; _D=0,0; poly A B C; dash A _D; right A _D C; len A B 13; len A C 13; len B C 10; lenx A _D ?",
      "choices": [
       {
        "text": "$12$",
@@ -3270,6 +3317,7 @@
     },
     {
      "question": "במשולש שווה שוקיים זווית הראש היא $90°$. מה גודל כל זווית בסיס?",
+     "figure": "A=0,2.6; B=-2.6,0; C=2.6,0; poly A B C; tick A B 1; tick A C 1; right B A C; ang A B C ?",
      "choices": [
       {
        "text": "$45°$",
@@ -3287,6 +3335,7 @@
     },
     {
      "question": "במשולש $ABC$ ($AB = AC$) $AD$ חוצה את זווית הראש, ו־$BC = 14$. מה $DC$?",
+     "figure": "A=0,5.58; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; tick A B 1; tick A C 1; line A D; ang B A D; ang D A C; len D C ?; note BC = 14",
      "choices": [
       {
        "text": "$7$",
@@ -3304,6 +3353,7 @@
     },
     {
      "question": "במשולש $ABC$ ($AB = AC$): $∢B = 2x$ ו־$∢C = 50°$. מה $x$?",
+     "figure": "A=0,3.1; B=-2.6,0; C=2.6,0; poly A B C; tick A B 1; tick A C 1; ang C B A 2x; ang A C B 50°",
      "choices": [
       {
        "text": "$x = 25$",
@@ -3334,6 +3384,7 @@
    "questions": [
     {
      "question": "במשולש $ABC$: $∢B = ∢C = 70°$ ו־$AB = 8$. מה $AC$?",
+     "figure": "A=0,7.14; B=-2.6,0; C=2.6,0; poly A B C; ang C B A 70°; ang A C B 70°; len A B 8; len A C ?",
      "choices": [
       {
        "text": "$8$",
@@ -3351,6 +3402,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢A = 50°$, $∢B = 65°$. אילו צלעות שוות?",
+     "figure": "A=0,5.58; B=-2.6,0; C=2.6,0; poly A B C; ang B A C 50°; ang C B A 65°",
      "choices": [
       {
        "text": "$AB = AC$",
@@ -3368,6 +3420,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢A = ∢B = 40°$. אילו צלעות שוות?",
+     "figure": "C=0,2.18; A=-2.6,0; B=2.6,0; poly C A B; ang B A C 40°; ang C B A 40°",
      "choices": [
       {
        "text": "$BC = AC$",
@@ -3385,6 +3438,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢B = ∢C$, $AB = 5$ ו־$BC = 8$. מה היקף המשולש?",
+     "figure": "A=0,1.95; B=-2.6,0; C=2.6,0; poly A B C; ang C B A; ang A C B; len A B 5; len B C 8",
      "choices": [
       {
        "text": "$18$",
@@ -3402,6 +3456,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢A = 80°$, $∢B = 50°$. אילו צלעות שוות?",
+     "figure": "A=0,3.1; B=-2.6,0; C=2.6,0; poly A B C; ang B A C 80°; ang C B A 50°",
      "choices": [
       {
        "text": "$AB = AC$",
@@ -3419,6 +3474,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢A = ∢B = 60°$. איזה משולש זה?",
+     "figure": "C=0,4.5; A=-2.6,0; B=2.6,0; poly C A B; ang B A C 60°; ang C B A 60°",
      "choices": [
       {
        "text": "משולש שווה צלעות",
@@ -3436,6 +3492,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢A = 36°$, $∢B = 72°$, $AC = 9$. מה $AB$?",
+     "figure": "A=0,8; B=-2.6,0; C=2.6,0; poly A B C; ang B A C 36°; ang C B A 72°; len A C 9; len A B ?",
      "choices": [
       {
        "text": "$9$",
@@ -3453,6 +3510,7 @@
     },
     {
      "question": "במשולש $ABC$ הזוויות החיצוניות ליד $B$ וליד $C$ שוות. מה אפשר להסיק?",
+     "figure": "A=0,5.58; B=-2.6,0; C=2.6,0; _B2=-4.94,0; _C2=4.94,0; poly A B C; line _B2 _C2; ang2 A B _B2; ang2 _C2 C A",
      "choices": [
       {
        "text": "$AB = AC$",
@@ -3470,6 +3528,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢A = 70°$, $∢B = 40°$. האם המשולש שווה שוקיים?",
+     "figure": "B=0,7.14; A=-2.6,0; C=2.6,0; poly B A C; ang C A B 70°; ang A B C 40°",
      "choices": [
       {
        "text": "כן, $AB = BC$",
@@ -3487,6 +3546,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢B = ∢C$, $AB = 2x + 1$ ו־$AC = x + 6$. מה $x$?",
+     "figure": "A=0,5.58; B=-2.6,0; C=2.6,0; poly A B C; ang C B A; ang A C B; len A B 2x + 1; len A C x + 6",
      "choices": [
       {
        "text": "$x = 5$",
@@ -3517,6 +3577,7 @@
    "questions": [
     {
      "question": "במשולש $ABC$, $AD$ הוא גם תיכון לצלע $BC$ וגם גובה לה. מה אפשר להסיק?",
+     "figure": "A=0,4.99; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; line A D; right A D C; tick B D 2; tick D C 2",
      "choices": [
       {
        "text": "$AB = AC$",
@@ -3534,6 +3595,7 @@
     },
     {
      "question": "במשולש $ABC$, $AD$ חוצה את $∢A$ וגם מאונך ל־$BC$, ו־$AB = 7$. מה $AC$?",
+     "figure": "A=0,4.99; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; line A D; right A D C; ang B A D; ang D A C; len A B 7; len A C ?",
      "choices": [
       {
        "text": "$7$",
@@ -3551,6 +3613,7 @@
     },
     {
      "question": "במשולש $ABC$, $AD$ גובה לצלע $BC$, ו־$BD = DC = 4$, $AB = 6$. מה היקף המשולש?",
+     "figure": "A=0,2.91; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; line A D; right A D C; len B D 4; len D C 4; len A B 6",
      "choices": [
       {
        "text": "$20$",
@@ -3568,6 +3631,7 @@
     },
     {
      "question": "במשולש $ABC$, $AD$ חוצה את $∢A$ והוא גם תיכון לצלע $BC$, ו־$∢B = 55°$. מה גודל $∢C$?",
+     "figure": "A=0,3.71; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; line A D; ang B A D; ang D A C; tick B D 2; tick D C 2; ang C B A 55°; ang A C B ?",
      "choices": [
       {
        "text": "$55°$",
@@ -3585,6 +3649,7 @@
     },
     {
      "question": "במשולש $ABC$, $AD$ גובה ותיכון לצלע $BC$, ו־$∢BAD = 20°$. מה גודל $∢B$?",
+     "figure": "A=0,7.14; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; line A D; right A D C; tick B D 2; tick D C 2; ang B A D 20°; ang A B C ?",
      "choices": [
       {
        "text": "$70°$",
@@ -3602,6 +3667,7 @@
     },
     {
      "question": "איזה נתון מספיק כדי להוכיח שהמשולש $ABC$ שווה שוקיים?",
+     "figure": "A=2.2,3.6; B=0,0; C=6.2,0; D=2.79,0@s; poly A B C; line A D",
      "choices": [
       {
        "text": "$AD$ גם גובה וגם תיכון לצלע $BC$",
@@ -3619,6 +3685,7 @@
     },
     {
      "question": "במשולש $ABC$: $AD ⊥ BC$ ו־$AD$ חוצה את $∢A$. נתון $∢B = 3x + 10$, $∢C = 5x − 20$. מה $x$?",
+     "figure": "A=0,3.71; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; line A D; right A D C; ang B A D; ang D A C; ang C B A 3x + 10; ang A C B 5x − 20",
      "choices": [
       {
        "text": "$x = 15$",
@@ -3636,6 +3703,7 @@
     },
     {
      "question": "במשולש $ABC$, חוצה הזווית $A$ הוא גם גובה. נתון $AB = 3y$ ו־$AC = y + 8$. מה $y$?",
+     "figure": "A=0,4.99; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; line A D; right A D C; ang B A D; ang D A C; len A B 3y; len A C y + 8",
      "choices": [
       {
        "text": "$y = 4$",
@@ -3653,6 +3721,7 @@
     },
     {
      "question": "במשולש $ABC$: $BD = DC$ ו־$AD ⊥ BC$, ו־$∢BAC = 50°$. מה גודל $∢ABC$?",
+     "figure": "A=0,5.58; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; line A D; right A D C; tick B D 2; tick D C 2; ang B A C 50°; ang A B C ?",
      "choices": [
       {
        "text": "$65°$",
@@ -3670,6 +3739,7 @@
     },
     {
      "question": "במשולש $ABC$, $AE$ תיכון לצלע $BC$ והוא גם חוצה זווית. נתון $AB = 10$, $BC = 12$. מה $AE$?",
+     "figure": "A=0,3.47; B=-2.6,0; C=2.6,0; E=0,0@s; poly A B C; line A E; tick B E 2; tick E C 2; ang B A E; ang E A C; len A B 10; lenx A E ?; note BC = 12",
      "choices": [
       {
        "text": "$8$",
@@ -3700,6 +3770,7 @@
    "questions": [
     {
      "question": "איזה משולש הוא $A(0, 6)$, $B(−4, 0)$, $C(4, 0)$?",
+     "figure": "A=0,6; B=-4,0; C=4,0; poly A B C; grid",
      "choices": [
       {
        "text": "שווה שוקיים ($AB = AC$)",
@@ -3717,6 +3788,7 @@
     },
     {
      "question": "במשולש $A(0, 6)$, $B(−4, 0)$, $C(4, 0)$, מה אורך הגובה לבסיס $BC$?",
+     "figure": "A=0,6; B=-4,0; C=4,0; _H=0,0; poly A B C; grid; dash A _H",
      "choices": [
       {
        "text": "$6$",
@@ -3734,6 +3806,7 @@
     },
     {
      "question": "במשולש $A(2, 7)$, $B(−1, 3)$, $C(5, 3)$, מה אורך הגובה לבסיס $BC$?",
+     "figure": "A=2,7; B=-1,3; C=5,3; _H=2,3; poly A B C; grid; dash A _H",
      "choices": [
       {
        "text": "$4$",
@@ -3751,6 +3824,7 @@
     },
     {
      "question": "מה שטח המשולש $A(2, 7)$, $B(−1, 3)$, $C(5, 3)$?",
+     "figure": "A=2,7; B=-1,3; C=5,3; poly A B C; grid",
      "choices": [
       {
        "text": "$12$",
@@ -3768,6 +3842,7 @@
     },
     {
      "question": "המשולש $A(3, 5)$, $B(0, 1)$, $C(x, 1)$ שווה שוקיים שבסיסו $BC$. מה $x$?",
+     "figure": "A=3,5; B=0,1; grid; line A B; note C(x, 1)",
      "choices": [
       {
        "text": "$x = 6$",
@@ -3785,6 +3860,7 @@
     },
     {
      "question": "$B(−3, −2)$ ו־$C(5, −2)$ הם קצות הבסיס של משולש שווה שוקיים $ABC$. על איזה ישר נמצא $A$?",
+     "figure": "B=-3,-2; C=5,-2; grid; line B C",
      "choices": [
       {
        "text": "$x = 1$",
@@ -3802,6 +3878,7 @@
     },
     {
      "question": "במשולש $A(1, 4)$, $B(−2, 0)$, $C(4, 0)$, מה $AB$?",
+     "figure": "A=1,4; B=-2,0; C=4,0; poly A B C; grid",
      "choices": [
       {
        "text": "$5$",
@@ -3819,6 +3896,7 @@
     },
     {
      "question": "במשולש $A(1, 4)$, $B(−2, 0)$, $C(4, 0)$, היכן הגובה מ־$A$ פוגש את $BC$?",
+     "figure": "A=1,4; B=-2,0; C=4,0; poly A B C; grid",
      "choices": [
       {
        "text": "$(1, 0)$",
@@ -3836,6 +3914,7 @@
     },
     {
      "question": "מה היקף המשולש $A(0, 8)$, $B(−6, 0)$, $C(6, 0)$?",
+     "figure": "A=0,8; B=-6,0; C=6,0; poly A B C; grid",
      "choices": [
       {
        "text": "$32$",
@@ -3853,6 +3932,7 @@
     },
     {
      "question": "מה שטח המשולש $A(4, 1)$, $B(0, 4)$, $C(8, 4)$?",
+     "figure": "A=4,1; B=0,4; C=8,4; poly A B C; grid",
      "choices": [
       {
        "text": "$12$",
@@ -6243,6 +6323,7 @@
    "questions": [
     {
      "question": "במשולש $ABC$: $AB = 5$, $BC = 7$, $AC = 9$. איזו זווית היא הגדולה ביותר?",
+     "figure": "A=-0.5,4.97; B=0,0; C=7,0; poly A B C; len B C 7; len A C 9; len A B 5",
      "choices": [
       {
        "text": "$∢B$",
@@ -6260,6 +6341,7 @@
     },
     {
      "question": "במשולש $ABC$: $AB = 5$, $BC = 7$, $AC = 9$. איזו זווית היא הקטנה ביותר?",
+     "figure": "A=-0.5,4.97; B=0,0; C=7,0; poly A B C; len B C 7; len A C 9; len A B 5",
      "choices": [
       {
        "text": "$∢C$",
@@ -6277,6 +6359,7 @@
     },
     {
      "question": "במשולש $ABC$: $AB = 8$, $BC = 6$, $AC = 10$. מה סדר הזוויות מהקטנה לגדולה?",
+     "figure": "A=0,8; B=0,0; C=6,0; poly A B C; len B C 6; len A C 10; len A B 8",
      "choices": [
       {
        "text": "$∢A < ∢C < ∢B$",
@@ -6294,6 +6377,7 @@
     },
     {
      "question": "במשולש $ABC$: $AB = AC = 7$, $BC = 10$. איזו זווית היא הגדולה ביותר?",
+     "figure": "A=5,4.9; B=0,0; C=10,0; poly A B C; len B C 10; len A C 7; len A B 7",
      "choices": [
       {
        "text": "$∢A$",
@@ -6311,6 +6395,7 @@
     },
     {
      "question": "מהי הצלע הגדולה ביותר במשולש ישר זווית, ולמה?",
+     "figure": "_A=6,0; _B=0,4.2; _C=0,0; poly _A _B _C; right _A _C _B",
      "choices": [
       {
        "text": "היתר, כי הוא מול הזווית הישרה",
@@ -6328,6 +6413,7 @@
     },
     {
      "question": "במשולש $ABC$: $AB = 4$, $BC = 4$, $AC = 6$. איזו טענה נכונה?",
+     "figure": "A=-0.5,3.97; B=0,0; C=4,0; poly A B C; len B C 4; len A C 6; len A B 4",
      "choices": [
       {
        "text": "$∢B$ היא הזווית הגדולה ביותר",
@@ -6345,6 +6431,7 @@
     },
     {
      "question": "במשולש $PQR$: $PQ = 12$, $QR = 9$, $PR = 15$. מול איזו צלע נמצאת הזווית הקטנה ביותר?",
+     "figure": "P=0,12; Q=0,0; R=9,0; poly P Q R; len Q R 9; len P R 15; len P Q 12",
      "choices": [
       {
        "text": "מול $QR$, זו $∢P$",
@@ -6362,6 +6449,7 @@
     },
     {
      "question": "במשולש $ABC$: $AC > BC$. מה אפשר להסיק?",
+     "figure": "A=1.2,5.88; B=0,0; C=5,0; poly A B C; note AC > BC",
      "choices": [
       {
        "text": "$∢B > ∢A$",
@@ -6379,6 +6467,7 @@
     },
     {
      "question": "במשולש $KLM$: $KL = 6$, $LM = 11$, $KM = 8$. מה סדר הזוויות מהגדולה לקטנה?",
+     "figure": "K=4.23,4.26; L=0,0; M=11,0; poly K L M; len L M 11; len K M 8; len K L 6",
      "choices": [
       {
        "text": "$∢K > ∢L > ∢M$",
@@ -6396,6 +6485,7 @@
     },
     {
      "question": "במשולש $ABC$: $AB = 5$, $BC = 5$, $AC = 5$. מה נכון?",
+     "figure": "A=2.5,4.33; B=0,0; C=5,0; poly A B C; len B C 5; len A C 5; len A B 5",
      "choices": [
       {
        "text": "כל הזוויות שוות",
@@ -6426,6 +6516,7 @@
    "questions": [
     {
      "question": "במשולש $ABC$: $∢A = 50°$, $∢B = 60°$, $∢C = 70°$. איזו צלע היא הגדולה ביותר?",
+     "figure": "A=3.68,6.37; B=0,0; C=6,0; poly A B C; ang B A C 50°; ang C B A 60°; ang A C B 70°",
      "choices": [
       {
        "text": "$AB$",
@@ -6443,6 +6534,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢A = 100°$, $∢B = 30°$. איזו צלע היא הקטנה ביותר?",
+     "figure": "A=4.04,2.33; B=0,0; C=6,0; poly A B C; ang B A C 100°; ang C B A 30°",
      "choices": [
       {
        "text": "$AC$",
@@ -6460,6 +6552,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢C = 90°$, $∢A = ∢B = 45°$. איזו צלע היא הגדולה ביותר?",
+     "figure": "A=6,0; B=0,6; C=0,0; poly A B C; right A C B; ang C A B 45°; ang A B C 45°",
      "choices": [
       {
        "text": "$AB$",
@@ -6477,6 +6570,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢A = 40°$, $∢B = 70°$. איזו צלע היא הקטנה ביותר?",
+     "figure": "A=3,8.24; B=0,0; C=6,0; poly A B C; ang B A C 40°; ang C B A 70°",
      "choices": [
       {
        "text": "$BC$",
@@ -6494,6 +6588,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢A = 80°$, $∢B = 60°$, $∢C = 40°$. מה סדר הצלעות מהגדולה לקטנה?",
+     "figure": "A=1.96,3.39; B=0,0; C=6,0; poly A B C; ang B A C 80°; ang C B A 60°; ang A C B 40°",
      "choices": [
       {
        "text": "$BC > AC > AB$",
@@ -6511,6 +6606,7 @@
     },
     {
      "question": "במשולש $ABC$, $∢B$ זווית קהה. איזו צלע היא הגדולה ביותר?",
+     "figure": "B=3.29,1.9; C=0,0; A=6,0; poly B C A; ang C B A; note ∢B > 90°",
      "choices": [
       {
        "text": "$AC$",
@@ -6528,6 +6624,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢A = 65°$, $∢B = 50°$. האם $BC > AC$?",
+     "figure": "A=3.86,4.6; B=0,0; C=6,0; poly A B C; ang B A C 65°; ang C B A 50°",
      "choices": [
       {
        "text": "כן, כי $∢A > ∢B$",
@@ -6545,6 +6642,7 @@
     },
     {
      "question": "במשולש $DEF$: $∢D = 35°$, $∢E = 110°$. איזו צלע היא הגדולה ביותר?",
+     "figure": "E=3,2.1; D=0,0; F=6,0; poly E D F; ang F D E 35°; ang D E F 110°",
      "choices": [
       {
        "text": "$DF$",
@@ -6562,6 +6660,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢A = 2x$, $∢B = 3x$, $∢C = 4x$. איזו צלע היא הקטנה ביותר?",
+     "figure": "A=4.6,7.96; B=0,0; C=6,0; poly A B C; ang B A C 2x; ang C B A 3x; ang A C B 4x",
      "choices": [
       {
        "text": "$BC$",
@@ -6579,6 +6678,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢A = 30°$, $∢B = 75°$. איזו טענה נכונה?",
+     "figure": "A=3,11.2; B=0,0; C=6,0; poly A B C; ang B A C 30°; ang C B A 75°",
      "choices": [
       {
        "text": "$AB = AC$",
@@ -6607,6 +6707,7 @@
    "questions": [
     {
      "question": "במשולש ישר זווית אחת הזוויות $30°$ והיתר $14$ ס״מ. מה אורך הניצב שמול הזווית של $30°$?",
+     "figure": "_A=6,0; _B=0,3.46; _C=0,0; poly _A _B _C; right _A _C _B; ang _C _A _B 30°; len _A _B 14; len _B _C ?",
      "choices": [
       {
        "text": "$7$ ס״מ",
@@ -6624,6 +6725,7 @@
     },
     {
      "question": "במשולש ישר זווית אחת הזוויות $30°$ והיתר $9$ ס״מ. מה אורך הניצב שמול הזווית של $30°$?",
+     "figure": "_A=6,0; _B=0,3.46; _C=0,0; poly _A _B _C; right _A _C _B; ang _C _A _B 30°; len _A _B 9; len _B _C ?",
      "choices": [
       {
        "text": "$4.5$ ס״מ",
@@ -6641,6 +6743,7 @@
     },
     {
      "question": "במשולש ישר זווית הניצב שמול זווית של $30°$ הוא $6$ ס״מ. מה אורך היתר?",
+     "figure": "_A=6,0; _B=0,3.46; _C=0,0; poly _A _B _C; right _A _C _B; ang _C _A _B 30°; len _B _C 6; len _A _B ?",
      "choices": [
       {
        "text": "$12$ ס״מ",
@@ -6658,6 +6761,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢C = 90°$, $∢A = 30°$, $AB = 20$. מה $BC$?",
+     "figure": "A=6,0; B=0,3.46; C=0,0; poly A B C; right A C B; ang C A B 30°; len A B 20; len B C ?",
      "choices": [
       {
        "text": "$10$",
@@ -6675,6 +6779,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢C = 90°$, $∢A = 30°$. איזו צלע שווה למחצית $AB$?",
+     "figure": "A=6,0; B=0,3.46; C=0,0; poly A B C; right A C B; ang C A B 30°",
      "choices": [
       {
        "text": "$BC$",
@@ -6692,6 +6797,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢C = 90°$, $∢B = 60°$, $AB = 16$. מה $BC$?",
+     "figure": "A=6,0; B=0,3.46; C=0,0; poly A B C; right A C B; ang A B C 60°; len A B 16; len B C ?",
      "choices": [
       {
        "text": "$8$",
@@ -6709,6 +6815,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢B = 90°$, $∢C = 30°$, $AB = 5$. מה $AC$?",
+     "figure": "C=6,0; A=0,3.46; B=0,0; poly C A B; right C B A; ang B C A 30°; len A B 5; len A C ?",
      "choices": [
       {
        "text": "$10$",
@@ -6726,6 +6833,7 @@
     },
     {
      "question": "במשולש ישר זווית אחת הזוויות $60°$ והיתר $22$. מה אורך הניצב הקצר?",
+     "figure": "_A=6,0; _B=0,3.46; _C=0,0; poly _A _B _C; right _A _C _B; ang _A _B _C 60°; len _A _B 22; len _B _C ?",
      "choices": [
       {
        "text": "$11$",
@@ -6743,6 +6851,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢C = 90°$, $∢A = 30°$, $BC = x + 2$, $AB = 3x$. מה $x$?",
+     "figure": "A=6,0; B=0,3.46; C=0,0; poly A B C; right A C B; ang C A B 30°; len B C x + 2; len A B 3x",
      "choices": [
       {
        "text": "$x = 4$",
@@ -6760,6 +6869,7 @@
     },
     {
      "question": "סולם באורך $6$ מ׳ נשען על קיר ויוצר עם הקרקע זווית של $30°$. לאיזה גובה הוא מגיע?",
+     "figure": "_A=6,0; _B=0,3.46; _C=0,0; poly _A _B _C; right _A _C _B; ang _C _A _B 30°; len _A _B 6; len _B _C ?",
      "choices": [
       {
        "text": "$3$ מ׳",
@@ -6837,6 +6947,7 @@
    "questions": [
     {
      "question": "במשולש $ABC$: $∢C = 90°$ ו־$BC = AB : 2$. מה גודל $∢A$?",
+     "figure": "A=6,0; B=0,3.46; C=0,0; poly A B C; right A C B; ang C A B ?; note BC = AB : 2",
      "choices": [
       {
        "text": "$30°$",
@@ -6854,6 +6965,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢C = 90°$, $AB = 12$, $BC = 6$. מה גודל $∢B$?",
+     "figure": "A=6,0; B=0,3.46; C=0,0; poly A B C; right A C B; len A B 12; len B C 6; ang A B C ?",
      "choices": [
       {
        "text": "$60°$",
@@ -6871,6 +6983,7 @@
     },
     {
      "question": "במשולש ישר זווית הניצב $5$ והיתר $10$. מה גודל הזווית שמול הניצב הזה?",
+     "figure": "_A=6,0; _B=0,3.46; _C=0,0; poly _A _B _C; right _A _C _B; len _B _C 5; len _A _B 10; ang _C _A _B ?",
      "choices": [
       {
        "text": "$30°$",
@@ -6888,6 +7001,7 @@
     },
     {
      "question": "במשולש $DEF$: $∢E = 90°$, $DF = 18$, $EF = 9$. מה גודל $∢F$?",
+     "figure": "D=6,0; F=0,3.46; E=0,0; poly D F E; right D E F; len D F 18; len F E 9; ang D F E ?",
      "choices": [
       {
        "text": "$60°$",
@@ -6905,6 +7019,7 @@
     },
     {
      "question": "במשולש ישר זווית הניצב $7$ והיתר $14$. מה גודלן של שתי הזוויות החדות?",
+     "figure": "_A=6,0; _B=0,3.46; _C=0,0; poly _A _B _C; right _A _C _B; len _B _C 7; len _A _B 14; ang _C _A _B ?; ang _A _B _C ?",
      "choices": [
       {
        "text": "$30°$ ו־$60°$",
@@ -6922,6 +7037,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢C = 90°$, $AC = 4$, $AB = 8$. מה גודל $∢A$?",
+     "figure": "A=6,0; B=0,10.39; C=0,0; poly A B C; right A C B; len A C 4; len A B 8; ang C A B ?",
      "choices": [
       {
        "text": "$60°$",
@@ -6939,6 +7055,7 @@
     },
     {
      "question": "במשולש ישר זווית היתר $20$ וניצב אחד $10$. האם אחת הזוויות היא $30°$?",
+     "figure": "_A=6,0; _B=0,3.46; _C=0,0; poly _A _B _C; right _A _C _B; len _B _C 10; len _A _B 20",
      "choices": [
       {
        "text": "כן, הזווית שמול הניצב $10$",
@@ -6956,6 +7073,7 @@
     },
     {
      "question": "במשולש ישר זווית היתר $10$ וניצב אחד $6$. האם אחת הזוויות היא $30°$?",
+     "figure": "_A=6,0; _B=0,4.5; _C=0,0; poly _A _B _C; right _A _C _B; len _B _C 6; len _A _B 10",
      "choices": [
       {
        "text": "לא, הניצב אינו חצי מהיתר",
@@ -6969,6 +7087,7 @@
     },
     {
      "question": "כבל באורך $8$ מ׳ מחובר לראש עמוד שגובהו $4$ מ׳ ולקרקע. מה הזווית בין הכבל לקרקע?",
+     "figure": "_A=6,0; _B=0,3.46; _C=0,0; poly _A _B _C; right _A _C _B; len _B _C 4; len _A _B 8; ang _C _A _B ?",
      "choices": [
       {
        "text": "$30°$",
@@ -6986,6 +7105,7 @@
     },
     {
      "question": "במשולש $ABC$: $∢C = 90°$, $BC = 3$, $AB = 6$. מה גודל $∢B$?",
+     "figure": "A=6,0; B=0,3.46; C=0,0; poly A B C; right A C B; len B C 3; len A B 6; ang A B C ?",
      "choices": [
       {
        "text": "$60°$",
@@ -7016,6 +7136,7 @@
    "questions": [
     {
      "question": "במשולש שווה צלעות $ABC$ הגובה $AD$. מה גודל $∢BAD$?",
+     "figure": "A=3,5.2; B=0,0; C=6,0; D=3,0@s; poly A B C; tick A B 1; tick B C 1; tick A C 1; line A D; right A D C; ang B A D ?",
      "choices": [
       {
        "text": "$30°$",
@@ -7033,6 +7154,7 @@
     },
     {
      "question": "צלע משולש שווה צלעות $12$ ס״מ, ו־$AD$ גובה. מה $BD$?",
+     "figure": "A=3,5.2; B=0,0; C=6,0; D=3,0@s; poly A B C; tick A B 1; tick B C 1; tick A C 1; line A D; right A D C; len A B 12; len B D ?",
      "choices": [
       {
        "text": "$6$ ס״מ",
@@ -7050,6 +7172,7 @@
     },
     {
      "question": "במשולש שווה צלעות $ABC$ הגובה $AD$. מה הזוויות של המשולש $ABD$?",
+     "figure": "A=3,5.2; B=0,0; C=6,0; D=3,0@s; poly A B C; tick A B 1; tick B C 1; tick A C 1; line A D; right A D C",
      "choices": [
       {
        "text": "$30°$, $60°$, $90°$",
@@ -7067,6 +7190,7 @@
     },
     {
      "question": "צלע משולש שווה צלעות $2$. מה אורך הגובה?",
+     "figure": "A=3,5.2; B=0,0; C=6,0; _D=3,0; poly A B C; tick A B 1; tick B C 1; tick A C 1; dash A _D; right A _D C; len A B 2; lenx A _D ?",
      "choices": [
       {
        "text": "$√3$",
@@ -7084,6 +7208,7 @@
     },
     {
      "question": "גובה במשולש שווה צלעות יוצר משולש ישר זווית $ABD$. אם $BD = 5$, מה אורך צלע המשולש?",
+     "figure": "A=3,5.2; B=0,0; C=6,0; D=3,0@s; poly A B C; tick A B 1; tick B C 1; tick A C 1; line A D; right A D C; len B D 5; len A B ?",
      "choices": [
       {
        "text": "$10$",
@@ -7101,6 +7226,7 @@
     },
     {
      "question": "במשולש שווה צלעות $ABC$, $AD$ חוצה את $∢A$. מה גודל $∢ADB$?",
+     "figure": "A=3,5.2; B=0,0; C=6,0; D=3,0@s; poly A B C; tick A B 1; tick B C 1; tick A C 1; line A D; ang B A D; ang D A C; ang A D B ?",
      "choices": [
       {
        "text": "$90°$",
@@ -7118,6 +7244,7 @@
     },
     {
      "question": "היקף משולש שווה צלעות $36$ ס״מ. מה המרחק מקודקוד $B$ לנקודה שבה הגובה מ־$A$ פוגש את $BC$?",
+     "figure": "A=3,5.2; B=0,0; C=6,0; _D=3,0; poly A B C; tick A B 1; tick B C 1; tick A C 1; dash A _D; right A _D C; len B _D ?",
      "choices": [
       {
        "text": "$6$ ס״מ",
@@ -7135,6 +7262,7 @@
     },
     {
      "question": "במשולש $ABC$: $AB = AC$, $∢A = 120°$, $AD$ גובה לבסיס ו־$AB = 10$. מה $AD$?",
+     "figure": "A=0,1.5; B=-2.6,0; C=2.6,0; D=0,0@s; poly A B C; tick A B 1; tick A C 1; line A D; right A D C; ang B A C; len A B 10; note ∢A = 120°; lenx A D ?",
      "choices": [
       {
        "text": "$5$",
@@ -7152,6 +7280,7 @@
     },
     {
      "question": "במשולש $ABC$: $AB = AC = 8$ ו־$∢B = 30°$. מה אורך הגובה מ־$A$ לבסיס?",
+     "figure": "A=0,1.5; B=-2.6,0; C=2.6,0; _D=0,0; poly A B C; tick A B 1; tick A C 1; dash A _D; right A _D C; len A B 8; ang C B A 30°; lenx A _D ?",
      "choices": [
       {
        "text": "$4$",
@@ -7169,6 +7298,7 @@
     },
     {
      "question": "צלע משולש שווה צלעות $6$. מה אורך הגובה?",
+     "figure": "A=3,5.2; B=0,0; C=6,0; _D=3,0; poly A B C; tick A B 1; tick B C 1; tick A C 1; dash A _D; right A _D C; len A B 6; lenx A _D ?",
      "choices": [
       {
        "text": "$√27$",
@@ -7197,6 +7327,7 @@
    "questions": [
     {
      "question": "הישרים $a$ ו־$b$ מקבילים, ו־$∢1 = 70°$. מה גודל הזווית המתחלפת ל־$∢1$?",
+     "figure": "_T=0,2; _S=0.73,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=-0.44,3.22; _D=1.17,-1.22; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; par _aL _aR 1; par _bL _bR 1; ang _S _T _aR 1; note ∢1 = 70°",
      "choices": [
       {
        "text": "$70°$",
@@ -7214,6 +7345,7 @@
     },
     {
      "question": "הישרים $a$ ו־$b$ מקבילים, ו־$∢1 = 125°$. מה גודל הזווית המתאימה ל־$∢1$?",
+     "figure": "_T=0,2; _S=-1.4,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=0.75,3.06; _D=-2.15,-1.06; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; par _aL _aR 1; par _bL _bR 1; ang _S _T _aR 1; note ∢1 = 125°",
      "choices": [
       {
        "text": "$125°$",
@@ -7231,6 +7363,7 @@
     },
     {
      "question": "הישרים $a$ ו־$b$ מקבילים, ו־$∢1 = 65°$. מה גודל הזווית החד־צדדית ל־$∢1$?",
+     "figure": "_T=0,2; _S=0.93,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=-0.55,3.18; _D=1.48,-1.18; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; par _aL _aR 1; par _bL _bR 1; ang _S _T _aR 1; note ∢1 = 65°",
      "choices": [
       {
        "text": "$115°$",
@@ -7248,6 +7381,7 @@
     },
     {
      "question": "$a ∥ b$, ושתי זוויות מתאימות הן $3x + 10$ ו־$2x + 40$. מה $x$?",
+     "figure": "_T=0,2; _S=-0.73,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=0.44,3.22; _D=-1.17,-1.22; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; par _aL _aR 1; par _bL _bR 1; ang _aR _T _U 3x + 10; ang _bR _S _T 2x + 40",
      "choices": [
       {
        "text": "$x = 30$",
@@ -7265,6 +7399,7 @@
     },
     {
      "question": "$a ∥ b$, ושתי זוויות חד־צדדיות הן $2x$ ו־$x + 30$. מה $x$?",
+     "figure": "_T=0,2; _S=-0.35,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=0.23,3.28; _D=-0.58,-1.28; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; par _aL _aR 1; par _bL _bR 1; ang _S _T _aR 2x; ang _bR _S _T x + 30",
      "choices": [
       {
        "text": "$x = 50$",
@@ -7282,6 +7417,7 @@
     },
     {
      "question": "$a ∥ b$, ושתי זוויות מתחלפות הן $4x − 20$ ו־$2x + 30$. מה $x$?",
+     "figure": "_T=0,2; _S=0.35,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=-0.23,3.28; _D=0.58,-1.28; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; par _aL _aR 1; par _bL _bR 1; ang _S _T _aR 4x − 20; ang _T _S _bL 2x + 30",
      "choices": [
       {
        "text": "$x = 25$",
@@ -7299,6 +7435,7 @@
     },
     {
      "question": "$a ∥ b$, ו־$∢1 = 48°$. מה גודל הזווית הצמודה לזווית המתחלפת ל־$∢1$?",
+     "figure": "_T=0,2; _S=1.8,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=-0.87,2.97; _D=2.67,-0.97; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; par _aL _aR 1; par _bL _bR 1; ang _S _T _aR 1; note ∢1 = 48°",
      "choices": [
       {
        "text": "$132°$",
@@ -7316,6 +7453,7 @@
     },
     {
      "question": "$a ∥ b$, והחותך מאונך לישר $a$. מה הזווית בין החותך לישר $b$?",
+     "figure": "_T=0,2; _S=0,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=0,3.3; _D=0,-1.3; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; par _aL _aR 1; par _bL _bR 1; right _aR _T _U; ang _bR _S _T ?",
      "choices": [
       {
        "text": "$90°$",
@@ -7333,6 +7471,7 @@
     },
     {
      "question": "$a ∥ b$, ושתי זוויות חד־צדדיות $∢1$ ו־$∢2$ מקיימות $∢1 = 2 · ∢2$. מה גודל $∢1$?",
+     "figure": "_T=0,2; _S=-1.15,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=0.65,3.13; _D=-1.8,-1.13; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; par _aL _aR 1; par _bL _bR 1; ang _S _T _aR 1; ang _bR _S _T 2; note ∢1 = 2 · ∢2",
      "choices": [
       {
        "text": "$120°$",
@@ -7350,6 +7489,7 @@
     },
     {
      "question": "$a ∥ b$, ושתי זוויות מתאימות הן $∢1 = 5x$ ו־$∢2 = 3x + 24$. מה גודל $∢1$?",
+     "figure": "_T=0,2; _S=-1.15,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=0.65,3.13; _D=-1.8,-1.13; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; par _aL _aR 1; par _bL _bR 1; ang _aR _T _U 1; ang _bR _S _T 2; note ∢1 = 5x, ∢2 = 3x + 24",
      "choices": [
       {
        "text": "$60°$",
@@ -7380,6 +7520,7 @@
    "questions": [
     {
      "question": "חותך חוצה שני ישרים, ושתי זוויות מתחלפות הן $50°$ ו־$50°$. האם הישרים מקבילים?",
+     "figure": "_T=0,2; _S=1.68,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=-0.84,3; _D=2.51,-1; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; ang _S _T _aR 50°; ang _T _S _bL 50°",
      "choices": [
       {
        "text": "כן",
@@ -7393,6 +7534,7 @@
     },
     {
      "question": "חותך חוצה שני ישרים, ושתי זוויות חד־צדדיות הן $65°$ ו־$115°$. האם הישרים מקבילים?",
+     "figure": "_T=0,2; _S=0.93,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=-0.55,3.18; _D=1.48,-1.18; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; ang _S _T _aR 65°; ang _bR _S _T 115°",
      "choices": [
       {
        "text": "כן",
@@ -7406,6 +7548,7 @@
     },
     {
      "question": "חותך חוצה שני ישרים, ושתי זוויות מתאימות הן $70°$ ו־$75°$. האם הישרים מקבילים?",
+     "figure": "_T=0,2; _S=-0.73,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=0.44,3.22; _D=-1.17,-1.22; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; ang _aR _T _U 70°; ang _bR _S _T 75°",
      "choices": [
       {
        "text": "לא",
@@ -7419,6 +7562,7 @@
     },
     {
      "question": "חותך חוצה שני ישרים, ושתי זוויות חד־צדדיות הן $80°$ ו־$80°$. האם הישרים מקבילים?",
+     "figure": "_T=0,2; _S=0.35,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=-0.23,3.28; _D=0.58,-1.28; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; ang _S _T _aR 80°; ang _bR _S _T 80°",
      "choices": [
       {
        "text": "לא, סכומן אינו $180°$",
@@ -7432,6 +7576,7 @@
     },
     {
      "question": "זוויות חד־צדדיות הן $2x + 10$ ו־$x + 20$. עבור איזה $x$ הישרים מקבילים?",
+     "figure": "_T=0,2; _S=0.73,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=-0.44,3.22; _D=1.17,-1.22; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; ang _S _T _aR 2x + 10; ang _bR _S _T x + 20",
      "choices": [
       {
        "text": "$x = 50$",
@@ -7449,6 +7594,7 @@
     },
     {
      "question": "זוויות מתחלפות הן $3x$ ו־$x + 40$. עבור איזה $x$ הישרים מקבילים?",
+     "figure": "_T=0,2; _S=1.15,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=-0.65,3.13; _D=1.8,-1.13; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; ang _S _T _aR 3x; ang _T _S _bL x + 40",
      "choices": [
       {
        "text": "$x = 20$",
@@ -7466,6 +7612,7 @@
     },
     {
      "question": "במרובע $ABCD$: $∢A = 110°$, $∢B = 70°$. אילו צלעות בהכרח מקבילות?",
+     "figure": "A=0,0; B=5,0; D=-1.16,3.19; C=4.11,2.44; poly A B C D; ang B A D 110°; ang C B A 70°",
      "choices": [
       {
        "text": "$AD ∥ BC$",
@@ -7483,6 +7630,7 @@
     },
     {
      "question": "במרובע $ABCD$: $∢A = 75°$, $∢D = 105°$. אילו צלעות בהכרח מקבילות?",
+     "figure": "A=0,0; B=7,0; C=5.27,3; D=0.8,3; poly A B C D; ang B A D 75°; ang A D C 105°",
      "choices": [
       {
        "text": "$AB ∥ DC$",
@@ -7500,6 +7648,7 @@
     },
     {
      "question": "מה מספיק כדי ששני ישרים שחותך חוצה אותם יהיו מקבילים?",
+     "figure": "_T=0,2; _S=-1.06,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=0.61,3.15; _D=-1.67,-1.15; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b",
      "choices": [
       {
        "text": "זוויות מתחלפות שוות",
@@ -7517,6 +7666,7 @@
     },
     {
      "question": "חותך חוצה שני ישרים, ושתי זוויות חד־צדדיות הן $42°$ ו־$138°$. האם הישרים מקבילים?",
+     "figure": "_T=0,2; _S=2.22,0; _aL=-4.2,2; _aR=3.2,2; _bL=-4.2,0; _bR=3.2,0; _U=-0.97,2.87; _D=3.19,-0.87; line _aL _aR; line _bL _bR; line _U _D; text 3.55,2 a; text 3.55,0 b; ang _S _T _aR 42°; ang _bR _S _T 138°",
      "choices": [
       {
        "text": "כן",
@@ -7543,6 +7693,7 @@
    "questions": [
     {
      "question": "איזה מרובע נקרא טרפז?",
+     "figure": "A=0,0; B=7,0; C=4.9,3; D=1.4,3; poly A B C D",
      "choices": [
       {
        "text": "מרובע שיש בו זוג אחד בדיוק של צלעות מקבילות",
@@ -7560,6 +7711,7 @@
     },
     {
      "question": "בטרפז $ABCD$ ($AB ∥ DC$): $∢A = 70°$. מה גודל $∢D$?",
+     "figure": "A=0,0; B=7,0; C=5.27,3; D=1.09,3; poly A B C D; par A B 1; par D C 1; ang B A D 70°; ang A D C ?",
      "choices": [
       {
        "text": "$110°$",
@@ -7577,6 +7729,7 @@
     },
     {
      "question": "בטרפז $ABCD$ ($AB ∥ DC$): $∢B = 125°$. מה גודל $∢C$?",
+     "figure": "A=0,0; B=7,0; C=9.1,3; D=1.6,3; poly A B C D; par A B 1; par D C 1; ang C B A 125°; ang D C B ?",
      "choices": [
       {
        "text": "$55°$",
@@ -7594,6 +7747,7 @@
     },
     {
      "question": "בטרפז $ABCD$ ($AB ∥ DC$): $∢A = 3 · ∢D$. מה גודל $∢A$?",
+     "figure": "A=0,0; B=7,0; C=5.5,2.6; D=-2.6,2.6; poly A B C D; par A B 1; par D C 1; ang B A D ?; ang A D C; note ∢A = 3 · ∢D",
      "choices": [
       {
        "text": "$135°$",
@@ -7611,6 +7765,7 @@
     },
     {
      "question": "בטרפז $ABCD$ ($AB ∥ DC$), אילו זוגות של זוויות משלימים ל־$180°$?",
+     "figure": "A=0,0; B=7,0; C=4.9,3; D=1.4,3; poly A B C D; par A B 1; par D C 1",
      "choices": [
       {
        "text": "$∢A + ∢D$ ו־$∢B + ∢C$",
@@ -7628,6 +7783,7 @@
     },
     {
      "question": "בטרפז $ABCD$ ($AB ∥ DC$): $∢A = 80°$, $∢B = 60°$. מה $∢C + ∢D$?",
+     "figure": "A=0,0; B=7,0; C=5.27,3; D=0.53,3; poly A B C D; par A B 1; par D C 1; ang B A D 80°; ang C B A 60°; ang D C B ?; ang A D C ?",
      "choices": [
       {
        "text": "$220°$",
@@ -7645,6 +7801,7 @@
     },
     {
      "question": "האם יש טרפז עם שלוש זוויות ישרות?",
+     "figure": "A=0,0; B=7,0; C=4.9,3; D=0,3; poly A B C D; par A B 1; par D C 1; right B A D; right A D C",
      "choices": [
       {
        "text": "לא, אז גם הרביעית ישרה והמרובע מלבן",
@@ -7658,6 +7815,7 @@
     },
     {
      "question": "בטרפז ישר זווית $ABCD$ ($AB ∥ DC$, $∢D = 90°$): $∢B = 115°$. מה גודל $∢C$?",
+     "figure": "A=0,0; B=5,0; C=6.4,3; D=0,3; poly A B C D; par A B 1; par D C 1; right A D C; ang C B A 115°; ang D C B ?",
      "choices": [
       {
        "text": "$65°$",
@@ -7675,6 +7833,7 @@
     },
     {
      "question": "מהם הבסיסים של טרפז?",
+     "figure": "A=0,0; B=7,0; C=4.9,3; D=1.4,3; poly A B C D; par A B 1; par D C 1",
      "choices": [
       {
        "text": "הצלעות המקבילות",
@@ -7692,6 +7851,7 @@
     },
     {
      "question": "בטרפז $ABCD$ ($AB ∥ DC$): $∢CAB = 30°$. מה גודל $∢ACD$?",
+     "figure": "A=0,0; B=7,0; C=4.9,3; D=1.4,3; poly A B C D; par A B 1; par D C 1; line A C; ang C A B 30°; ang A C D ?",
      "choices": [
       {
        "text": "$30°$",
@@ -7722,6 +7882,7 @@
    "questions": [
     {
      "question": "בטרפז שווה שוקיים $ABCD$ ($AB ∥ DC$, $AD = BC$): $∢A = 70°$. מה גודל $∢B$?",
+     "figure": "A=0,0; B=7,0; C=5.91,3; D=1.09,3; poly A B C D; par A B 1; par D C 1; tick A D 1; tick B C 1; ang B A D 70°; ang C B A ?",
      "choices": [
       {
        "text": "$70°$",
@@ -7735,6 +7896,7 @@
     },
     {
      "question": "בטרפז שווה שוקיים $ABCD$ ($AB ∥ DC$, $AD = BC$): $∢A = 70°$. מה גודל $∢C$?",
+     "figure": "A=0,0; B=7,0; C=5.91,3; D=1.09,3; poly A B C D; par A B 1; par D C 1; tick A D 1; tick B C 1; ang B A D 70°; ang D C B ?",
      "choices": [
       {
        "text": "$110°$",
@@ -7752,6 +7914,7 @@
     },
     {
      "question": "מה נכון לגבי האלכסונים של טרפז שווה שוקיים?",
+     "figure": "A=0,0; B=7,0; C=5.6,3; D=1.4,3; poly A B C D; par A B 1; par D C 1; tick A D 1; tick B C 1; line A C; line B D",
      "choices": [
       {
        "text": "הם שווים",
@@ -7769,6 +7932,7 @@
     },
     {
      "question": "בטרפז שווה שוקיים $ABCD$ האלכסון $AC = 12$. מה $BD$?",
+     "figure": "A=0,0; B=7,0; C=5.6,3; D=1.4,3; poly A B C D; par A B 1; par D C 1; tick A D 1; tick B C 1; line A C; line B D; note AC = 12",
      "choices": [
       {
        "text": "$12$",
@@ -7786,6 +7950,7 @@
     },
     {
      "question": "בסיסי טרפז שווה שוקיים $10$ ו־$4$, והגובה $4$. מה אורך השוק?",
+     "figure": "_A=0,0; _B=10,0; _C=7,4; _D=3,4; _H=3,0; poly _A _B _C _D; dash _D _H; right _D _H _B; lenx _D _H 4; len _A _B 10; len _D _C 4; len _A _D ?; tick _A _D 1; tick _B _C 1",
      "choices": [
       {
        "text": "$5$",
@@ -7803,6 +7968,7 @@
     },
     {
      "question": "בטרפז שווה שוקיים $ABCD$ ($AB ∥ DC$): $∢D = 2 · ∢A$. מה גודל $∢C$?",
+     "figure": "A=0,0; B=7,0; C=5.27,3; D=1.73,3; poly A B C D; par A B 1; par D C 1; tick A D 1; tick B C 1; note ∢D = 2 · ∢A; ang D C B ?",
      "choices": [
       {
        "text": "$120°$",
@@ -7820,6 +7986,7 @@
     },
     {
      "question": "היקף טרפז שווה שוקיים $30$, ובסיסיו $8$ ו־$12$. מה אורך השוק?",
+     "figure": "_A=0,0; _B=12,0; _C=10,3; _D=2,3; poly _A _B _C _D; len _A _B 12; len _D _C 8; len _A _D ?; len _B _C ?; tick _A _D 1; tick _B _C 1",
      "choices": [
       {
        "text": "$5$",
@@ -7837,6 +8004,7 @@
     },
     {
      "question": "בסיסי טרפז שווה שוקיים $14$ ו־$6$, וזווית הבסיס הגדול $60°$. מה אורך השוק?",
+     "figure": "_A=0,0; _B=14,0; _C=10,6.93; _D=4,6.93; poly _A _B _C _D; len _A _B 14; len _D _C 6; len _A _D ?; ang _B _A _D 60°; tick _A _D 1; tick _B _C 1",
      "choices": [
       {
        "text": "$8$",
@@ -7854,6 +8022,7 @@
     },
     {
      "question": "בטרפז שווה שוקיים $ABCD$ ($AB ∥ DC$), מה $∢A + ∢C$?",
+     "figure": "A=0,0; B=7,0; C=5.6,3; D=1.4,3; poly A B C D; par A B 1; par D C 1; tick A D 1; tick B C 1; ang B A D; ang D C B",
      "choices": [
       {
        "text": "$180°$",
@@ -7871,6 +8040,7 @@
     },
     {
      "question": "איזו טענה נכונה בכל טרפז שווה שוקיים?",
+     "figure": "A=0,0; B=7,0; C=5.6,3; D=1.4,3; poly A B C D; par A B 1; par D C 1; tick A D 1; tick B C 1",
      "choices": [
       {
        "text": "זוויות הבסיס שוות והאלכסונים שווים",
@@ -7902,6 +8072,7 @@
    "questions": [
     {
      "question": "במרובע $ABCD$: $∢A + ∢D = 180°$, אבל $∢A + ∢B ≠ 180°$. מהו המרובע?",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; poly A B C D; note ∢A + ∢D = 180°, ∢A + ∢B ≠ 180°",
      "choices": [
       {
        "text": "טרפז שבו $AB ∥ DC$",
@@ -7919,6 +8090,7 @@
     },
     {
      "question": "במרובע $ABCD$: $AB ∥ DC$, ו־$AD$ אינו מקביל ל־$BC$. מהו המרובע?",
+     "figure": "A=0,0; B=7,0; C=4.48,3; D=1.09,3; poly A B C D; par A B 1; par D C 1",
      "choices": [
       {
        "text": "טרפז",
@@ -7936,6 +8108,7 @@
     },
     {
      "question": "במרובע $ABCD$: $AB ∥ DC$ ו־$AB = DC$. מהו המרובע?",
+     "figure": "A=0,0; B=6,0; C=7,3; D=1.6,3; poly A B C D; par A B 1; par D C 1; tick A B 1; tick D C 1",
      "choices": [
       {
        "text": "מקבילית",
@@ -7949,6 +8122,7 @@
     },
     {
      "question": "במרובע $ABCD$: $∢A = 70°$, $∢B = 110°$, $∢C = 80°$. מהו המרובע?",
+     "figure": "A=0,0; B=5,0; D=1.23,3.38; C=5.82,2.26; poly A B C D; ang B A D 70°; ang C B A 110°; ang D C B 80°",
      "choices": [
       {
        "text": "טרפז שבו $AD ∥ BC$",
@@ -7966,6 +8140,7 @@
     },
     {
      "question": "במשולש $ABC$, $D$ על $AB$ ו־$E$ על $AC$, ו־$∢ADE = ∢ABC$. מהו המרובע $DBCE$?",
+     "figure": "A=2.4,4.6; B=0,0; C=6.4,0; D=1.39,2.67@w; E=4.08,2.67@e; poly A B C; line D E; ang A D E; ang A B C",
      "choices": [
       {
        "text": "טרפז",
@@ -7983,6 +8158,7 @@
     },
     {
      "question": "במרובע $ABCD$: $AB ∥ DC$ ו־$AD = BC$. מה אפשר להסיק?",
+     "figure": "A=0,0; B=7,0; C=5.6,3; D=1.4,3; poly A B C D; par A B 1; par D C 1; tick A D 1; tick B C 1; note AB ∥ DC, AD = BC",
      "choices": [
       {
        "text": "המרובע טרפז שווה שוקיים או מקבילית",
@@ -8000,6 +8176,7 @@
     },
     {
      "question": "במרובע $ABCD$: $∢A = ∢B = 90°$. אילו צלעות מקבילות?",
+     "figure": "A=0,0; B=5.5,0; C=5.5,2.6; D=0,4; poly A B C D; right B A D; right C B A",
      "choices": [
       {
        "text": "$AD ∥ BC$",
@@ -8017,6 +8194,7 @@
     },
     {
      "question": "במרובע $ABCD$: $∢A = 65°$, $∢D = 115°$, $∢B = 70°$. מהו המרובע?",
+     "figure": "A=0,0; B=7,0; C=5.91,3; D=1.4,3; poly A B C D; ang B A D 65°; ang A D C 115°; ang C B A 70°",
      "choices": [
       {
        "text": "טרפז שבו $AB ∥ DC$",
@@ -8034,6 +8212,7 @@
     },
     {
      "question": "בטרפז $ABCD$ ($AB ∥ DC$): $∢D = ∢C$. איזה טרפז זה?",
+     "figure": "A=0,0; B=7,0; C=5.27,3; D=1.73,3; poly A B C D; par A B 1; par D C 1; ang A D C; ang D C B",
      "choices": [
       {
        "text": "טרפז שווה שוקיים",
@@ -8051,6 +8230,7 @@
     },
     {
      "question": "שני ישרים מאונכים לאותו ישר. מה היחס ביניהם?",
+     "figure": "_L1=-0.5,0; _L2=6,0; _P=1.5,0; _P2=1.5,3.4; _Q=4,0; _Q2=4,3.4; line _L1 _L2; line _P _P2; line _Q _Q2; right _L2 _P _P2; right _L2 _Q _Q2",
      "choices": [
       {
        "text": "הם מקבילים",
@@ -8081,6 +8261,7 @@
    "questions": [
     {
      "question": "בסיסי טרפז $10$ ו־$6$, וגובהו $4$. מה שטחו?",
+     "figure": "_A=0,0; _B=10,0; _C=8,4; _D=2,4; _H=2,0; poly _A _B _C _D; dash _D _H; right _D _H _B; lenx _D _H 4; len _A _B 10; len _D _C 6",
      "choices": [
       {
        "text": "$32$",
@@ -8102,6 +8283,7 @@
     },
     {
      "question": "בסיסי טרפז $7$ ו־$5$, וגובהו $6$. מה שטחו?",
+     "figure": "_A=0,0; _B=7,0; _C=6,3.6; _D=1,3.6; _H=1,0; poly _A _B _C _D; dash _D _H; right _D _H _B; lenx _D _H 6; len _A _B 7; len _D _C 5",
      "choices": [
       {
        "text": "$36$",
@@ -8119,6 +8301,7 @@
     },
     {
      "question": "שטח טרפז $60$ ובסיסיו $8$ ו־$12$. מה גובהו?",
+     "figure": "_A=0,0; _B=12,0; _C=10,3; _D=2,3; _H=2,0; poly _A _B _C _D; dash _D _H; right _D _H _B; lenx _D _H ?; len _A _B 12; len _D _C 8; note S = 60",
      "choices": [
       {
        "text": "$6$",
@@ -8136,6 +8319,7 @@
     },
     {
      "question": "שטח טרפז $45$, גובהו $5$ ואחד הבסיסים $7$. מה הבסיס השני?",
+     "figure": "_A=0,0; _B=11,0; _C=9,3; _D=2,3; _H=2,0; poly _A _B _C _D; dash _D _H; right _D _H _B; lenx _D _H 5; len _A _B ?; len _D _C 7; note S = 45",
      "choices": [
       {
        "text": "$11$",
@@ -8153,6 +8337,7 @@
     },
     {
      "question": "בסיסי טרפז $9$ ו־$15$, ושוקיו $5$ ו־$5$. מה היקפו?",
+     "figure": "_A=0,0; _B=15,0; _C=12,4; _D=3,4; poly _A _B _C _D; len _A _B 15; len _D _C 9; len _A _D 5; len _B _C 5",
      "choices": [
       {
        "text": "$34$",
@@ -8170,6 +8355,7 @@
     },
     {
      "question": "בסיסי טרפז שווה שוקיים $12$ ו־$6$, ושוקו $5$. מה שטחו?",
+     "figure": "_A=0,0; _B=12,0; _C=9,4; _D=3,4; poly _A _B _C _D; len _A _B 12; len _D _C 6; len _A _D 5; len _B _C 5; tick _A _D 1; tick _B _C 1",
      "choices": [
       {
        "text": "$36$",
@@ -8187,6 +8373,7 @@
     },
     {
      "question": "בטרפז ישר זווית הבסיסים $10$ ו־$4$, והשוק המאונכת $8$. מה היקפו?",
+     "figure": "_A=0,0; _B=10,0; _C=4,4.8; _D=0,4.8; poly _A _B _C _D; right _B _A _D; right _A _D _C; len _A _B 10; len _D _C 4; len _A _D 8",
      "choices": [
       {
        "text": "$32$",
@@ -8204,6 +8391,7 @@
     },
     {
      "question": "בסיסי טרפז $x$ ו־$x + 4$, גובהו $6$ ושטחו $42$. מה $x$?",
+     "figure": "_A=0,0; _B=9,0; _C=7,3.3; _D=2,3.3; _H=2,0; poly _A _B _C _D; dash _D _H; right _D _H _B; lenx _D _H 6; len _A _B x + 4; len _D _C x; note S = 42",
      "choices": [
       {
        "text": "$x = 5$",
@@ -8221,6 +8409,7 @@
     },
     {
      "question": "שטח טרפז $50$ וגובהו $5$. מה סכום הבסיסים?",
+     "figure": "_A=0,0; _B=11,0; _C=9,3; _D=2,3; _H=2,0; poly _A _B _C _D; dash _D _H; right _D _H _B; lenx _D _H 5; note S = 50",
      "choices": [
       {
        "text": "$20$",
@@ -8238,6 +8427,7 @@
     },
     {
      "question": "בסיסי טרפז שווה שוקיים $16$ ו־$10$, ושוקיו $5$. מה גובהו?",
+     "figure": "_A=0,0; _B=16,0; _C=13,4; _D=3,4; _H=3,0; poly _A _B _C _D; dash _D _H; right _D _H _B; lenx _D _H ?; len _A _B 16; len _D _C 10; len _A _D 5; len _B _C 5",
      "choices": [
       {
        "text": "$4$",
@@ -8268,6 +8458,7 @@
    "questions": [
     {
      "question": "בטרפז $A(0, 0)$, $B(8, 0)$, $C(6, 4)$, $D(2, 4)$, אילו צלעות מקבילות?",
+     "figure": "A=0,0; B=8,0; C=6,4; D=2,4; poly A B C D; grid",
      "choices": [
       {
        "text": "$AB ∥ DC$",
@@ -8285,6 +8476,7 @@
     },
     {
      "question": "בטרפז $A(0, 0)$, $B(8, 0)$, $C(6, 4)$, $D(2, 4)$, מה אורכי הבסיסים?",
+     "figure": "A=0,0; B=8,0; C=6,4; D=2,4; poly A B C D; grid",
      "choices": [
       {
        "text": "$8$ ו־$4$",
@@ -8302,6 +8494,7 @@
     },
     {
      "question": "בטרפז $A(0, 0)$, $B(8, 0)$, $C(6, 4)$, $D(2, 4)$, מה הגובה?",
+     "figure": "A=0,0; B=8,0; C=6,4; D=2,4; poly A B C D; grid",
      "choices": [
       {
        "text": "$4$",
@@ -8319,6 +8512,7 @@
     },
     {
      "question": "מה שטח הטרפז $A(0, 0)$, $B(8, 0)$, $C(6, 4)$, $D(2, 4)$?",
+     "figure": "A=0,0; B=8,0; C=6,4; D=2,4; poly A B C D; grid",
      "choices": [
       {
        "text": "$24$",
@@ -8336,6 +8530,7 @@
     },
     {
      "question": "האם הטרפז $A(0, 0)$, $B(8, 0)$, $C(6, 4)$, $D(2, 4)$ שווה שוקיים?",
+     "figure": "A=0,0; B=8,0; C=6,4; D=2,4; poly A B C D; grid",
      "choices": [
       {
        "text": "כן, $AD = BC = √20$",
@@ -8349,6 +8544,7 @@
     },
     {
      "question": "איזה מרובע הוא $A(−2, 1)$, $B(4, 1)$, $C(4, 5)$, $D(1, 5)$?",
+     "figure": "A=-2,1; B=4,1; C=4,5; D=1,5; poly A B C D; grid",
      "choices": [
       {
        "text": "טרפז ישר זווית",
@@ -8366,6 +8562,7 @@
     },
     {
      "question": "מה שטח הטרפז $A(−2, 1)$, $B(4, 1)$, $C(4, 5)$, $D(1, 5)$?",
+     "figure": "A=-2,1; B=4,1; C=4,5; D=1,5; poly A B C D; grid",
      "choices": [
       {
        "text": "$18$",
@@ -8383,6 +8580,7 @@
     },
     {
      "question": "בטרפז $A(−2, 1)$, $B(4, 1)$, $C(4, 5)$, $D(1, 5)$, מה אורך $AD$?",
+     "figure": "A=-2,1; B=4,1; C=4,5; D=1,5; poly A B C D; grid",
      "choices": [
       {
        "text": "$5$",
@@ -8400,6 +8598,7 @@
     },
     {
      "question": "מה היקף הטרפז $A(−2, 1)$, $B(4, 1)$, $C(4, 5)$, $D(1, 5)$?",
+     "figure": "A=-2,1; B=4,1; C=4,5; D=1,5; poly A B C D; grid",
      "choices": [
       {
        "text": "$18$",
@@ -8417,6 +8616,7 @@
     },
     {
      "question": "נתונים $A(0, 0)$, $B(6, 0)$, $C(5, 3)$. איזו נקודה $D$ יוצרת טרפז שווה שוקיים $ABCD$ שבו $AB ∥ DC$?",
+     "figure": "A=0,0; B=6,0; C=5,3; grid; line A B; line B C",
      "choices": [
       {
        "text": "$(1, 3)$",
@@ -9906,6 +10106,7 @@
    "questions": [
     {
      "question": "איזה מרובע נקרא מקבילית?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; poly A B C D",
      "choices": [
       {
        "text": "מרובע ששני זוגות הצלעות הנגדיות בו מקבילים",
@@ -9923,6 +10124,7 @@
     },
     {
      "question": "במקבילית $ABCD$: $∢A = 70°$. מה גודל $∢C$?",
+     "figure": "A=0,0; B=6,0; C=7.16,3.19; D=1.16,3.19; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; ang B A D 70°; ang D C B ?",
      "choices": [
       {
        "text": "$70°$",
@@ -9940,6 +10142,7 @@
     },
     {
      "question": "במקבילית $ABCD$: $∢A = 70°$. מה גודל $∢B$?",
+     "figure": "A=0,0; B=6,0; C=7.16,3.19; D=1.16,3.19; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; ang B A D 70°; ang C B A ?",
      "choices": [
       {
        "text": "$110°$",
@@ -9957,6 +10160,7 @@
     },
     {
      "question": "במקבילית $ABCD$: $AB = 7$, $BC = 4$. מה היקפה?",
+     "figure": "A=0,0; B=7,0; C=8.69,3.63; D=1.69,3.63; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; len A B 7; len B C 4",
      "choices": [
       {
        "text": "$22$",
@@ -9974,6 +10178,7 @@
     },
     {
      "question": "במקבילית $ABCD$: $∢A = 2 · ∢B$. מה גודל $∢A$?",
+     "figure": "A=0,0; B=6,0; C=4.4,2.77; D=-1.6,2.77; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; ang B A D ?; note ∢A = 2 · ∢B",
      "choices": [
       {
        "text": "$120°$",
@@ -9991,6 +10196,7 @@
     },
     {
      "question": "במקבילית $ABCD$: $∢A + ∢C = 140°$. מה גודל $∢B$?",
+     "figure": "A=0,0; B=6,0; C=7.16,3.19; D=1.16,3.19; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; ang C B A ?; note ∢A + ∢C = 140°",
      "choices": [
       {
        "text": "$110°$",
@@ -10008,6 +10214,7 @@
     },
     {
      "question": "במקבילית $ABCD$: $AB = 3x − 1$, $DC = x + 7$. מה $x$?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; len A B 3x − 1; len D C x + 7",
      "choices": [
       {
        "text": "$x = 4$",
@@ -10025,6 +10232,7 @@
     },
     {
      "question": "היקף מקבילית $40$, ו־$AB = 12$. מה $BC$?",
+     "figure": "A=0,0; B=6,0; C=7.69,3.63; D=1.69,3.63; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; len A B 12; len B C ?; note P = 40",
      "choices": [
       {
        "text": "$8$",
@@ -10042,6 +10250,7 @@
     },
     {
      "question": "במקבילית $ABCD$: $∢A = 5x + 10$, $∢C = 3x + 40$. מה גודל $∢A$?",
+     "figure": "A=0,0; B=6,0; C=6.3,3.39; D=0.3,3.39; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; ang B A D 5x + 10; ang D C B 3x + 40",
      "choices": [
       {
        "text": "$85°$",
@@ -10059,6 +10268,7 @@
     },
     {
      "question": "איזו טענה נכונה בכל מקבילית?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2",
      "choices": [
       {
        "text": "הצלעות הנגדיות שוות",
@@ -10089,6 +10299,7 @@
    "questions": [
     {
      "question": "במקבילית $ABCD$ האלכסונים נחתכים ב־$O$, ו־$AC = 12$. מה $AO$?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; line A C; line B D; dot O; lenx A O ?; note AC = 12",
      "choices": [
       {
        "text": "$6$",
@@ -10106,6 +10317,7 @@
     },
     {
      "question": "במקבילית $ABCD$ האלכסונים נחתכים ב־$O$: $AO = 5$, $BO = 3$. מה $BD$?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; line A C; line B D; dot O; lenx A O 5; lenx B O 3",
      "choices": [
       {
        "text": "$6$",
@@ -10123,6 +10335,7 @@
     },
     {
      "question": "מה נכון לגבי אלכסוני המקבילית?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; line A C; line B D; dot O",
      "choices": [
       {
        "text": "הם חוצים זה את זה",
@@ -10140,6 +10353,7 @@
     },
     {
      "question": "במקבילית $ABCD$ ($O$ מפגש האלכסונים): $AO = 2x + 1$, $OC = x + 5$. מה $x$?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; line A C; line B D; dot O; lenx A O 2x + 1; lenx O C x + 5",
      "choices": [
       {
        "text": "$x = 4$",
@@ -10157,6 +10371,7 @@
     },
     {
      "question": "במקבילית $ABCD$ ($O$ מפגש האלכסונים): $AC = 3x$, $AO = x + 4$. מה $x$?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; line A C; line B D; dot O; lenx A O x + 4; note AC = 3x",
      "choices": [
       {
        "text": "$x = 8$",
@@ -10174,6 +10389,7 @@
     },
     {
      "question": "במקבילית $ABCD$ ($O$ מפגש האלכסונים): $AO = 4$, $BO = 3$ ו־$∢AOB = 90°$. מה $AB$?",
+     "figure": "O=0,0@e; A=-4,-0.6; C=4,0.6; B=0.45,-3; D=-0.45,3; poly A B C D; line A C; line B D; dot O; right A O B; lenx A O 4; lenx B O 3; len A B ?",
      "choices": [
       {
        "text": "$5$",
@@ -10191,6 +10407,7 @@
     },
     {
      "question": "במקבילית $ABCD$ ($O$ מפגש האלכסונים), לאיזה משולש חופף המשולש $AOB$?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; line A C; line B D; dot O",
      "choices": [
       {
        "text": "$△COD$",
@@ -10208,6 +10425,7 @@
     },
     {
      "question": "במקבילית $ABCD$ ($O$ מפגש האלכסונים): $AC + BD = 30$, $AO = 6$. מה $BO$?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; line A C; line B D; dot O; lenx A O 6; lenx B O ?; note AC + BD = 30",
      "choices": [
       {
        "text": "$9$",
@@ -10225,6 +10443,7 @@
     },
     {
      "question": "במקבילית $ABCD$ ($O$ מפגש האלכסונים): $AO = 7$, $BD = 10$. מה $AC + BD$?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; line A C; line B D; dot O; lenx A O 7; note BD = 10",
      "choices": [
       {
        "text": "$24$",
@@ -10242,6 +10461,7 @@
     },
     {
      "question": "במקבילית $ABCD$ ($O$ מפגש האלכסונים) שטח המשולש $AOB$ הוא $5$. מה שטח המקבילית?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; par A B 1; par D C 1; par A D 2; par B C 2; line A C; line B D; dot O; note S(△AOB) = 5",
      "choices": [
       {
        "text": "$20$",
@@ -10272,6 +10492,7 @@
    "questions": [
     {
      "question": "במרובע $ABCD$ האלכסונים חוצים זה את זה. מהו המרובע?",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; O=2.55,1.7@s; poly A B C D; line A C; line B D; dot O; note AO = OC, BO = OD",
      "choices": [
       {
        "text": "מקבילית",
@@ -10289,6 +10510,7 @@
     },
     {
      "question": "במרובע $ABCD$: $AB ∥ DC$ ו־$AD = BC$. האם הוא בהכרח מקבילית?",
+     "figure": "A=0,0; B=7,0; C=6.2,3; D=2.2,3; poly A B C D; par A B 1; par D C 1; tick A D 1; tick B C 1",
      "choices": [
       {
        "text": "לא, ייתכן שהוא טרפז שווה שוקיים",
@@ -10302,6 +10524,7 @@
     },
     {
      "question": "במרובע $ABCD$: $AB ∥ DC$ ו־$AB = DC$. האם הוא מקבילית?",
+     "figure": "A=0,0; B=6,0; C=7,3; D=1.6,3; poly A B C D; par A B 1; par D C 1; tick A B 1; tick D C 1",
      "choices": [
       {
        "text": "כן",
@@ -10315,6 +10538,7 @@
     },
     {
      "question": "במרובע $ABCD$: $AB = DC$ ו־$AD = BC$. האם הוא מקבילית?",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; poly A B C D; note AB = DC, AD = BC",
      "choices": [
       {
        "text": "כן",
@@ -10332,6 +10556,7 @@
     },
     {
      "question": "במרובע $ABCD$ האלכסונים מאונכים זה לזה. האם הוא בהכרח מקבילית?",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; O=2.55,1.7@s; poly A B C D; line A C; line B D; dot O; right A O B; note AC ⊥ BD",
      "choices": [
       {
        "text": "לא",
@@ -10345,6 +10570,7 @@
     },
     {
      "question": "במרובע $ABCD$: $∢A = ∢C$ ו־$∢B = ∢D$. מהו המרובע?",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; poly A B C D; ang B A D; ang D C B; ang2 C B A; ang2 A D C",
      "choices": [
       {
        "text": "מקבילית",
@@ -10362,6 +10588,7 @@
     },
     {
      "question": "במרובע $ABCD$: $AB = DC = 6$, $AD = BC = 9$. מהו המרובע?",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; poly A B C D; len A B 6; len D C 6; len A D 9; len B C 9",
      "choices": [
       {
        "text": "מקבילית",
@@ -10379,6 +10606,7 @@
     },
     {
      "question": "במרובע $ABCD$ האלכסונים נחתכים ב־$O$, ו־$AO = OC$, $BO = OD$. מהו המרובע?",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; O=2.55,1.7@s; poly A B C D; line A C; line B D; dot O; note AO = OC, BO = OD",
      "choices": [
       {
        "text": "מקבילית",
@@ -10396,6 +10624,7 @@
     },
     {
      "question": "במרובע $ABCD$: $AB ∥ DC$, $AB = 5$ ו־$DC = 8$. מהו המרובע?",
+     "figure": "A=0,0; B=5,0; C=6.5,3; D=-1.5,3; poly A B C D; par A B 1; par D C 1; len A B 5; len D C 8",
      "choices": [
       {
        "text": "טרפז",
@@ -10409,6 +10638,7 @@
     },
     {
      "question": "במרובע $ABCD$: $∢A + ∢B = 180°$ ו־$∢A + ∢D = 180°$. מהו המרובע?",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; poly A B C D; note ∢A + ∢B = 180°, ∢A + ∢D = 180°",
      "choices": [
       {
        "text": "מקבילית",
@@ -10439,6 +10669,7 @@
    "questions": [
     {
      "question": "האם $A(0, 0)$, $B(5, 0)$, $C(7, 3)$, $D(2, 3)$ היא מקבילית?",
+     "figure": "A=0,0; B=5,0; C=7,3; D=2,3; poly A B C D; grid",
      "choices": [
       {
        "text": "כן, $AB$ ו־$DC$ מקבילים ושווים ($5$)",
@@ -10452,6 +10683,7 @@
     },
     {
      "question": "במקבילית $A(0, 0)$, $B(5, 0)$, $C(7, 3)$, $D(2, 3)$, היכן נחתכים האלכסונים?",
+     "figure": "A=0,0; B=5,0; C=7,3; D=2,3; poly A B C D; grid; dash A C; dash B D",
      "choices": [
       {
        "text": "$(3.5, 1.5)$",
@@ -10469,6 +10701,7 @@
     },
     {
      "question": "מה שטח המקבילית $A(0, 0)$, $B(5, 0)$, $C(7, 3)$, $D(2, 3)$?",
+     "figure": "A=0,0; B=5,0; C=7,3; D=2,3; poly A B C D; grid",
      "choices": [
       {
        "text": "$15$",
@@ -10486,6 +10719,7 @@
     },
     {
      "question": "נתונים $A(1, 1)$, $B(4, 2)$, $C(6, 5)$. מה $D$ במקבילית $ABCD$?",
+     "figure": "A=1,1; B=4,2; C=6,5; grid; line A B; line B C",
      "choices": [
       {
        "text": "$(3, 4)$",
@@ -10503,6 +10737,7 @@
     },
     {
      "question": "במקבילית שבה $A(1, 1)$ ו־$C(6, 5)$ קודקודים נגדיים, היכן נחתכים האלכסונים?",
+     "figure": "A=1,1; C=6,5; grid; dash A C",
      "choices": [
       {
        "text": "$(3.5, 3)$",
@@ -10520,6 +10755,7 @@
     },
     {
      "question": "נתונים $A(−2, 1)$, $B(3, 1)$, $C(5, 4)$. מה $D$ במקבילית $ABCD$?",
+     "figure": "A=-2,1; B=3,1; C=5,4; grid; line A B; line B C",
      "choices": [
       {
        "text": "$(0, 4)$",
@@ -10537,6 +10773,7 @@
     },
     {
      "question": "מה שטח המקבילית $A(−2, 1)$, $B(3, 1)$, $C(5, 4)$, $D(0, 4)$?",
+     "figure": "A=-2,1; B=3,1; C=5,4; D=0,4; poly A B C D; grid",
      "choices": [
       {
        "text": "$15$",
@@ -10554,6 +10791,7 @@
     },
     {
      "question": "האם $A(0, 0)$, $B(4, 0)$, $C(5, 2)$, $D(1, 3)$ היא מקבילית?",
+     "figure": "A=0,0; B=4,0; C=5,2; D=1,3; poly A B C D; grid",
      "choices": [
       {
        "text": "לא, $DC$ אינו מקביל ל־$AB$",
@@ -10567,6 +10805,7 @@
     },
     {
      "question": "נתונים $A(0, 0)$, $B(6, 0)$, $D(2, 4)$. מה $C$ במקבילית $ABCD$?",
+     "figure": "A=0,0; B=6,0; D=2,4; grid; line A B; line A D",
      "choices": [
       {
        "text": "$(8, 4)$",
@@ -10584,6 +10823,7 @@
     },
     {
      "question": "מה היקף המקבילית $A(0, 0)$, $B(6, 0)$, $C(8, 4)$, $D(2, 4)$?",
+     "figure": "A=0,0; B=6,0; C=8,4; D=2,4; poly A B C D; grid",
      "choices": [
       {
        "text": "$12 + 2√20$",
@@ -11346,6 +11586,7 @@
    "questions": [
     {
      "question": "איזה מרובע נקרא מלבן?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; poly A B C D",
      "choices": [
       {
        "text": "מקבילית שיש בה זווית ישרה",
@@ -11363,6 +11604,7 @@
     },
     {
      "question": "היקף מלבן $26$ ואורכו $8$. מה רוחבו?",
+     "figure": "_A=0,0; _B=6,0; _C=6,3.6; _D=0,3.6; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; len _A _B 8; len _B _C ?; note P = 26",
      "choices": [
       {
        "text": "$5$",
@@ -11380,6 +11622,7 @@
     },
     {
      "question": "במלבן $ABCD$: $AB = 12$, $BC = 5$. מה $AC$?",
+     "figure": "A=0,0; B=6,0; C=6,2.5; D=0,2.5; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; len A B 12; len B C 5; lenx A C ?",
      "choices": [
       {
        "text": "$13$",
@@ -11397,6 +11640,7 @@
     },
     {
      "question": "שטח מלבן $48$ ואורכו $8$. מה רוחבו?",
+     "figure": "_A=0,0; _B=6,0; _C=6,3.6; _D=0,3.6; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; len _A _B 8; len _B _C ?; note S = 48",
      "choices": [
       {
        "text": "$6$",
@@ -11414,6 +11658,7 @@
     },
     {
      "question": "במקבילית אחת הזוויות ישרה. מה גודל שאר הזוויות?",
+     "figure": "_A=0,0; _B=6,0; _C=6,3.6; _D=0,3.6; poly _A _B _C _D; right _B _A _D",
      "choices": [
       {
        "text": "כולן $90°$",
@@ -11431,6 +11676,7 @@
     },
     {
      "question": "אורך מלבן כפול מרוחבו, והיקפו $36$. מה רוחבו?",
+     "figure": "_A=0,0; _B=6,0; _C=6,3; _D=0,3; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; len _B _C ?; note P = 36",
      "choices": [
       {
        "text": "$6$",
@@ -11448,6 +11694,7 @@
     },
     {
      "question": "מלבן שצלעותיו $6$ ו־$8$. מה אורך האלכסון?",
+     "figure": "_A=0,0; _B=8,0; _C=8,6; _D=0,6; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; line _A _C; len _A _B 8; len _B _C 6; lenx _A _C ?",
      "choices": [
       {
        "text": "$10$",
@@ -11465,6 +11712,7 @@
     },
     {
      "question": "אלכסון מלבן $13$, ואחת מצלעותיו $5$. מה הצלע השנייה?",
+     "figure": "_A=0,0; _B=12,0; _C=12,5; _D=0,5; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; line _A _C; lenx _A _C 13; len _B _C 5; len _A _B ?",
      "choices": [
       {
        "text": "$12$",
@@ -11482,6 +11730,7 @@
     },
     {
      "question": "במלבן $ABCD$: $AB = x + 2$, $DC = 2x − 3$. מה $x$?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; poly A B C D; right B A D; right C B A; right D C B; right A D C; len A B x + 2; len D C 2x − 3",
      "choices": [
       {
        "text": "$x = 5$",
@@ -11499,6 +11748,7 @@
     },
     {
      "question": "שטח מלבן $60$ והיקפו $34$. מה אורכי צלעותיו?",
+     "figure": "_A=0,0; _B=6,0; _C=6,3.6; _D=0,3.6; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; note S = 60, P = 34",
      "choices": [
       {
        "text": "$5$ ו־$12$",
@@ -11529,6 +11779,7 @@
    "questions": [
     {
      "question": "במלבן $ABCD$ ($O$ מפגש האלכסונים) $AC = 10$. מה $BO$?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; O=3,1.8@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; lenx B O ?; note AC = 10",
      "choices": [
       {
        "text": "$5$",
@@ -11546,6 +11797,7 @@
     },
     {
      "question": "במלבן $ABCD$ ($O$ מפגש האלכסונים) $∢OAB = 30°$. מה גודל $∢OBA$?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; O=3,1.8@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; ang O A B 30°; ang A B O ?",
      "choices": [
       {
        "text": "$30°$",
@@ -11563,6 +11815,7 @@
     },
     {
      "question": "במלבן $ABCD$ ($O$ מפגש האלכסונים) $∢AOB = 120°$. מה גודל $∢OAB$?",
+     "figure": "A=0,0; B=6,0; C=6,3.46; D=0,3.46; O=3,1.73@n; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; ang A O B 120°; ang O A B ?",
      "choices": [
       {
        "text": "$30°$",
@@ -11580,6 +11833,7 @@
     },
     {
      "question": "במלבן $ABCD$ ($O$ מפגש האלכסונים): $AO = 2x + 1$, $BD = 6x − 4$. מה $x$?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; O=3,1.8@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; lenx A O 2x + 1; note BD = 6x − 4",
      "choices": [
       {
        "text": "$x = 3$",
@@ -11597,6 +11851,7 @@
     },
     {
      "question": "מה נכון לגבי אלכסוני המלבן?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; O=3,1.8@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O",
      "choices": [
       {
        "text": "הם שווים וחוצים זה את זה",
@@ -11614,6 +11869,7 @@
     },
     {
      "question": "במלבן $ABCD$ ($O$ מפגש האלכסונים) $∢ACB = 35°$. מה גודל $∢AOB$?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; O=3,1.8@n; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; ang A C B 35°; ang A O B ?",
      "choices": [
       {
        "text": "$70°$",
@@ -11631,6 +11887,7 @@
     },
     {
      "question": "במלבן $ABCD$ ($O$ מפגש האלכסונים): $AC = 8$ ו־$∢AOB = 60°$. מה $AB$?",
+     "figure": "A=0,0; B=3,0; C=3,5.2; D=0,5.2; O=1.5,2.6@n; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; ang A O B 60°; len A B ?; note AC = 8",
      "choices": [
       {
        "text": "$4$",
@@ -11648,6 +11905,7 @@
     },
     {
      "question": "במלבן $ABCD$: $AB = 6$, $BC = 8$, ו־$O$ מפגש האלכסונים. מה $AO$?",
+     "figure": "A=0,0; B=4.5,0; C=4.5,6; D=0,6; O=2.25,3@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; len A B 6; len B C 8; lenx A O ?",
      "choices": [
       {
        "text": "$5$",
@@ -11665,6 +11923,7 @@
     },
     {
      "question": "במלבן $ABCD$ ($O$ מפגש האלכסונים): $AO + BO + CO + DO = 26$. מה $AC$?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; O=3,1.8@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; note AO + BO + CO + DO = 26",
      "choices": [
       {
        "text": "$13$",
@@ -11682,6 +11941,7 @@
     },
     {
      "question": "במלבן $ABCD$ ($O$ מפגש האלכסונים) $∢BAC = 40°$. מה גודל $∢AOD$?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; O=3,1.8@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; ang B A O 40°; ang A O D ?",
      "choices": [
       {
        "text": "$80°$",
@@ -11712,6 +11972,7 @@
    "questions": [
     {
      "question": "מקבילית שאלכסוניה שווים היא:",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; line A C; line B D; dot O; note AC = BD",
      "choices": [
       {
        "text": "מלבן",
@@ -11729,6 +11990,7 @@
     },
     {
      "question": "מקבילית שיש בה זווית ישרה היא:",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; poly A B C D; note ∢A = 90°",
      "choices": [
       {
        "text": "מלבן",
@@ -11746,6 +12008,7 @@
     },
     {
      "question": "מרובע שיש בו שלוש זוויות ישרות הוא:",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; poly A B C D; note ∢A = ∢B = ∢C = 90°",
      "choices": [
       {
        "text": "מלבן",
@@ -11763,6 +12026,7 @@
     },
     {
      "question": "מרובע שאלכסוניו שווים הוא:",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; O=2.55,1.7@s; poly A B C D; line A C; line B D; dot O; note AC = BD",
      "choices": [
       {
        "text": "לא בהכרח מלבן",
@@ -11776,6 +12040,7 @@
     },
     {
      "question": "מרובע שאלכסוניו שווים וחוצים זה את זה הוא:",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; O=2.55,1.7@s; poly A B C D; line A C; line B D; dot O; note AC = BD, AO = OC, BO = OD",
      "choices": [
       {
        "text": "מלבן",
@@ -11793,6 +12058,7 @@
     },
     {
      "question": "מקבילית שאלכסוניה מאונכים היא:",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; line A C; line B D; dot O; note AC ⊥ BD",
      "choices": [
       {
        "text": "מעוין, לא בהכרח מלבן",
@@ -11806,6 +12072,7 @@
     },
     {
      "question": "במקבילית $ABCD$: $AC = 2x + 3$, $BD = 4x − 5$, ו־$x = 4$. מה סוג המקבילית?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; line A C; line B D; dot O; note AC = 2x + 3, BD = 4x − 5, x = 4",
      "choices": [
       {
        "text": "מלבן",
@@ -11823,6 +12090,7 @@
     },
     {
      "question": "במקבילית $ABCD$: $∢A = ∢B$. מה סוג המקבילית?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; poly A B C D; note ∢A = ∢B",
      "choices": [
       {
        "text": "מלבן",
@@ -11840,6 +12108,7 @@
     },
     {
      "question": "במקבילית $ABCD$ ($O$ מפגש האלכסונים) $AO = BO$. מה סוג המקבילית?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; line A C; line B D; dot O; note AO = BO",
      "choices": [
       {
        "text": "מלבן",
@@ -11857,6 +12126,7 @@
     },
     {
      "question": "במרובע יש זוג צלעות נגדיות מקבילות וזווית ישרה. האם הוא בהכרח מלבן?",
+     "figure": "_A=0,0; _B=7,0; _C=4,3; _D=0,3; poly _A _B _C _D; par _A _B 1; par _D _C 1; right _B _A _D",
      "choices": [
       {
        "text": "לא, ייתכן שהוא טרפז ישר זווית",
@@ -15856,6 +16126,7 @@
    "questions": [
     {
      "question": "איזה מרובע נקרא מעוין?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; poly A B C D",
      "choices": [
       {
        "text": "מרובע שכל צלעותיו שוות",
@@ -15873,6 +16144,7 @@
     },
     {
      "question": "היקף מעוין $36$. מה אורך צלעו?",
+     "figure": "_A=-3.46,0; _B=0,-2; _C=3.46,0; _D=0,2; poly _A _B _C _D; tick _A _B 1; tick _B _C 1; tick _C _D 1; tick _D _A 1; len _A _B ?; note P = 36",
      "choices": [
       {
        "text": "$9$",
@@ -15890,6 +16162,7 @@
     },
     {
      "question": "צלע מעוין $7$. מה היקפו?",
+     "figure": "_A=-3.46,0; _B=0,-2; _C=3.46,0; _D=0,2; poly _A _B _C _D; tick _A _B 1; tick _B _C 1; tick _C _D 1; tick _D _A 1; len _A _B 7",
      "choices": [
       {
        "text": "$28$",
@@ -15907,6 +16180,7 @@
     },
     {
      "question": "האם כל מעוין הוא מקבילית?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1",
      "choices": [
       {
        "text": "כן",
@@ -15920,6 +16194,7 @@
     },
     {
      "question": "במעוין $ABCD$: $AB = 2x + 1$, $BC = x + 6$. מה $x$?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; len A B 2x + 1; len B C x + 6",
      "choices": [
       {
        "text": "$x = 5$",
@@ -15937,6 +16212,7 @@
     },
     {
      "question": "מעוין הוא גם:",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1",
      "choices": [
       {
        "text": "דלתון וגם מקבילית",
@@ -15954,6 +16230,7 @@
     },
     {
      "question": "צלע מעוין $3x − 1$ והיקפו $44$. מה $x$?",
+     "figure": "_A=-3.46,0; _B=0,-2; _C=3.46,0; _D=0,2; poly _A _B _C _D; tick _A _B 1; tick _B _C 1; tick _C _D 1; tick _D _A 1; len _A _B 3x − 1; note P = 44",
      "choices": [
       {
        "text": "$x = 4$",
@@ -15971,6 +16248,7 @@
     },
     {
      "question": "איזו טענה נכונה?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1",
      "choices": [
       {
        "text": "כל ריבוע הוא מעוין",
@@ -15988,6 +16266,7 @@
     },
     {
      "question": "במרובע $ABCD$: $AB = BC = CD = DA = 6$ ו־$∢A = 90°$. מהו המרובע?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; len A B 6; note AB = BC = CD = DA, ∢A = 90°",
      "choices": [
       {
        "text": "ריבוע",
@@ -16005,6 +16284,7 @@
     },
     {
      "question": "במעוין $ABCD$: $AB = 3y − 2$, $CD = y + 4$. מה $y$?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; len A B 3y − 2; len C D y + 4",
      "choices": [
       {
        "text": "$y = 3$",
@@ -16035,6 +16315,7 @@
    "questions": [
     {
      "question": "במעוין $ABCD$: $∢A = 70°$. מה גודל $∢B$?",
+     "figure": "A=-3.28,0; B=0,-2.29; C=3.28,0; D=0,2.29; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; ang B A D 70°; ang C B A ?",
      "choices": [
       {
        "text": "$110°$",
@@ -16048,6 +16329,7 @@
     },
     {
      "question": "במעוין $ABCD$: $∢A = 70°$. מה גודל $∢BAC$?",
+     "figure": "A=-3.28,0; B=0,-2.29; C=3.28,0; D=0,2.29; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; ang B A D 70°",
      "choices": [
       {
        "text": "$35°$",
@@ -16065,6 +16347,7 @@
     },
     {
      "question": "במעוין $ABCD$: $∢ABC = 120°$. מה גודל $∢ABD$?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line B D; ang A B C 120°",
      "choices": [
       {
        "text": "$60°$",
@@ -16082,6 +16365,7 @@
     },
     {
      "question": "במעוין $ABCD$: $∢A = 60°$ ו־$AB = 4$. מה אורך האלכסון $BD$?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; dash B D; ang B A D 60°; len A B 4; lenx B D ?",
      "choices": [
       {
        "text": "$4$",
@@ -16099,6 +16383,7 @@
     },
     {
      "question": "במעוין $ABCD$: $∢BAC = 25°$. מה גודל $∢ABC$?",
+     "figure": "A=-3.63,0; B=0,-1.69; C=3.63,0; D=0,1.69; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; ang B A C 25°; ang A B C ?",
      "choices": [
       {
        "text": "$130°$",
@@ -16116,6 +16401,7 @@
     },
     {
      "question": "במעוין $ABCD$: $∢ABD = 40°$. מה גודל $∢BAD$?",
+     "figure": "A=-2.57,0; B=0,-3.06; C=2.57,0; D=0,3.06; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line B D; ang A B D 40°; ang B A D ?",
      "choices": [
       {
        "text": "$100°$",
@@ -16133,6 +16419,7 @@
     },
     {
      "question": "במעוין $ABCD$: $∢A = 2 · ∢B$. מה גודל $∢A$?",
+     "figure": "A=-2,0; B=0,-3.46; C=2,0; D=0,3.46; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; ang B A D ?; note ∢A = 2 · ∢B",
      "choices": [
       {
        "text": "$120°$",
@@ -16150,6 +16437,7 @@
     },
     {
      "question": "במעוין $ABCD$ ($O$ מפגש האלכסונים): $∢OAB = 30°$. מה גודל $∢OBA$?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; O=0,0@se; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O; ang O A B 30°; ang A B O ?",
      "choices": [
       {
        "text": "$60°$",
@@ -16167,6 +16455,7 @@
     },
     {
      "question": "במעוין $ABCD$: $∢A = 80°$. מה גודל $∢ACD$?",
+     "figure": "A=-3.06,0; B=0,-2.57; C=3.06,0; D=0,2.57; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; ang B A D 80°; ang A C D ?",
      "choices": [
       {
        "text": "$40°$",
@@ -16184,6 +16473,7 @@
     },
     {
      "question": "במעוין $ABCD$: $∢A + ∢C = 100°$. מה גודל $∢B$?",
+     "figure": "A=-3.63,0; B=0,-1.69; C=3.63,0; D=0,1.69; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; ang C B A ?; note ∢A + ∢C = 100°",
      "choices": [
       {
        "text": "$130°$",
@@ -16214,6 +16504,7 @@
    "questions": [
     {
      "question": "אלכסוני מעוין $16$ ו־$12$. מה אורך צלעו?",
+     "figure": "A=-4,0; B=0,-3; C=4,0; D=0,3; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; dash A C; dash B D; len A B ?; note AC = 16, BD = 12",
      "choices": [
       {
        "text": "$10$",
@@ -16231,6 +16522,7 @@
     },
     {
      "question": "אלכסוני מעוין $10$ ו־$8$. מה שטחו?",
+     "figure": "A=-3.9,0; B=0,-3.12; C=3.9,0; D=0,3.12; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; dash A C; dash B D; note AC = 10, BD = 8",
      "choices": [
       {
        "text": "$40$",
@@ -16248,6 +16540,7 @@
     },
     {
      "question": "מה נכון לגבי אלכסוני המעוין?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; O=0,0@se; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O",
      "choices": [
       {
        "text": "הם מאונכים וחוצים זה את זה",
@@ -16265,6 +16558,7 @@
     },
     {
      "question": "צלע מעוין $13$ ואחד מאלכסוניו $10$. מה האלכסון השני?",
+     "figure": "A=-5.54,0; B=0,-2.31; C=5.54,0; D=0,2.31; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; dash A C; dash B D; len A B 13; note BD = 10, AC = ?",
      "choices": [
       {
        "text": "$24$",
@@ -16282,6 +16576,7 @@
     },
     {
      "question": "צלע מעוין $5$ ואחד מאלכסוניו $6$. מה האלכסון השני?",
+     "figure": "A=-4,0; B=0,-3; C=4,0; D=0,3; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; dash A C; dash B D; len A B 5; note BD = 6, AC = ?",
      "choices": [
       {
        "text": "$8$",
@@ -16299,6 +16594,7 @@
     },
     {
      "question": "שטח מעוין $24$ ואחד מאלכסוניו $6$. מה האלכסון השני?",
+     "figure": "A=-4,0; B=0,-3; C=4,0; D=0,3; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; dash A C; dash B D; note BD = 6, AC = ?, S = 24",
      "choices": [
       {
        "text": "$8$",
@@ -16316,6 +16612,7 @@
     },
     {
      "question": "במעוין $ABCD$ ($O$ מפגש האלכסונים), מה גודל $∢AOB$?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; O=0,0@se; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O; ang A O D ?",
      "choices": [
       {
        "text": "$90°$",
@@ -16333,6 +16630,7 @@
     },
     {
      "question": "במעוין $ABCD$ ($O$ מפגש האלכסונים): $AO = 4$, $BO = 3$. מה שטח המעוין?",
+     "figure": "A=-4,0; B=0,-3; C=4,0; D=0,3; O=0,0@se; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O; len A O 4; lenx B O 3",
      "choices": [
       {
        "text": "$24$",
@@ -16350,6 +16648,7 @@
     },
     {
      "question": "במעוין $AC = 2x$, $BD = x + 3$, והשטח $18$. מה $x$?",
+     "figure": "A=-3.28,0; B=0,-2.29; C=3.28,0; D=0,2.29; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; dash A C; dash B D; note AC = 2x, BD = x + 3, S = 18",
      "choices": [
       {
        "text": "$x = 3$",
@@ -16367,6 +16666,7 @@
     },
     {
      "question": "צלע מעוין $6$ והגובה אליה $4$. מה שטח המעוין?",
+     "figure": "_A=0,0; _B=6,0; _C=10.47,4; _D=4.47,4; _H=4.47,0; poly _A _B _C _D; dash _D _H; right _D _H _B; tick _A _B 1; tick _B _C 1; tick _C _D 1; tick _D _A 1; len _A _B 6; lenx _D _H 4",
      "choices": [
       {
        "text": "$24$",
@@ -16398,6 +16698,7 @@
    "questions": [
     {
      "question": "מקבילית שאלכסוניה מאונכים היא:",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; line A C; line B D; dot O; note AC ⊥ BD",
      "choices": [
       {
        "text": "מעוין",
@@ -16415,6 +16716,7 @@
     },
     {
      "question": "במקבילית $ABCD$: $AB = BC$. מה סוג המקבילית?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; poly A B C D; note AB = BC",
      "choices": [
       {
        "text": "מעוין",
@@ -16432,6 +16734,7 @@
     },
     {
      "question": "מרובע שאלכסוניו מאונכים הוא:",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; O=2.55,1.7@s; poly A B C D; line A C; line B D; dot O; note AC ⊥ BD",
      "choices": [
       {
        "text": "לא בהכרח מעוין (למשל דלתון)",
@@ -16445,6 +16748,7 @@
     },
     {
      "question": "במקבילית $ABCD$ האלכסון $AC$ חוצה את $∢A$. מה סוג המקבילית?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; poly A B C D; line A C; ang B A C; ang C A D",
      "choices": [
       {
        "text": "מעוין",
@@ -16462,6 +16766,7 @@
     },
     {
      "question": "מרובע שאלכסוניו מאונכים וחוצים זה את זה הוא:",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; O=2.55,1.7@s; poly A B C D; line A C; line B D; dot O; note AC ⊥ BD, AO = OC, BO = OD",
      "choices": [
       {
        "text": "מעוין",
@@ -16479,6 +16784,7 @@
     },
     {
      "question": "מרובע שכל צלעותיו שוות הוא:",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; poly A B C D; note AB = BC = CD = DA",
      "choices": [
       {
        "text": "מעוין",
@@ -16496,6 +16802,7 @@
     },
     {
      "question": "במקבילית $ABCD$: $AB = 2x$, $BC = x + 5$, ו־$x = 5$. מה סוג המקבילית?",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; poly A B C D; len A B 2x; len B C x + 5; note x = 5",
      "choices": [
       {
        "text": "מעוין",
@@ -16513,6 +16820,7 @@
     },
     {
      "question": "מקבילית שאלכסוניה שווים ומאונכים היא:",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; line A C; line B D; dot O; note AC = BD, AC ⊥ BD",
      "choices": [
       {
        "text": "ריבוע",
@@ -16530,6 +16838,7 @@
     },
     {
      "question": "במרובע $ABCD$ כל אלכסון חוצה את שתי הזוויות שהוא מחבר. מהו המרובע?",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; poly A B C D; line A C; line B D; ang B A C; ang C A D; ang D C A; ang A C B; ang2 A B D; ang2 D B C; ang2 C D B; ang2 B D A",
      "choices": [
       {
        "text": "מעוין",
@@ -16547,6 +16856,7 @@
     },
     {
      "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$) נתון גם $AB = BC$. מהו המרובע?",
+     "figure": "A=0,2.18; B=-2.6,0; C=0,-4.5; D=2.6,0; poly A B C D; tick A B 1; tick A D 1; tick C B 2; tick C D 2; note AB = BC",
      "choices": [
       {
        "text": "מעוין",
@@ -16578,6 +16888,7 @@
    "questions": [
     {
      "question": "איזה מרובע נקרא ריבוע?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; poly A B C D",
      "choices": [
       {
        "text": "מלבן שבו צלעות סמוכות שוות",
@@ -16595,6 +16906,7 @@
     },
     {
      "question": "צלע ריבוע $6$. מה אורך האלכסון?",
+     "figure": "_A=0,0; _B=4,0; _C=4,4; _D=0,4; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; tick _A _B 1; tick _B _C 1; tick _C _D 1; tick _D _A 1; line _A _C; len _A _B 6; lenx _A _C ?",
      "choices": [
       {
        "text": "$√72$",
@@ -16612,6 +16924,7 @@
     },
     {
      "question": "היקף ריבוע $20$. מה שטחו?",
+     "figure": "_A=0,0; _B=4,0; _C=4,4; _D=0,4; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; tick _A _B 1; tick _B _C 1; tick _C _D 1; tick _D _A 1; note P = 20",
      "choices": [
       {
        "text": "$25$",
@@ -16629,6 +16942,7 @@
     },
     {
      "question": "האם כל ריבוע הוא מלבן?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; poly A B C D; right B A D; right C B A; right D C B; right A D C; tick A B 1; tick B C 1; tick C D 1; tick D A 1",
      "choices": [
       {
        "text": "כן",
@@ -16642,6 +16956,7 @@
     },
     {
      "question": "האם כל מלבן הוא ריבוע?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; poly A B C D; right B A D; right C B A; right D C B; right A D C",
      "choices": [
       {
        "text": "לא",
@@ -16655,6 +16970,7 @@
     },
     {
      "question": "שטח ריבוע $49$. מה היקפו?",
+     "figure": "_A=0,0; _B=4,0; _C=4,4; _D=0,4; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; tick _A _B 1; tick _B _C 1; tick _C _D 1; tick _D _A 1; note S = 49",
      "choices": [
       {
        "text": "$28$",
@@ -16672,6 +16988,7 @@
     },
     {
      "question": "אלכסון ריבוע $10$. מה שטחו?",
+     "figure": "_A=0,0; _B=4,0; _C=4,4; _D=0,4; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; tick _A _B 1; tick _B _C 1; tick _C _D 1; tick _D _A 1; line _A _C; lenx _A _C 10",
      "choices": [
       {
        "text": "$50$",
@@ -16689,6 +17006,7 @@
     },
     {
      "question": "בריבוע $ABCD$, מה גודל $∢ABD$?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; poly A B C D; right B A D; right C B A; right D C B; right A D C; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line B D; ang A B D ?",
      "choices": [
       {
        "text": "$45°$",
@@ -16706,6 +17024,7 @@
     },
     {
      "question": "מלבן שהוא גם מעוין הוא:",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; poly A B C D",
      "choices": [
       {
        "text": "ריבוע",
@@ -16723,6 +17042,7 @@
     },
     {
      "question": "צלע ריבוע $x + 3$ והיקפו $28$. מה $x$?",
+     "figure": "_A=0,0; _B=4,0; _C=4,4; _D=0,4; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; tick _A _B 1; tick _B _C 1; tick _C _D 1; tick _D _A 1; len _A _B x + 3; note P = 28",
      "choices": [
       {
        "text": "$x = 4$",
@@ -16753,6 +17073,7 @@
    "questions": [
     {
      "question": "מה נכון לגבי אלכסוני הריבוע?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; O=2,2@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O",
      "choices": [
       {
        "text": "הם שווים, מאונכים, חוצים זה את זה וחוצים את הזוויות",
@@ -16770,6 +17091,7 @@
     },
     {
      "question": "בריבוע $ABCD$ ($O$ מפגש האלכסונים), מה גודל $∢AOB$?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; O=2,2@n; poly A B C D; right B A D; right C B A; right D C B; right A D C; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O; ang A O B ?",
      "choices": [
       {
        "text": "$90°$",
@@ -16787,6 +17109,7 @@
     },
     {
      "question": "בריבוע $ABCD$ ($O$ מפגש האלכסונים), מה גודל $∢OAB$?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; O=2,2@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O; ang O A B ?",
      "choices": [
       {
        "text": "$45°$",
@@ -16804,6 +17127,7 @@
     },
     {
      "question": "בריבוע $ABCD$ ($O$ מפגש האלכסונים) $AC = 12$. מה $OB$?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; O=2,2@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O; lenx O B ?; note AC = 12",
      "choices": [
       {
        "text": "$6$",
@@ -16821,6 +17145,7 @@
     },
     {
      "question": "אלכסון ריבוע $8$. מה שטחו?",
+     "figure": "_A=0,0; _B=4,0; _C=4,4; _D=0,4; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; tick _A _B 1; tick _B _C 1; tick _C _D 1; tick _D _A 1; line _A _C; lenx _A _C 8",
      "choices": [
       {
        "text": "$32$",
@@ -16838,6 +17163,7 @@
     },
     {
      "question": "בריבוע $ABCD$ ($O$ מפגש האלכסונים), איזה משולש הוא $AOB$?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; O=2,2@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O",
      "choices": [
       {
        "text": "ישר זווית ושווה שוקיים",
@@ -16855,6 +17181,7 @@
     },
     {
      "question": "בריבוע $ABCD$ ($O$ מפגש האלכסונים) $AO = 5$. מה שטח הריבוע?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; O=2,2@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O; lenx A O 5",
      "choices": [
       {
        "text": "$50$",
@@ -16872,6 +17199,7 @@
     },
     {
      "question": "בריבוע $ABCD$, מה גודל $∢CAD$?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; poly A B C D; right B A D; right C B A; right D C B; right A D C; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; ang C A D ?",
      "choices": [
       {
        "text": "$45°$",
@@ -16889,6 +17217,7 @@
     },
     {
      "question": "אלכסון ריבוע $√50$. מה אורך צלעו?",
+     "figure": "_A=0,0; _B=4,0; _C=4,4; _D=0,4; poly _A _B _C _D; right _B _A _D; right _C _B _A; right _D _C _B; right _A _D _C; tick _A _B 1; tick _B _C 1; tick _C _D 1; tick _D _A 1; line _A _C; lenx _A _C √50; len _A _B ?",
      "choices": [
       {
        "text": "$5$",
@@ -16906,6 +17235,7 @@
     },
     {
      "question": "בריבוע $ABCD$ ($O$ מפגש האלכסונים): $AO = 2x − 1$, $BD = 3x + 4$. מה $x$?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; O=2,2@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O; lenx A O 2x − 1; note BD = 3x + 4",
      "choices": [
       {
        "text": "$x = 6$",
@@ -16936,6 +17266,7 @@
    "questions": [
     {
      "question": "מלבן שאלכסוניו מאונכים הוא:",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; O=3,1.8@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; note AC ⊥ BD",
      "choices": [
       {
        "text": "ריבוע",
@@ -16953,6 +17284,7 @@
     },
     {
      "question": "מעוין שאלכסוניו שווים הוא:",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; O=0,0@se; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O; note AC = BD",
      "choices": [
       {
        "text": "ריבוע",
@@ -16970,6 +17302,7 @@
     },
     {
      "question": "מעוין שיש בו זווית ישרה הוא:",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; note ∢A = 90°",
      "choices": [
       {
        "text": "ריבוע",
@@ -16983,6 +17316,7 @@
     },
     {
      "question": "מלבן שיש בו שתי צלעות סמוכות שוות הוא:",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; poly A B C D; right B A D; right C B A; right D C B; right A D C; note AB = BC",
      "choices": [
       {
        "text": "ריבוע",
@@ -16996,6 +17330,7 @@
     },
     {
      "question": "מרובע שאלכסוניו שווים ומאונכים הוא:",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; O=2.55,1.7@s; poly A B C D; line A C; line B D; dot O; note AC = BD, AC ⊥ BD",
      "choices": [
       {
        "text": "לא בהכרח ריבוע",
@@ -17009,6 +17344,7 @@
     },
     {
      "question": "מקבילית שאלכסוניה שווים ומאונכים היא:",
+     "figure": "A=0,0; B=6,0; C=7.44,3.08; D=1.44,3.08; O=3.72,1.54@s; poly A B C D; line A C; line B D; dot O; note AC = BD, AC ⊥ BD",
      "choices": [
       {
        "text": "ריבוע",
@@ -17026,6 +17362,7 @@
     },
     {
      "question": "במעוין $ABCD$: $∢A = ∢B$. מה סוג המעוין?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; note ∢A = ∢B",
      "choices": [
       {
        "text": "ריבוע",
@@ -17043,6 +17380,7 @@
     },
     {
      "question": "במלבן $ABCD$ האלכסון $AC$ חוצה את $∢A$. מה סוג המלבן?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; ang B A C; ang C A D",
      "choices": [
       {
        "text": "ריבוע",
@@ -17060,6 +17398,7 @@
     },
     {
      "question": "מרובע שכל צלעותיו שוות ואלכסוניו שווים הוא:",
+     "figure": "A=0,0; B=6,-0.4; C=5.1,3.4; D=0.9,2.7; O=2.55,1.7@s; poly A B C D; line A C; line B D; dot O; note AB = BC = CD = DA, AC = BD",
      "choices": [
       {
        "text": "ריבוע",
@@ -17077,6 +17416,7 @@
     },
     {
      "question": "במלבן $ABCD$: $AB = 2x + 1$, $BC = 3x − 4$. עבור איזה $x$ המלבן ריבוע?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; poly A B C D; right B A D; right C B A; right D C B; right A D C; len A B 2x + 1; len B C 3x − 4",
      "choices": [
       {
        "text": "$x = 5$",
@@ -17105,6 +17445,7 @@
    "questions": [
     {
      "question": "במשולש ישר זווית היתר $10$ ס״מ. מה אורך התיכון ליתר?",
+     "figure": "_A=6,0; _B=0,4.2; _C=0,0; _M=3,2.1@ne; poly _A _B _C; right _A _C _B; line _C _M; len _A _B 10; len _C _M ?",
      "choices": [
       {
        "text": "$5$ ס״מ",
@@ -17122,6 +17463,7 @@
     },
     {
      "question": "במשולש $ABC$ ($∢C = 90°$) $CM$ תיכון ליתר ו־$CM = 7$. מה $AB$?",
+     "figure": "A=6,0; B=0,4.2; C=0,0; M=3,2.1@ne; poly A B C; right A C B; line C M; len C M 7; note AB = ?",
      "choices": [
       {
        "text": "$14$",
@@ -17139,6 +17481,7 @@
     },
     {
      "question": "במשולש $ABC$ ($∢C = 90°$) $CM$ תיכון ליתר ו־$∢A = 35°$. מה גודל $∢ACM$?",
+     "figure": "A=6,0; B=0,4.2; C=0,0; M=3,2.1@ne; poly A B C; right A C B; line C M; ang C A B 35°; ang A C M ?",
      "choices": [
       {
        "text": "$35°$",
@@ -17156,6 +17499,7 @@
     },
     {
      "question": "במשולש $ABC$ ($∢C = 90°$) $CM$ תיכון ליתר ו־$∢A = 35°$. מה גודל $∢BCM$?",
+     "figure": "A=6,0; B=0,4.2; C=0,0; M=3,2.1@ne; poly A B C; right A C B; line C M; ang C A B 35°; ang B C M ?",
      "choices": [
       {
        "text": "$55°$",
@@ -17173,6 +17517,7 @@
     },
     {
      "question": "במשולש $ABC$ ($∢C = 90°$): $AC = 6$, $BC = 8$. מה אורך התיכון ליתר?",
+     "figure": "A=6,0; B=0,8; C=0,0; M=3,4@ne; poly A B C; right A C B; line C M; len A C 6; len B C 8; len C M ?",
      "choices": [
       {
        "text": "$5$",
@@ -17190,6 +17535,7 @@
     },
     {
      "question": "במשולש $ABC$ ($∢C = 90°$) $CM$ תיכון ליתר. איזה משולש $AMC$?",
+     "figure": "A=6,0; B=0,4.2; C=0,0; M=3,2.1@ne; poly A B C; right A C B; line C M",
      "choices": [
       {
        "text": "שווה שוקיים",
@@ -17207,6 +17553,7 @@
     },
     {
      "question": "במשולש $ABC$ ($∢C = 90°$) $CM$ תיכון ליתר ו־$∢B = 60°$. מה גודל $∢CMB$?",
+     "figure": "A=6,0; B=0,3.46; C=0,0; M=3,1.73@ne; poly A B C; right A C B; line C M; ang A B C 60°; ang C M B ?",
      "choices": [
       {
        "text": "$60°$",
@@ -17224,6 +17571,7 @@
     },
     {
      "question": "במשולש ישר זווית התיכון ליתר $2x + 1$ והיתר $6x − 4$. מה $x$?",
+     "figure": "_A=6,0; _B=0,4.2; _C=0,0; _M=3,2.1@ne; poly _A _B _C; right _A _C _B; line _C _M; len _C _M 2x + 1; len _A _B 6x − 4",
      "choices": [
       {
        "text": "$x = 3$",
@@ -17237,6 +17585,7 @@
     },
     {
      "question": "במשולש $ABC$ ($∢C = 90°$) $CM$ תיכון ליתר ו־$AB = 18$. מה $AM + CM$?",
+     "figure": "A=6,0; B=0,4.2; C=0,0; M=3,2.1@ne; poly A B C; right A C B; line C M; note AB = 18",
      "choices": [
       {
        "text": "$18$",
@@ -17254,6 +17603,7 @@
     },
     {
      "question": "במשולש $ABC$ ($∢C = 90°$) $CM$ תיכון ליתר ו־$∢ACM = 25°$. מה גודל $∢B$?",
+     "figure": "A=6,0; B=0,2.8; C=0,0; M=3,1.4@ne; poly A B C; right A C B; line C M; ang A C M 25°; ang A B C ?",
      "choices": [
       {
        "text": "$65°$",
@@ -17284,6 +17634,7 @@
    "questions": [
     {
      "question": "במשולש $ABC$, $CM$ תיכון לצלע $AB$ ו־$CM = AB : 2$. מה גודל $∢C$?",
+     "figure": "A=0,0; B=6,0; M=3,0@s; C=1.73,2.72; poly A B C; line C M; tick A M 1; tick M B 1; ang A C B ?; note CM = AB : 2",
      "choices": [
       {
        "text": "$90°$",
@@ -17301,6 +17652,7 @@
     },
     {
      "question": "במשולש $ABC$, $CM$ תיכון לצלע $AB$: $AB = 12$, $CM = 6$. איזו זווית ישרה?",
+     "figure": "A=0,0; B=6,0; M=3,0@s; C=1.73,2.72; poly A B C; line C M; tick A M 1; tick M B 1; len C M 6; note AB = 12",
      "choices": [
       {
        "text": "$∢C$",
@@ -17318,6 +17670,7 @@
     },
     {
      "question": "במשולש $PQR$, $PN$ תיכון לצלע $QR$: $QR = 10$, $PN = 5$. מה גודל $∢P$?",
+     "figure": "Q=0,0; R=6,0; N=3,0@s; P=1.73,2.72; poly Q R P; line P N; tick Q N 1; tick N R 1; len P N 5; ang Q P R ?; note QR = 10",
      "choices": [
       {
        "text": "$90°$",
@@ -17335,6 +17688,7 @@
     },
     {
      "question": "במשולש $ABC$, $CM$ תיכון לצלע $AB$: $AB = 12$, $CM = 7$. האם $∢C = 90°$?",
+     "figure": "A=0,0; B=6,0; M=3,0@s; C=1.8,3.29; poly A B C; line C M; tick A M 1; tick M B 1; len C M 7; ang A C B ?; note AB = 12",
      "choices": [
       {
        "text": "לא, התיכון אינו חצי מ־$AB$",
@@ -17348,6 +17702,7 @@
     },
     {
      "question": "הנקודות $A$, $B$, $C$ נמצאות במרחק $5$ מהנקודה $M$, ו־$M$ אמצע $AB$. מה גודל $∢ACB$?",
+     "figure": "A=0,0; B=6,0; M=3,0@s; C=1.73,2.72; poly A B C; line C M; tick A M 1; tick M B 1; len A M 5; len M B 5; len C M 5; ang A C B ?",
      "choices": [
       {
        "text": "$90°$",
@@ -17365,6 +17720,7 @@
     },
     {
      "question": "במשולש $ABC$, $CM$ תיכון לצלע $AB$, $AM = MC$ ו־$∢A = 40°$. מה גודל $∢B$?",
+     "figure": "A=0,0; B=6,0; M=3,0@s; C=3.52,2.95; poly A B C; line C M; tick A M 1; tick M B 1; tick C M 1; ang B A C 40°; ang C B A ?",
      "choices": [
       {
        "text": "$50°$",
@@ -17382,6 +17738,7 @@
     },
     {
      "question": "במשולש $ABC$, $CM$ תיכון לצלע $AB$: $AB = 2x + 6$, $CM = x + 3$. מה גודל $∢C$?",
+     "figure": "A=0,0; B=6,0; M=3,0@s; C=1.73,2.72; poly A B C; line C M; tick A M 1; tick M B 1; len C M x + 3; ang A C B ?; note AB = 2x + 6",
      "choices": [
       {
        "text": "$90°$",
@@ -17399,6 +17756,7 @@
     },
     {
      "question": "במשולש $ABC$, $M$ אמצע $AB$ ו־$MA = MB = MC = 4$. מה אורך $AB$?",
+     "figure": "A=0,0; B=6,0; M=3,0@s; C=1.73,2.72; poly A B C; line C M; tick A M 1; tick M B 1; len A M 4; len M B 4; len C M 4",
      "choices": [
       {
        "text": "$8$",
@@ -17416,6 +17774,7 @@
     },
     {
      "question": "במשולש $ABC$, $CM$ תיכון לצלע $AB$ ו־$CM = AM$. אילו שתי זוויות משלימות ל־$90°$?",
+     "figure": "A=0,0; B=6,0; M=3,0@s; C=1.73,2.72; poly A B C; line C M; tick A M 1; tick M B 1; tick C M 1",
      "choices": [
       {
        "text": "$∢A$ ו־$∢B$",
@@ -17433,6 +17792,7 @@
     },
     {
      "question": "במשולש $ABC$, $CM$ תיכון לצלע $AB$: $CM = 5$, $AC = 6$, $AB = 10$. מה $BC$?",
+     "figure": "A=0,0; B=10,0; M=5,0@s; C=3.6,4.8; poly A B C; line C M; tick A M 1; tick M B 1; len C M 5; len A C 6; len B C ?; note AB = 10",
      "choices": [
       {
        "text": "$8$",
@@ -17463,6 +17823,7 @@
    "questions": [
     {
      "question": "במלבן $ABCD$ האלכסון $AC = 16$, ו־$O$ אמצע $AC$. מה $BO$?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; O=3,1.8@n; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; dot O; dash B O; len B O ?; note AC = 16",
      "choices": [
       {
        "text": "$8$",
@@ -17480,6 +17841,7 @@
     },
     {
      "question": "במלבן $ABCD$, $O$ נקודת חיתוך האלכסונים ו־$BO = 6.5$. מה אורך האלכסון $AC$?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; O=3,1.8@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; lenx B O 6.5",
      "choices": [
       {
        "text": "$13$",
@@ -17497,6 +17859,7 @@
     },
     {
      "question": "במרובע $ABCD$: $∢B = ∢D = 90°$ ו־$M$ אמצע $AC$. מה נכון?",
+     "figure": "A=-3,0; C=3,0; B=1.5,-2.6; D=-1.03,2.82; M=0,0@n; poly A B C D; line A C; dot M; dash M B; dash M D; right A B C; right C D A",
      "choices": [
       {
        "text": "$MB = MD = AC : 2$",
@@ -17514,6 +17877,7 @@
     },
     {
      "question": "במרובע $ABCD$: $∢B = ∢D = 90°$, $AC = 20$, ו־$M$ אמצע $AC$. מה $BM + DM$?",
+     "figure": "A=-3,0; C=3,0; B=1.5,-2.6; D=-1.03,2.82; M=0,0@n; poly A B C D; line A C; dot M; dash M B; dash M D; right A B C; right C D A; note AC = 20",
      "choices": [
       {
        "text": "$20$",
@@ -17531,6 +17895,7 @@
     },
     {
      "question": "במלבן $ABCD$, $O$ נקודת חיתוך האלכסונים ו־$∢OAB = 25°$. מה גודל $∢OBA$?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; O=3,1.8@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; ang O A B 25°; ang A B O ?",
      "choices": [
       {
        "text": "$25°$",
@@ -17548,6 +17913,7 @@
     },
     {
      "question": "במלבן $ABCD$, $O$ נקודת חיתוך האלכסונים ו־$∢OBC = 35°$. מה גודל $∢BOC$?",
+     "figure": "A=0,0; B=6,0; C=6,3.6; D=0,3.6; O=3,1.8@w; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; ang O B C 35°; ang B O C ?",
      "choices": [
       {
        "text": "$110°$",
@@ -17565,6 +17931,7 @@
     },
     {
      "question": "בריבוע $ABCD$ האלכסון $10$, ו־$O$ אמצע האלכסון $AC$. מה $OB$?",
+     "figure": "A=0,0; B=4,0; C=4,4; D=0,4; O=2,2@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O; lenx O B ?; note AC = 10",
      "choices": [
       {
        "text": "$5$",
@@ -17582,6 +17949,7 @@
     },
     {
      "question": "בטרפז ישר זווית $ABCD$ ($AB ∥ DC$, $∢D = 90°$) $M$ אמצע $AC$ ו־$AC = 12$. מה $DM$?",
+     "figure": "A=0,0; B=7,0; C=4,3; D=0,3; M=2,1.5@se; poly A B C D; par A B 1; par D C 1; right A D C; line A C; dot M; dash D M; len D M ?; note AC = 12",
      "choices": [
       {
        "text": "$6$",
@@ -17599,6 +17967,7 @@
     },
     {
      "question": "במעוין $ABCD$ האלכסונים נחתכים ב־$O$, ו־$M$ אמצע הצלע $AB = 10$. מה $OM$?",
+     "figure": "A=-3.46,0; B=0,-2; C=3.46,0; D=0,2; O=0,0@se; M=-1.73,-1@sw; poly A B C D; tick A B 1; tick B C 1; tick C D 1; tick D A 1; line A C; line B D; dot O; dot M; dash O M; lenx O M ?; note AB = 10",
      "choices": [
       {
        "text": "$5$",
@@ -17616,6 +17985,7 @@
     },
     {
      "question": "במלבן $ABCD$: $AB = 8$, $BC = 6$, ו־$O$ נקודת חיתוך האלכסונים. מה $BO$?",
+     "figure": "A=0,0; B=8,0; C=8,6; D=0,6; O=4,3@s; poly A B C D; right B A D; right C B A; right D C B; right A D C; line A C; line B D; dot O; len A B 8; len B C 6; lenx B O ?",
      "choices": [
       {
        "text": "$5$",
@@ -19287,6 +19657,7 @@
    "questions": [
     {
      "question": "$△ABC ∼ △DEF$: $AB = 6$, $DE = 9$, $BC = 8$. מה $EF$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=9.44,0; F=6.29,3.3; poly A B C; poly D E F; len A B 6; len B C 8; len D E 9; len E F ?",
      "choices": [
       {
        "text": "$12$",
@@ -19304,6 +19675,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$ ו־$∢A = 50°$. מה גודל $∢D$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=9.44,0; F=6.29,3.3; poly A B C; poly D E F; ang B A C 50°; ang E D F ?",
      "choices": [
       {
        "text": "$50°$",
@@ -19321,6 +19693,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$: $AB = 4$, $DE = 10$. מה יחס הדמיון $△DEF : △ABC$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=12.64,0; F=7.39,5.5; poly A B C; poly D E F; len A B 4; len D E 10",
      "choices": [
       {
        "text": "$2.5$",
@@ -19338,6 +19711,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$ ביחס $1 : 3$, ו־$AC = 5$. מה $DF$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=12.64,0; F=7.39,5.5; poly A B C; poly D E F; len A C 5; len D F ?",
      "choices": [
       {
        "text": "$15$",
@@ -19355,6 +19729,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$: $AB = 6$, $BC = 8$, $DE = 3$. מה $EF$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=6.24,0; F=5.19,1.1; poly A B C; poly D E F; len A B 6; len B C 8; len D E 3; len E F ?",
      "choices": [
       {
        "text": "$4$",
@@ -19372,6 +19747,7 @@
     },
     {
      "question": "$△ABC ∼ △PQR$. איזו צלע מתאימה ל־$BC$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; P=4.64,0; Q=9.44,0; R=6.29,3.3; poly A B C; poly P Q R",
      "choices": [
       {
        "text": "$QR$",
@@ -19389,6 +19765,7 @@
     },
     {
      "question": "במשולש $ABC$, $DE ∥ BC$ ($D$ על $AB$, $E$ על $AC$): $AD = 2$, $AB = 6$, $BC = 9$. מה $DE$?",
+     "figure": "A=2.4,4.6; B=0,0; C=6.4,0; D=1.6,3.07@w; E=3.73,3.07@e; poly A B C; line D E; par D E 1; par B C 1; len A D 2; len B C 9; lenx D E ?; note AB = 6",
      "choices": [
       {
        "text": "$3$",
@@ -19406,6 +19783,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$ ו־$∢B = 70°$, $∢C = 40°$. מה גודל $∢D$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=9.44,0; F=6.29,3.3; poly A B C; poly D E F; ang A B C 70°; ang B C A 40°; ang E D F ?",
      "choices": [
       {
        "text": "$70°$",
@@ -19423,6 +19801,7 @@
     },
     {
      "question": "צלעות משולש $3$, $4$, $5$. במשולש דומה הצלע הקטנה $6$. מהן שאר הצלעות?",
+     "figure": "_a=0,0; _b=4,0; _c=0,3; _d=5.8,0; _e=13.8,0; _f=5.8,6; poly _a _b _c; poly _d _e _f; len _a _b 4; len _a _c 3; len _b _c 5; len _d _f 6; len _d _e ?; len _e _f ?",
      "choices": [
       {
        "text": "$8$ ו־$10$",
@@ -19440,6 +19819,7 @@
     },
     {
      "question": "במשולש $ABC$, $DE ∥ BC$: $AD = 3$, $DB = 2$, $DE = 6$. מה $BC$?",
+     "figure": "A=2.4,4.6; B=0,0; C=6.4,0; D=0.96,1.84@w; E=4.8,1.84@e; poly A B C; line D E; par D E 1; par B C 1; len A D 3; len D B 2; lenx D E 6; len B C ?",
      "choices": [
       {
        "text": "$10$",
@@ -19470,6 +19850,7 @@
    "questions": [
     {
      "question": "יחס הדמיון בין שני משולשים $2 : 3$. מה יחס ההיקפים?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=9.44,0; _f=6.29,3.3; poly _a _b _c; poly _d _e _f; note k = 2 : 3",
      "choices": [
       {
        "text": "$2 : 3$",
@@ -19487,6 +19868,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$ ביחס $1 : 4$, והיקף $ABC$ הוא $15$. מה היקף $DEF$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=12.64,0; F=7.39,5.5; poly A B C; poly D E F; note k = 1 : 4, P(ABC) = 15",
      "choices": [
       {
        "text": "$60$",
@@ -19504,6 +19886,7 @@
     },
     {
      "question": "היקפי שני משולשים דומים $12$ ו־$30$. מה יחס הדמיון?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=12.64,0; _f=7.39,5.5; poly _a _b _c; poly _d _e _f; note P₁ = 12, P₂ = 30",
      "choices": [
       {
        "text": "$2 : 5$",
@@ -19521,6 +19904,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$: $AB = 5$, $DE = 15$, והיקף $DEF$ הוא $36$. מה היקף $ABC$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=12.64,0; F=7.39,5.5; poly A B C; poly D E F; len A B 5; len D E 15; note P(DEF) = 36",
      "choices": [
       {
        "text": "$12$",
@@ -19538,6 +19922,7 @@
     },
     {
      "question": "צלעות משולש $5$, $6$, $7$. מה היקף משולש דומה לו ביחס $3$?",
+     "figure": "_a=0,0; _b=7,0; _c=2.71,4.2; _d=10.15,0; _e=24.15,0; _f=15.58,8.4; poly _a _b _c; poly _d _e _f; len _a _b 7; len _a _c 5; len _b _c 6; note k = 3",
      "choices": [
       {
        "text": "$54$",
@@ -19555,6 +19940,7 @@
     },
     {
      "question": "יחס ההיקפים של שני משולשים דומים $3 : 5$. מה יחס הצלעות המתאימות?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=9.97,0; _f=6.47,3.67; poly _a _b _c; poly _d _e _f; note P₁ : P₂ = 3 : 5",
      "choices": [
       {
        "text": "$3 : 5$",
@@ -19572,6 +19958,7 @@
     },
     {
      "question": "היקף משולש $24$. מקטינים אותו ביחס $1 : 2$. מה היקף המשולש החדש?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=6.24,0; _f=5.19,1.1; poly _a _b _c; poly _d _e _f; note P = 24, k = 1 : 2",
      "choices": [
       {
        "text": "$12$",
@@ -19589,6 +19976,7 @@
     },
     {
      "question": "במשולש $ABC$, $DE ∥ BC$ ו־$AD : AB = 1 : 3$. היקף $ABC$ הוא $27$. מה היקף $ADE$?",
+     "figure": "A=2.4,4.6; B=0,0; C=6.4,0; D=1.6,3.07@w; E=3.73,3.07@e; poly A B C; line D E; par D E 1; par B C 1; note AD : AB = 1 : 3, P(ABC) = 27",
      "choices": [
       {
        "text": "$9$",
@@ -19606,6 +19994,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$, והיקפיהם $20$ ו־$50$. $BC = 8$. מה $EF$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=12.64,0; F=7.39,5.5; poly A B C; poly D E F; len B C 8; len E F ?; note P(ABC) = 20, P(DEF) = 50",
      "choices": [
       {
        "text": "$20$",
@@ -19623,6 +20012,7 @@
     },
     {
      "question": "מגדילים משולש כך שכל צלע גדלה פי $1.5$. פי כמה גדל ההיקף?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=9.44,0; _f=6.29,3.3; poly _a _b _c; poly _d _e _f; note k = 1.5",
      "choices": [
       {
        "text": "פי $1.5$",
@@ -19653,6 +20043,7 @@
    "questions": [
     {
      "question": "יחס הדמיון בין שני משולשים $2 : 3$. מה יחס השטחים?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=9.44,0; _f=6.29,3.3; poly _a _b _c; poly _d _e _f; note k = 2 : 3",
      "choices": [
       {
        "text": "$4 : 9$",
@@ -19670,6 +20061,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$ ביחס $1 : 3$, ושטח $ABC$ הוא $5$. מה שטח $DEF$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=12.64,0; F=7.39,5.5; poly A B C; poly D E F; note k = 1 : 3, S(ABC) = 5",
      "choices": [
       {
        "text": "$45$",
@@ -19687,6 +20079,7 @@
     },
     {
      "question": "מגדילים משולש כך שכל צלע גדלה פי $2$. פי כמה גדל השטח?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=11.04,0; _f=6.84,4.4; poly _a _b _c; poly _d _e _f; note k = 2",
      "choices": [
       {
        "text": "פי $4$",
@@ -19704,6 +20097,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$: $AB = 4$, $DE = 6$, ושטח $ABC$ הוא $16$. מה שטח $DEF$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=9.44,0; F=6.29,3.3; poly A B C; poly D E F; len A B 4; len D E 6; note S(ABC) = 16",
      "choices": [
       {
        "text": "$36$",
@@ -19721,6 +20115,7 @@
     },
     {
      "question": "במשולש $ABC$, $DE ∥ BC$ ו־$AD : AB = 1 : 2$. שטח $ABC$ הוא $40$. מה שטח $ADE$?",
+     "figure": "A=2.4,4.6; B=0,0; C=6.4,0; D=1.2,2.3@w; E=4.4,2.3@e; poly A B C; line D E; par D E 1; par B C 1; note AD : AB = 1 : 2, S(ABC) = 40",
      "choices": [
       {
        "text": "$10$",
@@ -19738,6 +20133,7 @@
     },
     {
      "question": "במשולש $ABC$, $DE ∥ BC$ ו־$AD : AB = 1 : 2$. שטח $ABC$ הוא $40$. מה שטח הטרפז $DBCE$?",
+     "figure": "A=2.4,4.6; B=0,0; C=6.4,0; D=1.2,2.3@w; E=4.4,2.3@e; poly A B C; line D E; par D E 1; par B C 1; note AD : AB = 1 : 2, S(ABC) = 40",
      "choices": [
       {
        "text": "$30$",
@@ -19755,6 +20151,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$ ביחס $3 : 5$, ושטח $DEF$ הוא $50$. מה שטח $ABC$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=9.97,0; F=6.47,3.67; poly A B C; poly D E F; note k = 3 : 5, S(DEF) = 50",
      "choices": [
       {
        "text": "$18$",
@@ -19772,6 +20169,7 @@
     },
     {
      "question": "מקטינים משולש ביחס $1 : 10$. איזה חלק מהשטח המקורי נשאר?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=5.92,0; _f=5.08,0.88; poly _a _b _c; poly _d _e _f; note k = 1 : 10",
      "choices": [
       {
        "text": "$1/100$",
@@ -19789,6 +20187,7 @@
     },
     {
      "question": "במפה בקנה מידה $1 : 100$ שטח משולש הוא $12$ סמ״ר. מה השטח האמיתי בסמ״ר?",
+     "figure": "_a=1.1,2.2; _b=0,0; _c=3.2,0; poly _a _b _c; note 1 : 100, S = 12",
      "choices": [
       {
        "text": "$120000$",
@@ -19806,6 +20205,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$ ביחס $k = 1.5$, ושטח $ABC$ הוא $8$. מה שטח $DEF$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=9.44,0; F=6.29,3.3; poly A B C; poly D E F; note k = 1.5, S(ABC) = 8",
      "choices": [
       {
        "text": "$18$",
@@ -19836,6 +20236,7 @@
    "questions": [
     {
      "question": "יחס השטחים של שני משולשים דומים $9 : 16$. מה יחס הדמיון?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=8.91,0; _f=6.11,2.93; poly _a _b _c; poly _d _e _f; note S₁ : S₂ = 9 : 16",
      "choices": [
       {
        "text": "$3 : 4$",
@@ -19853,6 +20254,7 @@
     },
     {
      "question": "שטחי שני משולשים דומים $8$ ו־$50$. מה יחס הצלעות?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=12.64,0; _f=7.39,5.5; poly _a _b _c; poly _d _e _f; note S₁ = 8, S₂ = 50",
      "choices": [
       {
        "text": "$2 : 5$",
@@ -19870,6 +20272,7 @@
     },
     {
      "question": "שטח משולש גדל פי $9$ בלי לשנות את צורתו. פי כמה גדלה כל צלע?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=12.64,0; _f=7.39,5.5; poly _a _b _c; poly _d _e _f; note S₂ = 9 · S₁",
      "choices": [
       {
        "text": "פי $3$",
@@ -19887,6 +20290,7 @@
     },
     {
      "question": "$△ABC ∼ △DEF$, ושטחיהם $12$ ו־$27$. $AB = 4$. מה $DE$?",
+     "figure": "A=0,0; B=3.2,0; C=1.1,2.2; D=4.64,0; E=9.44,0; F=6.29,3.3; poly A B C; poly D E F; len A B 4; len D E ?; note S(ABC) = 12, S(DEF) = 27",
      "choices": [
       {
        "text": "$6$",
@@ -19904,6 +20308,7 @@
     },
     {
      "question": "יחס השטחים של שני משולשים דומים $1 : 4$. מה יחס ההיקפים?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=11.04,0; _f=6.84,4.4; poly _a _b _c; poly _d _e _f; note S₁ : S₂ = 1 : 4",
      "choices": [
       {
        "text": "$1 : 2$",
@@ -19921,6 +20326,7 @@
     },
     {
      "question": "שטחי שני משולשים דומים $25$ ו־$36$. היקף הקטן $20$. מה היקף הגדול?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=8.48,0; _f=5.96,2.64; poly _a _b _c; poly _d _e _f; note S₁ = 25, S₂ = 36, P₁ = 20",
      "choices": [
       {
        "text": "$24$",
@@ -19938,6 +20344,7 @@
     },
     {
      "question": "במשולש $ABC$, $DE ∥ BC$, ושטח $ADE$ הוא רבע משטח $ABC$. מה $AD : AB$?",
+     "figure": "A=2.4,4.6; B=0,0; C=6.4,0; D=1.2,2.3@w; E=4.4,2.3@e; poly A B C; line D E; par D E 1; par B C 1; note S(ADE) = S(ABC) : 4",
      "choices": [
       {
        "text": "$1 : 2$",
@@ -19955,6 +20362,7 @@
     },
     {
      "question": "יחס השטחים של שני משולשים דומים $2 : 1$. מה יחס הדמיון?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=6.91,0; _f=5.42,1.56; poly _a _b _c; poly _d _e _f; note S₁ : S₂ = 2 : 1",
      "choices": [
       {
        "text": "$√2 : 1$",
@@ -19972,6 +20380,7 @@
     },
     {
      "question": "שטח משולש $18$, ושטח משולש דומה לו $2$. צלע במשולש הקטן $3$. מה הצלע המתאימה בגדול?",
+     "figure": "_a=0,0; _b=3.2,0; _c=1.1,2.2; _d=4.64,0; _e=5.92,0; _f=5.08,0.88; poly _a _b _c; poly _d _e _f; len _d _e 3; len _a _b ?; note S₁ = 18, S₂ = 2",
      "choices": [
       {
        "text": "$9$",
@@ -19989,6 +20398,7 @@
     },
     {
      "question": "במפה בקנה מידה $1 : 1000$ שטח מגרש $6$ סמ״ר. מה שטחו האמיתי במ״ר?",
+     "figure": "_a=1.1,2.2; _b=0,0; _c=3.2,0; poly _a _b _c; note 1 : 1000, S = 6",
      "choices": [
       {
        "text": "$600$",

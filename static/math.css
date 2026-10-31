@@ -126,10 +126,6 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-plot circle{fill:var(--uc)}
 .mx-plot text{font:11px var(--f-body);fill:var(--muted)}
 /* a photographed problem */
-.mx-photo{display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:start;border:1.5px dashed var(--mx-accent);border-radius:16px;
-  padding:14px 16px;background:transparent;color:var(--ink);cursor:pointer}
-.mx-photo b{font-size:18px;color:var(--mx-accent)}
-.mx-photo small{font-size:14px;color:var(--muted)}
 .mx-thumb{display:block;max-width:100%;max-height:180px;object-fit:contain;align-self:center;border-radius:10px;border:1px solid var(--line)}
 .mx-pbody{display:flex;flex-direction:column;gap:12px}
 .mx-wait{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;text-align:center}
@@ -147,6 +143,20 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-work{margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--mx-accent-soft)}
 .mx-row{display:flex;gap:8px;flex-wrap:wrap}
 @media (prefers-reduced-motion:no-preference){.mx-sheet{animation:mx-up .22s ease-out}@keyframes mx-up{from{transform:translateY(30px);opacity:.4}}}
+.mx-figure{direction:ltr;align-self:center;width:100%;max-width:340px;text-align:center}
+.mx-figure svg{display:block;width:100%;height:auto}
+.mx-figure .s{stroke:var(--uc);stroke-width:2.2;fill:none;stroke-linejoin:round;stroke-linecap:round}
+.mx-figure .d{stroke:var(--uc);stroke-width:1.6;stroke-dasharray:5 4;fill:none}
+.mx-figure .m{stroke:var(--ink);stroke-width:1.4;fill:none;opacity:.75}
+.mx-figure .g{stroke:var(--line);stroke-width:1}
+.mx-figure .ax{stroke:var(--muted);stroke-width:1.4}
+.mx-figure circle{fill:var(--uc)}
+.mx-figure text{text-anchor:middle;fill:var(--ink);font:600 13px var(--f-body)}
+.mx-figure .v{font:italic 700 15px var(--f-body)}
+.mx-figure .n{font:500 9px var(--f-body);fill:var(--muted)}
+.mx-figure .t{font:500 13px var(--f-body);fill:var(--muted)}
+.mx-figure p{margin:2px 0 4px;font-weight:600;direction:ltr}
+.mx-figure small{font-size:12px;color:var(--muted)}
 .mx-geometry{direction:ltr;align-self:center;width:100%;max-width:320px;text-align:center}
 .mx-geometry svg{display:block;width:100%;height:auto}
 .mx-geometry path{stroke:var(--uc);stroke-width:2;fill:none}

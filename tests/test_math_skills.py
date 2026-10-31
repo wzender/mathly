@@ -31,6 +31,28 @@ def test_choice_samples_still_require_one_correct_choice():
     assert "t_ext question 4: needs exactly one correct choice" in problems(graph)
 
 
+GEOMETRY_UNITS = {"k", "i", "a", "l", "z", "g", "m", "b", "c", "o", "d"}
+
+
+def test_every_geometry_question_has_a_figure():
+    graph = algebra9()
+    geometry = [q for s in graph["skills"] if s["unit"] in GEOMETRY_UNITS for q in s.get("questions", [])]
+    assert len(geometry) == 410 and all(q.get("figure") for q in geometry)
+    assert not any("figure" in q for s in graph["skills"] if s["unit"] not in GEOMETRY_UNITS
+                   for q in s.get("questions", []))
+
+
+def test_a_broken_figure_is_named():
+    graph = copy.deepcopy(algebra9())
+    question = next(s for s in graph["skills"] if s["id"] == "k_def")["questions"][1]
+    question["figure"] = "A=0,0; B=1,0; poly A B C"
+    assert "k_def question 2: figure names unknown point C" in problems(graph)
+    question["figure"] = "A=0,0; B=1,0; spin A B"
+    assert "k_def question 2: unknown figure operation spin" in problems(graph)
+    question["figure"] = "A=0,0; B=1,0; tick A B many"
+    assert any("count must be a number" in item for item in problems(graph))
+
+
 def test_question_lists():
     graph = copy.deepcopy(algebra9())
     skill = lambda sid: next(item for item in graph["skills"] if item["id"] == sid)
