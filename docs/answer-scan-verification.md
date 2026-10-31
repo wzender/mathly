@@ -13,7 +13,7 @@ The automated database tests run the actual additive migration in disposable Pos
 | Lost response; concurrent finalization | Idempotency and real PostgreSQL concurrent connection tests |
 | Expiry, stale lease, renewal | Server-clock database and API tests |
 | Restart persistence; deletion cleanup | New application instance against the same database and private files |
-| No grading or mastery from upload | Browser progress assertion |
+| Upload receipt alone does not award mastery | Credit follows a completed, correct grading result |
 | AI solver remains independent | Existing photo API and phone browser regressions |
 | Correct, partial, incorrect, unreadable, uncertain checks | Structured-output validation and browser feedback/progress checks |
 | Private durable feedback; no forged credit | Owner-checked grading API, service-only grading table/RPC, restart checks |
@@ -21,11 +21,15 @@ The automated database tests run the actual additive migration in disposable Pos
 
 ## Handwritten-answer grading verification
 
+Automatic-grading tests additionally verify that the first check starts without a desktop or extra click, upload acknowledgement precedes a blocked AI response, concurrent background/UI triggers use one provider call, and automatic retries never repeat a failed check. The connected live Mathly project was inspected read-only and already contains the grading table and RPC; no schema changes were needed for this follow-up.
+
 The grading tests apply both migrations to disposable PostgreSQL, use real app APIs, and stub only the external AI service. They verify the original snapshot and stored image are used; a client-supplied score or replacement prompt is ignored. A failure leaves the photograph attached, retry creates a new check, completed checks are reused, concurrent requests invoke the provider once, and another account cannot inspect or check the attempt. Browser checks cover the Hebrew feedback panel, safe escaping of model text, score suppression for unreadable/uncertain work, refresh persistence, credit only for correct complete work, and creating a new attempt while retaining the old photo and grade.
 
-These checks validate application behavior, not the model's real handwriting recognition or grading accuracy. Deployment smoke check: apply the grading migration, configure `ANTHROPIC_API_KEY`, submit one correct worked solution, one incorrect/partial solution, and one illegible image. Select **בדיקת התשובה** for each, verify the transcription and feedback, and confirm only the correct complete solution completes the skill. Test a retry and reopen the page to confirm persistence. No real-provider accuracy evaluation or physical-device certification is implied by the automated tests.
+These checks validate application behavior, not the model's real handwriting recognition or grading accuracy. Deployment smoke check: apply the grading migration, configure `ANTHROPIC_API_KEY`, submit one correct worked solution, one incorrect/partial solution, and one illegible image. Verify that grading starts automatically for each, inspect the transcription and feedback, and confirm only the correct complete solution completes the skill. Test a retry and reopen the page to confirm persistence. No real-provider accuracy evaluation or physical-device certification is implied by the automated tests.
 
-Grading implementation verification on 2026-10-31: `.venv/bin/python -m pytest -q` completed with **54 passed**. Both migrations applied successfully to a disposable PostgreSQL database; `supabase db advisors --type all --fail-on warn` against that database reported **no issues**. Python compilation and `git diff --check` passed. No hosted project was modified and no real AI grading request was made.
+Initial manual-grading implementation verification on 2026-10-31: `.venv/bin/python -m pytest -q` completed with **54 passed**. Both migrations applied successfully to a disposable PostgreSQL database; `supabase db advisors --type all --fail-on warn` against that database reported **no issues**. Python compilation and `git diff --check` passed. No hosted project was modified and no real AI grading request was made.
+
+Automatic-grading follow-up verification on 2026-10-31: full suite **57 passed**, followed by **32 passed** for the scan/grading API checks after the response-handling cleanup. JavaScript syntax, Python compilation, and whitespace checks passed. The live project schema was inspected read-only; no hosted data was changed and no real-provider request was made.
 
 ## Local verification record — 2026-10-31
 

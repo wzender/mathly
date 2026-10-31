@@ -5,7 +5,7 @@ import logging
 import os
 import uuid
 
-from fastapi import Depends, File, UploadFile
+from fastapi import BackgroundTasks, Depends, File, UploadFile
 from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 
@@ -15,6 +15,12 @@ from .math_photo import PhotoUnavailable
 from .math_skills import algebra9, question_version
 
 log = logging.getLogger("mathly.answer_routes")
+
+
+def grading_key():
+    return (os.environ.get("ANTHROPIC_API_KEY", "").strip()
+            or os.environ.get("CLAUDE_API_KEY", "").strip())
+
 
 def install_answer_routes(app, signed_in):
     if not hasattr(app.state, "answers"):
@@ -35,7 +41,7 @@ def install_answer_routes(app, signed_in):
     def call(user, action, **data):
         result = app.state.answers.action(user, action, **data)
         if isinstance(result, dict) and result.get("attachment"):
-            result["grading_available"] = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
+            result["grading_available"] = bool(grading_key())
             try:
                 result["grading"] = app.state.answers.grade(user, "get", attempt_id=result["attempt"]["id"])
             except ScanError:
@@ -71,15 +77,17 @@ def install_answer_routes(app, signed_in):
         return reply(call(user, "get", attempt_id=uuid_text(attempt_id)))
 
     @app.post("/api/math/answer-attempts/{attempt_id}/grade")
-    def grade_answer(attempt_id: str, user=Depends(student)):
-        aid = uuid_text(attempt_id)
+    def grade_answer(attempt_id: str, body: dict | None = None, user=Depends(student)):
+        return evaluate_answer(user, uuid_text(attempt_id), automatic=bool(body and body.get("automatic") is True))
+
+    def evaluate_answer(user, aid, *, automatic=False):
         result = app.state.answers.action(user, "get", attempt_id=aid)
         if not result.get("attachment"):
             raise ScanError(409, "answer_required")
         existing = app.state.answers.grade(user, "get", attempt_id=aid)
-        if existing and existing["state"] in ("grading", "completed"):
+        if existing and (automatic or existing["state"] in ("grading", "completed")):
             return reply(call(user, "get", attempt_id=aid))
-        key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        key = grading_key()
         if not key:
             raise ScanError(503, "grading_unavailable")
         lease = str(uuid.uuid4())
@@ -103,6 +111,13 @@ def install_answer_routes(app, signed_in):
                 log.error("answer grader failed: %s", type(exc).__name__)
             raise ScanError(503, "grading_failed") from exc
         return reply(call(user, "get", attempt_id=aid))
+
+    def automatic_grade(user, attempt_id):
+        try:
+            evaluate_answer(user, attempt_id, automatic=True)
+        except ScanError as exc:
+            # Upload is already committed. Keep failures separate and retryable.
+            log.info("automatic answer grading stopped: %s", exc.code)
 
     @app.post("/api/math/answer-attempts/{attempt_id}/scans")
     def create_scan(attempt_id: str, body: dict, user=Depends(student)):
@@ -132,15 +147,19 @@ def install_answer_routes(app, signed_in):
         return JSONResponse(response, headers={"Cache-Control": "no-store"})
 
     @app.post("/api/math/answer-scans/{scan_id}/uploads/{lease_id}")
-    async def upload(scan_id: str, lease_id: str, photo: UploadFile = File(...), user=Depends(student)):
+    async def upload(scan_id: str, lease_id: str, background_tasks: BackgroundTasks,
+                     photo: UploadFile = File(...), user=Depends(student)):
         sid, lease = uuid_text(scan_id), uuid_text(lease_id)
         data = await photo.read(MAX_IMAGE + 1)
-        return await run_in_threadpool(submit, user, sid, lease, data, photo.content_type)
+        result = await run_in_threadpool(submit, user, sid, lease, data, photo.content_type)
+        if result.get("grading_available") and not result.get("grading"):
+            background_tasks.add_task(automatic_grade, user, result["attempt"]["id"])
+        return reply(result)
 
     def submit(user, sid, lease, data, content_type):
         result = usable(call(user, "get", scan_id=sid))
         if result.get("attachment"):
-            return reply(result)  # an earlier response may have been lost
+            return result  # an earlier response may have been lost
         scan = result["scan"]
         if scan["state"] != "uploading" or scan.get("lease_id") != lease:
             raise ScanError(409, "invalid_upload")
@@ -156,7 +175,7 @@ def install_answer_routes(app, signed_in):
                     app.state.answers.delete(object_key)
                 except ScanError:
                     pass  # orphan cleanup is safe even after an uncertain response
-            return reply(result)
+            return result
         except ScanError:
             try:
                 call(user, "fail", scan_id=sid, lease_id=lease)

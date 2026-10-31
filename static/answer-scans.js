@@ -114,6 +114,12 @@ async function renderQuestion(q){
     }catch(error){if(current(q))q.node.querySelector("[role=status]").textContent=error.message;}
     finally{q.loadingImage=false;}
   }else if(q.image&&q.node.querySelector("img")){const img=q.node.querySelector("img");img.src=q.image;img.hidden=false;}
+  // Resume a first check if the page closed or the server restarted just after
+  // receipt. Failed checks require an explicit retry, so polling cannot spend
+  // the student's daily allowance on repeated provider failures.
+  if(received&&r.grading_available&&!g&&!q.autoStarted){
+    q.autoStarted=true;checkAnswer(q,true);
+  }
 }
 function gradingPanel(r,checking){
   const g=r.grading;
@@ -127,14 +133,14 @@ function gradingPanel(r,checking){
       <small>בדיקה אוטומטית באמצעות AI. בדקו שהתמלול תואם למה שכתבתם.</small></section>`;
   }
   if(!r.grading_available&&!checking)return '<p>התמונה נשמרה כתשובה. בדיקה אוטומטית אינה זמינה כרגע באתר.</p>';
-  return `<p>לחיצה על בדיקה תשלח את צילום התשובה לשירות ה־AI לצורך בדיקת הפתרון.</p>
+  return `<p>התשובה נשלחת לבדיקה אוטומטית באמצעות AI.</p>
     <button class="mx-btn solid" data-grade ${checking?"disabled":""}>${checking?"בודקים את התשובה…":g?.state==="failed"?"ניסיון בדיקה נוסף":"בדיקת התשובה"}</button>`;
 }
-async function checkAnswer(q){
+async function checkAnswer(q,automatic=false){
   if(!current(q)||q.grading)return;
   q.grading=true;q.signature=null;await renderQuestion(q);schedule(q);
   try{
-    const r=await post(`/api/math/answer-attempts/${q.result.attempt.id}/grade`);
+    const r=await post(`/api/math/answer-attempts/${q.result.attempt.id}/grade`,{automatic});
     if(!current(q))return;q.result=r;
   }catch(error){if(current(q))q.gradeError=error.message;}
   finally{
@@ -157,6 +163,7 @@ function openCapture(result){
     <input data-camera type="file" accept="image/*" capture="environment" hidden>
     <button class="mx-btn" data-take hidden>צילום התשובה</button>
     <img class="mx-answer-image" data-preview alt="תצוגה מקדימה של התשובה" hidden>
+    <p>כשהבדיקה האוטומטית זמינה, צילום התשובה יישלח לבדיקה באמצעות AI. המשוב והציון יופיעו בשאלה במחשב.</p>
     <button class="mx-btn solid" data-submit hidden>שליחת התשובה למחשב</button></div>`;
   const c=capture={node,e,result,photo:null,url:null,key:null,busy:false,returnFocus:document.activeElement};visibleRoot.append(node);
   const status=node.querySelector("[data-status]"),camera=node.querySelector("[data-camera]"),take=node.querySelector("[data-take]"),send=node.querySelector("[data-submit]"),preview=node.querySelector("[data-preview]"),confirm=node.querySelector("[data-confirm]"),renew=node.querySelector("[data-renew]");

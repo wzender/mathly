@@ -227,8 +227,7 @@ def test_check_feedback_progress_reload_and_retake(scan_server, monkeypatch, ver
             computer.on('pageerror', lambda error: errors.append(str(error)))
             computer.goto(url); open_question(computer)
             playwright.expect(computer.locator('.mx-answer-image')).to_be_visible()
-            playwright.expect(computer.locator('[data-grade]')).to_be_enabled()
-            computer.locator('[data-grade]').click()
+            # Opening a received answer starts its first check automatically.
             playwright.expect(computer.locator('[data-grade]')).to_have_text('ניסיון בדיקה נוסף')
             computer.locator('[data-grade]').click()
             playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('בודקים את התשובה…')
@@ -257,3 +256,37 @@ def test_check_feedback_progress_reload_and_retake(scan_server, monkeypatch, ver
             assert not errors
         finally:
             release.set(); browser.close()
+
+
+def test_upload_is_acknowledged_before_automatic_grading_finishes(scan_server, monkeypatch):
+    url, store = scan_server
+    monkeypatch.setenv('ANTHROPIC_API_KEY', 'browser-test-key')
+    started, release = threading.Event(), threading.Event()
+    calls=[]
+    class Grader:
+        def __init__(self, key): pass
+        def grade(self, image, snapshot):
+            calls.append(snapshot);started.set()
+            assert release.wait(timeout=20)
+            return validate_assessment(assessment())
+    monkeypatch.setattr('app.answer_routes.AnswerGrader', Grader)
+    with playwright.sync_playwright() as p:
+        browser=p.chromium.launch()
+        try:
+            computer=session(browser).new_page();computer.goto(url);open_question(computer)
+            computer.locator('[data-request]').click()
+            playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('ממתינים לטלפון')
+            phone=session(browser,mobile=True).new_page();phone.goto(url)
+            phone.locator('[data-scan-index]').click();phone.locator('[data-confirm]').click()
+            phone.locator('[data-camera]').set_input_files({'name':'answer.png','mimeType':'image/png','buffer':png()})
+            playwright.expect(phone.locator('.mx-scan-card')).to_contain_text('יישלח לבדיקה באמצעות AI')
+            phone.locator('[data-submit]').click()
+            playwright.expect(phone.locator('[data-status]')).to_contain_text('הועלתה בהצלחה')
+            assert started.wait(timeout=5)
+            playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('בודקים את התשובה…')
+            assert len(calls)==1
+            release.set()
+            playwright.expect(computer.locator('.mx-grade')).to_contain_text('100/100',timeout=10000)
+            assert len(calls)==1
+        finally:
+            release.set();browser.close()
