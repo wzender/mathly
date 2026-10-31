@@ -91,13 +91,14 @@ class SupabaseAuth:
                 if "answered 404" not in str(exc):
                     raise
                 log.warning("the classes table is missing; every account is allowed")
-        # During the database migration, ignore rows belonging to a removed product.
-        rows = [row for row in rows if not row.get("subject") or row.get("subject") == "מתמטיקה"]
         for row in rows:
             row["emails"] = [str(value).lower() for value in row.get("emails") or []]
             row["teachers"] = [str(value).lower() for value in row.get("teachers") or []]
             row["lessons"] = row.get("lessons") or []
             row["nicknames"] = row.get("nicknames") or {}
+            row["exams"] = row.get("exams") or []
+            row["exam_note"] = str(row.get("exam_note") or "")
+            row["exam_title"] = str(row.get("exam_title") or "")
         with self._lock:
             self._classes = (now + CLASSES_TTL, rows)
         return rows

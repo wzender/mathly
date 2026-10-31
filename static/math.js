@@ -23,7 +23,7 @@ const key=()=>"mathly.progress.v1:"+(ME_EMAIL||"guest");
 const load=()=>{ try{ return JSON.parse(localStorage.getItem(key())||"{}"); }catch{ return {}; } };
 const save=()=>{ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} };
 
-let G=null, BY={}, POST={}, DEPTH={}, ORDER=[], P={done:{},tries:{}}, root=null, path=null, sheet=null, cur=null, back=null;
+let G=null, BY={}, POST={}, DEPTH={}, ORDER=[], P={done:{},tries:{}}, root=null, path=null, sheet=null, cur=null, back=null, ACTIVE_SUBJECT="";
 let picker=null, PH=null;   // the photo file picker, and the photographed problem on the sheet (see photo())
 let advanceTimer=null;
 let phonePair=null;
@@ -70,7 +70,8 @@ async function show(){
     try{ const r=await fetch("/api/math/skills"); if(!r.ok) throw new Error(`השרת ענה ${r.status}`); index(await r.json()); }
     catch(e){ path.innerHTML=`<p class="mx-note">לא הצלחנו לטעון את המסלול: ${esc(e.message)}. רעננו את העמוד ונסו שוב.</p>`; return; }
   }
-  P=Object.assign({done:{},tries:{}},load()); SHOWN=new Set(shownUnits().map(u=>u.id)); draw();
+  P=Object.assign({done:{},tries:{}},load()); SHOWN=new Set(shownUnits().map(u=>u.id));
+  subjectOptions().length?drawSubjectPicker():selectSubject("מתמטיקה");
   window.MathlyAnswers?.configure({api,account:CFG.userId,enabled:CFG.answerScans,root,onGraded:({questionId,grading})=>{
     if(grading.result.verdict!=="correct"||P.done[questionId])return;
     P.done[questionId]=grading.finished_at||new Date().toISOString();
@@ -79,11 +80,37 @@ async function show(){
 }
 function hide(){ cancelAdvance(); if(root) root.hidden=true; document.documentElement.classList.remove("math-on"); }
 
+function subjectOptions(){
+  const bySubject=new Map();
+  MY_CLASSES.forEach(row=>(row.exams||[]).forEach(exam=>{
+    if(!exam?.subject||!exam?.date)return;
+    const item=bySubject.get(exam.subject)||{name:exam.subject,dates:[],classes:new Set()};
+    item.dates.push(exam.date);item.classes.add(row.name);bySubject.set(exam.subject,item);
+  }));
+  return [...bySubject.values()].map(item=>({...item,dates:item.dates.sort()})).sort((a,b)=>a.dates[0].localeCompare(b.dates[0]));
+}
+function drawSubjectPicker(){
+  ACTIVE_SUBJECT="";
+  const manage=can("management.access"), subjects=subjectOptions(), today=new Date();today.setHours(0,0,0,0);
+  path.innerHTML=`<header class="mx-top"><div><h1>המקצועות שלי</h1><p class="mx-sub">בחרו מקצוע כדי לפתוח את המסלול שלו</p></div><div class="mx-acts">${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
+    <section class="mx-subject-grid" aria-label="מקצועות הכיתה">${subjects.map(item=>{
+      const [icon,tone]=examLooks[item.name]||["●","other"],future=item.dates.find(date=>examDate(date)>=today),count=item.dates.length;
+      return `<button class="mx-subject-card exam-${tone}" data-subject="${esc(item.name)}"><span class="mx-subject-icon" aria-hidden="true">${icon}</span><span><b>${esc(item.name)}</b><small>${count} מבחנים${future?` · הבא ${examDay(future)}`:" · הסתיימו"}</small></span><i aria-hidden="true">‹</i></button>`;
+    }).join("")}</section>`;
+}
+function selectSubject(subject){
+  ACTIVE_SUBJECT=subject;
+  if(subject==="מתמטיקה")return draw();
+  const [icon,tone]=examLooks[subject]||["●","other"];
+  path.innerHTML=`<header class="mx-top"><div><h1>${esc(subject)}</h1><p class="mx-sub">המקצועות שלי</p></div><button class="mx-btn" data-act="subjects">לכל המקצועות</button></header><section class="mx-subject-empty exam-${tone}"><span aria-hidden="true">${icon}</span><h2>המסלול של ${esc(subject)} עדיין לא זמין</h2><p>לוח המבחנים של המקצוע כבר מחובר לכיתה. כשהמסלול יתווסף, הוא ייפתח מכאן.</p><button class="mx-btn solid" data-act="subjects">חזרה למקצועות</button></section>`;
+}
+
 function draw(){
   const UNITS=G.units.filter(u=>SHOWN.has(u.id)), mine=G.skills.filter(s=>SHOWN.has(s.unit));
   const total=mine.length, doneN=mine.filter(s=>P.done[s.id]).length, nxt=next();
   const cls=typeof MY_CLASS!=="undefined"&&MY_CLASS?` · כיתת ${esc(MY_CLASS.name)}`:"";
   const manage=can("management.access"), pct=Math.round(100*doneN/total);
+  const examRows=(MY_CLASS?[MY_CLASS]:MY_CLASSES).filter(row=>(row.exams||[]).length);
   const units=UNITS.map(u=>{
     const ids=ORDER.filter(id=>BY[id].unit===u.id), d=ids.filter(id=>P.done[id]).length;
     return `<div class="mx-su u-${u.id}"><b>${esc(u.name)}</b><span class="mx-bar"><i style="width:${Math.round(100*d/ids.length)}%"></i></span><small>${d} מתוך ${ids.length}</small></div>`;
@@ -99,10 +126,11 @@ function draw(){
       }).join("")}</div></section>`;
   }).join("");
   path.innerHTML=`<header class="mx-top"><div><h1>המסלול שלי</h1><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
-      <div class="mx-acts">${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
+      <div class="mx-acts">${subjectOptions().length?'<button class="mx-btn" data-act="subjects">מקצועות</button>':""}${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
     <section class="mx-progress" aria-label="ההתקדמות שלי">
       <div class="mx-ring" style="--p:${pct}"><b>${doneN}</b><small>מתוך ${total}</small></div>
       <div class="mx-units">${units}</div></section>
+    ${examRows.map(row=>examBoard(row,true)).join("")}
     ${nxt?`<button class="mx-next" data-id="${nxt}"><small>ממשיכים מכאן</small><b>${fmt(BY[nxt].name)}</b></button>`:'<p class="mx-note">סיימתם את כל המסלול. כל הכבוד!</p>'}
     <button class="mx-photo" data-act="photo"><b>צילום תרגיל</b><small>צלמו תרגיל מהמחברת או מהדף, ונעזור לכם לפתור אותו צעד אחר צעד</small></button>
     <button class="mx-photo" data-act="phone"><b>צילום בטלפון, פתרון במחשב</b><small>סרקו קוד בטלפון, צלמו תרגיל וראו את התשובה כאן אוטומטית</small></button>
@@ -175,9 +203,16 @@ function answer(btn){
 function onClick(e){
   const t=e.target.closest("button,[data-act]"); if(!t||!root.contains(t)) return;
   if(t.dataset.choice!=null) return answer(t);
+  if(t.dataset.subject) return selectSubject(t.dataset.subject);
   if(t.dataset.id) return open(t.dataset.id);
+  if(t.dataset.manageMode) return showManageMode(t.dataset.manageMode);
+  if(t.dataset.classAction) return manageClassAction(t.dataset.classAction,t.dataset.classId);
   switch(t.dataset.act){
     case "manage": return manageClasses();
+    case "manage-refresh": return loadManagedClasses(true);
+    case "manage-lab": return showManageMode("lab");
+    case "manage-practice": return closeSheet();
+    case "subjects": return drawSubjectPicker();
     case "phone": return pairPhone();
     case "copy-phone": return copyPhone(t);
     case "photo": case "retake": return picker.click();
@@ -189,49 +224,173 @@ function onClick(e){
   }
 }
 
+let MANAGED_CLASSES=[], MANAGE_MODE="classes", MANAGE_BUSY=false;
+const manageTabs=[
+  ["classes","כיתות","פתיחה, עריכה ומחיקה"],
+  ["students","תלמידים","רשימה ומסנן כיתות"],
+  ["content","תוכן","נושאים, סרטונים וטקסטים"],
+  ["flags","ניטור","פעילות ודיווחי ציונים"],
+  ["access","הרשאות","תפקידים וגישה"]
+];
+
+const examLooks={
+  "גיאוגרפיה":["🌍","geo"],"אזרחות":["🏛️","civics"],"מבוא מדעי":["🧪","intro"],
+  "מתמטיקה":["∑","math"],"לשון":["✍️","language"],"חינוך פיננסי":["₪","finance"],
+  "מדעים":["🔬","science"],"אנגלית":["A","english"],"ספרות":["📚","literature"],
+  "היסטוריה":["⌛","history"],"תנ״ך":["📜","bible"]
+};
+const examDate=value=>{const [y,m,d]=String(value).split("-").map(Number);return new Date(y,m-1,d)};
+const examDay=value=>{const date=examDate(value);return `${String(date.getDate()).padStart(2,"0")}.${String(date.getMonth()+1).padStart(2,"0")}.${date.getFullYear()}`};
+const examFullDate=value=>new Intl.DateTimeFormat("he-IL",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(examDate(value));
+const examMonth=value=>new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(examDate(value));
+const classSubjects=row=>[...new Set(G.units.filter(unit=>(row.lessons||[]).includes(unit.id)).map(unit=>unit.subject).filter(Boolean))];
+function examCards(exams,nextDate){
+  return exams.map(exam=>{
+    const [icon,tone]=examLooks[exam.subject]||["●","other"], next=exam.date===nextDate;
+    return `<article class="mx-exam-card exam-${tone}${next?" is-next":""}"><span class="mx-exam-icon" aria-hidden="true">${icon}</span><div><b>${esc(exam.subject)}</b><small>${examDay(exam.date)}${next?" · המבחן הבא":""}</small></div></article>`;
+  }).join("");
+}
+function examBoard(row,compact=false){
+  const all=[...(row.exams||[])].filter(exam=>exam?.date&&exam?.subject).sort((a,b)=>a.date.localeCompare(b.date));
+  const subjects=classSubjects(row), exams=compact?all.filter(exam=>subjects.includes(exam.subject)):all;
+  if(!exams.length)return "";
+  const today=new Date();today.setHours(0,0,0,0);
+  const upcoming=exams.filter(exam=>examDate(exam.date)>=today), nextDate=upcoming[0]?.date||"";
+  const groups=[];exams.forEach(exam=>{const month=examMonth(exam.date),last=groups[groups.length-1];if(last?.month===month)last.exams.push(exam);else groups.push({month,exams:[exam]});});
+  const full=`<div class="mx-exam-months">${groups.map(group=>`<section><h5>${esc(group.month)}</h5><div class="mx-exam-grid">${examCards(group.exams,nextDate)}</div></section>`).join("")}</div>`;
+  const title=esc(compact?`מבחני ${subjects.join(" ו")}`:row.exam_title||`לוח מבחנים – ${row.name}`),note=esc(row.exam_note||"");
+  if(!compact)return `<section class="mx-exam-board"><div class="mx-exam-head"><div><h4>${title}</h4><small>${exams.length} מבחנים</small></div></div>${full}${note?`<p class="mx-exam-note">${note}</p>`:""}</section>`;
+  const next=upcoming[0], days=next?Math.max(0,Math.ceil((examDate(next.date)-today)/86400000)):null;
+  const countdown=next?`<div class="mx-exam-countdown exam-${(examLooks[next.subject]||["","other"])[1]}"><span><b>${days===0?"היום":days===1?"מחר":days}</b><small>${days>1?"ימים למבחן":""}</small></span><div><small>המבחן הקרוב</small><strong>${esc(next.subject)}</strong><time datetime="${esc(next.date)}"><span>מועד המבחן</span>${esc(examFullDate(next.date))}<small>${examDay(next.date)}</small></time></div></div>`:"";
+  return `<section class="mx-exam-board compact"><div class="mx-exam-head"><div><h2>${title}</h2><small>${upcoming.length?`${upcoming.length} מבחנים בהמשך השנה`:"לוח המבחנים הסתיים"}</small></div></div>${countdown}${upcoming.length?`<div class="mx-exam-grid">${examCards(upcoming,nextDate)}</div>`:""}${note?`<p class="mx-exam-note">${note}</p>`:""}</section>`;
+}
+
 async function manageClasses(){
   if(!can("management.access")) return;
   closeSheet(); back=document.activeElement; cur="management";
   sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
-    <div class="mx-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
-      <div class="mx-shtop"><h3 id="mxTitle">ניהול כיתות</h3><button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
-      <div class="mx-management"><p role="status">טוענים את הכיתות…</p></div></div>`;
+    <div class="mx-sheet mx-manage-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-manage-head"><h3 id="mxTitle">ניהול</h3><span class="mx-manage-spacer"></span>
+        <button class="mx-btn" data-act="manage-refresh">רענון</button>
+        <button class="mx-btn" data-act="manage-lab">מעבדה</button>
+        <button class="mx-btn solid" data-act="manage-practice">לתרגול</button>
+        <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+      <p class="mx-manage-state" aria-live="polite"></p>
+      <div class="mx-manage-modes" role="tablist" aria-label="ניהול">${manageTabs.map(([mode,title,sub])=>`<button role="tab" data-manage-mode="${mode}">${title}<small>${sub}</small></button>`).join("")}</div>
+      <div class="mx-management"></div></div>`;
   sheet.hidden=false; sheet.querySelector(".mx-x").focus();
-  const box=sheet.querySelector(".mx-management");
+  MANAGE_MODE="classes";
+  await loadManagedClasses();
+}
+
+async function loadManagedClasses(refresh=false){
+  if(MANAGE_BUSY||cur!=="management") return;
+  const state=sheet.querySelector(".mx-manage-state");
+  MANAGE_BUSY=true; state.textContent=refresh?"מרעננים את נתוני הניהול…":"טוענים את הכיתות…";
   try{
     const response=await api("/api/classes");
     if(!response.ok) throw new Error("לא הצלחנו לטעון את הכיתות. נסו שוב.");
     const {classes}=await response.json();
-    if(!box.isConnected) return;
-    if(!classes.length){box.innerHTML='<p>אין כיתות לניהול.</p>';return;}
-    box.innerHTML=`<label>כיתה<select class="mx-class-picker">${classes.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("")}</select></label><div class="mx-class-editor"></div>`;
-    const select=box.querySelector("select"), editor=box.querySelector(".mx-class-editor");
-    if(MY_CLASS&&classes.some(c=>c.id===MY_CLASS.id)) select.value=String(MY_CLASS.id);
-    function edit(){
-      const row=classes.find(c=>String(c.id)===select.value);
-      editor.innerHTML=`<form><fieldset><legend>יחידות הלימוד בכיתה</legend>${G.units.map(u=>`<label><input type="checkbox" name="unit" value="${esc(u.id)}"${row.lessons.includes(u.id)?" checked":""}> ${esc(u.name)}</label>`).join("")}</fieldset>
-        <button class="mx-btn solid" type="submit">שמירת השינויים</button><p role="status" aria-live="polite"></p></form>`;
-      const form=editor.querySelector("form"), message=form.querySelector('[role="status"]'), submit=form.querySelector('button');
-      form.onsubmit=async event=>{
-        event.preventDefault();
-        const lessons=[...form.querySelectorAll('input:checked')].map(input=>input.value);
-        if(!lessons.length){message.textContent="בחרו לפחות יחידת לימוד אחת.";return;}
-        submit.disabled=true; select.disabled=true; message.textContent="שומרים…";
-        try{
-          const saved=await api(`/api/classes/${encodeURIComponent(row.id)}`,{method:"PUT",headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({name:row.name,emails:row.emails||[],teachers:row.teachers||[],lessons})});
-          if(!saved.ok) throw new Error("לא הצלחנו לשמור את השינויים. נסו שוב.");
-          row.lessons=lessons;
-          MY_CLASSES.forEach(c=>{if(c.id===row.id)c.lessons=lessons;});
-          if(MY_CLASS?.id===row.id) MY_CLASS.lessons=lessons;
-          SHOWN=new Set(shownUnits().map(u=>u.id)); draw();
-          message.textContent="השינויים נשמרו. אפשר לחזור למסלול.";
-        }catch(error){message.textContent=error.message;}
-        finally{submit.disabled=false;select.disabled=false;}
-      };
-    }
-    select.onchange=edit; edit();
-  }catch(error){box.textContent=error.message;}
+    if(cur!=="management") return;
+    MANAGED_CLASSES=classes||[]; state.textContent=refresh?"הנתונים עודכנו.":""; showManageMode(MANAGE_MODE);
+  }catch(error){state.textContent=error.message;sheet.querySelector(".mx-management").innerHTML=`<p class="mx-note">${esc(error.message)}</p>`;}
+  finally{MANAGE_BUSY=false;}
+}
+
+function showManageMode(mode){
+  if(cur!=="management") return;
+  MANAGE_MODE=mode;
+  sheet.querySelectorAll("[data-manage-mode]").forEach(button=>button.setAttribute("aria-selected",String(button.dataset.manageMode===mode)));
+  const box=sheet.querySelector(".mx-management");
+  if(mode==="classes") return drawManagedClasses(box);
+  if(mode==="students"){
+    const students=new Map();
+    MANAGED_CLASSES.forEach(row=>(row.emails||[]).forEach(email=>students.set(email,[...(students.get(email)||[]),row.name])));
+    box.innerHTML=`<div class="mx-manage-title"><h4>תלמידים</h4><span>${students.size} תלמידים · ${MANAGED_CLASSES.length} כיתות</span></div>${students.size?`<div class="mx-manage-list">${[...students].map(([email,classes])=>`<article><b dir="ltr">${esc(email)}</b><small>${esc(classes.join(" · "))}</small></article>`).join("")}</div>`:'<p class="mx-note">עדיין לא נוספו תלמידים לכיתות.</p>'}`;
+    return;
+  }
+  if(mode==="content"){
+    box.innerHTML=`<div class="mx-manage-title"><h4>תוכן לימודי</h4><span>${G.units.length} נושאים במסלול</span></div><div class="mx-manage-list">${G.units.map(unit=>{const skills=G.skills.filter(skill=>skill.unit===unit.id);const count=MANAGED_CLASSES.filter(row=>(row.lessons||[]).includes(unit.id)).length;return `<article class="u-${unit.id}"><b>${esc(unit.name)}</b><small>${skills.length} מיומנויות · פעיל ב־${count} כיתות</small></article>`}).join("")}</div>`;
+    return;
+  }
+  if(mode==="flags"){
+    const done=Object.keys(P.done||{}).length, tries=Object.values(P.tries||{}).reduce((sum,n)=>sum+(+n||0),0);
+    box.innerHTML=`<div class="mx-manage-title"><h4>ניטור</h4><span>פעילות ודיווחי ציונים</span></div><div class="mx-manage-stats"><article><b>${MANAGED_CLASSES.length}</b><small>כיתות פעילות</small></article><article><b>${done}</b><small>מיומנויות שהושלמו במכשיר זה</small></article><article><b>${tries}</b><small>ניסיונות במכשיר זה</small></article></div><p class="mx-note">נתוני התקדמות כיתתיים יופיעו כאן כאשר שירות דיווחי הציונים יחובר.</p>`;
+    return;
+  }
+  if(mode==="access"){
+    const roles=CFG.roles||[], permissions=CFG.permissions||[];
+    box.innerHTML=`<div class="mx-manage-title"><h4>הרשאות</h4><span>תפקידים וגישה</span></div><div class="mx-access-card"><small>התפקידים שלך</small><div class="mx-tag-row">${roles.length?roles.map(role=>`<span>${esc(role)}</span>`).join(""):'<span>מנהל/ת</span>'}</div><small>הרשאות פעילות</small><div class="mx-tag-row">${permissions.map(permission=>`<span dir="ltr">${esc(permission)}</span>`).join("")}</div></div>`;
+    return;
+  }
+  box.innerHTML='<div class="mx-manage-title"><h4>מעבדה</h4><span>כלים לבדיקה ופיתוח</span></div><p class="mx-note">כלי המעבדה למתמטיקה יתווספו כאן. אפשר לחזור לכל אזור ניהול מהכרטיסיות למעלה.</p>';
+}
+
+function drawManagedClasses(box){
+  const classes=MANAGED_CLASSES;
+  box.innerHTML=`<div class="mx-manage-title"><h4>כיתות</h4><span>פתיחה, עריכה ומחיקה</span></div>
+    <div class="mx-class-toolbar"><button class="mx-btn solid" data-class-action="new">+ כיתה חדשה</button><span>${classes.length} כיתות</span></div>
+    ${classes.length?`<div class="mx-class-cards">${classes.map(row=>{
+      const units=G.units.filter(unit=>(row.lessons||[]).includes(unit.id));
+      const subjects=classSubjects(row);
+      const unitLine=units.length===G.units.length?`כל היחידות (${G.units.length})`:units.map(unit=>unit.name).join(" · ")||"לא נבחרו";
+      const students=row.emails||[], teachers=row.teachers||[];
+      return `<article class="mx-class-card"><div class="mx-class-card-head"><h5>${esc(row.name)}</h5><div class="mx-class-actions"><button class="mx-btn" data-class-action="edit" data-class-id="${esc(row.id)}">עריכה</button><button class="mx-btn danger" data-class-action="delete" data-class-id="${esc(row.id)}">מחיקה</button></div></div>
+        <dl><dt>יחידות</dt><dd>${esc(unitLine)}</dd><dt>מקצועות היחידות</dt><dd>${esc(subjects.join(" · ")||"לא הוגדרו")}</dd><dt>תלמידים</dt><dd>${students.length?`${students.length}: ${esc(students.join(" · "))}`:"עוד אין"}</dd><dt>מורים</dt><dd>${teachers.length?esc(teachers.join(" · ")):"עוד לא נבחרו"}</dd></dl>${examBoard(row)}</article>`;
+    }).join("")}</div>`:'<div class="mx-empty-class"><h5>עוד אין כיתות</h5><p>פתחו כיתה ראשונה, בחרו את יחידות הלימוד והוסיפו את כתובות התלמידים.</p></div>'}`;
+}
+
+function manageClassAction(action,id){
+  if(action==="new") return openClassEditor(null);
+  if(action==="cancel") return drawManagedClasses(sheet.querySelector(".mx-management"));
+  const row=MANAGED_CLASSES.find(item=>String(item.id)===String(id));
+  if(!row) return;
+  if(action==="edit") return openClassEditor(row);
+  if(action==="delete") return deleteManagedClass(row);
+}
+
+function openClassEditor(row){
+  const box=sheet.querySelector(".mx-management"), creating=!row;
+  const selected=new Set(row?.lessons||G.units.map(unit=>unit.id));
+  box.innerHTML=`<div class="mx-manage-title"><h4>${creating?"כיתה חדשה":`עריכת ${esc(row.name)}`}</h4><button class="mx-btn" type="button" data-class-action="cancel">חזרה לכיתות</button></div>
+    <form class="mx-class-form"><label>שם הכיתה<input name="name" required maxlength="80" autocomplete="off" placeholder="למשל: ט׳ 1" value="${esc(row?.name||"")}"></label>
+      <fieldset><legend>יחידות הלימוד<small>התלמידים יראו במסלול רק את המיומנויות של היחידות שסומנו. מקצוע היחידה קובע אילו מבחנים יוצגו במסלול.</small></legend><div class="mx-unit-picks">${G.units.map(unit=>`<label class="u-${unit.id}"><input type="checkbox" name="unit" value="${esc(unit.id)}"${selected.has(unit.id)?" checked":""}><span>${esc(unit.name)}<small>${esc(unit.subject)} · ${G.skills.filter(skill=>skill.unit===unit.id).length} מיומנויות</small></span></label>`).join("")}</div></fieldset>
+      <label>התלמידים<small>כתובת דוא״ל אחת בכל שורה. תלמיד יכול להשתייך ליותר מכיתה אחת.</small><textarea name="emails" dir="ltr" spellcheck="false" placeholder="student@example.com">${esc((row?.emails||[]).join("\n"))}</textarea></label>
+      <label>מורי הכיתה<small>כתובת דוא״ל אחת בכל שורה. למורים תהיה גישה לכיתה הזו.</small><textarea name="teachers" dir="ltr" spellcheck="false" placeholder="teacher@example.com">${esc((row?.teachers||[]).join("\n"))}</textarea></label>
+      <div class="mx-class-form-actions"><button class="mx-btn solid" type="submit">${creating?"פתיחת הכיתה":"שמירת השינויים"}</button><button class="mx-btn" type="button" data-class-action="cancel">ביטול</button><span role="status" aria-live="polite"></span></div></form>`;
+  const form=box.querySelector("form"), message=form.querySelector('[role="status"]');
+  form.querySelector('input[name="name"]').focus();
+  form.onsubmit=async event=>{
+    event.preventDefault();
+    const lessons=[...form.querySelectorAll('input[name="unit"]:checked')].map(input=>input.value);
+    if(!lessons.length){message.textContent="בחרו לפחות יחידת לימוד אחת.";return;}
+    const lines=name=>form.elements[name].value.split(/[\n,;]+/).map(value=>value.trim().toLowerCase()).filter(Boolean);
+    const body={name:form.elements.name.value.trim(),emails:lines("emails"),teachers:lines("teachers"),lessons};
+    const buttons=form.querySelectorAll("button"); buttons.forEach(button=>button.disabled=true); message.textContent=creating?"פותחים את הכיתה…":"שומרים…";
+    try{
+      const response=await api(creating?"/api/classes":`/api/classes/${encodeURIComponent(row.id)}`,{method:creating?"POST":"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      if(!response.ok){const detail=(await response.json().catch(()=>({}))).detail;throw new Error(detail||"לא הצלחנו לשמור את הכיתה. נסו שוב.");}
+      if(!creating){
+        Object.assign(row,body); MY_CLASSES.forEach(item=>{if(String(item.id)===String(row.id))Object.assign(item,body);});
+        if(String(MY_CLASS?.id)===String(row.id))Object.assign(MY_CLASS,body);
+        SHOWN=new Set(shownUnits().map(unit=>unit.id)); draw();
+      }
+      await loadManagedClasses(true);
+    }catch(error){message.textContent=error.message;buttons.forEach(button=>button.disabled=false);}
+  };
+}
+
+async function deleteManagedClass(row){
+  if(!confirm(`למחוק את הכיתה ${row.name}? התלמידים שלה לא יוכלו להיכנס עוד.`)) return;
+  const state=sheet.querySelector(".mx-manage-state"); state.textContent=`מוחקים את ${row.name}…`;
+  try{
+    const response=await api(`/api/classes/${encodeURIComponent(row.id)}`,{method:"DELETE"});
+    if(!response.ok){const detail=(await response.json().catch(()=>({}))).detail;throw new Error(detail||"לא הצלחנו למחוק את הכיתה.");}
+    MANAGED_CLASSES=MANAGED_CLASSES.filter(item=>String(item.id)!==String(row.id));
+    MY_CLASSES=MY_CLASSES.filter(item=>String(item.id)!==String(row.id));
+    if(String(MY_CLASS?.id)===String(row.id)) MY_CLASS=MY_CLASSES.length===1?MY_CLASSES[0]:null;
+    SHOWN=new Set(shownUnits().map(unit=>unit.id)); draw(); state.textContent="הכיתה נמחקה."; drawManagedClasses(sheet.querySelector(".mx-management"));
+  }catch(error){state.textContent=error.message;}
 }
 
 /* A photographed problem (/api/math/photo, app/math_photo.py): hints first. The sheet shows the problem as it was
@@ -407,7 +566,7 @@ async function boot(){
     const response=await api("/api/me");
     if(!response.ok){ state.className="error"; state.textContent=response.status===403?"החשבון אינו משויך לכיתת מתמטיקה.":"לא ניתן להשלים את הכניסה."; return; }
     const me=await response.json();CFG.userId=me.user_id;CFG.answerScans=me.answer_scans; ME_EMAIL=me.email||""; MY_CLASSES=me.classes||[]; MY_CLASS=MY_CLASSES.length===1?MY_CLASSES[0]:null;
-    CFG.permissions=me.permissions||[];
+    CFG.permissions=me.permissions||[]; CFG.roles=me.roles||[];
   }
   document.getElementById("boot").hidden=true;
   show();

@@ -104,6 +104,8 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
                 "permissions": (user or {}).get("permissions", []),
                 "teacher": bool((user or {}).get("teacher")),
                 "classes": [{"id": row["id"], "name": row["name"], "lessons": units_of(row),
+                             "exams": row.get("exams") or [], "exam_note": row.get("exam_note") or "",
+                             "exam_title": row.get("exam_title") or "",
                              "teacher": email.lower() in (row.get("teachers") or [])} for row in mine]}
 
     @app.get("/api/math/skills")

@@ -35,6 +35,7 @@ def test_the_algebra_graph_is_whole():
     assert problems(graph) == []
     assert len(graph["skills"]) == 59
     assert {unit["id"] for unit in graph["units"]} == {"f", "t", "n", "q", "p", "w", "g"}
+    assert {unit["subject"] for unit in graph["units"]} == {"מתמטיקה"}
 
 
 def test_a_broken_graph_is_named():

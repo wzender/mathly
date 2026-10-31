@@ -32,7 +32,8 @@ def problems(graph: dict) -> list[str]:
     units = {u["id"] for u in graph["units"]}
     skills = {s["id"]: s for s in graph["skills"]}
     mistakes = graph["mistakes"]
-    out = [f"{s['id']}: unknown unit {s['unit']}" for s in skills.values() if s["unit"] not in units]
+    out = [f"{u['id']}: subject is required" for u in graph["units"] if not str(u.get("subject") or "").strip()]
+    out += [f"{s['id']}: unknown unit {s['unit']}" for s in skills.values() if s["unit"] not in units]
     out += [f"{s['id']}: unknown prerequisite {p}" for s in skills.values() for p in s["prereqs"] if p not in skills]
     if out:
         return out

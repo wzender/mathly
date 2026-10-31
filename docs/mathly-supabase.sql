@@ -23,17 +23,13 @@ create table if not exists public.classes (
   nicknames jsonb not null default '{}',
   lessons text[] not null default '{}',
   teachers text[] not null default '{}',
+  exams jsonb not null default '[]',
+  exam_title text not null default '',
+  exam_note text not null default '',
   created_at timestamptz not null default now()
 );
 
-do $$ begin
-  if exists (select 1 from information_schema.columns
-             where table_schema = 'public' and table_name = 'classes' and column_name = 'subject') then
-    delete from public.classes where subject is distinct from 'מתמטיקה';
-  end if;
-end $$;
-alter table public.classes drop column if exists subject,
-  drop column if exists homework,
+alter table public.classes drop column if exists homework,
   drop column if exists due,
   drop column if exists homeworks,
   drop column if exists dailies;

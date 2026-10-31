@@ -103,7 +103,10 @@ def test_class_management_geometry_and_permissions(phone_server, manager):
     import json
 
     row = {"id": 7, "name": "כיתת תרגול", "lessons": ["f"],
-           "emails": ["student@example.com"], "teachers": ["teacher@example.com"]}
+           "emails": ["student@example.com"], "teachers": ["teacher@example.com"],
+           "exam_title": "לוח מבחנים – כיתה ט׳11, תשפ״ז",
+           "exam_note": "ייתכנו שינויים.",
+           "exams": [{"date": "2026-11-16", "subject": "מתמטיקה"}]}
     writes = []
     with playwright.sync_playwright() as p:
         browser = p.chromium.launch()
@@ -138,12 +141,18 @@ def test_class_management_geometry_and_permissions(phone_server, manager):
 
             page.route("**/api/classes/7", save)
             page.goto(phone_server)
+            playwright.expect(page.get_by_role("heading", name="המקצועות שלי")).to_be_visible()
+            page.locator('[data-subject="מתמטיקה"]').click()
             button = page.locator('[data-act="manage"]')
             if not manager:
                 playwright.expect(page.locator('.mx-top')).to_be_visible()
                 playwright.expect(button).to_have_count(0)
                 return
+            playwright.expect(page.locator(".mx-exam-countdown")).to_be_visible()
+            playwright.expect(page.locator(".mx-exam-countdown time")).to_contain_text("16 בנובמבר 2026")
             button.click()
+            playwright.expect(page.locator(".mx-exam-board")).to_contain_text("מתמטיקה")
+            page.get_by_role("button", name="עריכה").click()
             geometry = page.locator('input[name="unit"][value="g"]')
             geometry.check()
             page.get_by_role("button", name="שמירת השינויים").click()
