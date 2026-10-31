@@ -233,3 +233,43 @@ def test_upload_starts_grading_without_a_desktop_or_extra_click(answer_store, mo
             image = await c.get(f'/api/math/answer-attempts/{aid}/image')
             assert image.status_code == 200 and image.content == calls[0][0]
     asyncio.run(check())
+
+
+def test_grader_wire_schema_is_supported_by_anthropic(monkeypatch):
+    """Exercise the real SDK serializer against the documented API schema subset.
+
+    Direct create() calls don't strip unsupported numerical constraints as the
+    SDK's Pydantic parse() helper does. A permissive messages.create stub missed
+    the production HTTP 400 caused by minimum/maximum on the score field.
+    """
+    import anthropic
+    import httpx2
+    requests = []
+    def unsupported(value):
+        if isinstance(value, dict):
+            if set(value) & {'minimum', 'maximum', 'multipleOf', 'minLength', 'maxLength'}:
+                return True
+            return any(unsupported(item) for item in value.values())
+        return isinstance(value, list) and any(unsupported(item) for item in value)
+    def provider(req):
+        body = json.loads(req.content)
+        requests.append(body)
+        if unsupported(body['output_config']['format']['schema']):
+            return httpx2.Response(400, json={'type': 'error', 'error': {
+                'type': 'invalid_request_error', 'message': 'Unsupported JSON schema constraint'}})
+        return httpx2.Response(200, json={
+            'id': 'msg_grading_contract', 'type': 'message', 'role': 'assistant',
+            'model': body['model'], 'stop_reason': 'end_turn', 'stop_sequence': None,
+            'content': [{'type': 'text', 'text': json.dumps(assessment())}],
+            'usage': {'input_tokens': 10, 'output_tokens': 20}})
+    client = anthropic.Anthropic(api_key='test-only-key', max_retries=0,
+                                 http_client=httpx2.Client(transport=httpx2.MockTransport(provider)))
+    monkeypatch.setattr('app.answer_grading.photo_client', lambda key: client)
+    try:
+        result = AnswerGrader('test-only-key').grade(b'fixture image', {'question': 'Find the area.'})
+        assert result['verdict'] == 'correct' and result['score'] == 100
+        assert len(requests) == 1
+        assert json.loads(requests[0]['messages'][0]['content'][0]['text']) == {
+            'question_snapshot': {'question': 'Find the area.'}}
+    finally:
+        client.close()

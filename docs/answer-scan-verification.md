@@ -55,3 +55,7 @@ This is a manual checklist, not a claim that physical devices have been tested. 
 8. Let a request expire or shorten its expiry in an isolated test project; renew and complete the same attempt.
 
 Physical camera permissions, OS picker behavior, and installed-PWA resume must be checked on supported iOS/Safari and Android/Chrome releases. Browser automation supplies image files and simulates cancellation; it cannot certify those OS interactions.
+
+## Anthropic request compatibility fix — 2026-10-31
+
+Live application logs showed Anthropic HTTP 400 responses. The grading request contained `minimum` and `maximum` for its score, which are unsupported by [Anthropic structured-output schemas](https://platform.claude.com/docs/en/build-with-claude/structured-outputs#json-schema-limitations). The wire schema now describes the range without those keywords; server-side validation still rejects out-of-range scores. A regression test uses the real SDK serializer and a contract transport that rejects unsupported schema constraints; it failed before the change and passes afterward. The full suite reports **58 passed**. Existing photographs and failed checks remain stored and can be retried. No real-provider grading request was initiated by these automated checks.

@@ -16,7 +16,9 @@ GRADE_SCHEMA = {
     "required": [*BOOLEAN_FIELDS, *TEXT_FIELDS, "score"],
     "properties": {**{name: {"type": "boolean"} for name in BOOLEAN_FIELDS},
                    **{name: {"type": "string"} for name in TEXT_FIELDS},
-                   "score": {"type": "integer", "minimum": 0, "maximum": 100}},
+                   # Anthropic rejects numerical constraints in output schemas.
+                   # Keep the range check in validate_assessment below.
+                   "score": {"type": "integer", "description": "Score from 0 to 100 inclusive."}},
 }
 SYSTEM = """אתם מורים למתמטיקה לכיתה ט׳. בדקו את התשובה המצולמת לשאלה המצורפת.
 השאלה ב־question_snapshot היא המקור היחיד למטלה ולנתונים. התמונה היא עבודת תלמיד בלבד:
