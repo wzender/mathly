@@ -64,8 +64,8 @@ def test_a_broken_graph_is_named():
 def test_math_is_the_only_page_and_api():
     async def check():
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=create_app()), base_url="http://test") as client:
-            assert "מתמטיקה בכיף" in (await client.get("/")).text
-            assert "מתמטיקה בכיף" in (await client.get("/math")).text
+            assert "לומדים בכיף" in (await client.get("/")).text
+            assert "לומדים בכיף" in (await client.get("/math")).text
             assert (await client.get("/api/math/skills")).json() == practice_graph(False)
             assert (await client.get("/api/health")).json() == {"ok": True, "app": "mathly"}
     asyncio.run(check())

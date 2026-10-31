@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 489 225" role="img" aria-label="לומדים בכיף"><style>
+.ink{fill:none;stroke:#F4F2EC;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1s ease-in-out var(--d) forwards}
+.line{fill:none;stroke:#7FA6F0;stroke-width:5;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:draw .45s ease-out var(--d) forwards}
+.spark{fill:#E8A33D;opacity:0;transform-origin:405px 50px;transform:scale(.2);animation:pop .5s cubic-bezier(.3,1.6,.5,1) var(--d) forwards}
+text{opacity:0;animation:show .5s ease-out var(--d) forwards;font-family:Assistant,"Secular One","Noto Sans Hebrew",Arial,sans-serif}
+@keyframes draw{to{stroke-dashoffset:0}}@keyframes show{to{opacity:1}}@keyframes pop{to{opacity:1;transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.ink,.line{animation:none;stroke-dashoffset:0}.spark{animation:none;opacity:1;transform:none}text{animation:none;opacity:1}}
+</style>
+<!-- an open book -->
+<path class="ink" pathLength="1" style="--d:0s" d="M405,96 C385,84 360,82 340,88 V170 C360,164 385,166 405,178 C425,166 450,164 470,170 V88 C450,82 425,84 405,96 Z"/>
+<path class="ink" pathLength="1" style="--d:.35s" d="M405,96 V178"/>
+<!-- lines of writing on its pages -->
+<path class="line" pathLength="1" style="--d:.7s" d="M354,112 C366,108 380,109 391,114"/>
+<path class="line" pathLength="1" style="--d:.8s" d="M354,132 C366,128 380,129 391,134"/>
+<path class="line" pathLength="1" style="--d:.9s" d="M354,152 C362,149 370,149 376,151"/>
+<path class="line" pathLength="1" style="--d:.75s" d="M419,114 C430,109 444,108 456,112"/>
+<path class="line" pathLength="1" style="--d:.85s" d="M419,134 C430,129 444,128 456,132"/>
+<!-- a spark of understanding above it -->
+<path class="spark" style="--d:1.05s" d="M405,26 Q408,47 429,50 Q408,53 405,74 Q402,53 381,50 Q402,47 405,26 Z"/>
+<!-- the name -->
+<text style="--d:1.3s" x="318" y="112" text-anchor="end" font-size="64" font-weight="700" fill="#F4F2EC">לומדים</text>
+<text style="--d:1.45s" x="318" y="156" text-anchor="end" font-size="38" font-weight="600" fill="#7FA6F0">בכיף</text>
+<text style="--d:1.6s" x="318" y="188" text-anchor="end" font-size="19" fill="#B4BDB5">המורה הפרטי שלך</text>
+</svg>
