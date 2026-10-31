@@ -1,359 +1,117 @@
 {
  "source": {
-  "schedule": "https://meyda.education.gov.il/files/Pop/0files/matmatika/Chativat-Beynayim/tashpaz/prisa_9A.pdf",
-  "summer": "https://pop.education.gov.il/maagal_hashana/summer-preparatory/mathematics-9-5/"
+  "schedule": "https://meyda.education.gov.il/files/Pop/0files/matmatika/Chativat-Beynayim/tashpaz/prisa_9A.pdf"
  },
  "mastery": "5 תשובות נכונות מתוך 6 האחרונות, מהן 2 לפחות ברמה 2",
  "units": [
   {
-   "id": "f",
-   "subject": "מתמטיקה",
-   "name": "יסודות",
-   "source": "חזרה מכיתות ז׳–ח׳",
-   "when": ""
-  },
-  {
    "id": "t",
    "subject": "מתמטיקה",
    "name": "טכניקה אלגברית",
-   "source": "פריסת ט׳",
-   "when": "ספטמבר–אוקטובר, ינואר"
+   "source": "פריסת ט׳ תשפ״ז",
+   "when": "ספטמבר–אוקטובר"
+  },
+  {
+   "id": "k",
+   "subject": "מתמטיקה",
+   "name": "דלתון ומשולש שווה שוקיים",
+   "source": "פריסת ט׳ תשפ״ז",
+   "when": "ספטמבר–אוקטובר"
+  },
+  {
+   "id": "q",
+   "subject": "מתמטיקה",
+   "name": "פונקציה ריבועית",
+   "source": "פריסת ט׳ תשפ״ז",
+   "when": "נובמבר"
+  },
+  {
+   "id": "e",
+   "subject": "מתמטיקה",
+   "name": "משוואות ואי־שוויונות ריבועיים",
+   "source": "פריסת ט׳ תשפ״ז",
+   "when": "נובמבר–דצמבר"
+  },
+  {
+   "id": "a",
+   "subject": "מתמטיקה",
+   "name": "יחסים במשולש ומשולש ישר זווית",
+   "source": "פריסת ט׳ תשפ״ז",
+   "when": "נובמבר, אפריל"
+  },
+  {
+   "id": "z",
+   "subject": "מתמטיקה",
+   "name": "ישרים מקבילים, טרפז ומקבילית",
+   "source": "פריסת ט׳ תשפ״ז",
+   "when": "נובמבר–ינואר"
+  },
+  {
+   "id": "r",
+   "subject": "מתמטיקה",
+   "name": "משוואות רציונליות",
+   "source": "פריסת ט׳ תשפ״ז",
+   "when": "ינואר"
+  },
+  {
+   "id": "h",
+   "subject": "מתמטיקה",
+   "name": "הסתברות",
+   "source": "פריסת ט׳ תשפ״ז",
+   "when": "ינואר–פברואר"
+  },
+  {
+   "id": "s",
+   "subject": "מתמטיקה",
+   "name": "מערכת משוואות ממעלה שנייה",
+   "source": "פריסת ט׳ תשפ״ז",
+   "when": "פברואר"
+  },
+  {
+   "id": "m",
+   "subject": "מתמטיקה",
+   "name": "מלבן, מעוין וריבוע",
+   "source": "פריסת ט׳ תשפ״ז",
+   "when": "ינואר–אפריל"
   },
   {
    "id": "n",
    "subject": "מתמטיקה",
    "name": "תכונות של פונקציה",
-   "source": "פריסת ט׳",
+   "source": "פריסת ט׳ תשפ״ז",
    "when": "מרץ"
-  },
-  {
-   "id": "q",
-   "subject": "מתמטיקה",
-   "name": "פונקציה ומשוואה ריבועית",
-   "source": "פריסת ט׳",
-   "when": "נובמבר–פברואר"
   },
   {
    "id": "p",
    "subject": "מתמטיקה",
-   "name": "חזקות ושורשים",
-   "source": "פריסת ט׳",
+   "name": "חוקי חזקות ושורשים",
+   "source": "פריסת ט׳ תשפ״ז",
    "when": "מאי"
   },
   {
    "id": "w",
    "subject": "מתמטיקה",
    "name": "שאלות מילוליות",
-   "source": "פריסת ט׳",
+   "source": "פריסת ט׳ תשפ״ז",
    "when": "מאי"
   },
   {
-   "id": "g",
+   "id": "d",
    "subject": "מתמטיקה",
-   "name": "גאומטריה",
-   "source": "תרגול מקורי: שטחים ומשפט פיתגורס",
-   "when": ""
+   "name": "דמיון משולשים",
+   "source": "פריסת ט׳ תשפ״ז",
+   "when": "יוני"
   }
  ],
  "skills": [
-  {
-   "id": "f_neg",
-   "unit": "f",
-   "name": "מספרים מכוונים",
-   "short": "מספרים מכוונים",
-   "prereqs": [],
-   "description": "ארבע פעולות עם מספרים שליליים, כולל חיסור של מספר שלילי.",
-   "sample": {
-    "question": "$−3 − (−5)·2 = ?$",
-    "choices": [
-     {
-      "text": "$7$",
-      "correct": true
-     },
-     {
-      "text": "$−13$",
-      "mistake": "minus_minus"
-     },
-     {
-      "text": "$4$",
-      "mistake": "order_ops"
-     },
-     {
-      "text": "$−7$",
-      "mistake": "result_sign"
-     }
-    ]
-   }
-  },
-  {
-   "id": "f_frac",
-   "unit": "f",
-   "name": "פעולות בשברים",
-   "short": "שברים",
-   "prereqs": [],
-   "description": "חיבור, חיסור, כפל וחילוק של שברים, כולל מכנה משותף.",
-   "sample": {
-    "question": "$2/3 + 1/4 = ?$",
-    "choices": [
-     {
-      "text": "$11/12$",
-      "correct": true
-     },
-     {
-      "text": "$3/7$",
-      "mistake": "add_denoms"
-     },
-     {
-      "text": "$3/12$",
-      "mistake": "scale_numerators"
-     },
-     {
-      "text": "$1/6$",
-      "mistake": "mult_not_add"
-     }
-    ]
-   }
-  },
-  {
-   "id": "f_ops",
-   "unit": "f",
-   "name": "סדר פעולות והצבה",
-   "short": "סדר פעולות",
-   "prereqs": [
-    "f_neg",
-    "f_frac"
-   ],
-   "description": "הצבת מספרים, גם שליליים, בביטוי אלגברי לפי סדר הפעולות.",
-   "sample": {
-    "question": "הציבו $x = −2$:  $3x² − x = ?$",
-    "choices": [
-     {
-      "text": "$14$",
-      "correct": true
-     },
-     {
-      "text": "$−10$",
-      "mistake": "neg_square"
-     },
-     {
-      "text": "$38$",
-      "mistake": "coef_in_power"
-     },
-     {
-      "text": "$10$",
-      "mistake": "minus_minus"
-     }
-    ]
-   }
-  },
-  {
-   "id": "f_like",
-   "unit": "f",
-   "name": "כינוס איברים דומים",
-   "short": "כינוס איברים",
-   "prereqs": [
-    "f_ops"
-   ],
-   "description": "פישוט ביטוי בחיבור וחיסור של איברים דומים.",
-   "sample": {
-    "question": "$5a − 2b − 3a + 4b = ?$",
-    "choices": [
-     {
-      "text": "$2a + 2b$",
-      "correct": true
-     },
-     {
-      "text": "$4ab$",
-      "mistake": "join_unlike"
-     },
-     {
-      "text": "$8a + 2b$",
-      "mistake": "sign_of_term"
-     },
-     {
-      "text": "$2a − 6b$",
-      "mistake": "sign_of_term"
-     }
-    ]
-   }
-  },
-  {
-   "id": "f_power",
-   "unit": "f",
-   "name": "חזקה כמכפלה חוזרת",
-   "short": "חזקה בסיסית",
-   "prereqs": [
-    "f_ops"
-   ],
-   "description": "$x² = x·x$, וגם המקדם עולה בחזקה. הפריסה דורשת רק את זה לפני הטכניקה האלגברית.",
-   "sample": {
-    "question": "$(−3x)² = ?$",
-    "choices": [
-     {
-      "text": "$9x²$",
-      "correct": true
-     },
-     {
-      "text": "$−9x²$",
-      "mistake": "neg_square"
-     },
-     {
-      "text": "$−3x²$",
-      "mistake": "coef_not_raised"
-     },
-     {
-      "text": "$−6x²$",
-      "mistake": "power_as_mult"
-     }
-    ]
-   }
-  },
-  {
-   "id": "f_dist",
-   "unit": "f",
-   "name": "חוק הפילוג",
-   "short": "חוק הפילוג",
-   "prereqs": [
-    "f_like"
-   ],
-   "description": "מספר כפול סוגריים: $a(b + c) = ab + ac$.",
-   "sample": {
-    "question": "$−2(3x − 4) + 5x = ?$",
-    "choices": [
-     {
-      "text": "$−x + 8$",
-      "correct": true
-     },
-     {
-      "text": "$−x − 8$",
-      "mistake": "sign_product"
-     },
-     {
-      "text": "$−x − 4$",
-      "mistake": "partial_dist"
-     }
-    ]
-   }
-  },
-  {
-   "id": "f_lin",
-   "unit": "f",
-   "name": "משוואה ממעלה ראשונה",
-   "short": "משוואה קווית",
-   "prereqs": [
-    "f_dist"
-   ],
-   "description": "פתרון משוואה עם סוגריים, כולל משוואה בלי פתרון או עם אינסוף פתרונות.",
-   "sample": {
-    "question": "$3(x − 2) = x + 8$.  $x = ?$",
-    "choices": [
-     {
-      "text": "$7$",
-      "correct": true
-     },
-     {
-      "text": "$5$",
-      "mistake": "partial_dist"
-     },
-     {
-      "text": "$1$",
-      "mistake": "move_sign"
-     }
-    ]
-   }
-  },
-  {
-   "id": "f_linfun",
-   "unit": "f",
-   "name": "פונקציה קווית",
-   "short": "פונקציה קווית",
-   "prereqs": [
-    "f_lin"
-   ],
-   "description": "שיפוע, נקודת חיתוך עם ציר y, וישר דרך שתי נקודות.",
-   "sample": {
-    "question": "מהו השיפוע של הישר העובר דרך $(1, 2)$ ו־$(3, 8)$?",
-    "choices": [
-     {
-      "text": "$3$",
-      "correct": true
-     },
-     {
-      "text": "$1/3$",
-      "mistake": "slope_inverted"
-     },
-     {
-      "text": "$6$",
-      "mistake": "slope_dy_only"
-     }
-    ]
-   }
-  },
-  {
-   "id": "f_sys",
-   "unit": "f",
-   "name": "מערכת משוואות קוויות",
-   "short": "מערכת קווית",
-   "prereqs": [
-    "f_linfun"
-   ],
-   "description": "פתרון מערכת של שתי משוואות בהצבה או בהשוואת מקדמים.",
-   "sample": {
-    "question": "$x + y = 10$ ,  $x − y = 4$.  $(x, y) = ?$",
-    "choices": [
-     {
-      "text": "$(7, 3)$",
-      "correct": true
-     },
-     {
-      "text": "$(3, 7)$",
-      "mistake": "swapped_pair"
-     },
-     {
-      "text": "$(14, −4)$",
-      "mistake": "forgot_divide"
-     }
-    ]
-   }
-  },
-  {
-   "id": "f_sqrt",
-   "unit": "f",
-   "name": "שורש ריבועי",
-   "short": "שורש ריבועי",
-   "prereqs": [
-    "f_neg"
-   ],
-   "description": "שורש ריבועי של מספר, וההבדל בין שורש של סכום לסכום שורשים.",
-   "sample": {
-    "question": "$√(9 + 16) = ?$",
-    "choices": [
-     {
-      "text": "$5$",
-      "correct": true
-     },
-     {
-      "text": "$7$",
-      "mistake": "sqrt_split"
-     },
-     {
-      "text": "$12.5$",
-      "mistake": "sqrt_half"
-     }
-    ]
-   }
-  },
   {
    "id": "t_ext",
    "unit": "t",
    "name": "חוק הפילוג המורחב",
    "short": "פילוג מורחב",
-   "prereqs": [
-    "f_dist"
-   ],
-   "description": "סוגריים כפול סוגריים, ופישוט ביטויים בעזרתו.",
+   "prereqs": [],
+   "description": "כל איבר בסוגריים הראשונים כופל כל איבר בסוגריים השניים.",
    "month": "ספטמבר",
-   "core": true,
    "sample": {
     "question": "$(x + 3)(x − 5) = ?$",
     "choices": [
@@ -363,11 +121,11 @@
      },
      {
       "text": "$x² − 15$",
-      "mistake": "first_last_only"
+      "mistake": "ext_partial"
      },
      {
-      "text": "$x² − 8x − 15$",
-      "mistake": "sign_of_term"
+      "text": "$x² + 2x − 15$",
+      "mistake": "sign_mid"
      },
      {
       "text": "$x² − 2x + 15$",
@@ -380,27 +138,62 @@
    "id": "t_ext_eq",
    "unit": "t",
    "name": "משוואות בעזרת הפילוג המורחב",
-   "short": "משוואה בפילוג",
+   "short": "משוואה ופילוג",
    "prereqs": [
-    "t_ext",
-    "f_lin"
+    "t_ext"
    ],
-   "description": "פתיחת סוגריים בשני האגפים, ולעתים קרובות $x²$ מצטמצם.",
+   "description": "פותחים סוגריים בפילוג המורחב, מכנסים איברים ופותרים משוואה ממעלה ראשונה.",
    "month": "ספטמבר",
    "sample": {
-    "question": "$(x + 2)(x − 3) = x² + 4$.  $x = ?$",
+    "question": "פתרו: $(x + 2)(x + 3) = x² + 16$",
     "choices": [
      {
-      "text": "$−10$",
+      "text": "$x = 2$",
       "correct": true
      },
      {
-      "text": "$10$",
-      "mistake": "div_neg"
+      "text": "$x = 16/5$",
+      "mistake": "ext_partial"
      },
      {
-      "text": "אין פתרון",
-      "mistake": "first_last_only"
+      "text": "$x = 22/5$",
+      "mistake": "move_sign"
+     },
+     {
+      "text": "$x = 10$",
+      "mistake": "forgot_divide"
+     }
+    ]
+   }
+  },
+  {
+   "id": "t_area",
+   "unit": "t",
+   "name": "השוואת שטחים בעזרת הפילוג",
+   "short": "השוואת שטחים",
+   "prereqs": [
+    "t_ext"
+   ],
+   "description": "מבטאים שטחים כמכפלות של ביטויים אלגבריים ומשווים ביניהם.",
+   "month": "ספטמבר",
+   "sample": {
+    "question": "אורך מלבן $x + 4$ ורוחבו $x + 1$. צלע ריבוע $x + 2$. בכמה שטח המלבן גדול משטח הריבוע?",
+    "choices": [
+     {
+      "text": "$x$",
+      "correct": true
+     },
+     {
+      "text": "$5x$",
+      "mistake": "forgot_middle"
+     },
+     {
+      "text": "$2$",
+      "mistake": "area_perimeter"
+     },
+     {
+      "text": "$−x$",
+      "mistake": "diff_order"
      }
     ]
    }
@@ -411,12 +204,10 @@
    "name": "ריבוע של סכום והפרש",
    "short": "ריבוע סכום",
    "prereqs": [
-    "t_ext",
-    "f_power"
+    "t_ext"
    ],
-   "description": "$(a ± b)² = a² ± 2ab + b²$, בפיתוח אלגברי ובהמחשה גיאומטרית.",
+   "description": "$(a ± b)² = a² ± 2ab + b²$.",
    "month": "ספטמבר",
-   "core": true,
    "sample": {
     "question": "$(2x − 3)² = ?$",
     "choices": [
@@ -425,16 +216,16 @@
       "correct": true
      },
      {
-      "text": "$4x² − 9$",
+      "text": "$4x² + 9$",
       "mistake": "forgot_middle"
-     },
-     {
-      "text": "$2x² − 12x + 9$",
-      "mistake": "coef_not_raised"
      },
      {
       "text": "$4x² − 6x + 9$",
       "mistake": "middle_no_2"
+     },
+     {
+      "text": "$2x² − 12x + 9$",
+      "mistake": "coef_not_raised"
      }
     ]
    }
@@ -447,23 +238,26 @@
    "prereqs": [
     "t_ext"
    ],
-   "description": "$(a − b)(a + b) = a² − b²$, גם לחישוב בעל־פה.",
+   "description": "$(a + b)(a − b) = a² − b²$.",
    "month": "ספטמבר",
-   "core": true,
    "sample": {
-    "question": "חשבו בעל־פה: $51 · 49 = ?$",
+    "question": "$(3x + 5)(3x − 5) = ?$",
     "choices": [
      {
-      "text": "$2499$",
+      "text": "$9x² − 25$",
       "correct": true
      },
      {
-      "text": "$2501$",
+      "text": "$9x² + 25$",
       "mistake": "diff_sign"
      },
      {
-      "text": "$2500$",
-      "mistake": "forgot_b2"
+      "text": "$3x² − 25$",
+      "mistake": "coef_not_raised"
+     },
+     {
+      "text": "$9x² − 30x + 25$",
+      "mistake": "diffsq_as_square"
      }
     ]
    }
@@ -473,14 +267,11 @@
    "unit": "t",
    "name": "הוצאת גורם משותף",
    "short": "גורם משותף",
-   "prereqs": [
-    "f_dist"
-   ],
-   "description": "פירוק לגורמים בהוצאת הגורם המשותף הגדול ביותר.",
+   "prereqs": [],
+   "description": "מוציאים את הגורם המשותף הגדול ביותר, כולל משתנים.",
    "month": "אוקטובר",
-   "core": true,
    "sample": {
-    "question": "פרקו: $6x² − 9x$",
+    "question": "פרקו לגורמים: $6x² − 9x$",
     "choices": [
      {
       "text": "$3x(2x − 3)$",
@@ -491,43 +282,12 @@
       "mistake": "partial_gcf"
      },
      {
-      "text": "$x(6x − 9)$",
-      "mistake": "partial_gcf"
-     },
-     {
-      "text": "$3x(2x − 3x)$",
+      "text": "$3x(2x − 9)$",
       "mistake": "divide_each"
-     }
-    ]
-   }
-  },
-  {
-   "id": "t_factor_formula",
-   "unit": "t",
-   "name": "פירוק בנוסחאות הכפל המקוצר",
-   "short": "פירוק בנוסחאות",
-   "prereqs": [
-    "t_square",
-    "t_diffsq",
-    "t_gcf",
-    "f_sqrt"
-   ],
-   "description": "זיהוי הפרש ריבועים וריבוע של סכום בביטוי, ופירוקו.",
-   "month": "אוקטובר",
-   "sample": {
-    "question": "פרקו: $4x² − 25$",
-    "choices": [
-     {
-      "text": "$(2x − 5)(2x + 5)$",
-      "correct": true
      },
      {
-      "text": "$(2x − 5)²$",
-      "mistake": "diff_vs_square"
-     },
-     {
-      "text": "$(4x − 5)(4x + 5)$",
-      "mistake": "root_of_coef"
+      "text": "$3x(2x + 3)$",
+      "mistake": "sign_of_term"
      }
     ]
    }
@@ -535,15 +295,15 @@
   {
    "id": "t_trinomial",
    "unit": "t",
-   "name": "פירוק טרינום $x² + bx + c$",
+   "name": "פירוק טרינום ריבועי",
    "short": "פירוק טרינום",
    "prereqs": [
     "t_ext"
    ],
-   "description": "שני מספרים שמכפלתם c וסכומם b. לפי הפריסה רק כשהמקדם של $x²$ הוא 1.",
+   "description": "$x² + bx + c = (x + m)(x + n)$ כאשר $m + n = b$ ו־$m · n = c$.",
    "month": "אוקטובר",
    "sample": {
-    "question": "פרקו: $x² − x − 12$",
+    "question": "פרקו לגורמים: $x² − x − 12$",
     "choices": [
      {
       "text": "$(x − 4)(x + 3)$",
@@ -565,33 +325,35 @@
    }
   },
   {
-   "id": "t_domain",
+   "id": "t_factor_formula",
    "unit": "t",
-   "name": "תחום הצבה",
-   "short": "תחום הצבה",
+   "name": "פירוק בנוסחאות הכפל המקוצר",
+   "short": "פירוק בנוסחאות",
    "prereqs": [
-    "f_lin"
+    "t_square",
+    "t_diffsq",
+    "t_gcf"
    ],
-   "description": "אילו ערכים אסור להציב כי הם מאפסים את המכנה.",
-   "month": "ינואר",
+   "description": "מוציאים גורם משותף ואחר כך מפרקים בנוסחאות הכפל המקוצר.",
+   "month": "אוקטובר",
    "sample": {
-    "question": "מהו תחום ההצבה של $(x + 1)/(x(x + 4))$?",
+    "question": "פרקו לגורמים: $2x² − 18$",
     "choices": [
      {
-      "text": "$x ≠ 0$ ,  $x ≠ −4$",
+      "text": "$2(x − 3)(x + 3)$",
       "correct": true
      },
      {
-      "text": "$x ≠ 0$ ,  $x ≠ 4$",
-      "mistake": "zero_root_sign"
+      "text": "$2(x² − 9)$",
+      "mistake": "partial_factor"
      },
      {
-      "text": "$x ≠ 0$ בלבד",
-      "mistake": "one_factor_only"
+      "text": "$(2x − 3)(2x + 3)$",
+      "mistake": "gcf_first"
      },
      {
-      "text": "$x ≠ 0$ ,  $x ≠ −4$ ,  $x ≠ −1$",
-      "mistake": "numerator_domain"
+      "text": "$2(x − 3)²$",
+      "mistake": "diffsq_as_square"
      }
     ]
    }
@@ -603,29 +365,28 @@
    "short": "צמצום שברים",
    "prereqs": [
     "t_factor_formula",
-    "t_trinomial",
-    "t_domain"
+    "t_trinomial"
    ],
-   "description": "פירוק המונה והמכנה לגורמים וצמצום גורמים משותפים.",
+   "description": "מפרקים את המונה ואת המכנה לגורמים ומצמצמים גורמים משותפים.",
    "month": "אוקטובר",
    "sample": {
-    "question": "צמצמו: $(x² − 9)/(x² + 5x + 6)$",
+    "question": "צמצמו (בתחום ההצבה): $(x² − 9) / (x² + 3x)$",
     "choices": [
      {
-      "text": "$(x − 3)/(x + 2)$",
+      "text": "$(x − 3) / x$",
       "correct": true
      },
      {
-      "text": "$−9/(5x + 6)$",
+      "text": "$−9 / 3x$",
       "mistake": "cancel_terms"
      },
      {
-      "text": "$−3/2$",
-      "mistake": "cancel_terms"
-     },
-     {
-      "text": "$(x + 3)/(x + 2)$",
+      "text": "$(x + 3) / x$",
       "mistake": "factor_sign"
+     },
+     {
+      "text": "$x − 3$",
+      "mistake": "lost_denominator"
      }
     ]
    }
@@ -638,464 +399,318 @@
    "prereqs": [
     "t_reduce"
    ],
-   "description": "כפל מונים ומכנים, חילוק ככפל בהופכי, ופירוק לפני צמצום.",
+   "description": "חילוק בשבר הוא כפל בשבר ההפוך; מפרקים ומצמצמים.",
    "month": "אוקטובר",
    "sample": {
-    "question": "$2x/(x + 1)  :  4x²/(x² − 1) = ?$",
+    "question": "$(x² − 4) / x : (x + 2) / x² = ?$",
     "choices": [
      {
-      "text": "$(x − 1)/(2x)$",
+      "text": "$x(x − 2)$",
       "correct": true
      },
      {
-      "text": "$8x³/((x + 1)²(x − 1))$",
+      "text": "$(x − 2)(x + 2)² / x³$",
       "mistake": "div_not_flipped"
      },
      {
-      "text": "$(x − 1)/2$",
+      "text": "$x − 2$",
       "mistake": "cancel_power"
      },
      {
-      "text": "$(x + 1)/(2x)$",
+      "text": "$x(x + 2)$",
       "mistake": "factor_sign"
      }
     ]
    }
   },
   {
-   "id": "t_fraceq",
-   "unit": "t",
-   "name": "משוואות רציונליות",
-   "short": "משוואה רציונלית",
-   "prereqs": [
-    "t_reduce",
-    "q_eq_simple"
-   ],
-   "description": "פירוק המכנים, תחום הצבה, ופסילת פתרון שאינו קביל.",
-   "month": "ינואר",
+   "id": "k_kite_def",
+   "unit": "k",
+   "name": "הכרת הדלתון",
+   "short": "הכרת הדלתון",
+   "prereqs": [],
+   "description": "דלתון הוא מרובע שבו שני זוגות של צלעות סמוכות שוות.",
+   "month": "ספטמבר",
    "sample": {
-    "question": "$x²/(x − 3) = 9/(x − 3)$.  $x = ?$",
+    "question": "איזה משפט נכון לכל דלתון?",
     "choices": [
      {
-      "text": "$x = −3$",
+      "text": "יש בו שני זוגות של צלעות סמוכות שוות",
       "correct": true
      },
      {
-      "text": "$x = 3$ או $x = −3$",
-      "mistake": "excluded_root"
+      "text": "כל הצלעות שלו שוות",
+      "mistake": "kite_rhombus"
      },
      {
-      "text": "$x = 3$",
-      "mistake": "excluded_root"
+      "text": "יש בו שני זוגות של צלעות נגדיות שוות",
+      "mistake": "kite_parallelogram"
+     },
+     {
+      "text": "האלכסונים שלו שווים זה לזה",
+      "mistake": "kite_diag_equal"
      }
     ]
    }
   },
   {
-   "id": "n_intercepts",
-   "unit": "n",
-   "name": "נקודות חיתוך עם הצירים",
-   "short": "חיתוך עם הצירים",
+   "id": "k_kite_angles",
+   "unit": "k",
+   "name": "זוויות בדלתון",
+   "short": "זוויות בדלתון",
    "prereqs": [
-    "f_linfun"
+    "k_kite_def"
    ],
-   "description": "חיתוך עם ציר x: $y = 0$. חיתוך עם ציר y: $x = 0$. כל נקודה היא זוג סדור.",
-   "month": "מרץ",
-   "core": true,
+   "description": "בדלתון הזוויות שבין הצלעות השונות שוות זו לזו.",
+   "month": "ספטמבר",
    "sample": {
-    "question": "מהן נקודות החיתוך של $f(x) = 2x − 6$ עם הצירים?",
+    "question": "בדלתון $ABCD$: $AB = AD$, $CB = CD$, $∢A = 70°$, $∢C = 50°$. מה גודל $∢B$?",
     "choices": [
      {
-      "text": "$(3, 0)$ ,  $(0, −6)$",
+      "text": "$120°$",
       "correct": true
      },
      {
-      "text": "$(−6, 0)$ ,  $(0, 3)$",
-      "mistake": "axes_mixed"
+      "text": "$70°$",
+      "mistake": "kite_wrong_pair"
      },
      {
-      "text": "$(3, 0)$ ,  $(0, 6)$",
-      "mistake": "sign_product"
+      "text": "$240°$",
+      "mistake": "forgot_half"
+     },
+     {
+      "text": "$60°$",
+      "mistake": "angle_sum_180"
      }
     ]
    }
   },
   {
-   "id": "n_sign",
-   "unit": "n",
-   "name": "תחומי חיוביות ושליליות",
-   "short": "חיוביות ושליליות",
+   "id": "k_kite_diag",
+   "unit": "k",
+   "name": "האלכסון הראשי בדלתון",
+   "short": "אלכסון ראשי",
    "prereqs": [
-    "n_intercepts"
+    "k_kite_def"
    ],
-   "description": "איפה הגרף מעל ציר x ואיפה מתחתיו.",
-   "month": "מרץ",
-   "core": true,
+   "description": "האלכסון הראשי הוא אנך אמצעי לאלכסון השני וחוצה את הזוויות שבקצותיו.",
+   "month": "ספטמבר",
    "sample": {
-    "question": "באיזה תחום הפונקציה שבגרף שלילית?",
-    "graph": {
-     "points": [
-      [
-       -3,
-       -3
-      ],
-      [
-       -2,
-       0
-      ],
-      [
-       -0.5,
-       2
-      ],
-      [
-       1,
-       0
-      ],
-      [
-       2.5,
-       -2
-      ],
-      [
-       4,
-       0
-      ],
-      [
-       5,
-       2
-      ]
-     ],
-     "x": [
-      -3.5,
-      5.5
-     ],
-     "y": [
-      -3.5,
-      3.5
-     ]
-    },
-    "choices": [
-     {
-      "text": "$x < −2$ או $1 < x < 4$",
-      "correct": true
-     },
-     {
-      "text": "$−2 < x < 1$ או $x > 4$",
-      "mistake": "pos_neg_swap"
-     },
-     {
-      "text": "$x < 0$",
-      "mistake": "neg_x"
-     },
-     {
-      "text": "$1 < x < 4$ בלבד",
-      "mistake": "partial_intervals"
-     }
-    ]
-   }
-  },
-  {
-   "id": "n_extremum",
-   "unit": "n",
-   "name": "נקודות קיצון ותחומי עלייה וירידה",
-   "short": "קיצון, עלייה וירידה",
-   "prereqs": [
-    "n_sign"
-   ],
-   "description": "קריאה מהגרף: איפה הפונקציה עולה, איפה יורדת, ואיפה היא מחליפה כיוון.",
-   "month": "מרץ",
-   "core": true,
-   "sample": {
-    "question": "באילו תחומים הפונקציה שבגרף יורדת? (התחום המוצג: $−4 ≤ x ≤ 5$)",
-    "graph": {
-     "points": [
-      [
-       -4,
-       1
-      ],
-      [
-       -2,
-       4
-      ],
-      [
-       1,
-       -2
-      ],
-      [
-       3,
-       1
-      ],
-      [
-       5,
-       -1
-      ]
-     ],
-     "x": [
-      -4.5,
-      5.5
-     ],
-     "y": [
-      -3,
-      5
-     ]
-    },
-    "choices": [
-     {
-      "text": "$−2 < x < 1$ או $3 < x < 5$",
-      "correct": true
-     },
-     {
-      "text": "$−2 < x < 1$ בלבד",
-      "mistake": "partial_intervals"
-     },
-     {
-      "text": "$−2 < y < 4$",
-      "mistake": "x_vs_y_interval"
-     },
-     {
-      "text": "$−4 < x < −2$ או $1 < x < 3$",
-      "mistake": "dir_confusion"
-     }
-    ]
-   }
-  },
-  {
-   "id": "n_local_abs",
-   "unit": "n",
-   "name": "קיצון מקומי וקיצון מוחלט",
-   "short": "מקומי ומוחלט",
-   "prereqs": [
-    "n_extremum"
-   ],
-   "description": "ערך הקיצון הוא שיעור ה־y של הנקודה. מקסימום מקומי אינו בהכרח הגבוה ביותר. יש פונקציות בלי קיצון.",
-   "month": "מרץ",
-   "core": true,
-   "sample": {
-    "question": "מהו ערך המקסימום המוחלט של הפונקציה בתחום המוצג?",
-    "graph": {
-     "points": [
-      [
-       -3,
-       -1
-      ],
-      [
-       -1,
-       3
-      ],
-      [
-       1,
-       0
-      ],
-      [
-       3,
-       5
-      ],
-      [
-       4,
-       4
-      ]
-     ],
-     "x": [
-      -3.5,
-      4.5
-     ],
-     "y": [
-      -2,
-      6
-     ]
-    },
+    "question": "בדלתון $ABCD$ ($AB = AD$, $CB = CD$) האלכסונים נחתכים בנקודה $E$, ו־$BD = 10$. מה אורך $BE$?",
     "choices": [
      {
       "text": "$5$",
       "correct": true
      },
      {
-      "text": "$3$",
-      "mistake": "local_as_abs"
+      "text": "$10$",
+      "mistake": "kite_diag_bisect"
      },
      {
-      "text": "$(3, 5)$",
-      "mistake": "value_vs_point"
-     },
-     {
-      "text": "$x = 3$",
-      "mistake": "value_vs_point"
+      "text": "אי אפשר לדעת",
+      "mistake": "kite_diag_bisect"
      }
     ]
    }
   },
   {
-   "id": "n_eq_graph",
-   "unit": "n",
-   "name": "משוואה וגרף: $f(x) = m$",
-   "short": "f(x) = m",
+   "id": "k_kite_proof",
+   "unit": "k",
+   "name": "הוכחה שמרובע הוא דלתון",
+   "short": "הוכחת דלתון",
    "prereqs": [
-    "n_intercepts"
+    "k_kite_def"
    ],
-   "description": "מספר הפתרונות של $f(x) = m$ הוא מספר הפעמים שהגרף פוגש את הישר $y = m$.",
-   "month": "מרץ",
-   "core": true,
+   "description": "מרובע שבו אלכסון אחד הוא אנך אמצעי לאלכסון השני הוא דלתון.",
+   "month": "ספטמבר",
    "sample": {
-    "question": "לכמה פתרונות יש המשוואה $f(x) = 1$ בתחום המוצג?",
-    "graph": {
-     "points": [
-      [
-       -4,
-       3
-      ],
-      [
-       -2,
-       -1
-      ],
-      [
-       0,
-       2
-      ],
-      [
-       2,
-       -2
-      ],
-      [
-       4,
-       0
-      ]
-     ],
-     "x": [
-      -4.5,
-      4.5
-     ],
-     "y": [
-      -3,
-      4
-     ]
-    },
+    "question": "במרובע $ABCD$ האלכסון $AC$ הוא אנך אמצעי לאלכסון $BD$. מה אפשר להסיק בוודאות?",
     "choices": [
      {
-      "text": "$3$",
+      "text": "$ABCD$ הוא דלתון",
       "correct": true
      },
      {
-      "text": "$1$",
-      "mistake": "x_equals_m"
+      "text": "$ABCD$ הוא מעוין",
+      "mistake": "kite_rhombus"
      },
      {
-      "text": "$2$",
-      "mistake": "count_all"
+      "text": "$ABCD$ הוא מלבן",
+      "mistake": "kite_rect"
      }
     ]
    }
   },
   {
-   "id": "n_vshift",
-   "unit": "n",
-   "name": "הזזה אנכית של פונקציה",
-   "short": "הזזה אנכית",
+   "id": "k_kite_axes",
+   "unit": "k",
+   "name": "דלתון במערכת צירים",
+   "short": "דלתון בצירים",
    "prereqs": [
-    "n_extremum"
+    "k_kite_diag"
    ],
-   "description": "$f(x) + k$ מזיז את הגרף למעלה או למטה. נקודות הקיצון זזות, תחומי העלייה והירידה נשמרים.",
-   "month": "מרץ",
-   "core": true,
+   "description": "כשהאלכסון הראשי מונח על ציר, שני הקודקודים האחרים סימטריים ביחס אליו.",
+   "month": "ספטמבר",
    "sample": {
-    "question": "ל־f מקסימום ב־$(2, 5)$. מהו המקסימום של $g(x) = f(x) − 3$?",
+    "question": "$A(0, 6)$, $B(−3, 2)$, $C(0, 0)$. המרובע $ABCD$ הוא דלתון ($AB = AD$, $CB = CD$), והאלכסון $AC$ מונח על ציר $y$. מה שיעורי $D$?",
     "choices": [
      {
-      "text": "$(2, 2)$",
+      "text": "$(3, 2)$",
       "correct": true
      },
      {
-      "text": "$(2, 8)$",
-      "mistake": "vshift_dir"
+      "text": "$(−3, −2)$",
+      "mistake": "reflect_axis"
      },
      {
-      "text": "$(−1, 5)$",
-      "mistake": "vshift_as_h"
-     }
-    ]
-   }
-  },
-  {
-   "id": "n_hshift",
-   "unit": "n",
-   "name": "הזזה אופקית של פונקציה",
-   "short": "הזזה אופקית",
-   "prereqs": [
-    "n_extremum"
-   ],
-   "description": "$f(x − b)$ מזיז את הגרף ימינה כש־$b > 0$. הפריסה מציינת שתלמידים נוטים להזיז לכיוון הלא נכון.",
-   "month": "מרץ",
-   "core": true,
-   "sample": {
-    "question": "ל־f מינימום ב־$(1, −4)$. מהו המינימום של $g(x) = f(x − 3)$?",
-    "choices": [
-     {
-      "text": "$(4, −4)$",
-      "correct": true
+      "text": "$(2, 3)$",
+      "mistake": "swapped_pair"
      },
      {
-      "text": "$(−2, −4)$",
-      "mistake": "hshift_sign"
-     },
-     {
-      "text": "$(1, −7)$",
-      "mistake": "h_as_v"
-     }
-    ]
-   }
-  },
-  {
-   "id": "n_reflect",
-   "unit": "n",
-   "name": "שיקוף ביחס לציר x",
-   "short": "שיקוף",
-   "prereqs": [
-    "n_extremum"
-   ],
-   "description": "$−f(x)$ הופך את הגרף: מקסימום הופך למינימום, וחיוביות לשליליות.",
-   "month": "מרץ",
-   "core": true,
-   "sample": {
-    "question": "ל־f מקסימום ב־$(−2, 3)$. מה יש ל־$g(x) = −f(x)$?",
-    "choices": [
-     {
-      "text": "מינימום ב־$(−2, −3)$",
-      "correct": true
-     },
-     {
-      "text": "מקסימום ב־$(−2, −3)$",
-      "mistake": "reflect_type"
-     },
-     {
-      "text": "מקסימום ב־$(2, 3)$",
+      "text": "$(3, −2)$",
       "mistake": "reflect_axis"
      }
     ]
    }
   },
   {
-   "id": "n_props_graph",
-   "unit": "n",
-   "name": "מתכונות לגרף",
-   "short": "מתכונות לגרף",
-   "prereqs": [
-    "n_local_abs"
-   ],
-   "description": "סרטוט גרף שמתאים לתכונות נתונות, והסקת תכונות נוספות מהן.",
-   "month": "מרץ",
-   "core": true,
+   "id": "k_iso_base",
+   "unit": "k",
+   "name": "זוויות הבסיס במשולש שווה שוקיים",
+   "short": "זוויות הבסיס",
+   "prereqs": [],
+   "description": "במשולש שווה שוקיים זוויות הבסיס שוות.",
+   "month": "אוקטובר",
    "sample": {
-    "question": "f עולה ב־$x < 2$, יורדת ב־$x > 2$, ו־$f(2) = −1$. כמה נקודות חיתוך עם ציר x יש לה?",
+    "question": "במשולש $ABC$: $AB = AC$ ו־$∢A = 40°$. מה גודל $∢B$?",
     "choices": [
      {
-      "text": "אף אחת",
+      "text": "$70°$",
       "correct": true
      },
      {
-      "text": "שתיים",
-      "mistake": "max_below"
+      "text": "$40°$",
+      "mistake": "iso_wrong_angle"
      },
      {
-      "text": "אחת",
-      "mistake": "max_below"
+      "text": "$140°$",
+      "mistake": "forgot_half_angle"
+     },
+     {
+      "text": "$100°$",
+      "mistake": "iso_wrong_angle"
+     }
+    ]
+   }
+  },
+  {
+   "id": "k_iso_converse",
+   "unit": "k",
+   "name": "משפט הפוך: שתי זוויות שוות",
+   "short": "זוויות שוות ⇐ שוקיים",
+   "prereqs": [
+    "k_iso_base"
+   ],
+   "description": "משולש שבו שתי זוויות שוות הוא שווה שוקיים: הצלעות שמול הזוויות השוות שוות.",
+   "month": "אוקטובר",
+   "sample": {
+    "question": "במשולש $ABC$: $∢B = ∢C = 65°$ ו־$AB = 7$. מה אפשר לומר על $AC$?",
+    "choices": [
+     {
+      "text": "$AC = 7$",
+      "correct": true
+     },
+     {
+      "text": "$AC = BC$",
+      "mistake": "iso_wrong_side"
+     },
+     {
+      "text": "אי אפשר לדעת את $AC$",
+      "mistake": "iso_converse"
+     }
+    ]
+   }
+  },
+  {
+   "id": "k_iso_bisector",
+   "unit": "k",
+   "name": "חוצה זווית שהוא גם גובה",
+   "short": "חוצה זווית וגובה",
+   "prereqs": [
+    "k_iso_base"
+   ],
+   "description": "משולש שבו חוצה זווית הוא גם גובה (או גם תיכון) הוא שווה שוקיים.",
+   "month": "אוקטובר",
+   "sample": {
+    "question": "במשולש $ABC$, $AD$ הוא חוצה זווית $A$ וגם הגובה לצלע $BC$. מה אפשר להסיק?",
+    "choices": [
+     {
+      "text": "המשולש שווה שוקיים: $AB = AC$",
+      "correct": true
+     },
+     {
+      "text": "המשולש שווה צלעות",
+      "mistake": "iso_equilateral"
+     },
+     {
+      "text": "המשולש ישר זווית",
+      "mistake": "iso_right"
+     }
+    ]
+   }
+  },
+  {
+   "id": "k_iso_median",
+   "unit": "k",
+   "name": "התיכון לבסיס",
+   "short": "תיכון לבסיס",
+   "prereqs": [
+    "k_iso_base"
+   ],
+   "description": "במשולש שווה שוקיים התיכון לבסיס, הגובה לבסיס וחוצה זווית הראש מתלכדים.",
+   "month": "אוקטובר",
+   "sample": {
+    "question": "במשולש שווה שוקיים $ABC$ ($AB = AC$), $AD$ הוא התיכון לבסיס $BC$, ו־$∢BAC = 50°$. מה גודל $∢BAD$ ומה גודל $∢ADB$?",
+    "choices": [
+     {
+      "text": "$∢BAD = 25°$, $∢ADB = 90°$",
+      "correct": true
+     },
+     {
+      "text": "$∢BAD = 50°$, $∢ADB = 90°$",
+      "mistake": "iso_median_bisects"
+     },
+     {
+      "text": "$∢BAD = 25°$, $∢ADB = 65°$",
+      "mistake": "iso_median_height"
+     }
+    ]
+   }
+  },
+  {
+   "id": "k_iso_axes",
+   "unit": "k",
+   "name": "משולש שווה שוקיים במערכת צירים",
+   "short": "שוקיים בצירים",
+   "prereqs": [
+    "k_iso_median"
+   ],
+   "description": "כשהבסיס מקביל לציר $x$, הגובה לבסיס הוא הפרש שיעורי ה־$y$.",
+   "month": "אוקטובר",
+   "sample": {
+    "question": "$A(2, 7)$, $B(−1, 1)$, $C(5, 1)$. המשולש $ABC$ שווה שוקיים ($AB = AC$). מה אורך הגובה לבסיס $BC$?",
+    "choices": [
+     {
+      "text": "$6$",
+      "correct": true
+     },
+     {
+      "text": "$7$",
+      "mistake": "height_from_axis"
+     },
+     {
+      "text": "$3$",
+      "mistake": "iso_half_base"
      }
     ]
    }
@@ -1103,29 +718,61 @@
   {
    "id": "q_parabola",
    "unit": "q",
-   "name": "הפרבולה $f(x) = ax²$",
-   "short": "הפרבולה ax²",
-   "prereqs": [
-    "n_extremum",
-    "f_power"
-   ],
-   "description": "לפי הפריסה, a קובע רק את סוג הקיצון: $a > 0$ מינימום, $a < 0$ מקסימום. בלי מתיחה וכיווץ.",
+   "name": "הפרבולה $y = ax²$",
+   "short": "הפרבולה $ax²$",
+   "prereqs": [],
+   "description": "סימן $a$ קובע אם לפרבולה יש מינימום ($a > 0$) או מקסימום ($a < 0$).",
    "month": "נובמבר",
-   "core": true,
    "sample": {
-    "question": "מהי נקודת הקיצון של $f(x) = −2x²$, ומה סוגה?",
+    "question": "לאיזו מהפונקציות יש נקודת מקסימום?",
     "choices": [
      {
-      "text": "מקסימום $(0, 0)$",
+      "text": "$f(x) = −2x²$",
       "correct": true
      },
      {
-      "text": "מינימום $(0, 0)$",
+      "text": "$f(x) = 2x²$",
       "mistake": "opening_sign"
      },
      {
-      "text": "מקסימום $(0, −2)$",
-      "mistake": "a_as_vertex"
+      "text": "$f(x) = 0.5x²$",
+      "mistake": "opening_sign"
+     },
+     {
+      "text": "$f(x) = x²$",
+      "mistake": "opening_sign"
+     }
+    ]
+   }
+  },
+  {
+   "id": "q_props",
+   "unit": "q",
+   "name": "תכונות הפונקציה $ax²$",
+   "short": "תכונות $ax²$",
+   "prereqs": [
+    "q_parabola"
+   ],
+   "description": "קודקוד, עלייה וירידה, חיוביות ושליליות של פרבולה.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "באיזה תחום הפונקציה $f(x) = −3x²$ עולה?",
+    "choices": [
+     {
+      "text": "$x < 0$",
+      "correct": true
+     },
+     {
+      "text": "$x > 0$",
+      "mistake": "dir_confusion"
+     },
+     {
+      "text": "$y < 0$",
+      "mistake": "x_vs_y_interval"
+     },
+     {
+      "text": "לכל $x$",
+      "mistake": "dir_confusion"
      }
     ]
    }
@@ -1134,33 +781,30 @@
    "id": "q_vshift",
    "unit": "q",
    "name": "הזזה אנכית $ax² + k$",
-   "short": "ax² + k",
+   "short": "הזזה אנכית",
    "prereqs": [
-    "q_parabola",
-    "n_vshift",
-    "f_sqrt"
+    "q_parabola"
    ],
-   "description": "קודקוד $(0, k)$, נקודות חיתוך עם הצירים, ותחומי חיוביות ושליליות.",
+   "description": "$ax² + k$ היא הפרבולה $ax²$ שהוזזה $k$ יחידות למעלה או למטה. הקודקוד $(0, k)$.",
    "month": "נובמבר",
-   "core": true,
    "sample": {
-    "question": "מהן נקודות החיתוך של $y = x² − 4$ עם ציר x?",
+    "question": "מה קודקוד הפרבולה $f(x) = 2x² − 5$?",
     "choices": [
      {
-      "text": "$(2, 0)$ ,  $(−2, 0)$",
+      "text": "$(0, −5)$",
       "correct": true
      },
      {
-      "text": "$(0, −4)$",
-      "mistake": "axes_mixed"
+      "text": "$(−5, 0)$",
+      "mistake": "vshift_as_h"
      },
      {
-      "text": "$(2, 0)$ בלבד",
-      "mistake": "missing_neg_root"
+      "text": "$(0, 5)$",
+      "mistake": "k_sign"
      },
      {
-      "text": "$(4, 0)$ ,  $(−4, 0)$",
-      "mistake": "forgot_root"
+      "text": "$(5, 0)$",
+      "mistake": "vshift_as_h"
      }
     ]
    }
@@ -1169,16 +813,14 @@
    "id": "q_hshift",
    "unit": "q",
    "name": "הזזה אופקית $a(x − b)²$",
-   "short": "a(x − b)²",
+   "short": "הזזה אופקית",
    "prereqs": [
-    "q_parabola",
-    "n_hshift"
+    "q_parabola"
    ],
-   "description": "קודקוד $(b, 0)$ וציר סימטריה $x = b$.",
+   "description": "$a(x − b)²$ היא הפרבולה $ax²$ שהוזזה $b$ יחידות ימינה. הקודקוד $(b, 0)$.",
    "month": "נובמבר",
-   "core": true,
    "sample": {
-    "question": "מהו הקודקוד של $y = (x + 3)²$?",
+    "question": "מה קודקוד הפרבולה $f(x) = (x + 3)²$?",
     "choices": [
      {
       "text": "$(−3, 0)$",
@@ -1208,55 +850,58 @@
     "q_vshift",
     "q_hshift"
    ],
-   "description": "שילוב שתי ההזזות: קודקוד $(b, k)$, וסוג הקיצון לפי הסימן של a.",
+   "description": "שילוב הזזה אופקית ואנכית: הקודקוד $(b, k)$.",
    "month": "נובמבר",
-   "core": true,
    "sample": {
-    "question": "מהי נקודת הקיצון של $f(x) = −2(x − 3)² + 8$?",
+    "question": "מה קודקוד הפרבולה $f(x) = −(x − 4)² + 1$, והאם הוא נקודת מינימום או מקסימום?",
     "choices": [
      {
-      "text": "מקסימום $(3, 8)$",
+      "text": "$(4, 1)$, מקסימום",
       "correct": true
      },
      {
-      "text": "מינימום $(3, 8)$",
+      "text": "$(4, 1)$, מינימום",
       "mistake": "opening_sign"
      },
      {
-      "text": "מקסימום $(−3, 8)$",
+      "text": "$(−4, 1)$, מקסימום",
       "mistake": "hshift_sign"
      },
      {
-      "text": "מקסימום $(3, −8)$",
-      "mistake": "k_sign"
+      "text": "$(1, 4)$, מקסימום",
+      "mistake": "swapped_pair"
      }
     ]
    }
   },
   {
-   "id": "q_zero_prod",
+   "id": "q_vertex_props",
    "unit": "q",
-   "name": "מכפלה שווה לאפס",
-   "short": "מכפלה = 0",
+   "name": "חיתוך עם הצירים מהצגה קודקודית",
+   "short": "חיתוך מקודקודית",
    "prereqs": [
-    "f_lin"
+    "q_vertex"
    ],
-   "description": "$a(x − m)(x − n) = 0$: כל גורם שמתאפס נותן פתרון.",
-   "month": "אוקטובר",
+   "description": "מציבים $y = 0$ ופותרים $(x − b)² = c$ בשני הכיוונים.",
+   "month": "נובמבר",
    "sample": {
-    "question": "$(x − 3)(2x + 1) = 0$.  $x = ?$",
+    "question": "מהן נקודות החיתוך של $f(x) = (x − 2)² − 9$ עם ציר $x$?",
     "choices": [
      {
-      "text": "$x = 3$ ,  $x = −½$",
+      "text": "$(−1, 0)$ ו־$(5, 0)$",
       "correct": true
      },
      {
-      "text": "$x = −3$ ,  $x = ½$",
-      "mistake": "zero_sign"
+      "text": "$(5, 0)$ בלבד",
+      "mistake": "missing_neg_root"
      },
      {
-      "text": "$x = 3$ ,  $x = −2$",
-      "mistake": "divide_wrong"
+      "text": "$(2, −9)$",
+      "mistake": "vertex_as_root"
+     },
+     {
+      "text": "$(0, −5)$",
+      "mistake": "axes_mixed"
      }
     ]
    }
@@ -1267,30 +912,61 @@
    "name": "הצגה כמכפלה",
    "short": "הצגה כמכפלה",
    "prereqs": [
-    "q_parabola",
-    "q_zero_prod"
+    "q_parabola"
    ],
-   "description": "$f(x) = a(x − m)(x − n)$: נקודות אפס, וציר סימטריה באמצע ביניהן.",
+   "description": "$a(x − x₁)(x − x₂)$: נקודות החיתוך עם ציר $x$ הן $x₁$ ו־$x₂$.",
    "month": "נובמבר",
-   "core": true,
    "sample": {
-    "question": "ל־$h(x) = 2(x − 1)(x − 5)$: מהן נקודות האפס ומהו ציר הסימטריה?",
+    "question": "מהן נקודות החיתוך של $f(x) = 2(x − 1)(x + 3)$ עם ציר $x$?",
     "choices": [
      {
-      "text": "אפסים $1, 5$ · ציר $x = 3$",
+      "text": "$(1, 0)$ ו־$(−3, 0)$",
       "correct": true
      },
      {
-      "text": "אפסים $−1, −5$ · ציר $x = −3$",
-      "mistake": "zero_sign"
+      "text": "$(−1, 0)$ ו־$(3, 0)$",
+      "mistake": "zero_root_sign"
      },
      {
-      "text": "אפסים $1, 5$ · ציר $x = 2$",
-      "mistake": "axis_middle"
-     },
-     {
-      "text": "אפסים $2, 1, 5$ · ציר $x = 3$",
+      "text": "$(2, 0)$, $(1, 0)$ ו־$(−3, 0)$",
       "mistake": "a_as_zero"
+     },
+     {
+      "text": "$(0, −6)$",
+      "mistake": "axes_mixed"
+     }
+    ]
+   }
+  },
+  {
+   "id": "q_axis",
+   "unit": "q",
+   "name": "קודקוד מהצגה כמכפלה",
+   "short": "קודקוד ממכפלה",
+   "prereqs": [
+    "q_fform",
+    "q_vertex"
+   ],
+   "description": "ציר הסימטריה באמצע בין השורשים; מציבים אותו כדי למצוא את הקודקוד.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "מה קודקוד הפרבולה $f(x) = (x − 1)(x − 5)$?",
+    "choices": [
+     {
+      "text": "$(3, −4)$",
+      "correct": true
+     },
+     {
+      "text": "$(3, 0)$",
+      "mistake": "forgot_y"
+     },
+     {
+      "text": "$(−3, −4)$",
+      "mistake": "axis_sign"
+     },
+     {
+      "text": "$(6, 5)$",
+      "mistake": "forgot_half_axis"
      }
     ]
    }
@@ -1298,17 +974,15 @@
   {
    "id": "q_sform",
    "unit": "q",
-   "name": "הצגה סטנדרטית וקודקוד אלגברי",
+   "name": "הצגה סטנדרטית וקודקוד",
    "short": "הצגה סטנדרטית",
    "prereqs": [
-    "q_fform",
-    "q_vertex"
+    "q_axis"
    ],
-   "description": "$ax² + bx + c$: ציר סימטריה $x = −b/(2a)$, קודקוד, וחיתוך עם ציר y ב־$(0, c)$.",
+   "description": "ב־$ax² + bx + c$ שיעור $x$ של הקודקוד הוא $−b : 2a$, ו־$c$ הוא החיתוך עם ציר $y$.",
    "month": "נובמבר",
-   "core": true,
    "sample": {
-    "question": "מהו הקודקוד של $y = x² − 6x + 5$?",
+    "question": "מה קודקוד הפרבולה $f(x) = x² − 6x + 5$?",
     "choices": [
      {
       "text": "$(3, −4)$",
@@ -1316,7 +990,7 @@
      },
      {
       "text": "$(−3, 32)$",
-      "mistake": "axis_sign"
+      "mistake": "minus_b"
      },
      {
       "text": "$(6, 5)$",
@@ -1330,54 +1004,50 @@
    }
   },
   {
-   "id": "q_from_points",
+   "id": "q_sketch",
    "unit": "q",
-   "name": "מציאת הפונקציה מנקודות",
-   "short": "פונקציה מנקודות",
+   "name": "סרטוט פרבולה מהצגה סטנדרטית",
+   "short": "סרטוט פרבולה",
    "prereqs": [
-    "q_vertex",
-    "q_fform"
+    "q_sform"
    ],
-   "description": "בונים את הביטוי האלגברי מקודקוד ונקודה, או מנקודות האפס ונקודה. המכינה ל־5 יח״ל דורשת זאת, הפריסה לא.",
-   "core": true,
+   "description": "כיוון הפתיחה, קודקוד ונקודות חיתוך מספיקים לסרטוט הגרף.",
+   "month": "נובמבר",
    "sample": {
-    "question": "לפרבולה קודקוד $(2, −1)$, והיא עוברת דרך $(0, 3)$. מהי הפונקציה?",
+    "question": "איזה תיאור מתאים לגרף של $f(x) = −x² + 2x + 3$?",
     "choices": [
      {
-      "text": "$y = (x − 2)² − 1$",
+      "text": "פתוחה כלפי מטה, קודקוד $(1, 4)$, חותכת את ציר $x$ ב־$−1$ וב־$3$",
       "correct": true
      },
      {
-      "text": "$y = (x + 2)² − 1$",
-      "mistake": "hshift_sign"
+      "text": "פתוחה כלפי מעלה, קודקוד $(1, 4)$, חותכת את ציר $x$ ב־$−1$ וב־$3$",
+      "mistake": "opening_sign"
      },
      {
-      "text": "$y = 3(x − 2)² − 1$",
-      "mistake": "a_from_point"
+      "text": "פתוחה כלפי מטה, קודקוד $(1, 4)$, חותכת את ציר $x$ ב־$1$ וב־$−3$",
+      "mistake": "zero_root_sign"
      },
      {
-      "text": "$y = (x − 2)² + 3$",
-      "mistake": "a_from_point"
+      "text": "פתוחה כלפי מטה, קודקוד $(−1, 0)$, חותכת את ציר $x$ ב־$−1$ וב־$3$",
+      "mistake": "minus_b"
      }
     ]
    }
   },
   {
-   "id": "q_eq_simple",
-   "unit": "q",
+   "id": "e_simple",
+   "unit": "e",
    "name": "משוואה $ax² = b$",
-   "short": "ax² = b",
-   "prereqs": [
-    "f_sqrt",
-    "f_lin"
-   ],
-   "description": "פתרון בבידוד $x²$ והוצאת שורש, בלי נוסחה.",
-   "month": "אוקטובר",
+   "short": "משוואה $ax² = b$",
+   "prereqs": [],
+   "description": "מבודדים את $x²$ ומוציאים שורש: שני פתרונות, חיובי ושלילי.",
+   "month": "נובמבר",
    "sample": {
-    "question": "$3x² = 48$.  $x = ?$",
+    "question": "פתרו: $3x² = 48$",
     "choices": [
      {
-      "text": "$x = 4$ או $x = −4$",
+      "text": "$x = ±4$",
       "correct": true
      },
      {
@@ -1385,8 +1055,8 @@
       "mistake": "missing_neg_root"
      },
      {
-      "text": "$x = ±√45$",
-      "mistake": "sub_vs_div"
+      "text": "$x = ±16$",
+      "mistake": "forgot_root"
      },
      {
       "text": "$x = 8$",
@@ -1396,90 +1066,116 @@
    }
   },
   {
-   "id": "q_eq_gcf",
-   "unit": "q",
-   "name": "משוואה $ax² + bx = 0$",
-   "short": "ax² + bx = 0",
-   "prereqs": [
-    "q_zero_prod",
-    "t_gcf"
-   ],
-   "description": "פתרון בהוצאת גורם משותף, בלי לחלק ב־x.",
-   "month": "אוקטובר",
+   "id": "e_zero_prod",
+   "unit": "e",
+   "name": "מכפלה שווה לאפס",
+   "short": "מכפלה שווה לאפס",
+   "prereqs": [],
+   "description": "מכפלה שווה לאפס כאשר לפחות אחד הגורמים שווה לאפס.",
+   "month": "נובמבר",
    "sample": {
-    "question": "$5x² = 20x$.  $x = ?$",
+    "question": "פתרו: $(x − 7)(2x + 1) = 0$",
     "choices": [
      {
-      "text": "$x = 0$ או $x = 4$",
+      "text": "$x = 7$ או $x = −0.5$",
       "correct": true
      },
      {
-      "text": "$x = 4$",
+      "text": "$x = −7$ או $x = 0.5$",
+      "mistake": "zero_root_sign"
+     },
+     {
+      "text": "$x = 7$ או $x = −1$",
+      "mistake": "divide_wrong"
+     },
+     {
+      "text": "$x = 7$ בלבד",
+      "mistake": "one_factor_only"
+     }
+    ]
+   }
+  },
+  {
+   "id": "e_gcf",
+   "unit": "e",
+   "name": "משוואה $ax² + bx = 0$",
+   "short": "הוצאת $x$",
+   "prereqs": [
+    "e_zero_prod"
+   ],
+   "description": "מעבירים אגף, מוציאים $x$ כגורם משותף, ומקבלים מכפלה ששווה לאפס.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "פתרו: $x² = 5x$",
+    "choices": [
+     {
+      "text": "$x = 0$ או $x = 5$",
+      "correct": true
+     },
+     {
+      "text": "$x = 5$",
       "mistake": "divide_by_x"
      },
      {
-      "text": "$x = 0$ או $x = −4$",
-      "mistake": "lost_sign_move"
+      "text": "$x = 0$ או $x = −5$",
+      "mistake": "zero_root_sign"
      }
     ]
    }
   },
   {
-   "id": "q_eq_factor",
-   "unit": "q",
-   "name": "פתרון משוואה בפירוק לגורמים",
-   "short": "משוואה בפירוק",
+   "id": "e_factor",
+   "unit": "e",
+   "name": "פתרון בפירוק טרינום",
+   "short": "פתרון בפירוק",
    "prereqs": [
-    "q_zero_prod",
+    "e_zero_prod",
     "t_trinomial"
    ],
-   "description": "העברה לצורה $x² + bx + c = 0$, פירוק, ושימוש בכלל מכפלה שווה 0.",
-   "month": "אוקטובר",
-   "core": true,
+   "description": "מפרקים את הטרינום לשני גורמים ומשווים כל אחד לאפס.",
+   "month": "נובמבר",
    "sample": {
-    "question": "$x² + 2x = 15$.  $x = ?$",
+    "question": "פתרו: $x² + 2x − 15 = 0$",
     "choices": [
      {
-      "text": "$x = −5$ ,  $x = 3$",
+      "text": "$x = 3$ או $x = −5$",
       "correct": true
      },
      {
-      "text": "$x = 5$ ,  $x = −3$",
-      "mistake": "signs_swapped"
+      "text": "$x = −3$ או $x = 5$",
+      "mistake": "zero_root_sign"
      },
      {
-      "text": "$x = 15$ ,  $x = 13$",
-      "mistake": "product_not_zero"
+      "text": "$x = −15$ או $x = 1$",
+      "mistake": "product_only"
      }
     ]
    }
   },
   {
-   "id": "q_formula",
-   "unit": "q",
+   "id": "e_formula",
+   "unit": "e",
    "name": "נוסחת השורשים",
    "short": "נוסחת השורשים",
    "prereqs": [
-    "q_eq_simple",
-    "q_eq_factor",
-    "t_square"
+    "e_simple",
+    "e_factor"
    ],
-   "description": "$ax² + bx + c = 0$ עם כל $a ≠ 0$. בוחרים את הדרך היעילה לפי צורת המשוואה.",
+   "description": "$x = (−b ± √(b² − 4ac)) : 2a$, עבור $ax² + bx + c = 0$ כאשר $a ≠ 0$.",
    "month": "נובמבר",
-   "core": true,
    "sample": {
-    "question": "$2x² − 3x − 2 = 0$.  $x = ?$",
+    "question": "פתרו: $2x² − 3x − 2 = 0$",
     "choices": [
      {
-      "text": "$x = 2$ ,  $x = −½$",
+      "text": "$x = 2$ או $x = −0.5$",
       "correct": true
      },
      {
-      "text": "$x = −2$ ,  $x = ½$",
+      "text": "$x = −2$ או $x = 0.5$",
       "mistake": "minus_b"
      },
      {
-      "text": "$x = 4$ ,  $x = −1$",
+      "text": "$x = 4$ או $x = −1$",
       "mistake": "forgot_2a"
      },
      {
@@ -1490,17 +1186,17 @@
    }
   },
   {
-   "id": "q_disc",
-   "unit": "q",
-   "name": "מספר הפתרונות של משוואה ריבועית",
+   "id": "e_disc",
+   "unit": "e",
+   "name": "מספר הפתרונות",
    "short": "מספר פתרונות",
    "prereqs": [
-    "q_formula"
+    "e_formula"
    ],
-   "description": "הביטוי שבתוך השורש, $b² − 4ac$, קובע אם יש שני פתרונות, אחד או אף אחד.",
-   "month": "נובמבר",
+   "description": "הסימן של $b² − 4ac$ קובע אם יש שני פתרונות, פתרון אחד או אף פתרון.",
+   "month": "דצמבר",
    "sample": {
-    "question": "כמה פתרונות יש למשוואה $x² − 6x + 9 = 0$?",
+    "question": "כמה פתרונות יש למשוואה $x² − 4x + 4 = 0$?",
     "choices": [
      {
       "text": "פתרון אחד",
@@ -1518,140 +1214,425 @@
    }
   },
   {
-   "id": "q_sketch",
-   "unit": "q",
-   "name": "סרטוט פרבולה מהצגה סטנדרטית",
-   "short": "סרטוט פרבולה",
+   "id": "e_way",
+   "unit": "e",
+   "name": "בחירת דרך פתרון יעילה",
+   "short": "דרך יעילה",
    "prereqs": [
-    "q_sform",
-    "q_formula"
+    "e_formula",
+    "e_gcf"
    ],
-   "description": "כיוון, קודקוד, נקודות אפס וחיתוך עם ציר y, ומהם הסקיצה.",
-   "month": "נובמבר",
-   "sample": {
-    "question": "מה נכון לגבי $y = x² − 2x − 3$?",
-    "choices": [
-     {
-      "text": "פתוחה למעלה, קודקוד $(1, −4)$, אפסים $−1$ ו־$3$",
-      "correct": true
-     },
-     {
-      "text": "פתוחה למטה, קודקוד $(1, −4)$, אפסים $−1$ ו־$3$",
-      "mistake": "opening_sign"
-     },
-     {
-      "text": "פתוחה למעלה, קודקוד $(1, −4)$, אפסים $1$ ו־$−3$",
-      "mistake": "zero_sign"
-     },
-     {
-      "text": "פתוחה למעלה, קודקוד $(0, −3)$, אפסים $−1$ ו־$3$",
-      "mistake": "c_as_vertex"
-     }
-    ]
-   }
-  },
-  {
-   "id": "q_ineq",
-   "unit": "q",
-   "name": "אי־שוויון ריבועי",
-   "short": "אי־שוויון ריבועי",
-   "prereqs": [
-    "q_fform"
-   ],
-   "description": "פתרון בעזרת הפונקציה: נקודות האפס, כיוון הפתיחה, ותחומי החיוביות והשליליות.",
+   "description": "מזהים לפי צורת המשוואה את הדרך הקצרה: שורש, פירוק או נוסחה.",
    "month": "דצמבר",
    "sample": {
-    "question": "$(x − 1)(x − 5) < 0$.  $x = ?$",
+    "question": "פתרו: $(x − 1)² = 16$",
     "choices": [
      {
-      "text": "$1 < x < 5$",
+      "text": "$x = 5$ או $x = −3$",
       "correct": true
      },
      {
-      "text": "$x < 1$ או $x > 5$",
-      "mistake": "sign_regions"
-     },
-     {
-      "text": "$x < 0$",
-      "mistake": "neg_x"
-     },
-     {
-      "text": "$−5 < x < −1$",
-      "mistake": "zero_sign"
-     }
-    ]
-   }
-  },
-  {
-   "id": "q_sys",
-   "unit": "q",
-   "name": "מערכת: ישר ופרבולה",
-   "short": "ישר ופרבולה",
-   "prereqs": [
-    "f_sys",
-    "q_formula"
-   ],
-   "description": "פתרון מערכת ממעלה שנייה, והקשר לנקודות החיתוך של הגרפים.",
-   "month": "פברואר",
-   "sample": {
-    "question": "מהן נקודות החיתוך של $y = x²$ ו־$y = x + 2$?",
-    "choices": [
-     {
-      "text": "$(2, 4)$ ,  $(−1, 1)$",
-      "correct": true
-     },
-     {
-      "text": "$(2, 0)$ ,  $(−1, 0)$",
-      "mistake": "forgot_y"
-     },
-     {
-      "text": "$(−2, 4)$ ,  $(1, 1)$",
-      "mistake": "signs_swapped"
-     }
-    ]
-   }
-  },
-  {
-   "id": "q_sys2",
-   "unit": "q",
-   "name": "מערכת: שתי פרבולות",
-   "short": "שתי פרבולות",
-   "prereqs": [
-    "q_sys"
-   ],
-   "description": "השוואת שני ביטויים ריבועיים. $x²$ לא תמיד מצטמצם.",
-   "month": "פברואר",
-   "sample": {
-    "question": "מהן נקודות החיתוך של $y = x² − 3$ ו־$y = −x² + 5$?",
-    "choices": [
-     {
-      "text": "$(2, 1)$ ,  $(−2, 1)$",
-      "correct": true
-     },
-     {
-      "text": "$(2, 1)$ בלבד",
+      "text": "$x = 5$",
       "mistake": "missing_neg_root"
      },
      {
-      "text": "$(2, 0)$ ,  $(−2, 0)$",
-      "mistake": "forgot_y"
+      "text": "$x = 17$ או $x = −15$",
+      "mistake": "forgot_root"
+     },
+     {
+      "text": "$x = 4$ או $x = −4$",
+      "mistake": "lost_shift"
      }
     ]
    }
   },
   {
-   "id": "q_tri",
-   "unit": "q",
-   "name": "פרבולה ומשולשים",
-   "short": "פרבולה ומשולשים",
+   "id": "e_apply",
+   "unit": "e",
+   "name": "יישומים של משוואות ריבועיות",
+   "short": "יישומים",
    "prereqs": [
-    "q_sform"
+    "e_formula"
    ],
-   "description": "שטח משולש שקודקודיו על הפרבולה ועל הצירים. דורש גם גיאומטריה אנליטית מפס הגיאומטריה.",
-   "core": true,
-   "geometry": true,
+   "description": "בונים משוואה ריבועית מבעיה, פותרים ובודקים שהפתרון מתאים לשאלה.",
+   "month": "דצמבר",
    "sample": {
-    "question": "$y = x² − 4x$ חותכת את ציר x ב־O וב־A, וקודקודה B. מהו שטח המשולש OAB?",
+    "question": "מכפלת שני מספרים טבעיים עוקבים היא $56$. מה המספר הקטן?",
+    "choices": [
+     {
+      "text": "$7$",
+      "correct": true
+     },
+     {
+      "text": "$−8$",
+      "mistake": "inadmissible"
+     },
+     {
+      "text": "$8$",
+      "mistake": "other_quantity"
+     },
+     {
+      "text": "$28$",
+      "mistake": "half_product"
+     }
+    ]
+   }
+  },
+  {
+   "id": "e_ineq",
+   "unit": "e",
+   "name": "אי־שוויון ריבועי",
+   "short": "אי־שוויון ריבועי",
+   "prereqs": [
+    "e_factor",
+    "q_fform"
+   ],
+   "description": "מוצאים את השורשים ובודקים לפי צורת הפרבולה היכן היא חיובית או שלילית.",
+   "month": "דצמבר",
+   "sample": {
+    "question": "פתרו: $x² − x − 6 < 0$",
+    "choices": [
+     {
+      "text": "$−2 < x < 3$",
+      "correct": true
+     },
+     {
+      "text": "$x < −2$ או $x > 3$",
+      "mistake": "sign_regions"
+     },
+     {
+      "text": "$−3 < x < 2$",
+      "mistake": "zero_root_sign"
+     },
+     {
+      "text": "$x < 3$",
+      "mistake": "partial_intervals"
+     }
+    ]
+   }
+  },
+  {
+   "id": "e_ineq_down",
+   "unit": "e",
+   "name": "אי־שוויון עם פרבולה הפוכה",
+   "short": "פרבולה הפוכה",
+   "prereqs": [
+    "e_ineq"
+   ],
+   "description": "כאשר $a < 0$ הפרבולה חיובית בין השורשים; ב־$≥$ השורשים נכללים.",
+   "month": "דצמבר",
+   "sample": {
+    "question": "פתרו: $−x² + 9 ≥ 0$",
+    "choices": [
+     {
+      "text": "$−3 ≤ x ≤ 3$",
+      "correct": true
+     },
+     {
+      "text": "$x ≤ −3$ או $x ≥ 3$",
+      "mistake": "sign_regions"
+     },
+     {
+      "text": "$x ≤ 3$",
+      "mistake": "partial_intervals"
+     },
+     {
+      "text": "$−3 < x < 3$",
+      "mistake": "strict_vs_weak"
+     }
+    ]
+   }
+  },
+  {
+   "id": "a_side_angle",
+   "unit": "a",
+   "name": "מול הצלע הגדולה הזווית הגדולה",
+   "short": "צלע ⇐ זווית",
+   "prereqs": [],
+   "description": "אם במשולש שתי צלעות שונות, מול הצלע הגדולה נמצאת הזווית הגדולה.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "במשולש $ABC$: $AB = 5$, $BC = 7$, $AC = 9$. איזו זווית היא הגדולה ביותר?",
+    "choices": [
+     {
+      "text": "$∢B$",
+      "correct": true
+     },
+     {
+      "text": "$∢C$",
+      "mistake": "opposite_angle"
+     },
+     {
+      "text": "$∢A$",
+      "mistake": "opposite_angle"
+     },
+     {
+      "text": "אי אפשר לדעת",
+      "mistake": "side_angle_rule"
+     }
+    ]
+   }
+  },
+  {
+   "id": "a_angle_side",
+   "unit": "a",
+   "name": "מול הזווית הגדולה הצלע הגדולה",
+   "short": "זווית ⇐ צלע",
+   "prereqs": [
+    "a_side_angle"
+   ],
+   "description": "אם במשולש שתי זוויות שונות, מול הזווית הגדולה נמצאת הצלע הגדולה.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "במשולש $ABC$: $∢A = 50°$, $∢B = 60°$. איזו צלע היא הארוכה ביותר?",
+    "choices": [
+     {
+      "text": "$AB$",
+      "correct": true
+     },
+     {
+      "text": "$BC$",
+      "mistake": "opposite_angle"
+     },
+     {
+      "text": "$AC$",
+      "mistake": "opposite_angle"
+     },
+     {
+      "text": "אי אפשר לדעת",
+      "mistake": "side_angle_rule"
+     }
+    ]
+   }
+  },
+  {
+   "id": "a_order",
+   "unit": "a",
+   "name": "סידור צלעות לפי זוויות",
+   "short": "סידור צלעות",
+   "prereqs": [
+    "a_angle_side"
+   ],
+   "description": "מסדרים את הצלעות לפי סדר הזוויות שמולן.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "במשולש $ABC$: $∢A = 90°$, $∢B = 35°$. סדרו את הצלעות מהקצרה לארוכה.",
+    "choices": [
+     {
+      "text": "$AC < AB < BC$",
+      "correct": true
+     },
+     {
+      "text": "$BC < AB < AC$",
+      "mistake": "reversed_order"
+     },
+     {
+      "text": "$AB < AC < BC$",
+      "mistake": "opposite_angle"
+     }
+    ]
+   }
+  },
+  {
+   "id": "a_30_side",
+   "unit": "a",
+   "name": "ניצב מול זווית של $30°$",
+   "short": "ניצב מול $30°$",
+   "prereqs": [],
+   "description": "במשולש ישר זווית, הניצב שמול זווית של $30°$ שווה למחצית היתר.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "במשולש ישר זווית אחת הזוויות היא $30°$, והיתר באורך $14$ ס״מ. שרטטו את המשולש, חשבו את אורך הניצב שמול הזווית של $30°$ ונמקו על דף.",
+    "diagram": {
+     "type": "triangle",
+     "base": "",
+     "height": "?",
+     "side": "14 cm",
+     "alt": "משולש ישר זווית שהיתר שלו 14 סנטימטרים; הניצב המבוקש מול הזווית של 30 מעלות"
+    },
+    "type": "open-ended",
+    "version": 1
+   },
+   "fallback_sample": {
+    "question": "במשולש ישר זווית אחת הזוויות היא $30°$, והיתר באורך $14$ ס״מ. מה אורך הניצב שמול הזווית של $30°$?",
+    "choices": [
+     {
+      "text": "$7$ ס״מ",
+      "correct": true
+     },
+     {
+      "text": "$28$ ס״מ",
+      "mistake": "half_double"
+     },
+     {
+      "text": "אי אפשר לדעת בלי משפט פיתגורס",
+      "mistake": "a30_rule"
+     }
+    ],
+    "diagram": {
+     "type": "triangle",
+     "base": "",
+     "height": "?",
+     "side": "14 cm",
+     "alt": "משולש ישר זווית שהיתר שלו 14 סנטימטרים; הניצב המבוקש מול הזווית של 30 מעלות"
+    }
+   }
+  },
+  {
+   "id": "a_30_converse",
+   "unit": "a",
+   "name": "משפט הפוך: ניצב שהוא חצי היתר",
+   "short": "משפט הפוך $30°$",
+   "prereqs": [
+    "a_30_side"
+   ],
+   "description": "אם במשולש ישר זווית ניצב שווה למחצית היתר, הזווית שמולו היא $30°$.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "במשולש ישר זווית $ABC$ ($∢C = 90°$): $AB = 12$, $BC = 6$. מה גודל $∢A$?",
+    "choices": [
+     {
+      "text": "$30°$",
+      "correct": true
+     },
+     {
+      "text": "$60°$",
+      "mistake": "opposite_angle"
+     },
+     {
+      "text": "$45°$",
+      "mistake": "a30_rule"
+     }
+    ]
+   }
+  },
+  {
+   "id": "a_30_equilateral",
+   "unit": "a",
+   "name": "גובה במשולש שווה צלעות",
+   "short": "גובה בשווה צלעות",
+   "prereqs": [
+    "a_30_side"
+   ],
+   "description": "הגובה במשולש שווה צלעות מחלק אותו לשני משולשים של $30°$, $60°$, $90°$.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "במשולש שווה צלעות שאורך צלעו $10$ מורידים גובה. לאילו משולשים הוא מחלק את המשולש, ומה אורך הניצב הקצר בכל אחד מהם?",
+    "choices": [
+     {
+      "text": "שני משולשים של $30°, 60°, 90°$ עם ניצב קצר $5$",
+      "correct": true
+     },
+     {
+      "text": "שני משולשים שווי צלעות עם צלע $5$",
+      "mistake": "eq_split"
+     },
+     {
+      "text": "שני משולשים של $30°, 60°, 90°$ עם ניצב קצר $10$",
+      "mistake": "half_double"
+     }
+    ]
+   }
+  },
+  {
+   "id": "a_median_hyp",
+   "unit": "a",
+   "name": "התיכון ליתר",
+   "short": "תיכון ליתר",
+   "prereqs": [],
+   "description": "במשולש ישר זווית התיכון ליתר שווה למחצית היתר.",
+   "month": "אפריל",
+   "sample": {
+    "question": "במשולש ישר זווית היתר $AB = 18$, ו־$CM$ הוא התיכון ליתר. מה אורך $CM$?",
+    "choices": [
+     {
+      "text": "$9$",
+      "correct": true
+     },
+     {
+      "text": "$18$",
+      "mistake": "median_hyp_rule"
+     },
+     {
+      "text": "אי אפשר לדעת בלי הניצבים",
+      "mistake": "median_hyp_rule"
+     }
+    ]
+   }
+  },
+  {
+   "id": "a_median_converse",
+   "unit": "a",
+   "name": "משפט הפוך לתיכון ליתר",
+   "short": "הפוך לתיכון",
+   "prereqs": [
+    "a_median_hyp"
+   ],
+   "description": "אם התיכון לצלע שווה למחצית הצלע, המשולש ישר זווית.",
+   "month": "אפריל",
+   "sample": {
+    "question": "במשולש $ABC$, $M$ היא אמצע $AB$ ו־$CM = AM = MB$. מה גודל $∢ACB$?",
+    "choices": [
+     {
+      "text": "$90°$",
+      "correct": true
+     },
+     {
+      "text": "$60°$",
+      "mistake": "median_converse"
+     },
+     {
+      "text": "אי אפשר לדעת",
+      "mistake": "median_converse"
+     }
+    ]
+   }
+  },
+  {
+   "id": "a_median_angles",
+   "unit": "a",
+   "name": "זוויות בעזרת התיכון ליתר",
+   "short": "זוויות ותיכון",
+   "prereqs": [
+    "a_median_hyp"
+   ],
+   "description": "התיכון ליתר יוצר שני משולשים שווי שוקיים.",
+   "month": "אפריל",
+   "sample": {
+    "question": "במשולש ישר זווית $ABC$ ($∢C = 90°$), $CM$ הוא התיכון ליתר ו־$∢A = 25°$. מה גודל $∢ACM$?",
+    "choices": [
+     {
+      "text": "$25°$",
+      "correct": true
+     },
+     {
+      "text": "$65°$",
+      "mistake": "median_iso"
+     },
+     {
+      "text": "$45°$",
+      "mistake": "median_iso"
+     },
+     {
+      "text": "$130°$",
+      "mistake": "median_iso"
+     }
+    ]
+   }
+  },
+  {
+   "id": "a_mixed",
+   "unit": "a",
+   "name": "משולש ישר זווית בשילוב מרובעים",
+   "short": "בשילוב מרובעים",
+   "prereqs": [
+    "a_30_side",
+    "a_median_hyp"
+   ],
+   "description": "משתמשים במשפטי המשולש ישר הזווית בתוך מלבן או מעוין.",
+   "month": "אפריל",
+   "sample": {
+    "question": "במלבן $ABCD$ האלכסון $AC = 16$ ו־$∢CAB = 30°$. מה אורך $BC$?",
     "choices": [
      {
       "text": "$8$",
@@ -1659,71 +1640,2052 @@
      },
      {
       "text": "$16$",
-      "mistake": "forgot_half"
+      "mistake": "half_double"
      },
      {
-      "text": "$−8$",
-      "mistake": "neg_height"
+      "text": "$4$",
+      "mistake": "whole_diag"
      }
     ]
    }
   },
   {
-   "id": "p_laws1",
-   "unit": "p",
-   "name": "כפל וחילוק חזקות עם אותו בסיס",
-   "short": "כפל וחילוק חזקות",
-   "prereqs": [
-    "f_power"
-   ],
-   "description": "$aⁿ·aᵐ = aⁿ⁺ᵐ$, $aⁿ : aᵐ = aⁿ⁻ᵐ$ ו־$a⁰ = 1$. לפי הפריסה רק מעריך טבעי או אפס.",
-   "month": "מאי",
+   "id": "z_parallel_angles",
+   "unit": "z",
+   "name": "זוויות בין ישרים מקבילים",
+   "short": "זוויות במקבילים",
+   "prereqs": [],
+   "description": "זוויות מתחלפות ומתאימות שוות; זוויות חד־צדדיות משלימות ל־$180°$.",
+   "month": "נובמבר",
    "sample": {
-    "question": "$a⁵ · a³ : a² = ?$",
+    "question": "שני ישרים מקבילים נחתכים על ידי ישר שלישי. אחת הזוויות היא $65°$. מה גודל הזווית המתחלפת לה?",
     "choices": [
      {
-      "text": "$a⁶$",
+      "text": "$65°$",
       "correct": true
      },
      {
-      "text": "$a¹³$",
+      "text": "$115°$",
+      "mistake": "alt_vs_cointerior"
+     },
+     {
+      "text": "$25°$",
+      "mistake": "complement90"
+     }
+    ]
+   }
+  },
+  {
+   "id": "z_parallel_converse",
+   "unit": "z",
+   "name": "תנאים להקבלה",
+   "short": "תנאים להקבלה",
+   "prereqs": [
+    "z_parallel_angles"
+   ],
+   "description": "אם זוויות מתחלפות שוות, או חד־צדדיות משלימות ל־$180°$, הישרים מקבילים.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "ישר חותך שני ישרים. שתי זוויות חד־צדדיות הן $72°$ ו־$108°$. מה אפשר להסיק?",
+    "choices": [
+     {
+      "text": "הישרים מקבילים",
+      "correct": true
+     },
+     {
+      "text": "הישרים אינם מקבילים",
+      "mistake": "parallel_converse"
+     },
+     {
+      "text": "אי אפשר לדעת",
+      "mistake": "parallel_converse"
+     }
+    ]
+   }
+  },
+  {
+   "id": "z_trap_def",
+   "unit": "z",
+   "name": "הכרת הטרפז",
+   "short": "הכרת הטרפז",
+   "prereqs": [
+    "z_parallel_angles"
+   ],
+   "description": "בטרפז זוג אחד של צלעות מקבילות; הזוויות שליד כל שוק משלימות ל־$180°$.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "בטרפז $ABCD$ ($AB ∥ CD$), $∢A = 110°$. מה גודל $∢D$?",
+    "choices": [
+     {
+      "text": "$70°$",
+      "correct": true
+     },
+     {
+      "text": "$110°$",
+      "mistake": "alt_vs_cointerior"
+     },
+     {
+      "text": "$250°$",
+      "mistake": "angle_sum_180"
+     }
+    ]
+   }
+  },
+  {
+   "id": "z_trap_iso",
+   "unit": "z",
+   "name": "טרפז שווה שוקיים",
+   "short": "טרפז שווה שוקיים",
+   "prereqs": [
+    "z_trap_def"
+   ],
+   "description": "בטרפז שווה שוקיים זוויות הבסיס שוות והאלכסונים שווים.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "בטרפז שווה שוקיים $ABCD$ ($AB ∥ CD$, $AD = BC$), $∢A = 75°$. מה גודל $∢B$ ומה גודל $∢C$?",
+    "choices": [
+     {
+      "text": "$∢B = 75°$, $∢C = 105°$",
+      "correct": true
+     },
+     {
+      "text": "$∢B = 105°$, $∢C = 75°$",
+      "mistake": "trap_iso_angles"
+     },
+     {
+      "text": "$∢B = 75°$, $∢C = 75°$",
+      "mistake": "trap_iso_angles"
+     }
+    ]
+   }
+  },
+  {
+   "id": "z_trap_proof",
+   "unit": "z",
+   "name": "הוכחה שמרובע הוא טרפז",
+   "short": "הוכחת טרפז",
+   "prereqs": [
+    "z_parallel_converse",
+    "z_trap_def"
+   ],
+   "description": "מוכיחים שזוג אחד של צלעות מקביל ושהזוג השני אינו מקביל.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "במרובע $ABCD$: $∢A + ∢D = 180°$ ו־$∢A + ∢B ≠ 180°$. מה אפשר להסיק?",
+    "choices": [
+     {
+      "text": "$ABCD$ טרפז שבו $AB ∥ DC$",
+      "correct": true
+     },
+     {
+      "text": "$ABCD$ מקבילית",
+      "mistake": "trap_vs_par"
+     },
+     {
+      "text": "$ABCD$ טרפז שבו $AD ∥ BC$",
+      "mistake": "wrong_pair_parallel"
+     }
+    ]
+   }
+  },
+  {
+   "id": "z_trap_area",
+   "unit": "z",
+   "name": "שטח והיקף טרפז",
+   "short": "שטח טרפז",
+   "prereqs": [
+    "z_trap_def"
+   ],
+   "description": "שטח טרפז: סכום הבסיסים כפול הגובה, חלקי 2.",
+   "month": "נובמבר",
+   "sample": {
+    "question": "בטרפז הבסיסים $8$ ו־$12$ והגובה $5$. מה שטחו?",
+    "choices": [
+     {
+      "text": "$50$",
+      "correct": true
+     },
+     {
+      "text": "$100$",
+      "mistake": "forgot_half_area"
+     },
+     {
+      "text": "$480$",
+      "mistake": "mult_all"
+     }
+    ]
+   }
+  },
+  {
+   "id": "z_trap_axes",
+   "unit": "z",
+   "name": "טרפז במערכת צירים",
+   "short": "טרפז בצירים",
+   "prereqs": [
+    "z_trap_area"
+   ],
+   "description": "כשהבסיסים מקבילים לציר $x$, האורכים והגובה נקראים מהשיעורים.",
+   "month": "דצמבר",
+   "sample": {
+    "question": "$A(1, 1)$, $B(7, 1)$, $C(5, 4)$, $D(3, 4)$. מה שטח הטרפז $ABCD$?",
+    "choices": [
+     {
+      "text": "$12$",
+      "correct": true
+     },
+     {
+      "text": "$24$",
+      "mistake": "forgot_half_area"
+     },
+     {
+      "text": "$18$",
+      "mistake": "trap_one_base"
+     },
+     {
+      "text": "$16$",
+      "mistake": "height_from_axis"
+     }
+    ]
+   }
+  },
+  {
+   "id": "z_par_def",
+   "unit": "z",
+   "name": "מקבילית: הגדרה וזוויות",
+   "short": "זוויות במקבילית",
+   "prereqs": [
+    "z_parallel_angles"
+   ],
+   "description": "במקבילית שני זוגות של צלעות מקבילות; זוויות נגדיות שוות וזוויות סמוכות משלימות ל־$180°$.",
+   "month": "דצמבר",
+   "sample": {
+    "question": "במקבילית $ABCD$, $∢A = 3 · ∢B$. מה גודל $∢C$?",
+    "choices": [
+     {
+      "text": "$135°$",
+      "correct": true
+     },
+     {
+      "text": "$45°$",
+      "mistake": "par_opposite"
+     },
+     {
+      "text": "$90°$",
+      "mistake": "par_adjacent"
+     }
+    ]
+   }
+  },
+  {
+   "id": "z_par_diag",
+   "unit": "z",
+   "name": "אלכסוני המקבילית",
+   "short": "אלכסוני מקבילית",
+   "prereqs": [
+    "z_par_def"
+   ],
+   "description": "אלכסוני המקבילית חוצים זה את זה.",
+   "month": "דצמבר",
+   "sample": {
+    "question": "במקבילית $ABCD$ האלכסונים נחתכים בנקודה $O$. $AC = 14$, $BD = 10$. מה אורך $OB$?",
+    "choices": [
+     {
+      "text": "$5$",
+      "correct": true
+     },
+     {
+      "text": "$7$",
+      "mistake": "par_diag"
+     },
+     {
+      "text": "$10$",
+      "mistake": "par_diag"
+     }
+    ]
+   }
+  },
+  {
+   "id": "z_par_converse",
+   "unit": "z",
+   "name": "הוכחה שמרובע הוא מקבילית",
+   "short": "הוכחת מקבילית",
+   "prereqs": [
+    "z_par_diag"
+   ],
+   "description": "מרובע שבו האלכסונים חוצים זה את זה, או שני זוגות של צלעות נגדיות שוות, הוא מקבילית.",
+   "month": "ינואר",
+   "sample": {
+    "question": "איזה תנאי מספיק כדי לקבוע שמרובע הוא מקבילית?",
+    "choices": [
+     {
+      "text": "האלכסונים חוצים זה את זה",
+      "correct": true
+     },
+     {
+      "text": "זוג אחד של צלעות נגדיות מקבילות",
+      "mistake": "trap_vs_par"
+     },
+     {
+      "text": "זוג אחד של צלעות מקבילות וזוג שני של צלעות שוות",
+      "mistake": "par_trap_iso"
+     },
+     {
+      "text": "האלכסונים מאונכים זה לזה",
+      "mistake": "kite_par"
+     }
+    ]
+   }
+  },
+  {
+   "id": "r_domain",
+   "unit": "r",
+   "name": "תחום הצבה",
+   "short": "תחום הצבה",
+   "prereqs": [],
+   "description": "פוסלים כל ערך של $x$ שמאפס מכנה.",
+   "month": "ינואר",
+   "sample": {
+    "question": "מהו תחום ההצבה של $5 / (x − 4)$?",
+    "choices": [
+     {
+      "text": "$x ≠ 4$",
+      "correct": true
+     },
+     {
+      "text": "$x ≠ −4$",
+      "mistake": "domain_sign"
+     },
+     {
+      "text": "$x ≠ 5$",
+      "mistake": "numerator_domain"
+     },
+     {
+      "text": "$x ≠ 0$",
+      "mistake": "domain_zero"
+     }
+    ]
+   }
+  },
+  {
+   "id": "r_domain_factor",
+   "unit": "r",
+   "name": "תחום הצבה עם פירוק",
+   "short": "תחום עם פירוק",
+   "prereqs": [
+    "r_domain",
+    "t_factor_formula"
+   ],
+   "description": "מפרקים את המכנה כדי למצוא את כל הערכים שמאפסים אותו.",
+   "month": "ינואר",
+   "sample": {
+    "question": "מהו תחום ההצבה של $(x + 1) / (x² − 25)$?",
+    "choices": [
+     {
+      "text": "$x ≠ 5$, $x ≠ −5$",
+      "correct": true
+     },
+     {
+      "text": "$x ≠ 5$",
+      "mistake": "missing_neg_root"
+     },
+     {
+      "text": "$x ≠ 25$",
+      "mistake": "forgot_root"
+     },
+     {
+      "text": "$x ≠ −1$",
+      "mistake": "numerator_domain"
+     }
+    ]
+   }
+  },
+  {
+   "id": "r_simple",
+   "unit": "r",
+   "name": "משוואה עם מכנה אחד",
+   "short": "מכנה אחד",
+   "prereqs": [
+    "r_domain"
+   ],
+   "description": "כופלים במכנה ופותרים, ובודקים שהפתרון בתחום ההצבה.",
+   "month": "ינואר",
+   "sample": {
+    "question": "פתרו: $12 / x = 3$",
+    "choices": [
+     {
+      "text": "$x = 4$",
+      "correct": true
+     },
+     {
+      "text": "$x = 36$",
+      "mistake": "mult_instead"
+     },
+     {
+      "text": "$x = 1/4$",
+      "mistake": "inverse"
+     }
+    ]
+   }
+  },
+  {
+   "id": "r_cross",
+   "unit": "r",
+   "name": "משוואה של שני שברים",
+   "short": "שני שברים",
+   "prereqs": [
+    "r_simple"
+   ],
+   "description": "כופלים בשני המכנים (כפל בהצלבה) ופותרים.",
+   "month": "ינואר",
+   "sample": {
+    "question": "פתרו: $3 / (x − 1) = 2 / x$",
+    "choices": [
+     {
+      "text": "$x = −2$",
+      "correct": true
+     },
+     {
+      "text": "$x = 2$",
+      "mistake": "lost_sign_move"
+     },
+     {
+      "text": "$x = −1$",
+      "mistake": "partial_dist"
+     }
+    ]
+   }
+  },
+  {
+   "id": "r_common",
+   "unit": "r",
+   "name": "כפל במכנה משותף",
+   "short": "מכנה משותף",
+   "prereqs": [
+    "r_cross"
+   ],
+   "description": "כופלים את כל איברי המשוואה במכנה המשותף.",
+   "month": "ינואר",
+   "sample": {
+    "question": "פתרו: $1 / x + 1 / (2x) = 3$",
+    "choices": [
+     {
+      "text": "$x = 0.5$",
+      "correct": true
+     },
+     {
+      "text": "$x = 2$",
+      "mistake": "inverse"
+     },
+     {
+      "text": "$x = 2/9$",
+      "mistake": "add_denoms"
+     }
+    ]
+   }
+  },
+  {
+   "id": "r_excluded",
+   "unit": "r",
+   "name": "פתרון שאינו בתחום ההצבה",
+   "short": "פתרון פסול",
+   "prereqs": [
+    "r_cross",
+    "r_domain_factor"
+   ],
+   "description": "פתרון שמאפס מכנה אינו קביל, גם אם הוא פותר את המשוואה שאחרי הכפל.",
+   "month": "ינואר",
+   "sample": {
+    "question": "פתרו: $x² / (x − 2) = 4 / (x − 2)$",
+    "choices": [
+     {
+      "text": "$x = −2$",
+      "correct": true
+     },
+     {
+      "text": "$x = ±2$",
+      "mistake": "excluded_root"
+     },
+     {
+      "text": "$x = 2$",
+      "mistake": "excluded_root"
+     },
+     {
+      "text": "אין פתרון",
+      "mistake": "valid_root_dropped"
+     }
+    ]
+   }
+  },
+  {
+   "id": "r_factor_denoms",
+   "unit": "r",
+   "name": "מכנים שצריך לפרק",
+   "short": "פירוק מכנים",
+   "prereqs": [
+    "r_excluded"
+   ],
+   "description": "מפרקים את המכנים, מוצאים מכנה משותף ובודקים את תחום ההצבה.",
+   "month": "ינואר",
+   "sample": {
+    "question": "פתרו: $1/(x − 3) + 1/(x + 3) = 6 / (x² − 9)$",
+    "choices": [
+     {
+      "text": "אין פתרון",
+      "correct": true
+     },
+     {
+      "text": "$x = 3$",
+      "mistake": "excluded_root"
+     },
+     {
+      "text": "$x = ±3$",
+      "mistake": "excluded_root"
+     }
+    ]
+   }
+  },
+  {
+   "id": "r_quadratic",
+   "unit": "r",
+   "name": "משוואה רציונלית שמובילה למשוואה ריבועית",
+   "short": "רציונלית וריבועית",
+   "prereqs": [
+    "r_cross",
+    "e_factor"
+   ],
+   "description": "אחרי הכפל במכנה מתקבלת משוואה ריבועית.",
+   "month": "ינואר",
+   "sample": {
+    "question": "פתרו: $x + 6 / x = 5$",
+    "choices": [
+     {
+      "text": "$x = 2$ או $x = 3$",
+      "correct": true
+     },
+     {
+      "text": "$x = −2$ או $x = −3$",
+      "mistake": "zero_root_sign"
+     },
+     {
+      "text": "$x = 1.5$",
+      "mistake": "mult_only_one"
+     }
+    ]
+   }
+  },
+  {
+   "id": "r_reduce_first",
+   "unit": "r",
+   "name": "צמצום לפני פתרון",
+   "short": "צמצום ופתרון",
+   "prereqs": [
+    "r_excluded",
+    "t_reduce"
+   ],
+   "description": "אפשר לצמצם את השבר ולפתור, וזוכרים את תחום ההצבה המקורי.",
+   "month": "ינואר",
+   "sample": {
+    "question": "פתרו: $(x² − 1) / (x − 1) = 5$",
+    "choices": [
+     {
+      "text": "$x = 4$",
+      "correct": true
+     },
+     {
+      "text": "$x = 6$",
+      "mistake": "cancel_terms"
+     },
+     {
+      "text": "$x = ±√6$",
+      "mistake": "lost_denominator"
+     }
+    ]
+   }
+  },
+  {
+   "id": "r_word",
+   "unit": "r",
+   "name": "שאלה עם משוואה רציונלית",
+   "short": "שאלה רציונלית",
+   "prereqs": [
+    "r_quadratic"
+   ],
+   "description": "בונים משוואה עם שברים מנתוני השאלה ופותרים.",
+   "month": "ינואר",
+   "sample": {
+    "question": "מחלקים $24$ ממתקים שווה בשווה בין $x$ ילדים. אילו היו $2$ ילדים פחות, כל ילד היה מקבל $2$ ממתקים יותר. כמה ילדים יש?",
+    "choices": [
+     {
+      "text": "$6$",
+      "correct": true
+     },
+     {
+      "text": "$−4$",
+      "mistake": "inadmissible"
+     },
+     {
+      "text": "$4$",
+      "mistake": "other_quantity"
+     }
+    ]
+   }
+  },
+  {
+   "id": "h_basic",
+   "unit": "h",
+   "name": "הסתברות של מאורע",
+   "short": "הסתברות בסיסית",
+   "prereqs": [],
+   "description": "הסתברות = מספר התוצאות המתאימות חלקי מספר כל התוצאות השקולות.",
+   "month": "ינואר",
+   "sample": {
+    "question": "בשקית $3$ כדורים אדומים ו־$5$ כחולים. מוציאים כדור אחד באקראי. מה ההסתברות שהוא אדום?",
+    "choices": [
+     {
+      "text": "$3/8$",
+      "correct": true
+     },
+     {
+      "text": "$3/5$",
+      "mistake": "part_vs_whole"
+     },
+     {
+      "text": "$1/2$",
+      "mistake": "guess_cases"
+     }
+    ]
+   }
+  },
+  {
+   "id": "h_complement",
+   "unit": "h",
+   "name": "מאורע משלים",
+   "short": "מאורע משלים",
+   "prereqs": [
+    "h_basic"
+   ],
+   "description": "$P(‏לא A) = 1 − P(A)$.",
+   "month": "ינואר",
+   "sample": {
+    "question": "ההסתברות שיירד גשם מחר היא $0.35$. מה ההסתברות שלא יירד גשם?",
+    "choices": [
+     {
+      "text": "$0.65$",
+      "correct": true
+     },
+     {
+      "text": "$0.35$",
+      "mistake": "complement"
+     },
+     {
+      "text": "$1.35$",
+      "mistake": "complement"
+     },
+     {
+      "text": "$0.5$",
+      "mistake": "guess_cases"
+     }
+    ]
+   }
+  },
+  {
+   "id": "h_relfreq",
+   "unit": "h",
+   "name": "שכיחות יחסית",
+   "short": "שכיחות יחסית",
+   "prereqs": [
+    "h_basic"
+   ],
+   "description": "שכיחות יחסית היא מספר ההופעות חלקי מספר הניסויים, והיא מתקרבת להסתברות.",
+   "month": "ינואר",
+   "sample": {
+    "question": "הטילו קובייה $200$ פעמים, והמספר $6$ התקבל $40$ פעמים. מה השכיחות היחסית של $6$?",
+    "choices": [
+     {
+      "text": "$0.2$",
+      "correct": true
+     },
+     {
+      "text": "$1/6$",
+      "mistake": "relfreq_vs_prob"
+     },
+     {
+      "text": "$40$",
+      "mistake": "freq_abs"
+     },
+     {
+      "text": "$5$",
+      "mistake": "ratio_flipped"
+     }
+    ]
+   }
+  },
+  {
+   "id": "h_expected",
+   "unit": "h",
+   "name": "מספר צפוי לפי הסתברות",
+   "short": "מספר צפוי",
+   "prereqs": [
+    "h_relfreq"
+   ],
+   "description": "במספר גדול של ניסויים, מספר ההופעות הצפוי הוא ההסתברות כפול מספר הניסויים.",
+   "month": "ינואר",
+   "sample": {
+    "question": "ההסתברות שנורה פגומה היא $0.02$. בכמה נורות פגומות נצפה במשלוח של $1500$ נורות?",
+    "choices": [
+     {
+      "text": "$30$",
+      "correct": true
+     },
+     {
+      "text": "$300$",
+      "mistake": "decimal_error"
+     },
+     {
+      "text": "$2$",
+      "mistake": "prob_as_count"
+     }
+    ]
+   }
+  },
+  {
+   "id": "h_two_stage",
+   "unit": "h",
+   "name": "מאורע דו־שלבי",
+   "short": "דו־שלבי",
+   "prereqs": [
+    "h_basic"
+   ],
+   "description": "בניסוי דו־שלבי כופלים את ההסתברויות לאורך הענף.",
+   "month": "ינואר",
+   "sample": {
+    "question": "מטילים מטבע פעמיים. מה ההסתברות לקבל פעמיים „עץ“?",
+    "choices": [
+     {
+      "text": "$1/4$",
+      "correct": true
+     },
+     {
+      "text": "$1/2$",
+      "mistake": "one_stage"
+     },
+     {
+      "text": "$1/3$",
+      "mistake": "guess_cases"
+     },
+     {
+      "text": "$1$",
+      "mistake": "prob_add"
+     }
+    ]
+   }
+  },
+  {
+   "id": "h_tree",
+   "unit": "h",
+   "name": "דיאגרמת עץ עם החזרה",
+   "short": "עץ עם החזרה",
+   "prereqs": [
+    "h_two_stage"
+   ],
+   "description": "עם החזרה, ההסתברויות בשלב השני זהות לשלב הראשון.",
+   "month": "ינואר",
+   "sample": {
+    "question": "בשקית $2$ כדורים אדומים ו־$3$ כחולים. מוציאים כדור, מחזירים אותו, ומוציאים שוב. מה ההסתברות ששני הכדורים אדומים?",
+    "choices": [
+     {
+      "text": "$4/25$",
+      "correct": true
+     },
+     {
+      "text": "$2/5$",
+      "mistake": "one_stage"
+     },
+     {
+      "text": "$4/5$",
+      "mistake": "prob_add"
+     },
+     {
+      "text": "$1/10$",
+      "mistake": "with_replace"
+     }
+    ]
+   }
+  },
+  {
+   "id": "h_no_replace",
+   "unit": "h",
+   "name": "בלי החזרה",
+   "short": "בלי החזרה",
+   "prereqs": [
+    "h_tree"
+   ],
+   "description": "בלי החזרה, בשלב השני משתנים מספר הכדורים ומספר הכדורים מכל צבע.",
+   "month": "פברואר",
+   "sample": {
+    "question": "בשקית $2$ כדורים אדומים ו־$3$ כחולים. מוציאים שני כדורים בזה אחר זה בלי החזרה. מה ההסתברות ששניהם אדומים?",
+    "choices": [
+     {
+      "text": "$1/10$",
+      "correct": true
+     },
+     {
+      "text": "$4/25$",
+      "mistake": "no_replace"
+     },
+     {
+      "text": "$1/5$",
+      "mistake": "no_replace"
+     }
+    ]
+   }
+  },
+  {
+   "id": "h_table",
+   "unit": "h",
+   "name": "טבלה: הטלת שתי קוביות",
+   "short": "טבלת קוביות",
+   "prereqs": [
+    "h_two_stage"
+   ],
+   "description": "טבלה של $6 × 6$ מציגה את כל $36$ התוצאות השקולות.",
+   "month": "פברואר",
+   "sample": {
+    "question": "מטילים שתי קוביות. מה ההסתברות שסכום המספרים יהיה $7$?",
+    "choices": [
+     {
+      "text": "$1/6$",
+      "correct": true
+     },
+     {
+      "text": "$1/11$",
+      "mistake": "guess_cases"
+     },
+     {
+      "text": "$1/36$",
+      "mistake": "count_one"
+     }
+    ]
+   }
+  },
+  {
+   "id": "h_area",
+   "unit": "h",
+   "name": "מודל השטח",
+   "short": "מודל השטח",
+   "prereqs": [
+    "h_basic"
+   ],
+   "description": "כשבוחרים נקודה אקראית, ההסתברות היא יחס השטחים.",
+   "month": "פברואר",
+   "sample": {
+    "question": "לוח מטרה ריבועי בצלע $10$ ס״מ, ובמרכזו ריבוע בצלע $5$ ס״מ. חץ פוגע בנקודה אקראית בלוח. מה ההסתברות שיפגע בריבוע הפנימי?",
+    "choices": [
+     {
+      "text": "$1/4$",
+      "correct": true
+     },
+     {
+      "text": "$1/2$",
+      "mistake": "length_vs_area"
+     },
+     {
+      "text": "$1/3$",
+      "mistake": "part_vs_whole"
+     }
+    ]
+   }
+  },
+  {
+   "id": "h_atleast",
+   "unit": "h",
+   "name": "לפחות פעם אחת",
+   "short": "לפחות פעם אחת",
+   "prereqs": [
+    "h_complement",
+    "h_tree"
+   ],
+   "description": "„לפחות פעם אחת“ נוח לחשב בעזרת המאורע המשלים: „אף פעם“.",
+   "month": "פברואר",
+   "sample": {
+    "question": "מטילים קובייה פעמיים. מה ההסתברות לקבל $6$ לפחות פעם אחת?",
+    "choices": [
+     {
+      "text": "$11/36$",
+      "correct": true
+     },
+     {
+      "text": "$1/3$",
+      "mistake": "double_count"
+     },
+     {
+      "text": "$25/36$",
+      "mistake": "complement"
+     },
+     {
+      "text": "$1/36$",
+      "mistake": "both_vs_atleast"
+     }
+    ]
+   }
+  },
+  {
+   "id": "s_check",
+   "unit": "s",
+   "name": "בדיקת נקודת חיתוך",
+   "short": "בדיקת נקודה",
+   "prereqs": [],
+   "description": "נקודה היא פתרון של מערכת אם היא מקיימת את שתי המשוואות.",
+   "month": "פברואר",
+   "sample": {
+    "question": "האם הנקודה $(2, 4)$ היא נקודת חיתוך של $y = x²$ ושל $y = x + 2$?",
+    "choices": [
+     {
+      "text": "כן, היא מקיימת את שתי המשוואות",
+      "correct": true
+     },
+     {
+      "text": "לא, היא מקיימת רק את $y = x²$",
+      "mistake": "check_both"
+     },
+     {
+      "text": "אי אפשר לדעת בלי לשרטט",
+      "mistake": "check_both"
+     }
+    ]
+   }
+  },
+  {
+   "id": "s_substitute",
+   "unit": "s",
+   "name": "שיטת ההצבה",
+   "short": "הצבה",
+   "prereqs": [
+    "s_check"
+   ],
+   "description": "מציבים את $y$ מהמשוואה האחת בשנייה ומקבלים משוואה ריבועית.",
+   "month": "פברואר",
+   "sample": {
+    "question": "מציבים $y = 2x + 3$ במשוואה $y = x² + 3x − 3$. איזו משוואה מתקבלת?",
+    "choices": [
+     {
+      "text": "$x² + x − 6 = 0$",
+      "correct": true
+     },
+     {
+      "text": "$x² + 5x = 0$",
+      "mistake": "lost_sign_move"
+     },
+     {
+      "text": "$x² + x = 0$",
+      "mistake": "lost_sign_move"
+     }
+    ]
+   }
+  },
+  {
+   "id": "s_line_parab",
+   "unit": "s",
+   "name": "מערכת: ישר ופרבולה",
+   "short": "ישר ופרבולה",
+   "prereqs": [
+    "s_substitute",
+    "e_factor"
+   ],
+   "description": "פותרים את המשוואה הריבועית ומציבים כל $x$ כדי למצוא את $y$.",
+   "month": "פברואר",
+   "sample": {
+    "question": "פתרו: $y = x²$ ו־$y = x + 6$",
+    "choices": [
+     {
+      "text": "$(3, 9)$ ו־$(−2, 4)$",
+      "correct": true
+     },
+     {
+      "text": "$x = 3$ או $x = −2$",
+      "mistake": "forgot_y"
+     },
+     {
+      "text": "$(−3, 9)$ ו־$(2, 4)$",
+      "mistake": "zero_root_sign"
+     },
+     {
+      "text": "$(3, 9)$ בלבד",
+      "mistake": "one_solution"
+     }
+    ]
+   }
+  },
+  {
+   "id": "s_count",
+   "unit": "s",
+   "name": "מספר נקודות החיתוך",
+   "short": "מספר חיתוכים",
+   "prereqs": [
+    "s_line_parab",
+    "e_disc"
+   ],
+   "description": "מספר הפתרונות של המשוואה הריבועית הוא מספר נקודות החיתוך.",
+   "month": "פברואר",
+   "sample": {
+    "question": "כמה נקודות חיתוך יש לגרפים $y = x² + 4$ ו־$y = 2x$?",
+    "choices": [
+     {
+      "text": "אף אחת",
+      "correct": true
+     },
+     {
+      "text": "שתיים",
+      "mistake": "disc_meaning"
+     },
+     {
+      "text": "אחת",
+      "mistake": "disc_meaning"
+     }
+    ]
+   }
+  },
+  {
+   "id": "s_two_parab",
+   "unit": "s",
+   "name": "מערכת: שתי פרבולות",
+   "short": "שתי פרבולות",
+   "prereqs": [
+    "s_line_parab"
+   ],
+   "description": "משווים בין שתי הפרבולות ופותרים.",
+   "month": "פברואר",
+   "sample": {
+    "question": "פתרו: $y = x² − 2$ ו־$y = −x² + 6$",
+    "choices": [
+     {
+      "text": "$(2, 2)$ ו־$(−2, 2)$",
+      "correct": true
+     },
+     {
+      "text": "$(2, 2)$ בלבד",
+      "mistake": "missing_neg_root"
+     },
+     {
+      "text": "$(2, 2)$ ו־$(−2, −2)$",
+      "mistake": "y_sign"
+     }
+    ]
+   }
+  },
+  {
+   "id": "s_meaning",
+   "unit": "s",
+   "name": "משמעות גרפית של פתרון",
+   "short": "משמעות גרפית",
+   "prereqs": [
+    "s_line_parab"
+   ],
+   "description": "כל פתרון של המערכת הוא נקודה שבה הגרפים נפגשים.",
+   "month": "פברואר",
+   "sample": {
+    "question": "למערכת $y = f(x)$, $y = g(x)$ יש פתרון אחד בלבד. מה אפשר לומר על הגרפים?",
+    "choices": [
+     {
+      "text": "הם נפגשים בנקודה אחת בדיוק",
+      "correct": true
+     },
+     {
+      "text": "הם אינם נפגשים",
+      "mistake": "sys_meaning"
+     },
+     {
+      "text": "שניהם עוברים בראשית הצירים",
+      "mistake": "sys_meaning"
+     }
+    ]
+   }
+  },
+  {
+   "id": "s_tangent",
+   "unit": "s",
+   "name": "ישר אופקי ופרבולה",
+   "short": "ישר אופקי",
+   "prereqs": [
+    "s_count"
+   ],
+   "description": "ישר אופקי פוגש פרבולה בנקודה אחת רק בגובה הקודקוד.",
+   "month": "פברואר",
+   "sample": {
+    "question": "עבור איזה ערך של $k$ הישר $y = k$ חותך את הפרבולה $y = x² + 2$ בנקודה אחת בלבד?",
+    "choices": [
+     {
+      "text": "$k = 2$",
+      "correct": true
+     },
+     {
+      "text": "$k = 0$",
+      "mistake": "vertex_height"
+     },
+     {
+      "text": "$k = −2$",
+      "mistake": "k_sign"
+     }
+    ]
+   }
+  },
+  {
+   "id": "s_line_parab2",
+   "unit": "s",
+   "name": "מערכת עם מקדמים",
+   "short": "מערכת עם מקדמים",
+   "prereqs": [
+    "s_line_parab"
+   ],
+   "description": "מעבירים את כל האיברים לאגף אחד, פותרים ומציבים.",
+   "month": "פברואר",
+   "sample": {
+    "question": "פתרו: $y = x² − 4x + 5$ ו־$y = x + 1$",
+    "choices": [
+     {
+      "text": "$(1, 2)$ ו־$(4, 5)$",
+      "correct": true
+     },
+     {
+      "text": "$(1, 0)$ ו־$(4, 0)$",
+      "mistake": "forgot_y"
+     },
+     {
+      "text": "$(−1, 0)$ ו־$(−4, −3)$",
+      "mistake": "zero_root_sign"
+     }
+    ]
+   }
+  },
+  {
+   "id": "s_word",
+   "unit": "s",
+   "name": "מערכת בשאלה מילולית",
+   "short": "שאלת מערכת",
+   "prereqs": [
+    "s_line_parab"
+   ],
+   "description": "מתרגמים את התנאים לשתי משוואות ופותרים בהצבה.",
+   "month": "פברואר",
+   "sample": {
+    "question": "סכום שני מספרים הוא $10$ ומכפלתם $21$. מהם המספרים?",
+    "choices": [
+     {
+      "text": "$3$ ו־$7$",
+      "correct": true
+     },
+     {
+      "text": "$5$ ו־$5$",
+      "mistake": "product_check"
+     },
+     {
+      "text": "$1$ ו־$21$",
+      "mistake": "product_check"
+     }
+    ]
+   }
+  },
+  {
+   "id": "s_region",
+   "unit": "s",
+   "name": "מתי ישר מעל פרבולה",
+   "short": "ישר מעל פרבולה",
+   "prereqs": [
+    "s_line_parab",
+    "e_ineq"
+   ],
+   "description": "משווים בין הפונקציות ופותרים אי־שוויון ריבועי.",
+   "month": "פברואר",
+   "sample": {
+    "question": "$f(x) = x²$ ו־$g(x) = x + 2$. לאילו ערכי $x$ הגרף של $g$ נמצא מעל הגרף של $f$?",
+    "choices": [
+     {
+      "text": "$−1 < x < 2$",
+      "correct": true
+     },
+     {
+      "text": "$x < −1$ או $x > 2$",
+      "mistake": "sign_regions"
+     },
+     {
+      "text": "$−2 < x < 1$",
+      "mistake": "zero_root_sign"
+     }
+    ]
+   }
+  },
+  {
+   "id": "m_rect_def",
+   "unit": "m",
+   "name": "מלבן: אלכסונים",
+   "short": "אלכסוני מלבן",
+   "prereqs": [
+    "z_par_diag"
+   ],
+   "description": "מלבן הוא מקבילית שבה זווית ישרה; אלכסוניו שווים וחוצים זה את זה.",
+   "month": "ינואר",
+   "sample": {
+    "question": "במלבן $ABCD$ האלכסונים נחתכים בנקודה $O$, ו־$AC = 12$. מה אורך $OD$?",
+    "choices": [
+     {
+      "text": "$6$",
+      "correct": true
+     },
+     {
+      "text": "$12$",
+      "mistake": "par_diag"
+     },
+     {
+      "text": "אי אפשר לדעת",
+      "mistake": "rect_diag_equal"
+     }
+    ]
+   }
+  },
+  {
+   "id": "m_rect_angles",
+   "unit": "m",
+   "name": "זוויות במלבן",
+   "short": "זוויות במלבן",
+   "prereqs": [
+    "m_rect_def"
+   ],
+   "description": "חצאי האלכסונים במלבן שווים, ולכן נוצרים משולשים שווי שוקיים.",
+   "month": "ינואר",
+   "sample": {
+    "question": "במלבן $ABCD$ האלכסונים נחתכים בנקודה $O$, ו־$∢OAB = 35°$. מה גודל $∢AOB$?",
+    "choices": [
+     {
+      "text": "$110°$",
+      "correct": true
+     },
+     {
+      "text": "$35°$",
+      "mistake": "rect_iso"
+     },
+     {
+      "text": "$145°$",
+      "mistake": "rect_iso"
+     }
+    ]
+   }
+  },
+  {
+   "id": "m_rect_converse",
+   "unit": "m",
+   "name": "הוכחה שמקבילית היא מלבן",
+   "short": "הוכחת מלבן",
+   "prereqs": [
+    "m_rect_def"
+   ],
+   "description": "מקבילית עם זווית ישרה או עם אלכסונים שווים היא מלבן.",
+   "month": "פברואר",
+   "sample": {
+    "question": "מקבילית שבה ___ היא בהכרח מלבן.",
+    "choices": [
+     {
+      "text": "האלכסונים שווים זה לזה",
+      "correct": true
+     },
+     {
+      "text": "האלכסונים מאונכים זה לזה",
+      "mistake": "rect_vs_rhombus"
+     },
+     {
+      "text": "שתי צלעות סמוכות שוות",
+      "mistake": "rect_vs_rhombus"
+     }
+    ]
+   }
+  },
+  {
+   "id": "m_rect_area",
+   "unit": "m",
+   "name": "שטח והיקף מלבן",
+   "short": "שטח מלבן",
+   "prereqs": [
+    "m_rect_def"
+   ],
+   "description": "היקף מלבן $2(a + b)$, שטחו $a · b$.",
+   "month": "פברואר",
+   "sample": {
+    "question": "היקף מלבן הוא $26$ ס״מ ואורכו $8$ ס״מ. מה שטחו?",
+    "diagram": {
+     "type": "rectangle",
+     "base": "8 cm",
+     "height": "?",
+     "alt": "מלבן שאורכו 8 סנטימטרים ורוחבו לא ידוע"
+    },
+    "choices": [
+     {
+      "text": "$40$ סמ״ר",
+      "correct": true
+     },
+     {
+      "text": "$208$ סמ״ר",
+      "mistake": "area_perimeter"
+     },
+     {
+      "text": "$144$ סמ״ר",
+      "mistake": "half_perimeter"
+     }
+    ]
+   }
+  },
+  {
+   "id": "m_rhombus_def",
+   "unit": "m",
+   "name": "מעוין: צלעות ואלכסונים",
+   "short": "אלכסוני מעוין",
+   "prereqs": [
+    "z_par_diag"
+   ],
+   "description": "במעוין כל הצלעות שוות, והאלכסונים מאונכים וחוצים זה את זה.",
+   "month": "מרץ",
+   "sample": {
+    "question": "במעוין $ABCD$ האלכסונים $AC = 16$ ו־$BD = 12$. מה אורך צלע המעוין?",
+    "choices": [
+     {
+      "text": "$10$",
+      "correct": true
+     },
+     {
+      "text": "$14$",
+      "mistake": "add_lengths"
+     },
+     {
+      "text": "$20$",
+      "mistake": "diag_half"
+     }
+    ]
+   }
+  },
+  {
+   "id": "m_rhombus_angles",
+   "unit": "m",
+   "name": "זוויות במעוין",
+   "short": "זוויות במעוין",
+   "prereqs": [
+    "m_rhombus_def"
+   ],
+   "description": "אלכסוני המעוין חוצים את זוויותיו.",
+   "month": "מרץ",
+   "sample": {
+    "question": "במעוין $ABCD$, $∢ABC = 120°$. מה גודל $∢ABD$ (הזווית בין הצלע $AB$ לאלכסון $BD$)?",
+    "choices": [
+     {
+      "text": "$60°$",
+      "correct": true
+     },
+     {
+      "text": "$120°$",
+      "mistake": "rh_bisect"
+     },
+     {
+      "text": "$90°$",
+      "mistake": "rh_perp"
+     },
+     {
+      "text": "$30°$",
+      "mistake": "rh_bisect"
+     }
+    ]
+   }
+  },
+  {
+   "id": "m_rhombus_area",
+   "unit": "m",
+   "name": "שטח מעוין",
+   "short": "שטח מעוין",
+   "prereqs": [
+    "m_rhombus_def"
+   ],
+   "description": "שטח מעוין הוא מכפלת האלכסונים חלקי 2.",
+   "month": "מרץ",
+   "sample": {
+    "question": "אורכי האלכסונים של מעוין הם $10$ ו־$7$. מה שטחו?",
+    "choices": [
+     {
+      "text": "$35$",
+      "correct": true
+     },
+     {
+      "text": "$70$",
+      "mistake": "forgot_half_area"
+     },
+     {
+      "text": "$17$",
+      "mistake": "area_add"
+     }
+    ]
+   }
+  },
+  {
+   "id": "m_rhombus_converse",
+   "unit": "m",
+   "name": "הוכחה שמקבילית היא מעוין",
+   "short": "הוכחת מעוין",
+   "prereqs": [
+    "m_rhombus_def"
+   ],
+   "description": "מקבילית עם צלעות סמוכות שוות, אלכסונים מאונכים או אלכסון חוצה זווית היא מעוין.",
+   "month": "מרץ",
+   "sample": {
+    "question": "איזה תנאי מספיק כדי שמקבילית תהיה מעוין?",
+    "choices": [
+     {
+      "text": "אלכסון חוצה את זווית המקבילית",
+      "correct": true
+     },
+     {
+      "text": "האלכסונים שווים זה לזה",
+      "mistake": "rect_vs_rhombus"
+     },
+     {
+      "text": "יש בה זווית ישרה",
+      "mistake": "rect_vs_rhombus"
+     }
+    ]
+   }
+  },
+  {
+   "id": "m_square",
+   "unit": "m",
+   "name": "ריבוע: הגדרה ותכונות",
+   "short": "הגדרת ריבוע",
+   "prereqs": [
+    "m_rhombus_converse",
+    "m_rect_converse"
+   ],
+   "description": "ריבוע הוא גם מלבן וגם מעוין, ולכן יש לו את התכונות של שניהם.",
+   "month": "מרץ",
+   "sample": {
+    "question": "איזה משפט נכון?",
+    "choices": [
+     {
+      "text": "כל ריבוע הוא גם מלבן וגם מעוין",
+      "correct": true
+     },
+     {
+      "text": "כל מעוין הוא ריבוע",
+      "mistake": "square_hierarchy"
+     },
+     {
+      "text": "כל מלבן הוא ריבוע",
+      "mistake": "square_hierarchy"
+     }
+    ]
+   }
+  },
+  {
+   "id": "m_square_diag",
+   "unit": "m",
+   "name": "אלכסוני הריבוע",
+   "short": "אלכסוני ריבוע",
+   "prereqs": [
+    "m_square"
+   ],
+   "description": "בריבוע האלכסונים שווים, מאונכים, חוצים זה את זה וחוצים את הזוויות.",
+   "month": "אפריל",
+   "sample": {
+    "question": "בריבוע $ABCD$ האלכסונים נחתכים בנקודה $O$. מה גודל $∢OAB$ ומה גודל $∢AOB$?",
+    "choices": [
+     {
+      "text": "$∢OAB = 45°$, $∢AOB = 90°$",
+      "correct": true
+     },
+     {
+      "text": "$∢OAB = 90°$, $∢AOB = 45°$",
+      "mistake": "square_diag"
+     },
+     {
+      "text": "$∢OAB = 45°$, $∢AOB = 60°$",
+      "mistake": "square_diag"
+     }
+    ]
+   }
+  },
+  {
+   "id": "n_intercepts",
+   "unit": "n",
+   "name": "נקודות חיתוך עם הצירים",
+   "short": "חיתוך עם הצירים",
+   "prereqs": [],
+   "description": "חיתוך עם ציר $x$: מציבים $y = 0$. חיתוך עם ציר $y$: מציבים $x = 0$.",
+   "month": "מרץ",
+   "sample": {
+    "question": "מהן נקודות החיתוך של $f(x) = 2x − 6$ עם הצירים?",
+    "choices": [
+     {
+      "text": "$(3, 0)$ ו־$(0, −6)$",
+      "correct": true
+     },
+     {
+      "text": "$(−3, 0)$ ו־$(0, −6)$",
+      "mistake": "lost_sign_move"
+     },
+     {
+      "text": "$(0, 3)$ ו־$(−6, 0)$",
+      "mistake": "axes_mixed"
+     }
+    ]
+   }
+  },
+  {
+   "id": "n_sign",
+   "unit": "n",
+   "name": "תחומי חיוביות ושליליות",
+   "short": "חיוביות ושליליות",
+   "prereqs": [
+    "n_intercepts"
+   ],
+   "description": "הפונקציה חיובית היכן שהגרף מעל ציר $x$, ושלילית היכן שהוא מתחתיו.",
+   "month": "מרץ",
+   "sample": {
+    "question": "לפי הגרף, באיזה תחום הפונקציה חיובית?",
+    "graph": {
+     "points": [
+      [
+       -4,
+       -3
+      ],
+      [
+       -2,
+       0
+      ],
+      [
+       1,
+       3
+      ],
+      [
+       3,
+       0
+      ],
+      [
+       5,
+       -2
+      ]
+     ],
+     "x": [
+      -4.5,
+      5.5
+     ],
+     "y": [
+      -3.5,
+      4
+     ]
+    },
+    "choices": [
+     {
+      "text": "$−2 < x < 3$",
+      "correct": true
+     },
+     {
+      "text": "$x < −2$ או $x > 3$",
+      "mistake": "pos_neg_swap"
+     },
+     {
+      "text": "$0 < y < 3$",
+      "mistake": "x_vs_y_interval"
+     },
+     {
+      "text": "$x > 0$",
+      "mistake": "neg_x"
+     }
+    ]
+   }
+  },
+  {
+   "id": "n_extremum",
+   "unit": "n",
+   "name": "נקודות קיצון ותחומי עלייה וירידה",
+   "short": "קיצון ועלייה",
+   "prereqs": [
+    "n_sign"
+   ],
+   "description": "בין נקודות הקיצון הפונקציה עולה או יורדת.",
+   "month": "מרץ",
+   "sample": {
+    "question": "לפי הגרף, באיזה תחום הפונקציה עולה?",
+    "graph": {
+     "points": [
+      [
+       -4,
+       3
+      ],
+      [
+       -2,
+       -1
+      ],
+      [
+       1,
+       2
+      ],
+      [
+       4,
+       -3
+      ]
+     ],
+     "x": [
+      -4.5,
+      4.5
+     ],
+     "y": [
+      -3.5,
+      3.5
+     ]
+    },
+    "choices": [
+     {
+      "text": "$−2 < x < 1$",
+      "correct": true
+     },
+     {
+      "text": "$−1 < x < 2$",
+      "mistake": "x_vs_y_interval"
+     },
+     {
+      "text": "$x < −2$ או $x > 1$",
+      "mistake": "dir_confusion"
+     }
+    ]
+   }
+  },
+  {
+   "id": "n_local_abs",
+   "unit": "n",
+   "name": "קיצון מקומי וקיצון מוחלט",
+   "short": "מקומי ומוחלט",
+   "prereqs": [
+    "n_extremum"
+   ],
+   "description": "קיצון מקומי הוא קיצון בסביבה; קיצון מוחלט הוא הערך הקיצוני בכל הגרף.",
+   "month": "מרץ",
+   "sample": {
+    "question": "הגרף ממשיך לעלות בשני הקצוות. מהי נקודת המינימום המוחלט?",
+    "graph": {
+     "points": [
+      [
+       -4,
+       4
+      ],
+      [
+       -2,
+       -1
+      ],
+      [
+       0,
+       1.5
+      ],
+      [
+       2,
+       -3
+      ],
+      [
+       4,
+       4
+      ]
+     ],
+     "x": [
+      -4.5,
+      4.5
+     ],
+     "y": [
+      -3.5,
+      4.5
+     ]
+    },
+    "choices": [
+     {
+      "text": "$(2, −3)$",
+      "correct": true
+     },
+     {
+      "text": "$(−2, −1)$",
+      "mistake": "local_as_abs"
+     },
+     {
+      "text": "$(0, 1.5)$",
+      "mistake": "max_vs_min"
+     },
+     {
+      "text": "$−3$",
+      "mistake": "value_vs_point"
+     }
+    ]
+   }
+  },
+  {
+   "id": "n_min_value",
+   "unit": "n",
+   "name": "ערך המקסימום והמינימום",
+   "short": "ערך הקיצון",
+   "prereqs": [
+    "n_local_abs"
+   ],
+   "description": "ערך המקסימום או המינימום הוא שיעור ה־$y$ של נקודת הקיצון.",
+   "month": "מרץ",
+   "sample": {
+    "question": "לפונקציה נקודת מקסימום מוחלט $(−1, 7)$. מה הערך המקסימלי של הפונקציה?",
+    "choices": [
+     {
+      "text": "$7$",
+      "correct": true
+     },
+     {
+      "text": "$−1$",
+      "mistake": "x_as_value"
+     },
+     {
+      "text": "$(−1, 7)$",
+      "mistake": "value_vs_point"
+     }
+    ]
+   }
+  },
+  {
+   "id": "n_eq_graph",
+   "unit": "n",
+   "name": "משוואה וגרף: $f(x) = m$",
+   "short": "משוואה וגרף",
+   "prereqs": [
+    "n_extremum"
+   ],
+   "description": "מספר הפתרונות של $f(x) = m$ הוא מספר הפעמים שהגרף פוגש את הישר $y = m$.",
+   "month": "מרץ",
+   "sample": {
+    "question": "הגרף ממשיך לעלות בשני הקצוות. כמה פתרונות יש למשוואה $f(x) = 2$?",
+    "graph": {
+     "points": [
+      [
+       -4,
+       4
+      ],
+      [
+       -2,
+       -1
+      ],
+      [
+       0,
+       1.5
+      ],
+      [
+       2,
+       -3
+      ],
+      [
+       4,
+       4
+      ]
+     ],
+     "x": [
+      -4.5,
+      4.5
+     ],
+     "y": [
+      -3.5,
+      4.5
+     ]
+    },
+    "choices": [
+     {
+      "text": "$2$",
+      "correct": true
+     },
+     {
+      "text": "$4$",
+      "mistake": "count_all"
+     },
+     {
+      "text": "$1$",
+      "mistake": "x_equals_m"
+     },
+     {
+      "text": "$0$",
+      "mistake": "x_equals_m"
+     }
+    ]
+   }
+  },
+  {
+   "id": "n_vshift",
+   "unit": "n",
+   "name": "הזזה אנכית של פונקציה",
+   "short": "הזזה אנכית",
+   "prereqs": [
+    "n_extremum"
+   ],
+   "description": "$f(x) + k$ מזיזה את הגרף $k$ יחידות למעלה; שיעורי ה־$x$ נשמרים.",
+   "month": "מרץ",
+   "sample": {
+    "question": "לפונקציה $f$ נקודת מינימום $(3, −2)$. מהי נקודת המינימום של $f(x) + 5$?",
+    "choices": [
+     {
+      "text": "$(3, 3)$",
+      "correct": true
+     },
+     {
+      "text": "$(8, −2)$",
+      "mistake": "vshift_as_h"
+     },
+     {
+      "text": "$(3, −7)$",
+      "mistake": "vshift_dir"
+     }
+    ]
+   }
+  },
+  {
+   "id": "n_hshift",
+   "unit": "n",
+   "name": "הזזה אופקית של פונקציה",
+   "short": "הזזה אופקית",
+   "prereqs": [
+    "n_extremum"
+   ],
+   "description": "$f(x − b)$ מזיזה את הגרף $b$ יחידות ימינה; שיעורי ה־$y$ נשמרים.",
+   "month": "מרץ",
+   "sample": {
+    "question": "לפונקציה $f$ נקודת מקסימום $(1, 4)$. מהי נקודת המקסימום של $f(x − 2)$?",
+    "choices": [
+     {
+      "text": "$(3, 4)$",
+      "correct": true
+     },
+     {
+      "text": "$(−1, 4)$",
+      "mistake": "hshift_sign"
+     },
+     {
+      "text": "$(1, 2)$",
+      "mistake": "h_as_v"
+     }
+    ]
+   }
+  },
+  {
+   "id": "n_reflect",
+   "unit": "n",
+   "name": "שיקוף ביחס לציר $x$",
+   "short": "שיקוף",
+   "prereqs": [
+    "n_extremum"
+   ],
+   "description": "$−f(x)$ הוא שיקוף ביחס לציר $x$: מקסימום הופך למינימום.",
+   "month": "מרץ",
+   "sample": {
+    "question": "לפונקציה $f$ נקודת מקסימום $(2, 5)$. מהי נקודת הקיצון של $−f(x)$?",
+    "choices": [
+     {
+      "text": "$(2, −5)$, מינימום",
+      "correct": true
+     },
+     {
+      "text": "$(−2, 5)$, מקסימום",
+      "mistake": "reflect_axis"
+     },
+     {
+      "text": "$(2, −5)$, מקסימום",
+      "mistake": "reflect_type"
+     }
+    ]
+   }
+  },
+  {
+   "id": "n_props_shift",
+   "unit": "n",
+   "name": "תכונות שנשמרות בהזזה",
+   "short": "תחומים בהזזה",
+   "prereqs": [
+    "n_vshift",
+    "n_hshift"
+   ],
+   "description": "בהזזה אופקית תחומי העלייה והירידה זזים; בהזזה אנכית הם נשמרים.",
+   "month": "מרץ",
+   "sample": {
+    "question": "הפונקציה $f$ עולה בתחום $x < 1$. באיזה תחום עולה $f(x + 3)$?",
+    "choices": [
+     {
+      "text": "$x < −2$",
+      "correct": true
+     },
+     {
+      "text": "$x < 4$",
+      "mistake": "hshift_sign"
+     },
+     {
+      "text": "$x < 1$",
+      "mistake": "shift_keeps"
+     }
+    ]
+   }
+  },
+  {
+   "id": "p_mult",
+   "unit": "p",
+   "name": "כפל חזקות עם אותו בסיס",
+   "short": "כפל חזקות",
+   "prereqs": [],
+   "description": "$aᵐ · aⁿ = aᵐ⁺ⁿ$.",
+   "month": "מאי",
+   "sample": {
+    "question": "$a³ · a⁵ = ?$",
+    "choices": [
+     {
+      "text": "$a⁸$",
+      "correct": true
+     },
+     {
+      "text": "$a¹⁵$",
       "mistake": "mult_exponents"
      },
      {
-      "text": "$a⁴$",
+      "text": "$2a⁸$",
+      "mistake": "coef_doubled"
+     }
+    ]
+   }
+  },
+  {
+   "id": "p_div",
+   "unit": "p",
+   "name": "חילוק חזקות עם אותו בסיס",
+   "short": "חילוק חזקות",
+   "prereqs": [
+    "p_mult"
+   ],
+   "description": "$aᵐ : aⁿ = aᵐ⁻ⁿ$.",
+   "month": "מאי",
+   "sample": {
+    "question": "$x¹² : x⁴ = ?$",
+    "choices": [
+     {
+      "text": "$x⁸$",
+      "correct": true
+     },
+     {
+      "text": "$x³$",
+      "mistake": "div_exponents"
+     },
+     {
+      "text": "$x¹⁶$",
       "mistake": "div_exponents"
      }
     ]
    }
   },
   {
-   "id": "p_laws2",
+   "id": "p_power",
    "unit": "p",
-   "name": "חזקה של מכפלה, של מנה ושל חזקה",
+   "name": "חזקה של חזקה",
    "short": "חזקה של חזקה",
    "prereqs": [
-    "p_laws1"
+    "p_mult"
    ],
-   "description": "$(ab)ⁿ = aⁿbⁿ$, $(a:b)ⁿ = aⁿ:bⁿ$, $(aⁿ)ᵐ = aⁿᵐ$.",
+   "description": "$(aᵐ)ⁿ = aᵐⁿ$.",
    "month": "מאי",
    "sample": {
-    "question": "$(2x³)² = ?$",
+    "question": "$(y⁴)³ = ?$",
     "choices": [
      {
-      "text": "$4x⁶$",
+      "text": "$y¹²$",
       "correct": true
      },
      {
-      "text": "$2x⁶$",
-      "mistake": "coef_not_raised"
-     },
-     {
-      "text": "$4x⁵$",
+      "text": "$y⁷$",
       "mistake": "pow_pow_add"
      },
      {
-      "text": "$2x⁵$",
+      "text": "$y⁶⁴$",
+      "mistake": "pow_tower"
+     }
+    ]
+   }
+  },
+  {
+   "id": "p_product",
+   "unit": "p",
+   "name": "חזקה של מכפלה",
+   "short": "חזקה של מכפלה",
+   "prereqs": [
+    "p_power"
+   ],
+   "description": "$(ab)ⁿ = aⁿbⁿ$: מעלים בחזקה כל גורם, גם את המקדם.",
+   "month": "מאי",
+   "sample": {
+    "question": "$(2x³)⁴ = ?$",
+    "choices": [
+     {
+      "text": "$16x¹²$",
+      "correct": true
+     },
+     {
+      "text": "$2x¹²$",
       "mistake": "coef_not_raised"
+     },
+     {
+      "text": "$8x¹²$",
+      "mistake": "coef_mult"
+     },
+     {
+      "text": "$16x⁷$",
+      "mistake": "pow_pow_add"
+     }
+    ]
+   }
+  },
+  {
+   "id": "p_quotient",
+   "unit": "p",
+   "name": "חזקה של מנה",
+   "short": "חזקה של מנה",
+   "prereqs": [
+    "p_power"
+   ],
+   "description": "$(a/b)ⁿ = aⁿ / bⁿ$.",
+   "month": "מאי",
+   "sample": {
+    "question": "$(a² / 3)³ = ?$",
+    "choices": [
+     {
+      "text": "$a⁶ / 27$",
+      "correct": true
+     },
+     {
+      "text": "$a⁶ / 3$",
+      "mistake": "denom_not_raised"
+     },
+     {
+      "text": "$a⁵ / 27$",
+      "mistake": "pow_pow_add"
+     }
+    ]
+   }
+  },
+  {
+   "id": "p_zero",
+   "unit": "p",
+   "name": "מעריך אפס",
+   "short": "מעריך אפס",
+   "prereqs": [
+    "p_div"
+   ],
+   "description": "$a⁰ = 1$ לכל $a ≠ 0$.",
+   "month": "מאי",
+   "sample": {
+    "question": "$7⁰ + 7¹ = ?$",
+    "choices": [
+     {
+      "text": "$8$",
+      "correct": true
+     },
+     {
+      "text": "$7$",
+      "mistake": "zero_power"
+     },
+     {
+      "text": "$14$",
+      "mistake": "zero_power"
      }
     ]
    }
@@ -1734,24 +3696,53 @@
    "name": "השוואת חזקות",
    "short": "השוואת חזקות",
    "prereqs": [
-    "p_laws2"
+    "p_power"
    ],
-   "description": "השוואה בין חזקות בעזרת חוקי החזקה, בלי מחשבון.",
+   "description": "כדי להשוות חזקות כותבים אותן באותו בסיס.",
    "month": "מאי",
    "sample": {
-    "question": "מה גדול יותר: $2³⁰⁰$ או $3²⁰⁰$?",
+    "question": "איזה מספר גדול יותר: $2³⁰$ או $4¹⁴$?",
     "choices": [
      {
-      "text": "$3²⁰⁰$",
+      "text": "$2³⁰$",
       "correct": true
      },
      {
-      "text": "$2³⁰⁰$",
-      "mistake": "bigger_exp"
+      "text": "$4¹⁴$",
+      "mistake": "bigger_base"
      },
      {
       "text": "הם שווים",
-      "mistake": "bigger_exp"
+      "mistake": "bigger_base"
+     }
+    ]
+   }
+  },
+  {
+   "id": "p_simplify",
+   "unit": "p",
+   "name": "פישוט ביטוי עם חזקות",
+   "short": "פישוט חזקות",
+   "prereqs": [
+    "p_product",
+    "p_div"
+   ],
+   "description": "מפעילים את חוקי החזקות שלב אחר שלב.",
+   "month": "מאי",
+   "sample": {
+    "question": "$(x³)² · x : x⁴ = ?$",
+    "choices": [
+     {
+      "text": "$x³$",
+      "correct": true
+     },
+     {
+      "text": "$x²$",
+      "mistake": "pow_pow_add"
+     },
+     {
+      "text": "$x¹¹$",
+      "mistake": "div_as_mult"
      }
     ]
    }
@@ -1761,11 +3752,8 @@
    "unit": "p",
    "name": "חוקי שורש ריבועי",
    "short": "חוקי שורש",
-   "prereqs": [
-    "f_sqrt",
-    "p_laws2"
-   ],
-   "description": "$√a·√b = √(ab)$ ו־$√a : √b = √(a:b)$, ופישוט שורשים.",
+   "prereqs": [],
+   "description": "$√a · √b = √(ab)$ ו־$√a : √b = √(a : b)$, עבור $a, b ≥ 0$.",
    "month": "מאי",
    "sample": {
     "question": "$√12 · √3 = ?$",
@@ -1786,33 +3774,85 @@
    }
   },
   {
-   "id": "w_area",
-   "unit": "w",
-   "name": "שאלות הנדסיות",
-   "short": "שאלות הנדסיות",
+   "id": "p_sqrt_sum",
+   "unit": "p",
+   "name": "שורש של סכום",
+   "short": "שורש של סכום",
    "prereqs": [
-    "q_formula"
+    "p_sqrt_laws"
    ],
-   "description": "בניית משוואה ריבועית משטח או מאורך, ובדיקה שהפתרון מתאים לבעיה.",
+   "description": "שורש מתפרק על כפל ועל חילוק, אבל לא על חיבור.",
    "month": "מאי",
    "sample": {
-    "question": "שטח מלבן הוא 48 סמ״ר, ואורכו גדול מרוחבו ב־2 ס״מ. מה רוחבו?",
+    "question": "איזה שוויון נכון?",
     "choices": [
      {
-      "text": "6 ס״מ",
+      "text": "$√9 · √16 = √144$",
       "correct": true
      },
      {
-      "text": "6 ס״מ או −8 ס״מ",
+      "text": "$√9 + √16 = √25$",
+      "mistake": "sqrt_split"
+     },
+     {
+      "text": "$√(9 + 16) = 3 + 4$",
+      "mistake": "sqrt_split"
+     }
+    ]
+   }
+  },
+  {
+   "id": "w_area",
+   "unit": "w",
+   "name": "שאלה הנדסית",
+   "short": "שאלה הנדסית",
+   "prereqs": [
+    "e_formula"
+   ],
+   "description": "מבטאים אורכים בעזרת משתנה, בונים משוואה ריבועית ופוסלים פתרון שלילי.",
+   "month": "מאי",
+   "sample": {
+    "question": "אורך מלבן גדול ב־$3$ ס״מ מרוחבו, ושטחו $40$ סמ״ר. מה רוחבו?",
+    "choices": [
+     {
+      "text": "$5$ ס״מ",
+      "correct": true
+     },
+     {
+      "text": "$−8$ ס״מ",
       "mistake": "inadmissible"
      },
      {
-      "text": "8 ס״מ",
+      "text": "$8$ ס״מ",
       "mistake": "other_quantity"
+     }
+    ]
+   }
+  },
+  {
+   "id": "w_frame",
+   "unit": "w",
+   "name": "מסגרת סביב תמונה",
+   "short": "מסגרת",
+   "prereqs": [
+    "w_area"
+   ],
+   "description": "מסגרת ברוחב $x$ מוסיפה $2x$ לכל מימד.",
+   "month": "מאי",
+   "sample": {
+    "question": "תמונה בגודל $10$ על $6$ ס״מ. מוסיפים סביבה מסגרת ברוחב אחיד $x$, ושטח התמונה עם המסגרת $96$ סמ״ר. מה $x$?",
+    "choices": [
+     {
+      "text": "$1$ ס״מ",
+      "correct": true
      },
      {
-      "text": "23 ס״מ",
-      "mistake": "area_perimeter"
+      "text": "$−9$ ס״מ",
+      "mistake": "inadmissible"
+     },
+     {
+      "text": "$2$ ס״מ",
+      "mistake": "frame_one_side"
      }
     ]
    }
@@ -1820,28 +3860,54 @@
   {
    "id": "w_motion",
    "unit": "w",
-   "name": "שאלות תנועה",
-   "short": "שאלות תנועה",
+   "name": "שאלת תנועה",
+   "short": "שאלת תנועה",
    "prereqs": [
-    "q_formula",
-    "t_fraceq"
+    "w_area",
+    "r_cross"
    ],
-   "description": "דרך, מהירות וזמן, כשהמשתנה במכנה מוביל למשוואה ריבועית.",
+   "description": "זמן = דרך : מהירות. מהשוואת זמנים מתקבלת משוואה עם שברים.",
    "month": "מאי",
    "sample": {
-    "question": "רוכב נוסע 120 ק״מ. אילו נסע מהר יותר ב־10 קמ״ש, היה מגיע שעה אחת מוקדם יותר. מה מהירותו?",
+    "question": "רוכב אופניים נסע $60$ ק״מ. אילו מהירותו הייתה גדולה ב־$5$ קמ״ש, הנסיעה הייתה קצרה בשעה. מה מהירותו?",
     "choices": [
      {
-      "text": "30 קמ״ש",
+      "text": "$15$ קמ״ש",
       "correct": true
      },
      {
-      "text": "30 או −40 קמ״ש",
+      "text": "$−20$ קמ״ש",
       "mistake": "inadmissible"
      },
      {
-      "text": "40 קמ״ש",
+      "text": "$20$ קמ״ש",
       "mistake": "other_quantity"
+     }
+    ]
+   }
+  },
+  {
+   "id": "w_meet",
+   "unit": "w",
+   "name": "תנועה זו לקראת זו",
+   "short": "זו לקראת זו",
+   "prereqs": [],
+   "description": "בתנועה זו לקראת זו המרחק קטן בכל שעה בסכום המהירויות.",
+   "month": "מאי",
+   "sample": {
+    "question": "שתי מכוניות יוצאות באותו זמן משתי ערים שהמרחק ביניהן $300$ ק״מ, ונוסעות זו לקראת זו במהירויות $70$ ו־$80$ קמ״ש. אחרי כמה שעות ייפגשו?",
+    "choices": [
+     {
+      "text": "$2$ שעות",
+      "correct": true
+     },
+     {
+      "text": "$30$ שעות",
+      "mistake": "speed_diff"
+     },
+     {
+      "text": "$3.75$ שעות",
+      "mistake": "one_speed"
      }
     ]
    }
@@ -1849,27 +3915,78 @@
   {
    "id": "w_percent",
    "unit": "w",
-   "name": "שאלות עם אחוזים",
-   "short": "שאלות אחוזים",
-   "prereqs": [
-    "q_eq_simple"
-   ],
-   "description": "שינוי חוזר באחוזים מוביל לביטוי בריבוע.",
+   "name": "שינוי באחוזים",
+   "short": "שינוי באחוזים",
+   "prereqs": [],
+   "description": "שינוי של $p%$ הוא כפל ב־$1 ± p/100$; שינויים רצופים מוכפלים.",
    "month": "מאי",
    "sample": {
-    "question": "מחיר עלה ב־p אחוזים, ואחר כך שוב ב־p אחוזים, מ־200 ₪ ל־242 ₪. מהו p?",
+    "question": "מחיר מעיל עלה ב־$20%$, ואחר כך ירד ב־$20%$. מה המחיר הסופי ביחס למחיר המקורי?",
     "choices": [
      {
-      "text": "$10$",
+      "text": "נמוך ב־$4%$",
       "correct": true
      },
      {
-      "text": "$10.5$",
+      "text": "שווה למחיר המקורי",
       "mistake": "percent_add"
      },
      {
-      "text": "$21$",
-      "mistake": "other_quantity"
+      "text": "גבוה ב־$4%$",
+      "mistake": "percent_add"
+     }
+    ]
+   }
+  },
+  {
+   "id": "w_percent_twice",
+   "unit": "w",
+   "name": "גידול באחוזים פעמיים",
+   "short": "גידול פעמיים",
+   "prereqs": [
+    "w_percent",
+    "e_simple"
+   ],
+   "description": "גידול של $p%$ פעמיים: $(1 + p/100)²$.",
+   "month": "מאי",
+   "sample": {
+    "question": "מספר התושבים בעיר גדל פעמיים באותו אחוז, מ־$10,000$ ל־$12,100$. בכמה אחוזים גדל בכל פעם?",
+    "choices": [
+     {
+      "text": "$10%$",
+      "correct": true
+     },
+     {
+      "text": "$21%$",
+      "mistake": "square_total"
+     },
+     {
+      "text": "$10.5%$",
+      "mistake": "percent_split"
+     }
+    ]
+   }
+  },
+  {
+   "id": "w_numbers",
+   "unit": "w",
+   "name": "בעיה עם מספרים",
+   "short": "בעיית מספרים",
+   "prereqs": [
+    "e_formula"
+   ],
+   "description": "מתרגמים את התנאי למשוואה ריבועית ופוסלים פתרונות שאינם טבעיים.",
+   "month": "מאי",
+   "sample": {
+    "question": "סכום הריבועים של שני מספרים טבעיים עוקבים הוא $85$. מהם המספרים?",
+    "choices": [
+     {
+      "text": "$6$ ו־$7$",
+      "correct": true
+     },
+     {
+      "text": "$−7$ ו־$−6$",
+      "mistake": "inadmissible"
      }
     ]
    }
@@ -1877,649 +3994,1291 @@
   {
    "id": "w_extremum",
    "unit": "w",
-   "name": "בעיות קיצון",
-   "short": "בעיות קיצון",
+   "name": "בעיית קיצון",
+   "short": "בעיית קיצון",
    "prereqs": [
     "w_area",
     "q_vertex"
    ],
-   "description": "מקסימום ומינימום בבעיה, בעזרת קודקוד הפרבולה.",
+   "description": "מבטאים את הגודל כפונקציה ריבועית ומוצאים את הקודקוד.",
    "month": "מאי",
    "sample": {
-    "question": "סכום שני מספרים הוא 10. מהי המכפלה הגדולה ביותר שלהם?",
+    "question": "רוצים לגדר שטח מלבני צמוד לקיר (צלע אחת ללא גדר) בעזרת $40$ מ׳ גדר. מה השטח הגדול ביותר האפשרי?",
+    "choices": [
+     {
+      "text": "$200$ מ״ר",
+      "correct": true
+     },
+     {
+      "text": "$100$ מ״ר",
+      "mistake": "wall_side"
+     },
+     {
+      "text": "$400$ מ״ר",
+      "mistake": "wall_side"
+     },
+     {
+      "text": "$10$ מ״ר",
+      "mistake": "other_quantity"
+     }
+    ]
+   }
+  },
+  {
+   "id": "w_discount",
+   "unit": "w",
+   "name": "מחיר לפני הנחה",
+   "short": "לפני הנחה",
+   "prereqs": [
+    "w_percent"
+   ],
+   "description": "אחרי הנחה של $p%$ המחיר הוא $(1 − p/100)$ מהמחיר המקורי.",
+   "month": "מאי",
+   "sample": {
+    "question": "אחרי הנחה של $15%$ מחיר חולצה הוא $68$ ₪. מה היה המחיר לפני ההנחה?",
+    "choices": [
+     {
+      "text": "$80$ ₪",
+      "correct": true
+     },
+     {
+      "text": "$78.2$ ₪",
+      "mistake": "percent_of_new"
+     },
+     {
+      "text": "$83$ ₪",
+      "mistake": "percent_as_shekel"
+     }
+    ]
+   }
+  },
+  {
+   "id": "w_literacy",
+   "unit": "w",
+   "name": "שאלת אוריינות: שביל סביב גינה",
+   "short": "שביל סביב גינה",
+   "prereqs": [
+    "w_frame"
+   ],
+   "description": "מתרגמים תיאור מילולי לביטויים אלגבריים ובודקים את התשובה בהקשר.",
+   "month": "מאי",
+   "sample": {
+    "question": "גינה ריבועית מוקפת בשביל ברוחב $1$ מ׳. שטח הגינה יחד עם השביל גדול ב־$32$ מ״ר משטח הגינה. מה אורך צלע הגינה?",
+    "choices": [
+     {
+      "text": "$7$ מ׳",
+      "correct": true
+     },
+     {
+      "text": "$15.5$ מ׳",
+      "mistake": "frame_one_side"
+     },
+     {
+      "text": "$9$ מ׳",
+      "mistake": "other_quantity"
+     }
+    ]
+   }
+  },
+  {
+   "id": "d_ratio",
+   "unit": "d",
+   "name": "יחס הדמיון",
+   "short": "יחס הדמיון",
+   "prereqs": [],
+   "description": "במשולשים דומים הצלעות המתאימות פרופורציוניות.",
+   "month": "יוני",
+   "sample": {
+    "question": "$△ABC ∼ △DEF$: $AB = 6$, $DE = 9$, $BC = 8$. מה אורך $EF$?",
+    "choices": [
+     {
+      "text": "$12$",
+      "correct": true
+     },
+     {
+      "text": "$11$",
+      "mistake": "add_vs_ratio"
+     },
+     {
+      "text": "$16/3$",
+      "mistake": "ratio_inverted"
+     }
+    ]
+   }
+  },
+  {
+   "id": "d_angles",
+   "unit": "d",
+   "name": "זוויות במשולשים דומים",
+   "short": "זוויות בדמיון",
+   "prereqs": [
+    "d_ratio"
+   ],
+   "description": "במשולשים דומים הזוויות המתאימות שוות.",
+   "month": "יוני",
+   "sample": {
+    "question": "$△ABC ∼ △DEF$ ביחס $1 : 3$, ו־$∢A = 40°$. מה גודל $∢D$?",
+    "choices": [
+     {
+      "text": "$40°$",
+      "correct": true
+     },
+     {
+      "text": "$120°$",
+      "mistake": "angle_scale"
+     }
+    ]
+   }
+  },
+  {
+   "id": "d_perimeter",
+   "unit": "d",
+   "name": "יחס ההיקפים",
+   "short": "יחס היקפים",
+   "prereqs": [
+    "d_ratio"
+   ],
+   "description": "יחס ההיקפים של משולשים דומים שווה ליחס הדמיון.",
+   "month": "יוני",
+   "sample": {
+    "question": "יחס הדמיון בין שני משולשים הוא $2 : 5$, והיקף הקטן $14$. מה היקף הגדול?",
+    "choices": [
+     {
+      "text": "$35$",
+      "correct": true
+     },
+     {
+      "text": "$87.5$",
+      "mistake": "perim_square"
+     },
+     {
+      "text": "$17$",
+      "mistake": "add_vs_ratio"
+     }
+    ]
+   }
+  },
+  {
+   "id": "d_area",
+   "unit": "d",
+   "name": "יחס השטחים",
+   "short": "יחס שטחים",
+   "prereqs": [
+    "d_ratio"
+   ],
+   "description": "יחס השטחים של משולשים דומים שווה לריבוע יחס הדמיון.",
+   "month": "יוני",
+   "sample": {
+    "question": "יחס הדמיון בין שני משולשים הוא $1 : 3$, ושטח הקטן $5$ סמ״ר. מה שטח הגדול?",
+    "choices": [
+     {
+      "text": "$45$ סמ״ר",
+      "correct": true
+     },
+     {
+      "text": "$15$ סמ״ר",
+      "mistake": "area_ratio"
+     }
+    ]
+   }
+  },
+  {
+   "id": "d_area_back",
+   "unit": "d",
+   "name": "יחס הדמיון מתוך השטחים",
+   "short": "דמיון משטחים",
+   "prereqs": [
+    "d_area"
+   ],
+   "description": "יחס הדמיון הוא השורש של יחס השטחים.",
+   "month": "יוני",
+   "sample": {
+    "question": "שטחי שני משולשים דומים הם $16$ ו־$49$. מה יחס הדמיון?",
+    "choices": [
+     {
+      "text": "$4 : 7$",
+      "correct": true
+     },
+     {
+      "text": "$16 : 49$",
+      "mistake": "area_ratio"
+     }
+    ]
+   }
+  },
+  {
+   "id": "d_parallel",
+   "unit": "d",
+   "name": "ישר מקביל לצלע",
+   "short": "מקביל לצלע",
+   "prereqs": [
+    "d_ratio",
+    "z_parallel_angles"
+   ],
+   "description": "ישר שמקביל לצלע במשולש יוצר משולש דומה למשולש המקורי.",
+   "month": "יוני",
+   "sample": {
+    "question": "במשולש $ABC$, $DE ∥ BC$, $D$ על $AB$ ו־$E$ על $AC$. $AD = 4$, $AB = 10$, $BC = 15$. מה אורך $DE$?",
+    "choices": [
+     {
+      "text": "$6$",
+      "correct": true
+     },
+     {
+      "text": "$9$",
+      "mistake": "wrong_segment"
+     },
+     {
+      "text": "$37.5$",
+      "mistake": "ratio_inverted"
+     }
+    ]
+   }
+  },
+  {
+   "id": "d_area_parallel",
+   "unit": "d",
+   "name": "שטח המשולש הקטן",
+   "short": "שטח משולש קטן",
+   "prereqs": [
+    "d_parallel",
+    "d_area"
+   ],
+   "description": "יחס שטחי המשולשים הוא ריבוע יחס הצלעות המתאימות.",
+   "month": "יוני",
+   "sample": {
+    "question": "במשולש $ABC$, $DE ∥ BC$ ו־$AD : AB = 1 : 2$. שטח $△ABC$ הוא $36$. מה שטח $△ADE$?",
+    "choices": [
+     {
+      "text": "$9$",
+      "correct": true
+     },
+     {
+      "text": "$18$",
+      "mistake": "area_ratio"
+     },
+     {
+      "text": "$27$",
+      "mistake": "other_quantity"
+     }
+    ]
+   }
+  },
+  {
+   "id": "d_trapezoid_part",
+   "unit": "d",
+   "name": "שטח הטרפז שנוצר",
+   "short": "שטח טרפז שנוצר",
+   "prereqs": [
+    "d_area_parallel"
+   ],
+   "description": "שטח הטרפז הוא שטח המשולש הגדול פחות שטח המשולש הקטן.",
+   "month": "יוני",
+   "sample": {
+    "question": "במשולש $ABC$, $DE ∥ BC$ ו־$AD : AB = 2 : 3$. שטח $△ABC$ הוא $45$. מה שטח הטרפז $DBCE$?",
     "choices": [
      {
       "text": "$25$",
       "correct": true
      },
      {
-      "text": "$5$",
+      "text": "$20$",
       "mistake": "other_quantity"
      },
      {
-      "text": "$100$",
-      "mistake": "square_total"
-     },
-     {
-      "text": "$24$",
-      "mistake": "guess_cases"
+      "text": "$15$",
+      "mistake": "area_ratio"
      }
     ]
    }
   },
   {
-   "id": "g_rectangle",
-   "unit": "g",
-   "name": "שטח והיקף של מלבן",
-   "short": "שטח והיקף של מלבן",
-   "prereqs": [],
-   "description": "שטח מלבן הוא אורך כפול רוחב. היקף הוא סכום אורכי כל הצלעות.",
-   "sample": {
-    "question": "אורך מלבן הוא $8$ ס״מ ורוחבו $5$ ס״מ. מה שטחו?",
-    "choices": [
-     {
-      "text": "$40$ סמ״ר",
-      "correct": true
-     },
-     {
-      "text": "$26$ סמ״ר",
-      "mistake": "g_perimeter"
-     },
-     {
-      "text": "$13$ סמ״ר",
-      "mistake": "g_add_lengths"
-     }
-    ],
-    "diagram": {
-     "type": "rectangle",
-     "base": "8 cm",
-     "height": "5 cm",
-     "alt": "מלבן שאורכו 8 סנטימטרים ורוחבו 5 סנטימטרים"
-    }
-   },
-   "core": false
-  },
-  {
-   "id": "g_triangle_area",
-   "unit": "g",
-   "name": "שטח משולש",
-   "short": "שטח משולש",
+   "id": "d_right",
+   "unit": "d",
+   "name": "דמיון במשולש ישר זווית",
+   "short": "דמיון ישר זווית",
    "prereqs": [
-    "g_rectangle"
+    "d_area"
    ],
-   "description": "שטח משולש הוא מחצית מכפלת הבסיס בגובה המאונך לו.",
+   "description": "מוצאים את יחס הדמיון מצלעות מתאימות ומשתמשים בו לשטח.",
+   "month": "יוני",
    "sample": {
-    "question": "במשולש ישר זווית, אורכי הניצבים הם $6$ ס״מ ו־$8$ ס״מ. שרטטו את המשולש, חשבו את שטחו וכתבו את דרך הפתרון על דף.",
-    "diagram": {
-     "type": "triangle",
-     "base": "8 cm",
-     "height": "6 cm",
-     "side": "",
-     "alt": "משולש ישר זווית עם ניצבים באורך 6 ו־8 סנטימטרים"
-    },
-    "type": "open-ended",
-    "version": 1
-   },
-   "core": false,
-   "fallback_sample": {
-    "question": "במשולש ישר זווית, אורכי הניצבים הם $6$ ס״מ ו־$8$ ס״מ. מה שטחו?",
+    "question": "ניצבי משולש ישר זווית הם $3$ ו־$4$. משולש דומה לו, היתר שלו $15$. מה שטחו?",
     "choices": [
      {
-      "text": "$24$ סמ״ר",
+      "text": "$54$",
       "correct": true
      },
      {
-      "text": "$48$ סמ״ר",
-      "mistake": "g_half"
+      "text": "$18$",
+      "mistake": "area_ratio"
      },
      {
-      "text": "$14$ סמ״ר",
-      "mistake": "g_add_lengths"
+      "text": "$108$",
+      "mistake": "forgot_half_area"
      }
-    ],
-    "diagram": {
-     "type": "triangle",
-     "base": "8 cm",
-     "height": "6 cm",
-     "side": "",
-     "alt": "משולש ישר זווית עם ניצבים באורך 6 ו־8 סנטימטרים"
-    }
+    ]
    }
   },
   {
-   "id": "g_pythagoras",
-   "unit": "g",
-   "name": "משפט פיתגורס",
-   "short": "משפט פיתגורס",
-   "prereqs": [],
-   "description": "במשולש ישר זווית, סכום ריבועי הניצבים שווה לריבוע היתר: $a² + b² = c²$.",
+   "id": "d_scale",
+   "unit": "d",
+   "name": "קנה מידה ושטח",
+   "short": "קנה מידה",
+   "prereqs": [
+    "d_area"
+   ],
+   "description": "בקנה מידה $1 : n$ השטחים גדלים פי $n²$.",
+   "month": "יוני",
    "sample": {
-    "question": "במשולש ישר זווית, אורכי הניצבים הם $6$ ס״מ ו־$8$ ס״מ. מה אורך היתר?",
+    "question": "במפה בקנה מידה $1 : 1000$ שטח מגרש הוא $6$ סמ״ר. מה שטחו במציאות?",
     "choices": [
      {
-      "text": "$10$ ס״מ",
+      "text": "$600$ מ״ר",
       "correct": true
      },
      {
-      "text": "$100$ ס״מ",
-      "mistake": "g_no_root"
+      "text": "$0.6$ מ״ר",
+      "mistake": "area_ratio"
      },
      {
-      "text": "$14$ ס״מ",
-      "mistake": "g_add_lengths"
+      "text": "$60,000$ מ״ר",
+      "mistake": "unit_conv"
      }
-    ],
-    "diagram": {
-     "type": "triangle",
-     "base": "8 cm",
-     "height": "6 cm",
-     "side": "?",
-     "alt": "משולש ישר זווית עם ניצבים באורך 6 ו־8 סנטימטרים ויתר לא ידוע"
-    }
-   },
-   "core": false
+    ]
+   }
   }
  ],
  "mistakes": {
-  "minus_minus": {
-   "name": "חיסור של מספר שלילי",
-   "tip": "חיסור של מספר שלילי הוא חיבור: $−3 − (−10) = −3 + 10$.",
-   "back": "f_neg"
+  "ext_partial": {
+   "name": "כפל חלקי בפילוג המורחב",
+   "tip": "כל איבר בסוגריים הראשונים כופל כל איבר בשניים: $(a + b)(c + d) = ac + ad + bc + bd$.",
+   "back": "t_ext"
   },
-  "order_ops": {
-   "name": "סדר פעולות",
-   "tip": "כפל לפני חיסור: קודם $(−5)·2 = −10$, ואחר כך החיסור.",
+  "sign_mid": {
+   "name": "טעות סימן באיבר האמצעי",
+   "tip": "חברו את שתי המכפלות האמצעיות עם הסימנים שלהן: $3x + (−5x) = −2x$.",
    "back": null
-  },
-  "result_sign": {
-   "name": "סימן התוצאה",
-   "tip": "$−3 + 10 = 7$: המספר החיובי גדול יותר בערכו המוחלט.",
-   "back": null
-  },
-  "add_denoms": {
-   "name": "חיבור מונים ומכנים",
-   "tip": "מחברים שברים רק אחרי מכנה משותף: $2/3 = 8/12$, $1/4 = 3/12$.",
-   "back": "f_frac"
-  },
-  "scale_numerators": {
-   "name": "מכנה משותף בלי להרחיב את המונים",
-   "tip": "כשמרחיבים למכנה 12 מכפילים גם את המונה: $2/3 = 8/12$.",
-   "back": "f_frac"
-  },
-  "mult_not_add": {
-   "name": "כפל במקום חיבור",
-   "tip": "$2/3 · 1/4 = 1/6$, אבל כאן התבקש חיבור.",
-   "back": "f_frac"
-  },
-  "neg_square": {
-   "name": "ריבוע של מספר שלילי",
-   "tip": "מספר שלילי בריבוע הוא חיובי: $(−2)² = 4$ ו־$(−3x)² = 9x²$.",
-   "back": "f_neg"
-  },
-  "coef_in_power": {
-   "name": "החזקה הוחלה על המקדם",
-   "tip": "ב־$3x²$ רק x בריבוע: $3·(−2)² = 12$.",
-   "back": "f_ops"
-  },
-  "join_unlike": {
-   "name": "חיבור איברים שאינם דומים",
-   "tip": "מכנסים רק איברים עם אותה אות: a עם a, ו־b עם b.",
-   "back": "f_like"
-  },
-  "sign_of_term": {
-   "name": "הסימן שלפני האיבר",
-   "tip": "הסימן שלפני איבר שייך לו: $−3a$ ו־$−2b$ הם איברים שליליים.",
-   "back": "f_like"
-  },
-  "coef_not_raised": {
-   "name": "המקדם לא הועלה בחזקה",
-   "tip": "גם המקדם עולה בחזקה: $(2x³)² = 2²·(x³)² = 4x⁶$.",
-   "back": "f_power"
-  },
-  "power_as_mult": {
-   "name": "חזקה ככפל במעריך",
-   "tip": "חזקה היא כפל חוזר: $x² = x·x$, ולא $2·x$.",
-   "back": "f_power"
   },
   "sign_product": {
    "name": "סימן של מכפלה",
-   "tip": "שלילי כפול שלילי הוא חיובי, וחיובי כפול שלילי הוא שלילי.",
-   "back": "f_neg"
-  },
-  "partial_dist": {
-   "name": "פילוג רק לאיבר הראשון",
-   "tip": "המספר שלפני הסוגריים כופל כל איבר בתוכם.",
-   "back": "f_dist"
+   "tip": "מכפלה של מספר חיובי במספר שלילי היא שלילית: $3 · (−5) = −15$.",
+   "back": null
   },
   "move_sign": {
    "name": "העברת אגף בלי החלפת סימן",
-   "tip": "איבר שעובר לאגף השני מחליף את סימנו.",
-   "back": "f_lin"
-  },
-  "slope_inverted": {
-   "name": "שיפוע הפוך",
-   "tip": "שיפוע הוא השינוי ב־y חלקי השינוי ב־x: $(8 − 2)/(3 − 1) = 3$.",
-   "back": "f_linfun"
-  },
-  "slope_dy_only": {
-   "name": "שיפוע בלי חלוקה",
-   "tip": "מחלקים את השינוי ב־y בשינוי ב־x.",
-   "back": "f_linfun"
-  },
-  "swapped_pair": {
-   "name": "סדר בזוג הסדור",
-   "tip": "בזוג סדור x ראשון ו־y שני.",
-   "back": "f_sys"
+   "tip": "כשמעבירים איבר לאגף השני מחליפים את סימנו: $5x + 6 = 16 ⇒ 5x = 10$.",
+   "back": null
   },
   "forgot_divide": {
-   "name": "שכחת לחלק",
-   "tip": "חיבור המשוואות נותן $2x = 14$, ועוד צריך לחלק ב־2.",
-   "back": "f_lin"
-  },
-  "sqrt_split": {
-   "name": "שורש של סכום",
-   "tip": "$√(a + b) ≠ √a + √b$. קודם מחברים: $√25 = 5$.",
-   "back": "f_sqrt"
-  },
-  "sqrt_half": {
-   "name": "שורש כחצי",
-   "tip": "שורש ריבועי אינו חצי: $√16 = 4$ כי $4² = 16$.",
-   "back": "f_sqrt"
-  },
-  "first_last_only": {
-   "name": "פילוג חלקי",
-   "tip": "בפילוג מורחב כל איבר בסוגריים הראשונים כופל כל איבר בשניים: ארבע מכפלות.",
-   "back": "t_ext"
-  },
-  "div_neg": {
-   "name": "חילוק במספר שלילי",
-   "tip": "$−x = 10$, ולכן $x = −10$: מחלקים את שני האגפים ב־$−1$.",
-   "back": "f_lin"
+   "name": "שכחתם לחלק במקדם",
+   "tip": "בסוף מחלקים במקדם של $x$: $5x = 10 ⇒ x = 2$.",
+   "back": null
   },
   "forgot_middle": {
-   "name": "שכחת את האיבר האמצעי",
-   "tip": "$(a − b)² = a² − 2ab + b²$, ולא $a² − b²$.",
-   "back": "t_square"
+   "name": "שכחתם את האיבר האמצעי",
+   "tip": "$(a + b)² = a² + 2ab + b²$, ולא $a² + b²$.",
+   "back": null
+  },
+  "area_perimeter": {
+   "name": "היקף במקום שטח",
+   "tip": "שטח מלבן הוא אורך כפול רוחב; היקף הוא סכום הצלעות.",
+   "back": null
+  },
+  "diff_order": {
+   "name": "חיסור בסדר הפוך",
+   "tip": "„בכמה גדול $A$ מ־$B$“ הוא $A − B$.",
+   "back": null
   },
   "middle_no_2": {
-   "name": "האיבר האמצעי בלי 2",
-   "tip": "האיבר האמצעי הוא $2ab = 2·2x·3 = 12x$.",
+   "name": "שכחתם להכפיל ב־2",
+   "tip": "באיבר האמצעי יש כפל ב־2: $(a − b)² = a² − 2ab + b²$.",
    "back": "t_square"
+  },
+  "coef_not_raised": {
+   "name": "המקדם לא הועלה בחזקה",
+   "tip": "מעלים בחזקה גם את המקדם: $(2x)² = 4x²$, $(3x)² = 9x²$.",
+   "back": null
   },
   "diff_sign": {
    "name": "סימן בהפרש ריבועים",
-   "tip": "$(a + b)(a − b) = a² − b²$, ולכן $50² − 1² = 2499$.",
+   "tip": "$(a + b)(a − b) = a² − b²$: התוצאה היא הפרש.",
    "back": "t_diffsq"
   },
-  "forgot_b2": {
-   "name": "שכחת את $b²$",
-   "tip": "$51·49 = (50 + 1)(50 − 1) = 50² − 1²$.",
+  "diffsq_as_square": {
+   "name": "בלבול בין הפרש ריבועים לריבוע של הפרש",
+   "tip": "$(a − b)² = a² − 2ab + b²$, ואילו $(a − b)(a + b) = a² − b²$, בלי איבר אמצעי.",
    "back": "t_diffsq"
   },
   "partial_gcf": {
-   "name": "לא הגורם המשותף הגדול ביותר",
-   "tip": "גם 3 וגם x משותפים לשני האיברים, ולכן מוציאים $3x$.",
+   "name": "לא הוצאתם את כל הגורם המשותף",
+   "tip": "בדקו גם את המשתנים: $6x² − 9x = 3x(2x − 3)$.",
    "back": "t_gcf"
   },
   "divide_each": {
-   "name": "לא חילקת כל איבר",
-   "tip": "בתוך הסוגריים נשאר כל איבר חלקי הגורם: $9x : 3x = 3$.",
+   "name": "לא חילקתם כל איבר",
+   "tip": "כל איבר בסוגריים הוא האיבר המקורי חלקי הגורם המשותף: $9x : 3x = 3$.",
    "back": "t_gcf"
   },
-  "diff_vs_square": {
-   "name": "הפרש ריבועים מול ריבוע של הפרש",
-   "tip": "$a² − b² = (a − b)(a + b)$. ב־$(a − b)²$ יש גם איבר אמצעי.",
-   "back": "t_diffsq"
-  },
-  "root_of_coef": {
-   "name": "שורש של המקדם",
-   "tip": "$4x² = (2x)²$, ולכן $a = 2x$.",
-   "back": "f_sqrt"
+  "sign_of_term": {
+   "name": "סימן האיבר אבד",
+   "tip": "הסימן נשאר עם האיבר: $−9x : 3x = −3$.",
+   "back": null
   },
   "signs_swapped": {
-   "name": "סימנים הפוכים בפירוק",
-   "tip": "פתחו סוגריים לבדיקה: האיבר האמצעי צריך לצאת עם הסימן של המקור.",
+   "name": "הסימנים התחלפו",
+   "tip": "צריך שני מספרים שמכפלתם $c$ וסכומם $b$. בדקו את הסימנים בפתיחת הסוגריים.",
    "back": "t_trinomial"
   },
   "product_only": {
-   "name": "המכפלה נכונה, הסכום לא",
-   "tip": "מחפשים שני מספרים שמכפלתם $−12$ וסכומם $−1$: $−4$ ו־$3$.",
+   "name": "בדקתם רק את המכפלה",
+   "tip": "שני המספרים צריכים לתת גם את המכפלה $c$ וגם את הסכום $b$.",
    "back": "t_trinomial"
   },
-  "zero_root_sign": {
-   "name": "סימן הערך האסור",
-   "tip": "$x + 4 = 0$ כאשר $x = −4$.",
-   "back": "f_lin"
+  "partial_factor": {
+   "name": "הפירוק לא הושלם",
+   "tip": "אחרי הוצאת גורם משותף בדקו אם מה שנשאר מתפרק: $x² − 9 = (x − 3)(x + 3)$.",
+   "back": null
   },
-  "one_factor_only": {
-   "name": "בדקת רק גורם אחד",
-   "tip": "מכפלה היא 0 כשאחד הגורמים הוא 0, ולכן בודקים כל גורם במכנה.",
-   "back": "t_domain"
-  },
-  "numerator_domain": {
-   "name": "תחום הצבה לפי המונה",
-   "tip": "תחום ההצבה נקבע לפי המכנה בלבד: אסור לחלק ב־0. מונה 0 מותר.",
-   "back": "t_domain"
+  "gcf_first": {
+   "name": "פירוק בלי הוצאת גורם משותף",
+   "tip": "$(2x − 3)(2x + 3) = 4x² − 9$. הוציאו קודם את הגורם המשותף $2$.",
+   "back": "t_gcf"
   },
   "cancel_terms": {
    "name": "צמצום של מחוברים",
-   "tip": "מצמצמים רק גורמים בכפל. קודם מפרקים את המונה ואת המכנה.",
-   "back": "t_reduce"
+   "tip": "מצמצמים רק גורמים (כופלים), לא מחוברים. פרקו קודם את המונה ואת המכנה.",
+   "back": null
   },
   "factor_sign": {
-   "name": "טעות בפירוק",
-   "tip": "$x² − 9 = (x − 3)(x + 3)$ ו־$x² − 1 = (x − 1)(x + 1)$. בדקו איזה גורם מצטמצם ואיזה נשאר.",
-   "back": "t_factor_formula"
+   "name": "צמצום של הגורם הלא נכון",
+   "tip": "$a² − b² = (a − b)(a + b)$: מצמצמים רק את הגורם שמופיע גם במונה וגם במכנה, והגורם השני נשאר.",
+   "back": null
+  },
+  "lost_denominator": {
+   "name": "המכנה נעלם",
+   "tip": "המכנה לא נעלם: אחרי צמצום נשאר בו כל גורם שלא צומצם.",
+   "back": null
   },
   "div_not_flipped": {
-   "name": "חילוק בלי הופכי",
-   "tip": "חילוק בשבר הוא כפל בהופכי שלו: $: 4x²/(x² − 1)$ הופך ל־$· (x² − 1)/(4x²)$.",
-   "back": "f_frac"
+   "name": "חילקתם בלי להפוך את השבר",
+   "tip": "חילוק בשבר הוא כפל בשבר ההפוך: $A/B : C/D = A/B · D/C$.",
+   "back": null
   },
   "cancel_power": {
-   "name": "צמצום חזקות",
-   "tip": "$2x / 4x² = 1/(2x)$: נשאר x אחד במכנה.",
-   "back": "t_reduce"
+   "name": "צמצום שגוי של חזקה",
+   "tip": "$x² : x = x$, לא $1$. אחרי הצמצום נשאר גורם $x$.",
+   "back": null
   },
-  "excluded_root": {
-   "name": "פתרון שאינו קביל",
-   "tip": "$x = 3$ מאפס את המכנה, ולכן הוא לא פתרון. בודקים כל פתרון מול תחום ההצבה.",
-   "back": "t_domain"
+  "kite_rhombus": {
+   "name": "בלבול בין דלתון למעוין",
+   "tip": "בדלתון שני זוגות של צלעות סמוכות שוות. רק במעוין כל ארבע הצלעות שוות.",
+   "back": null
   },
-  "axes_mixed": {
-   "name": "חיתוך עם הציר הלא נכון",
-   "tip": "חיתוך עם ציר x: מציבים $y = 0$. חיתוך עם ציר y: מציבים $x = 0$.",
-   "back": "n_intercepts"
+  "kite_parallelogram": {
+   "name": "בלבול בין דלתון למקבילית",
+   "tip": "צלעות נגדיות שוות הן תכונה של מקבילית. בדלתון הצלעות השוות סמוכות.",
+   "back": null
   },
-  "pos_neg_swap": {
-   "name": "חיוביות ושליליות הפוכות",
-   "tip": "הפונקציה שלילית איפה שהגרף מתחת לציר x.",
-   "back": "n_sign"
+  "kite_diag_equal": {
+   "name": "אלכסוני הדלתון אינם שווים",
+   "tip": "בדלתון האלכסונים מאונכים זה לזה, אך אורכיהם בדרך כלל שונים.",
+   "back": null
   },
-  "neg_x": {
-   "name": "'שלילית' בערכי x",
-   "tip": "פונקציה שלילית פירושו ערכי y שליליים, לא x שלילי.",
-   "back": "n_sign"
+  "kite_wrong_pair": {
+   "name": "הזוויות השוות בדלתון",
+   "tip": "בדלתון הזוויות השוות הן אלה שבין הצלעות השונות: $∢B = ∢D$.",
+   "back": "k_kite_def"
   },
-  "partial_intervals": {
-   "name": "תחום אחד מתוך כמה",
-   "tip": "עוברים על כל הגרף משמאל לימין: יכולים להיות כמה תחומים כאלה.",
-   "back": "n_sign"
+  "forgot_half": {
+   "name": "שכחתם לחלק ל־2",
+   "tip": "שתי הזוויות שוות, ולכן מחלקים את הסכום שלהן ב־2.",
+   "back": null
+  },
+  "angle_sum_180": {
+   "name": "סכום הזוויות במרובע",
+   "tip": "סכום הזוויות במרובע הוא $360°$, לא $180°$.",
+   "back": null
+  },
+  "kite_diag_bisect": {
+   "name": "האלכסון הראשי חוצה את המשני",
+   "tip": "האלכסון הראשי $AC$ הוא אנך אמצעי לאלכסון $BD$, ולכן $BE = BD : 2$.",
+   "back": null
+  },
+  "kite_rect": {
+   "name": "בלבול עם מלבן",
+   "tip": "במלבן האלכסונים שווים וחוצים זה את זה, אך לא בהכרח מאונכים.",
+   "back": null
+  },
+  "reflect_axis": {
+   "name": "שיקוף ביחס לציר הלא נכון",
+   "tip": "שיקוף ביחס לציר $y$: $(x, y) → (−x, y)$. שיקוף ביחס לציר $x$: $(x, y) → (x, −y)$.",
+   "back": null
+  },
+  "swapped_pair": {
+   "name": "החלפת סדר השיעורים",
+   "tip": "בנקודה $(x, y)$ השיעור הראשון הוא $x$ והשני $y$.",
+   "back": null
+  },
+  "iso_wrong_angle": {
+   "name": "זוויות הבסיס",
+   "tip": "במשולש שווה שוקיים הזוויות השוות הן זוויות הבסיס, שמול השוקיים: $∢B = ∢C$.",
+   "back": "k_iso_base"
+  },
+  "forgot_half_angle": {
+   "name": "שכחתם לחלק בין שתי זוויות הבסיס",
+   "tip": "$∢B + ∢C = 180° − ∢A$, ושתי הזוויות שוות.",
+   "back": null
+  },
+  "iso_converse": {
+   "name": "המשפט ההפוך",
+   "tip": "אם במשולש שתי זוויות שוות, הצלעות שמולן שוות.",
+   "back": null
+  },
+  "iso_wrong_side": {
+   "name": "צלע מול זווית",
+   "tip": "הצלעות השוות הן אלה שמול הזוויות השוות: $AB$ מול $∢C$ ו־$AC$ מול $∢B$.",
+   "back": null
+  },
+  "iso_equilateral": {
+   "name": "מסקנה חזקה מדי",
+   "tip": "המשפט ההפוך מראה רק ש־$AB = AC$. אין סיבה ש־$BC$ תהיה שווה להן.",
+   "back": null
+  },
+  "iso_right": {
+   "name": "גובה אינו זווית ישרה במשולש",
+   "tip": "הגובה מאונך לצלע, אבל זה לא אומר שאחת מזוויות המשולש ישרה.",
+   "back": null
+  },
+  "iso_median_bisects": {
+   "name": "התיכון לבסיס חוצה את זווית הראש",
+   "tip": "במשולש שווה שוקיים התיכון לבסיס, הגובה לבסיס וחוצה זווית הראש מתלכדים.",
+   "back": "k_iso_median"
+  },
+  "iso_median_height": {
+   "name": "התיכון לבסיס הוא גם גובה",
+   "tip": "במשולש שווה שוקיים התיכון לבסיס מאונך לבסיס, ולכן הזווית $90°$.",
+   "back": "k_iso_median"
+  },
+  "height_from_axis": {
+   "name": "גובה נמדד עד הבסיס",
+   "tip": "הגובה הוא המרחק בין הישרים: הפרש שיעורי ה־$y$, לא שיעור ה־$y$ עצמו.",
+   "back": null
+  },
+  "iso_half_base": {
+   "name": "בלבול בין הגובה לחצי הבסיס",
+   "tip": "חצי הבסיס והגובה הם קטעים שונים. הגובה הוא המרחק מהקודקוד לבסיס.",
+   "back": null
+  },
+  "opening_sign": {
+   "name": "סימן $a$ קובע את כיוון הפרבולה",
+   "tip": "כאשר $a > 0$ הפרבולה פתוחה כלפי מעלה ויש לה מינימום; כאשר $a < 0$ יש לה מקסימום.",
+   "back": "q_parabola"
   },
   "dir_confusion": {
-   "name": "עלייה במקום ירידה",
-   "tip": "קוראים את הגרף משמאל לימין. יורדת: ככל ש־x גדל, y קטן.",
-   "back": "n_extremum"
+   "name": "עלייה וירידה",
+   "tip": "פונקציה עולה כאשר $y$ גדל ככל ש־$x$ גדל, כלומר כשהגרף מטפס משמאל לימין.",
+   "back": null
   },
   "x_vs_y_interval": {
-   "name": "תחום בערכי y",
-   "tip": "תחומי עלייה וירידה נכתבים בערכי x.",
-   "back": "n_extremum"
+   "name": "תחום נכתב בערכי $x$",
+   "tip": "תחומים (עלייה, ירידה, חיוביות) מתארים ערכי $x$, לא ערכי $y$.",
+   "back": null
+  },
+  "vshift_as_h": {
+   "name": "הזזה אנכית כאופקית",
+   "tip": "מספר שמחובר מחוץ לפונקציה מזיז את הגרף למעלה או למטה.",
+   "back": null
+  },
+  "k_sign": {
+   "name": "סימן ההזזה האנכית",
+   "tip": "$+k$ מזיז את הגרף למעלה ו־$−k$ למטה.",
+   "back": null
+  },
+  "hshift_sign": {
+   "name": "סימן ההזזה האופקית",
+   "tip": "$f(x − b)$ מזיזה את הגרף $b$ יחידות ימינה, ו־$f(x + b)$ שמאלה.",
+   "back": null
+  },
+  "h_as_v": {
+   "name": "הזזה אופקית כאנכית",
+   "tip": "מספר שבתוך הסוגריים עם $x$ מזיז את הגרף ימינה או שמאלה, לא למעלה או למטה.",
+   "back": null
+  },
+  "plug_zero": {
+   "name": "הצבת $x = 0$",
+   "tip": "הצבת $x = 0$ נותנת את נקודת החיתוך עם ציר $y$, לא את הקודקוד.",
+   "back": null
+  },
+  "missing_neg_root": {
+   "name": "שכחתם את הפתרון השלילי",
+   "tip": "גם למספר שלילי יש ריבוע חיובי: אם $u² = 9$ אז $u = 3$ או $u = −3$.",
+   "back": null
+  },
+  "vertex_as_root": {
+   "name": "הקודקוד אינו נקודת חיתוך",
+   "tip": "החיתוך עם ציר $x$ הוא היכן ש־$f(x) = 0$. הקודקוד הוא נקודת הקיצון.",
+   "back": null
+  },
+  "axes_mixed": {
+   "name": "בלבול בין הצירים",
+   "tip": "בחיתוך עם ציר $x$ מתקיים $y = 0$; בחיתוך עם ציר $y$ מתקיים $x = 0$.",
+   "back": null
+  },
+  "zero_root_sign": {
+   "name": "סימן הפתרון",
+   "tip": "$x − 1 = 0$ כאשר $x = 1$, ו־$x + 3 = 0$ כאשר $x = −3$: הפתרון בסימן הפוך למספר שבסוגריים.",
+   "back": null
+  },
+  "a_as_zero": {
+   "name": "המקדם $a$ אינו שורש",
+   "tip": "המקדם שלפני הסוגריים אינו מתאפס; רק הסוגריים מתאפסים.",
+   "back": null
+  },
+  "forgot_y": {
+   "name": "חסר שיעור $y$",
+   "tip": "אחרי שמוצאים את $x$ מציבים אותו כדי למצוא את $y$. התשובה היא נקודה $(x, y)$.",
+   "back": null
+  },
+  "axis_sign": {
+   "name": "סימן ציר הסימטריה",
+   "tip": "ציר הסימטריה באמצע בין השורשים: ממוצע שני השורשים.",
+   "back": null
+  },
+  "forgot_half_axis": {
+   "name": "שכחתם לחלק ב־2",
+   "tip": "ציר הסימטריה הוא ממוצע השורשים: $(1 + 5) : 2 = 3$.",
+   "back": null
+  },
+  "minus_b": {
+   "name": "שכחתם את המינוס",
+   "tip": "בנוסחה $x = −b : 2a$ (ובנוסחת השורשים) מופיע $−b$.",
+   "back": null
+  },
+  "forgot_2a_axis": {
+   "name": "שכחתם לחלק ב־$2a$",
+   "tip": "שיעור $x$ של הקודקוד הוא $−b : 2a$, לא $−b$.",
+   "back": null
+  },
+  "c_as_vertex": {
+   "name": "$c$ אינו הקודקוד",
+   "tip": "$c$ הוא נקודת החיתוך עם ציר $y$: $(0, c)$.",
+   "back": null
+  },
+  "forgot_root": {
+   "name": "שכחתם להוציא שורש",
+   "tip": "אחרי שמבודדים את הריבוע מוציאים שורש: $x² = 16 ⇒ x = ±4$.",
+   "back": null
+  },
+  "sqrt_half": {
+   "name": "שורש אינו חצי",
+   "tip": "$√16 = 4$, כי $4² = 16$. שורש אינו חלוקה ב־2.",
+   "back": null
+  },
+  "divide_wrong": {
+   "name": "שכחתם לחלק במקדם",
+   "tip": "$2x + 1 = 0 ⇒ 2x = −1 ⇒ x = −0.5$.",
+   "back": null
+  },
+  "one_factor_only": {
+   "name": "שני הגורמים יכולים להתאפס",
+   "tip": "מכפלה שווה לאפס אם לפחות אחד הגורמים שווה לאפס, ולכן בודקים כל גורם.",
+   "back": "e_zero_prod"
+  },
+  "divide_by_x": {
+   "name": "חילוק ב־$x$ מאבד פתרון",
+   "tip": "אסור לחלק ב־$x$, כי הוא עלול להיות $0$. מעבירים אגף ומפרקים: $x(x − 5) = 0$.",
+   "back": null
+  },
+  "forgot_2a": {
+   "name": "חילוק ב־$2a$",
+   "tip": "בנוסחת השורשים מחלקים ב־$2a$, לא ב־$2$.",
+   "back": null
+  },
+  "disc_sign": {
+   "name": "סימן ב־$b² − 4ac$",
+   "tip": "$b² − 4ac = 9 − 4·2·(−2) = 9 + 16 = 25$: מינוס כפול מינוס הוא פלוס.",
+   "back": null
+  },
+  "disc_meaning": {
+   "name": "משמעות הדיסקרימיננטה",
+   "tip": "אם $b² − 4ac > 0$ יש שני פתרונות, אם $b² − 4ac = 0$ פתרון אחד, ואם $b² − 4ac < 0$ אין פתרון.",
+   "back": null
+  },
+  "lost_shift": {
+   "name": "שכחתם את ההזזה",
+   "tip": "$x − 1 = ±4$, ולכן $x = 1 ± 4$.",
+   "back": null
+  },
+  "inadmissible": {
+   "name": "פתרון שאינו מתאים לשאלה",
+   "tip": "פתרון שלילי של המשוואה אינו יכול להיות אורך, מהירות או מספר טבעי.",
+   "back": null
+  },
+  "other_quantity": {
+   "name": "עניתם על כמות אחרת",
+   "tip": "קראו שוב: על איזו כמות השאלה שואלת?",
+   "back": null
+  },
+  "half_product": {
+   "name": "חלוקה ב־2 במקום משוואה",
+   "tip": "בנו משוואה: $n(n + 1) = 56$, ופתרו אותה.",
+   "back": null
+  },
+  "sign_regions": {
+   "name": "איפה הפרבולה חיובית",
+   "tip": "פרבולה פתוחה כלפי מעלה שלילית בין השורשים; פרבולה פתוחה כלפי מטה חיובית בין השורשים.",
+   "back": "e_ineq"
+  },
+  "partial_intervals": {
+   "name": "חסר חלק מהתנאי",
+   "tip": "התחום נקבע על ידי שני השורשים, ולכן יש לו שני קצוות.",
+   "back": null
+  },
+  "strict_vs_weak": {
+   "name": "אי־שוויון חלש",
+   "tip": "ב־$≥$ ו־$≤$ גם השורשים עצמם נכללים בפתרון, כי שם הביטוי שווה ל־$0$.",
+   "back": null
+  },
+  "opposite_angle": {
+   "name": "הזווית שמול הצלע",
+   "tip": "הזווית שמול צלע היא הזווית בקודקוד שאינו על הצלע: מול $AC$ נמצאת $∢B$.",
+   "back": null
+  },
+  "side_angle_rule": {
+   "name": "יחסי צלעות וזוויות",
+   "tip": "במשולש, מול הצלע הגדולה נמצאת הזווית הגדולה, ולהפך.",
+   "back": "a_side_angle"
+  },
+  "reversed_order": {
+   "name": "סדר הפוך",
+   "tip": "מול הזווית הקטנה נמצאת הצלע הקטנה, ומול הזווית הגדולה נמצאת הצלע הגדולה.",
+   "back": null
+  },
+  "half_double": {
+   "name": "חצי ולא כפליים",
+   "tip": "הניצב שמול זווית של $30°$ הוא חצי מהיתר, לא שווה לו או כפול ממנו.",
+   "back": "a_30_side"
+  },
+  "a30_rule": {
+   "name": "הניצב שמול $30°$",
+   "tip": "במשולש ישר זווית, הניצב שמול זווית של $30°$ שווה למחצית היתר, ולהפך.",
+   "back": "a_30_side"
+  },
+  "eq_split": {
+   "name": "הגובה יוצר זווית ישרה",
+   "tip": "הגובה מאונך לבסיס, ולכן נוצרים שני משולשים ישרי זווית עם זוויות $30°$ ו־$60°$.",
+   "back": null
+  },
+  "median_hyp_rule": {
+   "name": "התיכון ליתר",
+   "tip": "במשולש ישר זווית התיכון ליתר שווה למחצית היתר.",
+   "back": "a_median_hyp"
+  },
+  "median_converse": {
+   "name": "המשפט ההפוך לתיכון ליתר",
+   "tip": "אם התיכון שווה למחצית הצלע שאליה הוא יורד, הזווית שמול הצלע ישרה.",
+   "back": null
+  },
+  "median_iso": {
+   "name": "משולש שווה שוקיים שנוצר",
+   "tip": "$CM = AM$, ולכן במשולש $AMC$ הזוויות שמול הצלעות השוות שוות: $∢ACM = ∢A$.",
+   "back": null
+  },
+  "whole_diag": {
+   "name": "היתר הוא האלכסון כולו",
+   "tip": "במשולש $ABC$ היתר הוא האלכסון $AC$ כולו, ולכן $BC = AC : 2$.",
+   "back": null
+  },
+  "alt_vs_cointerior": {
+   "name": "מתחלפות או חד־צדדיות",
+   "tip": "זוויות מתחלפות בין ישרים מקבילים שוות; זוויות חד־צדדיות משלימות ל־$180°$.",
+   "back": "z_parallel_angles"
+  },
+  "complement90": {
+   "name": "השלמה ל־$90°$",
+   "tip": "זוויות בין ישרים מקבילים שוות או משלימות ל־$180°$, לא ל־$90°$.",
+   "back": null
+  },
+  "parallel_converse": {
+   "name": "משפט הפוך לישרים מקבילים",
+   "tip": "אם זוויות חד־צדדיות משלימות ל־$180°$, הישרים מקבילים.",
+   "back": null
+  },
+  "trap_iso_angles": {
+   "name": "זוויות בטרפז שווה שוקיים",
+   "tip": "בטרפז שווה שוקיים הזוויות שליד אותו בסיס שוות, וזוויות שליד אותה שוק משלימות ל־$180°$.",
+   "back": null
+  },
+  "trap_vs_par": {
+   "name": "טרפז או מקבילית",
+   "tip": "במקבילית יש שני זוגות של צלעות מקבילות. אם רק זוג אחד מקביל, זה טרפז.",
+   "back": null
+  },
+  "wrong_pair_parallel": {
+   "name": "איזה זוג מקביל",
+   "tip": "$∢A$ ו־$∢D$ הן זוויות חד־צדדיות על החותך $AD$, ולכן $AB ∥ DC$.",
+   "back": null
+  },
+  "forgot_half_area": {
+   "name": "שכחתם לחלק ב־2",
+   "tip": "בשטח טרפז, בשטח מעוין (מכפלת אלכסונים) ובשטח משולש מחלקים ב־2.",
+   "back": null
+  },
+  "mult_all": {
+   "name": "כפל כל הנתונים",
+   "tip": "בשטח טרפז מחברים את הבסיסים: $(a + b) · h : 2$.",
+   "back": null
+  },
+  "trap_one_base": {
+   "name": "השתמשתם בבסיס אחד",
+   "tip": "בשטח טרפז מחברים את שני הבסיסים: $(a + b) · h : 2$.",
+   "back": null
+  },
+  "par_opposite": {
+   "name": "זוויות נגדיות במקבילית",
+   "tip": "במקבילית $∢C = ∢A$ ו־$∢D = ∢B$.",
+   "back": "z_par_def"
+  },
+  "par_adjacent": {
+   "name": "זוויות סמוכות במקבילית",
+   "tip": "זוויות סמוכות במקבילית משלימות ל־$180°$: $∢A + ∢B = 180°$.",
+   "back": "z_par_def"
+  },
+  "par_diag": {
+   "name": "האלכסונים חוצים זה את זה",
+   "tip": "אלכסוני המקבילית חוצים זה את זה: כל חלק הוא חצי מהאלכסון שלו.",
+   "back": "z_par_diag"
+  },
+  "par_trap_iso": {
+   "name": "גם טרפז שווה שוקיים כזה",
+   "tip": "גם בטרפז שווה שוקיים זוג אחד מקביל וזוג שני שווה, ולכן זה לא מספיק.",
+   "back": null
+  },
+  "kite_par": {
+   "name": "גם דלתון כזה",
+   "tip": "גם בדלתון האלכסונים מאונכים, ולכן זה לא מספיק כדי לקבוע שהמרובע מקבילית.",
+   "back": null
+  },
+  "domain_sign": {
+   "name": "סימן בתחום ההצבה",
+   "tip": "המכנה מתאפס כאשר $x − 4 = 0$, כלומר כאשר $x = 4$.",
+   "back": null
+  },
+  "numerator_domain": {
+   "name": "המונה אינו מגביל",
+   "tip": "רק מכנה ששווה לאפס אסור. המונה יכול להיות כל מספר.",
+   "back": null
+  },
+  "domain_zero": {
+   "name": "לא כל מכנה פוסל את $0$",
+   "tip": "פוסלים את הערכים שבהם המכנה כולו שווה לאפס.",
+   "back": null
+  },
+  "mult_instead": {
+   "name": "כפל במקום חילוק",
+   "tip": "$12 = 3x$, ולכן $x = 12 : 3$.",
+   "back": null
+  },
+  "inverse": {
+   "name": "התשובה ההפוכה",
+   "tip": "כופלים את שני האגפים במכנה ורק אז מבודדים את $x$.",
+   "back": null
+  },
+  "lost_sign_move": {
+   "name": "סימן אבד בדרך",
+   "tip": "שימו לב לסימן כשפותחים סוגריים וכשמעבירים אגף.",
+   "back": null
+  },
+  "partial_dist": {
+   "name": "פילוג חלקי",
+   "tip": "כופלים את כל הסוגריים: $2(x − 1) = 2x − 2$, לא $2x − 1$.",
+   "back": null
+  },
+  "add_denoms": {
+   "name": "חיבור מכנים",
+   "tip": "לא מחברים מכנים: מביאים למכנה משותף, $1/x + 1/(2x) = 2/(2x) + 1/(2x) = 3/(2x)$.",
+   "back": null
+  },
+  "excluded_root": {
+   "name": "פתרון מחוץ לתחום ההצבה",
+   "tip": "פתרון שמאפס את המכנה אינו פתרון. בודקים כל פתרון מול תחום ההצבה.",
+   "back": "r_domain"
+  },
+  "valid_root_dropped": {
+   "name": "פתרון קביל נפסל",
+   "tip": "$x = −2$ אינו מאפס את המכנה ומקיים את המשוואה.",
+   "back": null
+  },
+  "mult_only_one": {
+   "name": "כפל של איבר אחד בלבד",
+   "tip": "כופלים ב־$x$ את כל האיברים בשני האגפים: $x² + 6 = 5x$.",
+   "back": null
+  },
+  "part_vs_whole": {
+   "name": "חלק מתוך השלם",
+   "tip": "מחלקים בכל האפשרויות (כל התוצאות או כל השטח), לא רק במה שנשאר.",
+   "back": null
+  },
+  "guess_cases": {
+   "name": "התוצאות אינן שוות הסתברות",
+   "tip": "מנו את כל האפשרויות השקולות, בעזרת טבלה או דיאגרמת עץ.",
+   "back": null
+  },
+  "complement": {
+   "name": "מאורע משלים",
+   "tip": "ההסתברות של המאורע המשלים היא $1 − P(A)$.",
+   "back": "h_complement"
+  },
+  "relfreq_vs_prob": {
+   "name": "שכיחות יחסית לעומת הסתברות",
+   "tip": "שכיחות יחסית מחושבת מתוצאות הניסוי; $1/6$ היא ההסתברות התאורטית.",
+   "back": null
+  },
+  "freq_abs": {
+   "name": "שכיחות לעומת שכיחות יחסית",
+   "tip": "השכיחות היחסית היא השכיחות חלקי מספר הניסויים.",
+   "back": null
+  },
+  "ratio_flipped": {
+   "name": "חילוק הפוך",
+   "tip": "מחלקים את מספר ההופעות במספר הניסויים, לא להפך.",
+   "back": null
+  },
+  "decimal_error": {
+   "name": "טעות במקום העשרוני",
+   "tip": "$0.02 = 2/100$, ולכן $1500 · 0.02 = 30$.",
+   "back": null
+  },
+  "prob_as_count": {
+   "name": "הסתברות אינה מספר פריטים",
+   "tip": "ההסתברות היא לפריט אחד. כופלים אותה במספר הפריטים.",
+   "back": null
+  },
+  "one_stage": {
+   "name": "התעלמות מהשלב השני",
+   "tip": "יש שני שלבים: כופלים את ההסתברויות לאורך הענף.",
+   "back": "h_two_stage"
+  },
+  "prob_add": {
+   "name": "חיבור במקום כפל",
+   "tip": "לאורך ענף בעץ כופלים הסתברויות; מחברים רק ענפים נפרדים.",
+   "back": "h_two_stage"
+  },
+  "with_replace": {
+   "name": "עם החזרה",
+   "tip": "הכדור מוחזר, ולכן בשלב השני ההסתברות זהה לשלב הראשון.",
+   "back": null
+  },
+  "no_replace": {
+   "name": "בלי החזרה משתנה השלב השני",
+   "tip": "אחרי שהוצאנו כדור בלי להחזיר, נשארו פחות כדורים, ופחות כדורים מהצבע שהוצא.",
+   "back": null
+  },
+  "count_one": {
+   "name": "ספרתם צירוף אחד בלבד",
+   "tip": "יש $6$ צירופים שסכומם $7$: $(1, 6), (2, 5), …, (6, 1)$, מתוך $36$.",
+   "back": null
+  },
+  "length_vs_area": {
+   "name": "יחס אורכים במקום יחס שטחים",
+   "tip": "ההסתברות היא יחס השטחים: $5² : 10² = 25 : 100$.",
+   "back": null
+  },
+  "double_count": {
+   "name": "ספירה כפולה",
+   "tip": "$1/6 + 1/6$ סופר פעמיים את $(6, 6)$. נוח יותר: $1 − (5/6)²$.",
+   "back": null
+  },
+  "both_vs_atleast": {
+   "name": "„לפחות פעם אחת“ אינו „פעמיים“",
+   "tip": "„לפחות פעם אחת“ כולל גם תוצאות עם $6$ אחד בלבד.",
+   "back": null
+  },
+  "check_both": {
+   "name": "בדיקה בשתי המשוואות",
+   "tip": "נקודת חיתוך מקיימת את שתי המשוואות: מציבים בכל אחת מהן.",
+   "back": null
+  },
+  "one_solution": {
+   "name": "שכחתם פתרון",
+   "tip": "למשוואה הריבועית יש שני פתרונות, ולכל אחד יש נקודת חיתוך.",
+   "back": null
+  },
+  "y_sign": {
+   "name": "שיעור $y$ שגוי",
+   "tip": "מציבים כל $x$ בנפרד: $(−2)² − 2 = 2$. ריבוע של מספר שלילי הוא חיובי.",
+   "back": null
+  },
+  "sys_meaning": {
+   "name": "פתרון וחיתוך גרפים",
+   "tip": "כל פתרון של המערכת הוא נקודה משותפת לשני הגרפים.",
+   "back": null
+  },
+  "vertex_height": {
+   "name": "ישר אופקי וקודקוד",
+   "tip": "ישר אופקי פוגש פרבולה בנקודה אחת בלבד רק בגובה הקודקוד.",
+   "back": null
+  },
+  "product_check": {
+   "name": "בדקו את שני התנאים",
+   "tip": "המספרים צריכים לקיים גם את הסכום וגם את המכפלה.",
+   "back": null
+  },
+  "rect_diag_equal": {
+   "name": "אלכסוני המלבן שווים",
+   "tip": "במלבן האלכסונים שווים וחוצים זה את זה.",
+   "back": "m_rect_def"
+  },
+  "rect_iso": {
+   "name": "המשולש $AOB$ שווה שוקיים",
+   "tip": "$OA = OB$ (חצאי אלכסונים שווים), ולכן $∢OBA = ∢OAB$.",
+   "back": null
+  },
+  "rect_vs_rhombus": {
+   "name": "בלבול בין מלבן למעוין",
+   "tip": "מקבילית עם אלכסונים שווים או עם זווית ישרה היא מלבן. מקבילית עם אלכסונים מאונכים או עם צלעות סמוכות שוות היא מעוין.",
+   "back": null
+  },
+  "half_perimeter": {
+   "name": "חצי היקף",
+   "tip": "$2(a + b) = 26 ⇒ a + b = 13$, ולכן הרוחב $13 − 8 = 5$.",
+   "back": null
+  },
+  "add_lengths": {
+   "name": "חיבור אורכים במקום פיתגורס",
+   "tip": "חצאי האלכסונים מאונכים, ולכן הצלע היא יתר: $√(8² + 6²)$.",
+   "back": null
+  },
+  "diag_half": {
+   "name": "חצאי האלכסונים",
+   "tip": "אלכסוני המעוין חוצים זה את זה, ולכן משתמשים בחצאי האלכסונים: $8$ ו־$6$.",
+   "back": null
+  },
+  "rh_bisect": {
+   "name": "האלכסון חוצה את הזווית",
+   "tip": "במעוין האלכסונים חוצים את הזוויות: $∢ABD = ∢ABC : 2$.",
+   "back": "m_rhombus_angles"
+  },
+  "rh_perp": {
+   "name": "מאונך אינו הזווית עם הצלע",
+   "tip": "האלכסונים מאונכים זה לזה, אבל הזווית בין צלע לאלכסון היא חצי מזווית המעוין.",
+   "back": null
+  },
+  "area_add": {
+   "name": "חיבור במקום כפל",
+   "tip": "שטח מעוין הוא מכפלת האלכסונים חלקי 2.",
+   "back": null
+  },
+  "square_hierarchy": {
+   "name": "יחסי הכלה בין מרובעים",
+   "tip": "ריבוע הוא מלבן עם צלעות סמוכות שוות, וגם מעוין עם זווית ישרה. לא כל מלבן או מעוין הוא ריבוע.",
+   "back": null
+  },
+  "square_diag": {
+   "name": "תכונות אלכסוני הריבוע",
+   "tip": "בריבוע האלכסונים מאונכים ($∢AOB = 90°$) וחוצים את הזוויות הישרות ($∢OAB = 45°$).",
+   "back": null
+  },
+  "pos_neg_swap": {
+   "name": "חיובית היא מעל ציר $x$",
+   "tip": "פונקציה חיובית היכן שהגרף מעל ציר $x$, ושלילית היכן שהוא מתחתיו.",
+   "back": null
+  },
+  "neg_x": {
+   "name": "חיוביות אינה $x > 0$",
+   "tip": "„פונקציה חיובית“ פירושה $f(x) > 0$ (ערכי $y$ חיוביים), לא $x > 0$.",
+   "back": null
   },
   "local_as_abs": {
-   "name": "מקסימום מקומי כמוחלט",
-   "tip": "ב־$(−1, 3)$ יש מקסימום מקומי. המוחלט הוא הערך הגבוה ביותר בכל התחום: 5.",
+   "name": "קיצון מקומי אינו בהכרח מוחלט",
+   "tip": "מינימום מוחלט הוא הנקודה הנמוכה ביותר בכל הגרף.",
    "back": "n_local_abs"
+  },
+  "max_vs_min": {
+   "name": "מקסימום לעומת מינימום",
+   "tip": "בנקודת מקסימום הגרף עולה לפניה ויורד אחריה; במינימום להפך.",
+   "back": null
   },
   "value_vs_point": {
-   "name": "ערך הקיצון מול נקודת הקיצון",
-   "tip": "ערך המקסימום הוא שיעור ה־y בלבד: 5. הנקודה היא $(3, 5)$.",
-   "back": "n_local_abs"
+   "name": "ערך לעומת נקודה",
+   "tip": "נקודת קיצון היא זוג $(x, y)$; ערך המקסימום או המינימום הוא שיעור ה־$y$ שלה.",
+   "back": null
   },
-  "x_equals_m": {
-   "name": "$f(x) = 1$ כ־$x = 1$",
-   "tip": "$f(x) = 1$ שואלת איפה הגרף בגובה 1. מעבירים את הישר $y = 1$ וסופרים מפגשים.",
-   "back": "n_eq_graph"
+  "x_as_value": {
+   "name": "שיעור $x$ במקום ערך",
+   "tip": "הערך המקסימלי הוא שיעור ה־$y$ של נקודת המקסימום, לא שיעור ה־$x$.",
+   "back": null
   },
   "count_all": {
-   "name": "לא נספרו כל המפגשים",
-   "tip": "עוברים על כל הגרף: הישר $y = 1$ פוגש אותו שלוש פעמים.",
+   "name": "חיתוכים עם ציר $x$",
+   "tip": "חיתוכים עם ציר $x$ פותרים $f(x) = 0$, לא $f(x) = 2$.",
+   "back": null
+  },
+  "x_equals_m": {
+   "name": "ישר אנכי במקום אופקי",
+   "tip": "פתרונות $f(x) = m$ הם ערכי $x$ שבהם הגרף פוגש את הישר האופקי $y = m$.",
    "back": "n_eq_graph"
   },
   "vshift_dir": {
    "name": "כיוון ההזזה האנכית",
-   "tip": "$f(x) − 3$ מוריד את הגרף ב־3: $(2, 5)$ עובר ל־$(2, 2)$.",
-   "back": "n_vshift"
-  },
-  "vshift_as_h": {
-   "name": "הזזה אנכית כאופקית",
-   "tip": "מספר מחוץ ל־f מזיז למעלה או למטה. x לא משתנה.",
-   "back": "n_vshift"
-  },
-  "hshift_sign": {
-   "name": "כיוון ההזזה האופקית",
-   "tip": "$f(x − b)$ זז ימינה ב־b. ב־$(x + 3)²$ מתקיים $b = −3$, ולכן הקודקוד ב־$x = −3$.",
-   "back": "n_hshift"
-  },
-  "h_as_v": {
-   "name": "הזזה אופקית כאנכית",
-   "tip": "מספר בתוך הסוגריים מזיז ימינה או שמאלה. y של הקיצון לא משתנה.",
-   "back": "n_hshift"
+   "tip": "$f(x) + 5$ מזיזה את הגרף $5$ יחידות למעלה, ו־$f(x) − 5$ למטה.",
+   "back": null
   },
   "reflect_type": {
-   "name": "סוג הקיצון בשיקוף",
-   "tip": "שיקוף ביחס לציר x הופך מקסימום למינימום.",
-   "back": "n_reflect"
+   "name": "שיקוף הופך את סוג הקיצון",
+   "tip": "שיקוף ביחס לציר $x$ הופך את הגרף, ולכן מקסימום הופך למינימום.",
+   "back": null
   },
-  "reflect_axis": {
-   "name": "שיקוף ביחס לציר הלא נכון",
-   "tip": "שיקוף ביחס לציר x משנה את הסימן של y. ה־x נשאר.",
-   "back": "n_reflect"
-  },
-  "max_below": {
-   "name": "מקסימום שלילי",
-   "tip": "ערך המקסימום הוא $−1$, ולכן כל הגרף מתחת לציר x ואין נקודות חיתוך איתו.",
-   "back": "n_props_graph"
-  },
-  "opening_sign": {
-   "name": "סוג הקיצון לפי a",
-   "tip": "כש־$a < 0$ יש מקסימום, וכש־$a > 0$ יש מינימום.",
-   "back": "q_parabola"
-  },
-  "a_as_vertex": {
-   "name": "a כשיעור הקודקוד",
-   "tip": "a קובע רק את סוג הקיצון. הקודקוד של $ax²$ תמיד ב־$(0, 0)$.",
-   "back": "q_parabola"
-  },
-  "missing_neg_root": {
-   "name": "פתרון שלילי חסר",
-   "tip": "גם המספר השלילי מקיים: $(−2)² = 4$. ל־$x² = 4$ יש שני פתרונות.",
-   "back": "f_sqrt"
-  },
-  "forgot_root": {
-   "name": "שכחת להוציא שורש",
-   "tip": "$x² = 4$, ולכן $x = ±√4 = ±2$.",
-   "back": "f_sqrt"
-  },
-  "plug_zero": {
-   "name": "הצבת $x = 0$",
-   "tip": "הצבת $x = 0$ נותנת את החיתוך עם ציר y, לא את הקודקוד.",
-   "back": "n_intercepts"
-  },
-  "k_sign": {
-   "name": "סימן ההזזה האנכית",
-   "tip": "ב־$a(x − b)² + k$ הקודקוד הוא $(b, k)$, וכאן $k = 8$.",
-   "back": "q_vshift"
-  },
-  "zero_sign": {
-   "name": "סימן נקודות האפס",
-   "tip": "$x − 1 = 0$ כאשר $x = 1$: נקודת האפס היא המספר בסוגריים עם סימן הפוך.",
-   "back": "q_zero_prod"
-  },
-  "divide_wrong": {
-   "name": "חילוק הפוך",
-   "tip": "$2x = −1$, ולכן $x = −1/2$.",
-   "back": "f_lin"
-  },
-  "axis_middle": {
-   "name": "מיקום ציר הסימטריה",
-   "tip": "ציר הסימטריה באמצע בין נקודות האפס: $(1 + 5)/2 = 3$.",
-   "back": "q_fform"
-  },
-  "a_as_zero": {
-   "name": "המקדם כנקודת אפס",
-   "tip": "המקדם a אינו נקודת אפס. רק הגורמים עם x מתאפסים.",
-   "back": "q_fform"
-  },
-  "axis_sign": {
-   "name": "סימן ציר הסימטריה",
-   "tip": "$x = −b/(2a)$. כאן $b = −6$, ולכן $x = 6/2 = 3$.",
-   "back": "q_sform"
-  },
-  "forgot_2a_axis": {
-   "name": "המכנה $2a$ בציר הסימטריה",
-   "tip": "מחלקים ב־$2a$: $x = 6/2 = 3$, לא 6.",
-   "back": "q_sform"
-  },
-  "c_as_vertex": {
-   "name": "c כקודקוד",
-   "tip": "c נותן את החיתוך עם ציר y. הקודקוד הוא על ציר הסימטריה $x = −b/(2a)$.",
-   "back": "q_sform"
-  },
-  "a_from_point": {
-   "name": "הנקודה במקום המקדם",
-   "tip": "מציבים את הנקודה ופותרים את a: $a(0 − 2)² − 1 = 3$, ולכן $a = 1$.",
-   "back": "q_from_points"
-  },
-  "sub_vs_div": {
-   "name": "חיסור במקום חילוק",
-   "tip": "מבודדים את $x²$ בחילוק ב־3: $x² = 16$.",
-   "back": "f_lin"
-  },
-  "divide_by_x": {
-   "name": "חילוק ב־x",
-   "tip": "חילוק ב־x מאבד את הפתרון $x = 0$. מעבירים לאגף אחד ומוציאים גורם משותף: $5x(x − 4) = 0$.",
-   "back": "q_eq_gcf"
-  },
-  "lost_sign_move": {
-   "name": "סימן בהעברת אגף",
-   "tip": "$5x² − 20x = 0$, ולכן $5x(x − 4) = 0$ ו־$x = 4$.",
-   "back": "f_lin"
-  },
-  "product_not_zero": {
-   "name": "מכפלה ששווה למספר שאינו 0",
-   "tip": "הכלל 'מכפלה שווה 0' עובד רק כשבאגף השני 0. קודם מעבירים: $x² + 2x − 15 = 0$.",
-   "back": "q_zero_prod"
-  },
-  "minus_b": {
-   "name": "הסימן של $−b$",
-   "tip": "בנוסחה מופיע $−b$. כאן $b = −3$, ולכן $−b = 3$.",
-   "back": "q_formula"
-  },
-  "forgot_2a": {
-   "name": "המכנה $2a$",
-   "tip": "בנוסחת השורשים מחלקים ב־$2a = 4$, לא ב־2.",
-   "back": "q_formula"
-  },
-  "disc_sign": {
-   "name": "החישוב בתוך השורש",
-   "tip": "$b² − 4ac$: כאן $c = −2$, ולכן $−4ac = +16$ והתוצאה $9 + 16 = 25$.",
-   "back": "q_formula"
-  },
-  "disc_meaning": {
-   "name": "משמעות הביטוי בתוך השורש",
-   "tip": "חיובי: שני פתרונות. אפס: פתרון אחד. שלילי: אין פתרון. כאן $36 − 36 = 0$.",
-   "back": "q_disc"
-  },
-  "sign_regions": {
-   "name": "שלילית בין האפסים",
-   "tip": "פרבולה עם מינימום שלילית בין נקודות האפס וחיובית מחוץ להן.",
-   "back": "q_ineq"
-  },
-  "forgot_y": {
-   "name": "שכחת את y",
-   "tip": "אחרי שמוצאים x מציבים באחת המשוואות כדי למצוא y.",
-   "back": "f_sys"
-  },
-  "forgot_half": {
-   "name": "שכחת לחלק ב־2",
-   "tip": "שטח משולש הוא בסיס כפול גובה חלקי 2: $4·4/2 = 8$.",
-   "back": "q_tri"
-  },
-  "neg_height": {
-   "name": "גובה שלילי",
-   "tip": "הגובה הוא מרחק, ולכן חיובי: הקודקוד $(2, −4)$ נמצא 4 יחידות מתחת לציר x.",
-   "back": "q_tri"
+  "shift_keeps": {
+   "name": "הזזה אופקית מזיזה תחומים",
+   "tip": "בהזזה אופקית תחומי העלייה והירידה זזים יחד עם הגרף; בהזזה אנכית הם נשמרים.",
+   "back": null
   },
   "mult_exponents": {
-   "name": "כפל מעריכים",
-   "tip": "בכפל חזקות עם אותו בסיס מחברים את המעריכים: $a⁵·a³ = a⁸$.",
-   "back": "p_laws1"
+   "name": "כפל המעריכים",
+   "tip": "בכפל חזקות עם אותו בסיס מחברים מעריכים: $a³ · a⁵ = a⁸$.",
+   "back": "p_mult"
+  },
+  "coef_doubled": {
+   "name": "מקדם שאינו קיים",
+   "tip": "$a³ · a⁵$ היא חזקה אחת, בלי מקדם 2.",
+   "back": null
   },
   "div_exponents": {
-   "name": "חילוק מעריכים",
-   "tip": "בחילוק חזקות עם אותו בסיס מחסרים את המעריכים: $a⁸ : a² = a⁶$.",
-   "back": "p_laws1"
+   "name": "חילוק המעריכים",
+   "tip": "בחילוק חזקות עם אותו בסיס מחסרים מעריכים: $x¹² : x⁴ = x⁸$.",
+   "back": "p_div"
   },
   "pow_pow_add": {
-   "name": "חיבור מעריכים בחזקה של חזקה",
-   "tip": "בחזקה של חזקה כופלים מעריכים: $(x³)² = x⁶$.",
-   "back": "p_laws2"
+   "name": "חיבור במקום כפל",
+   "tip": "בחזקה של חזקה כופלים מעריכים: $(y⁴)³ = y¹²$.",
+   "back": "p_power"
   },
-  "bigger_exp": {
-   "name": "מעריך גדול יותר, מספר גדול יותר",
-   "tip": "כתבו את שניהם עם אותו מעריך: $2³⁰⁰ = 8¹⁰⁰$ ו־$3²⁰⁰ = 9¹⁰⁰$.",
-   "back": "p_laws2"
+  "pow_tower": {
+   "name": "העלאה בחזקה של המעריך",
+   "tip": "$(y⁴)³ = y⁴ · y⁴ · y⁴ = y¹²$.",
+   "back": null
+  },
+  "coef_mult": {
+   "name": "המקדם הוכפל במקום שהועלה בחזקה",
+   "tip": "$2⁴ = 2 · 2 · 2 · 2 = 16$, לא $2 · 4$.",
+   "back": null
+  },
+  "denom_not_raised": {
+   "name": "גם המכנה מועלה בחזקה",
+   "tip": "$(a/b)ⁿ = aⁿ / bⁿ$: $3³ = 27$.",
+   "back": null
+  },
+  "zero_power": {
+   "name": "חזקת אפס",
+   "tip": "כל מספר (שאינו $0$) בחזקת $0$ שווה $1$: $7⁰ = 1$.",
+   "back": null
+  },
+  "bigger_base": {
+   "name": "בסיס גדול אינו מספיק",
+   "tip": "כדי להשוות, כותבים את החזקות באותו בסיס: $4¹⁴ = (2²)¹⁴ = 2²⁸$.",
+   "back": null
+  },
+  "div_as_mult": {
+   "name": "חיבור מעריכים בחילוק",
+   "tip": "בחילוק מחסרים מעריכים: $x⁷ : x⁴ = x³$.",
+   "back": "p_div"
   },
   "sqrt_add": {
-   "name": "שורש של מכפלה כשורש של סכום",
-   "tip": "$√a·√b = √(ab)$: $√12·√3 = √36$.",
-   "back": "p_sqrt_laws"
+   "name": "פעולה שגויה תחת השורש",
+   "tip": "$√a · √b = √(a · b)$, ולכן $√12 · √3 = √36$.",
+   "back": null
   },
   "sqrt_forgot": {
-   "name": "שכחת להוציא שורש",
-   "tip": "$√36 = 6$, לא 36.",
-   "back": "f_sqrt"
-  },
-  "inadmissible": {
-   "name": "פתרון שלא מתאים לבעיה",
-   "tip": "אורך ומהירות אינם שליליים. פוסלים פתרון שאינו מתאים לבעיה.",
+   "name": "שכחתם להוציא שורש",
+   "tip": "$√36 = 6$.",
    "back": null
   },
-  "other_quantity": {
-   "name": "ענית על גודל אחר",
-   "tip": "קראו שוב מה נשאל. פתרתם נכון, אבל המספר שבחרתם מתאר גודל אחר בבעיה.",
+  "sqrt_split": {
+   "name": "שורש של סכום",
+   "tip": "שורש אינו מתפרק על סכום: $√9 + √16 = 3 + 4 = 7$, אבל $√25 = 5$.",
    "back": null
   },
-  "area_perimeter": {
-   "name": "שטח מול היקף",
-   "tip": "שטח הוא אורך כפול רוחב: $w(w + 2) = 48$.",
-   "back": "w_area"
+  "frame_one_side": {
+   "name": "המסגרת משני הצדדים",
+   "tip": "מסגרת או שביל מוסיפים $x$ בכל צד, ולכן האורך החדש הוא $a + 2x$.",
+   "back": null
+  },
+  "speed_diff": {
+   "name": "בנסיעה זו לקראת זו מחברים מהירויות",
+   "tip": "המרחק ביניהן קטן בכל שעה ב־$70 + 80 = 150$ ק״מ.",
+   "back": null
+  },
+  "one_speed": {
+   "name": "השתמשתם במהירות אחת",
+   "tip": "שתי המכוניות מתקרבות זו לזו: מחברים את המהירויות.",
+   "back": null
   },
   "percent_add": {
-   "name": "חיבור אחוזים",
-   "tip": "שתי עליות של p% הן כפל: $200·(1 + p/100)² = 242$, ולכן $1 + p/100 = 1.1$.",
-   "back": "w_percent"
+   "name": "אחוזים אינם מתקזזים",
+   "tip": "ההנחה מחושבת מהמחיר החדש: $1.2 · 0.8 = 0.96$.",
+   "back": null
   },
   "square_total": {
-   "name": "ריבוע הסכום",
-   "tip": "$10² = 100$ הוא ריבוע הסכום, לא מכפלת המספרים.",
+   "name": "גידול כולל לעומת גידול בכל פעם",
+   "tip": "$(1 + p/100)² = 1.21 ⇒ 1 + p/100 = 1.1$.",
    "back": null
   },
-  "guess_cases": {
-   "name": "ניחוש ערכים",
-   "tip": "ניסוי של כמה ערכים לא מוכיח מקסימום. מוצאים את הקודקוד של $y = x(10 − x)$.",
-   "back": "q_vertex"
-  },
-  "g_perimeter": {
-   "name": "היקף במקום שטח",
-   "tip": "לחישוב שטח כפלו אורך ברוחב: $8 · 5$. ההיקף הוא $2 · (8 + 5)$.",
-   "back": "g_rectangle"
-  },
-  "g_add_lengths": {
-   "name": "חיבור אורכים",
-   "tip": "בחרו את הנוסחה המתאימה: שטח מלבן הוא אורך כפול רוחב, שטח משולש הוא בסיס כפול גובה חלקי $2$, ובפיתגורס מחברים את ריבועי הניצבים.",
+  "percent_split": {
+   "name": "אחוזים מצטברים בכפל",
+   "tip": "לא מחלקים את הגידול הכולל ב־2: $(1 + p/100)² = 1.21$.",
    "back": null
   },
-  "g_half": {
-   "name": "שכחתם לחלק בשתיים",
-   "tip": "המשולש הוא חצי מלבן בעל אותו בסיס וגובה: $6 · 8 / 2$.",
-   "back": "g_triangle_area"
+  "wall_side": {
+   "name": "הקיר חוסך צלע",
+   "tip": "הגדר מקיפה רק שלוש צלעות: $2x + y = 40$.",
+   "back": null
   },
-  "g_no_root": {
-   "name": "ריבוע היתר במקום היתר",
-   "tip": "$c² = 6² + 8² = 100$. הוציאו שורש כדי לקבל את אורך היתר.",
-   "back": "g_pythagoras"
+  "percent_of_new": {
+   "name": "האחוז מחושב מהמחיר המקורי",
+   "tip": "$0.85 · x = 68 ⇒ x = 68 : 0.85$.",
+   "back": null
+  },
+  "percent_as_shekel": {
+   "name": "אחוזים אינם שקלים",
+   "tip": "$15%$ הם חלק מהמחיר, לא $15$ ₪.",
+   "back": null
+  },
+  "add_vs_ratio": {
+   "name": "חיבור במקום יחס",
+   "tip": "בדמיון הצלעות פרופורציוניות: כופלים ביחס הדמיון, לא מוסיפים מספר קבוע.",
+   "back": null
+  },
+  "ratio_inverted": {
+   "name": "יחס הפוך",
+   "tip": "התאימו כל צלע לצלע המתאימה לה, וכפלו ביחס מהמשולש הנתון אל המבוקש.",
+   "back": null
+  },
+  "angle_scale": {
+   "name": "זוויות אינן מוכפלות",
+   "tip": "במשולשים דומים הזוויות המתאימות שוות; רק הצלעות מוכפלות ביחס.",
+   "back": null
+  },
+  "perim_square": {
+   "name": "היקף ביחס הדמיון",
+   "tip": "יחס ההיקפים שווה ליחס הדמיון, לא לריבועו.",
+   "back": null
+  },
+  "area_ratio": {
+   "name": "יחס השטחים הוא ריבוע יחס הדמיון",
+   "tip": "אם יחס הדמיון $k$, יחס השטחים $k²$.",
+   "back": "d_area"
+  },
+  "wrong_segment": {
+   "name": "הצלע המתאימה",
+   "tip": "$△ADE ∼ △ABC$, ולכן $DE : BC = AD : AB$.",
+   "back": null
+  },
+  "unit_conv": {
+   "name": "המרת יחידות שטח",
+   "tip": "$1$ מ״ר $= 100 · 100 = 10,000$ סמ״ר.",
+   "back": null
   }
  }
 }

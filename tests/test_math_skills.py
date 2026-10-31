@@ -33,15 +33,15 @@ def test_choice_samples_still_require_one_correct_choice():
 def test_the_algebra_graph_is_whole():
     graph = algebra9()
     assert problems(graph) == []
-    assert len(graph["skills"]) == 59
-    assert {unit["id"] for unit in graph["units"]} == {"f", "t", "n", "q", "p", "w", "g"}
+    assert len(graph["skills"]) == 140
+    assert {unit["id"] for unit in graph["units"]} == set("tkqearzhsmnpwd")
     assert {unit["subject"] for unit in graph["units"]} == {"מתמטיקה"}
 
 
 def test_a_broken_graph_is_named():
     graph = copy.deepcopy(algebra9())
     skill = lambda sid: next(item for item in graph["skills"] if item["id"] == sid)
-    skill("f_neg")["prereqs"] = ["f_ops"]
+    skill("t_ext")["prereqs"] = ["t_square"]
     assert problems(graph)[0].startswith("cycle:")
 
 
@@ -58,7 +58,7 @@ def test_math_is_the_only_page_and_api():
 class FakeSolver:
     def solve(self, image, media_type):
         return {"readable": True, "problem": "$x² = 9$", "steps": [{"hint": "h", "work": "w"}],
-                "answer": "$x = ±3$", "skill": "q_eq_simple", "note": ""}
+                "answer": "$x = ±3$", "skill": "e_simple", "note": ""}
 
 
 def test_a_photographed_problem_is_solved(monkeypatch):
@@ -77,8 +77,8 @@ def test_a_photographed_problem_is_solved(monkeypatch):
 def test_rollout_and_rollback_question_variants():
     enabled, disabled = practice_graph(True), practice_graph(False)
     assert problems(enabled) == problems(disabled) == []
-    opened = next(s for s in enabled['skills'] if s['id']=='g_triangle_area')
-    fallback = next(s for s in disabled['skills'] if s['id']=='g_triangle_area')
+    opened = next(s for s in enabled['skills'] if s['id']=='a_30_side')
+    fallback = next(s for s in disabled['skills'] if s['id']=='a_30_side')
     assert opened['sample']['type']=='open-ended' and 'choices' not in opened['sample']
     assert opened['question_version']==question_version(opened['sample'])
     assert len(fallback['sample']['choices']) == 3

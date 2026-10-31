@@ -237,11 +237,11 @@ def test_enable_rollback_preserves_received_answers(answer_store):
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://test',headers={'Authorization':f'Bearer {OWNER}'}) as c:
             assert (await c.get('/api/me')).json()['answer_scans'] is False
             skills=(await c.get('/api/math/skills')).json()['skills']
-            assert len(next(s for s in skills if s['id']=='g_triangle_area')['sample']['choices'])==3
+            assert len(next(s for s in skills if s['id']=='a_30_side')['sample']['choices'])==3
             assert (await c.get('/api/math/answer-scans')).status_code==503
             store.enabled=True
             skills=(await c.get('/api/math/skills')).json()['skills']
-            assert next(s for s in skills if s['id']=='g_triangle_area')['sample']['type']=='open-ended'
+            assert next(s for s in skills if s['id']=='a_30_side')['sample']['type']=='open-ended'
             assert (await c.get(f"/api/math/answer-attempts/{done['attempt']['id']}/image")).status_code==200
         with store.connect() as c:
             assert c.execute('select count(*) from classes').fetchone()[0]==1

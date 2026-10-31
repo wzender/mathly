@@ -102,7 +102,7 @@ def test_phone_refresh_upload_and_desktop_network_recovery(phone_server):
 def test_class_management_geometry_and_permissions(phone_server, manager):
     import json
 
-    row = {"id": 7, "name": "כיתת תרגול", "lessons": ["f"],
+    row = {"id": 7, "name": "כיתת תרגול", "lessons": ["t"],
            "emails": ["student@example.com"], "teachers": ["teacher@example.com"],
            "exam_title": "לוח מבחנים – כיתה ט׳11, תשפ״ז",
            "exam_note": "ייתכנו שינויים.",
@@ -153,7 +153,7 @@ def test_class_management_geometry_and_permissions(phone_server, manager):
             button.click()
             playwright.expect(page.locator(".mx-exam-board")).to_contain_text("מתמטיקה")
             page.get_by_role("button", name="עריכה").click()
-            geometry = page.locator('input[name="unit"][value="g"]')
+            geometry = page.locator('input[name="unit"][value="a"]')
             geometry.check()
             page.get_by_role("button", name="שמירת השינויים").click()
             playwright.expect(page.get_by_role("status")).to_contain_text("לא הצלחנו לשמור")
@@ -161,10 +161,10 @@ def test_class_management_geometry_and_permissions(phone_server, manager):
             page.get_by_role("button", name="שמירת השינויים").click()
             playwright.expect(page.get_by_role("status")).to_contain_text("השינויים נשמרו")
             assert writes[-1] == {"name": row["name"], "emails": row["emails"],
-                                  "teachers": row["teachers"], "lessons": ["f", "g"]}
+                                  "teachers": row["teachers"], "lessons": ["t", "a"]}
             page.locator('.mx-x').click()
-            playwright.expect(page.locator('[data-id="g_triangle_area"]')).to_be_visible()
+            playwright.expect(page.locator('[data-id="a_30_side"]')).to_be_visible()
             page.reload()
-            playwright.expect(page.locator('[data-id="g_triangle_area"]')).to_be_visible()
+            playwright.expect(page.locator('[data-id="a_30_side"]')).to_be_visible()
         finally:
             browser.close()

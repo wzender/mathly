@@ -13,7 +13,7 @@ class GeometrySolver:
         assert image == b"photo"
         assert media_type == "image/jpeg"
         return {"readable": True, "problem": "triangle", "steps": [{"hint": "h", "work": "w"}],
-                "answer": "10 cm", "skill": "g_pythagoras", "note": ""}
+                "answer": "10 cm", "skill": "a_30_side", "note": ""}
 
 
 def photo_app(monkeypatch):
