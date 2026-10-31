@@ -402,19 +402,45 @@ function manageClassAction(action,id){
 
 function openClassEditor(row){
   const box=sheet.querySelector(".mx-management"), creating=!row;
-  const selected=new Set(row?.lessons||G.units.map(unit=>unit.id));
+  const selected=new Set(row?.lessons||[]);   // a new class starts with no subject chosen
+  const subjects=[...new Set(G.units.map(unit=>unit.subject))], subjectUnits=subject=>G.units.filter(unit=>unit.subject===subject);
   box.innerHTML=`<div class="mx-manage-title"><h4>${creating?"כיתה חדשה":`עריכת ${esc(row.name)}`}</h4><button class="mx-btn" type="button" data-class-action="cancel">חזרה לכיתות</button></div>
     <form class="mx-class-form"><label>שם הכיתה<input name="name" required maxlength="80" autocomplete="off" placeholder="למשל: ט׳ 1" value="${esc(row?.name||"")}"></label>
-      <fieldset><legend>יחידות הלימוד<small>התלמידים יראו במסלול רק את המיומנויות של היחידות שסומנו. מקצוע היחידה קובע אילו מבחנים יוצגו במסלול.</small></legend>${[...new Set(G.units.map(unit=>unit.subject))].map(subject=>`<h6 class="mx-pick-subject">${esc(subject)}</h6><div class="mx-unit-picks">${G.units.filter(unit=>unit.subject===subject).map(unit=>{const skills=unitSkills(unit.id);return `<label class="u-${unit.id}"><input type="checkbox" name="unit" value="${esc(unit.id)}"${selected.has(unit.id)?" checked":""}><span>${esc(unit.name)}<small>${skills.length} תת־נושאים · ${questionCount(skills)} שאלות</small></span></label>`}).join("")}</div>`).join("")}</fieldset>
+      <fieldset><legend>מקצועות<small>בחרו את המקצועות שהכיתה לומדת. בחירת מקצוע מסמנת את כל יחידות הלימוד שלו, ואפשר לבטל יחידות שהכיתה לא לומדת.</small></legend>
+        <div class="mx-subject-picks">${subjects.map(subject=>{const [icon,tone]=examLooks[subject]||["●","other"], units=subjectUnits(subject);
+          return `<label class="exam-${tone}"><input type="checkbox" name="subject" value="${esc(subject)}"><span aria-hidden="true" class="mx-subject-icon">${icon}</span><span>${esc(subject)}<small>${units.length} יחידות</small></span></label>`}).join("")}</div></fieldset>
+      <fieldset class="mx-unit-fieldset"><legend>יחידות הלימוד<small>התלמידים יראו במסלול רק את המיומנויות של היחידות שסומנו. מקצוע היחידה קובע אילו מבחנים יוצגו במסלול.</small></legend>
+        <p class="mx-note mx-no-subject">בחרו מקצוע כדי לראות את יחידות הלימוד שלו.</p>
+        ${subjects.map(subject=>`<section class="mx-subject-units" data-subject-units="${esc(subject)}"><h6 class="mx-pick-subject">${esc(subject)}</h6><div class="mx-unit-picks">${subjectUnits(subject).map(unit=>{const skills=unitSkills(unit.id);return `<label class="u-${unit.id}"><input type="checkbox" name="unit" value="${esc(unit.id)}" data-subject="${esc(subject)}"${selected.has(unit.id)?" checked":""}><span>${esc(unit.name)}<small>${skills.length} תת־נושאים · ${questionCount(skills)} שאלות</small></span></label>`}).join("")}</div></section>`).join("")}</fieldset>
       <label>התלמידים<small>כתובת דוא״ל אחת בכל שורה. תלמיד יכול להשתייך ליותר מכיתה אחת.</small><textarea name="emails" dir="ltr" spellcheck="false" placeholder="student@example.com">${esc((row?.emails||[]).join("\n"))}</textarea></label>
       <label>מורי הכיתה<small>כתובת דוא״ל אחת בכל שורה. למורים תהיה גישה לכיתה הזו.</small><textarea name="teachers" dir="ltr" spellcheck="false" placeholder="teacher@example.com">${esc((row?.teachers||[]).join("\n"))}</textarea></label>
       <div class="mx-class-form-actions"><button class="mx-btn solid" type="submit">${creating?"פתיחת הכיתה":"שמירת השינויים"}</button><button class="mx-btn" type="button" data-class-action="cancel">ביטול</button><span role="status" aria-live="polite"></span></div></form>`;
   const form=box.querySelector("form"), message=form.querySelector('[role="status"]');
+  const unitBoxes=subject=>[...form.querySelectorAll('input[name="unit"]')].filter(input=>input.dataset.subject===subject);
+  // a subject is chosen while any of its units is; a subject's units stay in view from choosing it until it is cleared
+  const open=new Set(subjects.filter(subject=>subjectUnits(subject).some(unit=>selected.has(unit.id))));
+  const syncSubjects=()=>{
+    form.querySelectorAll('input[name="subject"]').forEach(input=>{
+      const boxes=unitBoxes(input.value), on=boxes.filter(box=>box.checked).length;
+      input.checked=on>0; input.indeterminate=on>0&&on<boxes.length;
+      form.querySelector(`[data-subject-units="${CSS.escape(input.value)}"]`).hidden=!open.has(input.value);
+    });
+    form.querySelector(".mx-no-subject").hidden=open.size>0;
+  };
+  form.addEventListener("change",event=>{
+    const input=event.target;
+    if(input.name==="subject"){
+      unitBoxes(input.value).forEach(box=>box.checked=input.checked);
+      if(input.checked) open.add(input.value); else open.delete(input.value);
+    }
+    if(input.name==="subject"||input.name==="unit") syncSubjects();
+  });
+  syncSubjects();
   form.querySelector('input[name="name"]').focus();
   form.onsubmit=async event=>{
     event.preventDefault();
     const lessons=[...form.querySelectorAll('input[name="unit"]:checked')].map(input=>input.value);
-    if(!lessons.length){message.textContent="בחרו לפחות יחידת לימוד אחת.";return;}
+    if(!lessons.length){message.textContent="בחרו לפחות מקצוע אחד.";return;}
     const lines=name=>form.elements[name].value.split(/[\n,;]+/).map(value=>value.trim().toLowerCase()).filter(Boolean);
     const body={name:form.elements.name.value.trim(),emails:lines("emails"),teachers:lines("teachers"),lessons};
     const buttons=form.querySelectorAll("button"); buttons.forEach(button=>button.disabled=true); message.textContent=creating?"פותחים את הכיתה…":"שומרים…";

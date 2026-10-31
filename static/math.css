@@ -212,6 +212,13 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-class-form input[type="text"],.mx-class-form input[name="name"],.mx-class-form textarea{box-sizing:border-box;width:100%;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);padding:11px 12px;font:inherit}
 .mx-class-form textarea{min-height:110px;resize:vertical;text-align:left}
 .mx-class-form fieldset{margin:0}
+.mx-subject-picks{--exam:var(--mx-accent);display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.mx-subject-picks label{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:13px;padding:9px 10px;cursor:pointer}
+.mx-subject-picks label:has(input:checked),.mx-subject-picks label:has(input:indeterminate){border-color:var(--exam);background:color-mix(in srgb,var(--exam) 14%,var(--surface))}
+.mx-subject-picks .mx-subject-icon{width:34px;height:34px;border-radius:10px;font-size:18px}
+.mx-subject-picks label>span:last-child{display:flex;flex-direction:column;gap:2px;font-weight:700}
+.mx-subject-picks label small{color:var(--muted);font-size:11px;font-weight:500}
+.mx-subject-units[hidden],.mx-no-subject[hidden]{display:none}
 .mx-unit-picks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .mx-unit-picks label{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:11px;padding:10px;cursor:pointer}
 .mx-unit-picks label:has(input:checked){border-color:var(--mx-accent);background:var(--mx-accent-soft)}
@@ -263,7 +270,7 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-qdots i.now{outline:2px solid var(--mx-accent);outline-offset:1px}
 .mx-count{font:700 11px/1 var(--f-body);padding:4px 7px;border-radius:999px;background:var(--bg);color:var(--muted)}
 .mx-content-subject{display:flex;flex-direction:column;gap:8px;margin-top:14px}
-.mx-content-subject>h5{display:flex;align-items:baseline;gap:8px;margin:0;font-size:18px;color:var(--exam,var(--mx-accent))}
+.mx-content-subject>h5{display:flex;align-items:baseline;gap:8px;margin:0;font-size:18px;color:var(--exam)}
 .mx-content-subject>h5 small{color:var(--muted);font-size:13px;font-weight:500}
 .mx-content-unit{border:1px solid var(--line);border-radius:12px;background:var(--bg)}
 .mx-content-unit summary{display:flex;flex-direction:column;gap:3px;padding:12px;cursor:pointer}
