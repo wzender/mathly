@@ -9,6 +9,7 @@ from app.math_skills import algebra9, practice_graph, problems, question_version
 
 def test_open_ended_samples_and_content_identity():
     graph = copy.deepcopy(algebra9())
+    graph["skills"][0].pop("questions")
     sample = graph["skills"][0]["sample"] = {"type": "open-ended", "version": 1,
                                            "question": "Draw a triangle."}
     assert problems(graph) == []
@@ -26,22 +27,37 @@ def test_open_ended_samples_and_content_identity():
 
 def test_choice_samples_still_require_one_correct_choice():
     graph = copy.deepcopy(algebra9())
-    graph["skills"][0]["sample"]["choices"] = []
-    assert any("exactly one correct choice" in item for item in problems(graph))
+    graph["skills"][0]["questions"][3]["choices"] = []
+    assert "t_ext question 4: needs exactly one correct choice" in problems(graph)
+
+
+def test_question_lists():
+    graph = copy.deepcopy(algebra9())
+    skill = lambda sid: next(item for item in graph["skills"] if item["id"] == sid)
+    listed = [s for s in graph["skills"] if "questions" in s]
+    assert [s["id"] for s in graph["skills"] if "sample" in s] == ["a_30_side"]   # the photographed answer
+    assert len(listed) == 95 and all(len(s["questions"]) == 10 for s in listed)
+    skill("t_ext")["sample"] = skill("t_ext")["questions"][0]
+    skill("t_gcf")["questions"] = []
+    skill("q_props")["questions"][0] = {"type": "open-ended", "version": 1, "question": "Sketch it."}
+    found = problems(graph)
+    assert "t_ext: needs a sample or a list of questions, not both" in found
+    assert "t_gcf: the question list is empty" in found
+    assert "q_props question 1: a question list holds multiple-choice questions only" in found
 
 
 def test_the_algebra_graph_is_whole():
     graph = algebra9()
     assert problems(graph) == []
-    assert len(graph["skills"]) == 140
-    assert {unit["id"] for unit in graph["units"]} == set("tkqearzhsmnpwd")
+    assert len(graph["skills"]) == 96
+    assert {unit["id"] for unit in graph["units"]} == set("tkiqalzevgrmhsnbcopwd")
     assert {unit["subject"] for unit in graph["units"]} == {"מתמטיקה"}
 
 
 def test_a_broken_graph_is_named():
     graph = copy.deepcopy(algebra9())
     skill = lambda sid: next(item for item in graph["skills"] if item["id"] == sid)
-    skill("t_ext")["prereqs"] = ["t_square"]
+    skill("t_ext")["prereqs"] = ["t_formulas"]
     assert problems(graph)[0].startswith("cycle:")
 
 
@@ -58,7 +74,7 @@ def test_math_is_the_only_page_and_api():
 class FakeSolver:
     def solve(self, image, media_type):
         return {"readable": True, "problem": "$x² = 9$", "steps": [{"hint": "h", "work": "w"}],
-                "answer": "$x = ±3$", "skill": "e_simple", "note": ""}
+                "answer": "$x = ±3$", "skill": "e_way", "note": ""}
 
 
 def test_a_photographed_problem_is_solved(monkeypatch):
@@ -83,3 +99,17 @@ def test_rollout_and_rollback_question_variants():
     assert opened['question_version']==question_version(opened['sample'])
     assert len(fallback['sample']['choices']) == 3
     assert all('fallback_sample' not in s for s in enabled['skills'])
+
+
+def test_each_subunit_names_its_units_subject():
+    graph = practice_graph(False)
+    subject = {unit["id"]: unit["subject"] for unit in graph["units"]}
+    assert all(skill["subject"] == subject[skill["unit"]] for skill in graph["skills"])
+
+
+def test_a_class_of_a_split_unit_keeps_its_content():
+    from app.main import units_of
+    assert units_of({"lessons": ["k"]}) == ["k", "i"]                       # דלתון ומשולש שווה שוקיים
+    assert units_of({"lessons": ["m", "t"]}) == ["t", "m", "b", "c"]        # מלבן, מעוין וריבוע
+    assert units_of({"lessons": ["i"]}) == ["i"]
+    assert units_of({}) == [unit["id"] for unit in algebra9()["units"]]

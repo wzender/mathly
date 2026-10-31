@@ -63,7 +63,7 @@ def install_answer_routes(app, signed_in):
     @app.post("/api/math/answer-attempts")
     def resume_attempt(body: dict, user=Depends(student)):
         question = next((s for s in algebra9()["skills"] if s["id"] == body.get("question_id")), None)
-        if not question or question["sample"].get("type") != "open-ended":
+        if not question or question.get("sample", {}).get("type") != "open-ended":
             raise ScanError(404, "not_found")
         sample = question["sample"]
         version = question_version(sample)

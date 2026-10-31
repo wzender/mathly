@@ -158,6 +158,7 @@ def test_scan_api_end_to_end_failure_retry_and_restart(answer_store, monkeypatch
     import copy
     from app.math_skills import algebra9, question_version
     graph = copy.deepcopy(algebra9())
+    graph['skills'][0].pop('questions')
     graph['skills'][0]['sample'] = {'type': 'open-ended', 'question': 'Draw a proof', 'version': 1}
     monkeypatch.setattr('app.answer_routes.algebra9', lambda: graph)
     monkeypatch.delenv('ANTHROPIC_API_KEY', raising=False)

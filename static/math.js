@@ -2,8 +2,10 @@
    The skill graph comes from /api/math/skills (app/math_skills.py). A skill is open once every skill it needs is
    done, and the first open one is where the student goes on. A student may still open a locked skill: without a
    placement test, one who already knows the foundations should not have to answer them first.
-   Each skill has one sample question, and answering it correctly marks the skill done. Progress is kept on
-   this device, per account (mathly.progress.v1:<email>). */
+   A skill has one sample question or a list of questions. It is done once every one of its questions has been
+   answered correctly; after each answer the student moves to the next unsolved question, so a missed question comes
+   back after the others. Progress is kept on this device, per account (mathly.progress.v1:<email>): `done` per
+   skill, and `solved` (indexes answered correctly) and `at` (the question to show) for skills with a list. */
 (()=>{
 const css=document.createElement("link"); css.rel="stylesheet"; css.href=document.currentScript.src.replace("math.js","math.css");
 document.head.append(css);
@@ -23,7 +25,7 @@ const key=()=>"mathly.progress.v1:"+(ME_EMAIL||"guest");
 const load=()=>{ try{ return JSON.parse(localStorage.getItem(key())||"{}"); }catch{ return {}; } };
 const save=()=>{ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} };
 
-let G=null, BY={}, POST={}, DEPTH={}, ORDER=[], P={done:{},tries:{}}, root=null, path=null, sheet=null, cur=null, back=null, ACTIVE_SUBJECT="";
+let G=null, BY={}, POST={}, ORDER=[], P={done:{},tries:{},solved:{},at:{}}, root=null, curQ=0, path=null, sheet=null, cur=null, back=null, ACTIVE_SUBJECT="";
 let picker=null, PH=null;   // the photo file picker, and the photographed problem on the sheet (see photo())
 let advanceTimer=null;
 let phonePair=null;
@@ -36,10 +38,16 @@ function cancelAdvance(){ clearTimeout(advanceTimer); advanceTimer=null; }
 function index(graph){
   G=graph; BY=Object.fromEntries(G.skills.map(s=>[s.id,s])); POST=Object.fromEntries(G.skills.map(s=>[s.id,[]]));
   G.skills.forEach(s=>s.prereqs.forEach(p=>POST[p].push(s.id)));
-  const depth=id=>DEPTH[id]??(DEPTH[id]=BY[id].prereqs.length?1+Math.max(...BY[id].prereqs.map(depth)):0);
-  G.skills.forEach(s=>depth(s.id));
-  // the path's order: unit by unit, and in a unit each skill after the ones it needs
-  ORDER=G.units.flatMap(u=>G.skills.filter(s=>s.unit===u.id).sort((a,b)=>DEPTH[a.id]-DEPTH[b.id]).map(s=>s.id));
+  // the path's order: unit by unit, and in a unit the order of the file (the teaching schedule's),
+  // except that a skill waits until the skills it needs in its unit are placed
+  ORDER=G.units.flatMap(u=>{
+    const left=G.skills.filter(s=>s.unit===u.id), placed=new Set(), out=[];
+    while(left.length){
+      const i=left.findIndex(s=>s.prereqs.every(p=>placed.has(p)||BY[p].unit!==u.id));
+      const [s]=left.splice(i,1); placed.add(s.id); out.push(s.id);
+    }
+    return out;
+  });
 }
 // the units the student's class studies (its "lessons"); a teacher, or an account in no class, has every unit.
 // A skill of a unit the class does not study counts as known: it does not lock the skills that need it.
@@ -50,6 +58,11 @@ const shownUnits=()=>{
 let SHOWN=new Set();
 const status=id=>P.done[id]?"done":BY[id].prereqs.every(p=>P.done[p]||!SHOWN.has(BY[p].unit))?"open":"locked";
 const next=()=>ORDER.find(id=>SHOWN.has(BY[id].unit)&&status(id)==="open")||null;
+const QS=s=>s.questions||[s.sample];
+const solvedOf=id=>new Set(P.solved[id]||[]);
+// the question after `from` that is not solved yet; once all are solved, simply the next one
+const nextQ=(id,from)=>{ const n=QS(BY[id]).length, got=solvedOf(id);
+  for(let k=1;k<=n;k++){ const j=(from+k)%n; if(!got.has(j)) return j; } return (from+1)%n; };
 
 async function show(){
   document.documentElement.classList.add("math-on");
@@ -70,7 +83,7 @@ async function show(){
     try{ const r=await fetch("/api/math/skills"); if(!r.ok) throw new Error(`השרת ענה ${r.status}`); index(await r.json()); }
     catch(e){ path.innerHTML=`<p class="mx-note">לא הצלחנו לטעון את המסלול: ${esc(e.message)}. רעננו את העמוד ונסו שוב.</p>`; return; }
   }
-  P=Object.assign({done:{},tries:{}},load()); SHOWN=new Set(shownUnits().map(u=>u.id));
+  P=Object.assign({done:{},tries:{},solved:{},at:{}},load()); SHOWN=new Set(shownUnits().map(u=>u.id));
   subjectOptions().length?drawSubjectPicker():selectSubject("מתמטיקה");
   window.MathlyAnswers?.configure({api,account:CFG.userId,enabled:CFG.answerScans,root,onGraded:({questionId,grading})=>{
     if(grading.result.verdict!=="correct"||P.done[questionId])return;
@@ -119,10 +132,10 @@ function draw(){
     const ids=ORDER.filter(id=>BY[id].unit===u.id);
     return `<section class="mx-unit u-${u.id}"><div class="mx-uhead"><h2>${esc(u.name)}</h2><span>${esc(u.source)}${u.when?" · "+esc(u.when):""}</span></div>
       <div class="mx-trail">${ids.map((id,i)=>{
-        const s=BY[id], st=status(id), here=id===nxt;
+        const s=BY[id], st=status(id), here=id===nxt, n=QS(s).length, k=solvedOf(id).size;
         return `<button class="mx-node st-${st}${here?" here":""}" data-id="${id}" aria-label="${esc(plain(s.name))}, ${st==="done"?"הושלמה":st==="open"?"פתוחה":"נעולה"}">
           <span class="mx-dot">${st==="done"?"✓":i+1}</span>
-          <span class="mx-lbl"><b>${fmt(s.name)}</b><small>${s.core?'<span class="mx-core">ליבה 5 יח״ל</span>':""}${here?'<span class="mx-go">ממשיכים כאן</span>':""}</small></span></button>`;
+          <span class="mx-lbl"><b>${fmt(s.name)}</b><small>${s.core?'<span class="mx-core">ליבה 5 יח״ל</span>':""}${n>1&&st!=="done"&&k?`<span class="mx-count">${k}/${n}</span>`:""}${here?'<span class="mx-go">ממשיכים כאן</span>':""}</small></span></button>`;
       }).join("")}</div></section>`;
   }).join("");
   path.innerHTML=`<header class="mx-top"><div><h1>המסלול שלי</h1><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
@@ -135,17 +148,19 @@ function draw(){
     <button class="mx-photo" data-act="photo"><b>צילום תרגיל</b><small>צלמו תרגיל מהמחברת או מהדף, ונעזור לכם לפתור אותו צעד אחר צעד</small></button>
     <button class="mx-photo" data-act="phone"><b>צילום בטלפון, פתרון במחשב</b><small>סרקו קוד בטלפון, צלמו תרגיל וראו את התשובה כאן אוטומטית</small></button>
     ${trail}
-    <p class="mx-note">בשלב הזה יש שאלה אחת לדוגמה לכל מיומנות. ההתקדמות נשמרת במכשיר הזה.</p>`;
+    <p class="mx-note">מיומנות מסומנת כהושלמה כשעונים נכון על כל השאלות שלה. ההתקדמות נשמרת במכשיר הזה.</p>`;
 }
 
 function chips(ids){
-  return ids.length?ids.map(id=>`<button class="mx-chip u-${BY[id].unit}${P.done[id]?" is-done":""}" data-id="${id}">${P.done[id]?"✓ ":""}${esc(BY[id].short)}</button>`).join(""):'<em>אין</em>';
+  return ids.length?ids.map(id=>`<button class="mx-chip u-${BY[id].unit}${P.done[id]?" is-done":""}" data-id="${id}">${P.done[id]?"✓ ":""}${fmt(BY[id].short)}</button>`).join(""):'<em>אין</em>';
 }
 function open(id){
   stopPhone();
   cancelAdvance();
-  const s=BY[id], st=status(id), unit=G.units.find(u=>u.id===s.unit), openEnded=s.sample.type==="open-ended";
-  const options=s.sample.choices||[],rot=options.length?ORDER.indexOf(id)%options.length:0;
+  const s=BY[id], st=status(id), unit=G.units.find(u=>u.id===s.unit), all=QS(s), n=all.length;
+  curQ=Math.min(P.at[id]||0,n-1);
+  const q=all[curQ], openEnded=q.type==="open-ended", got=solvedOf(id);
+  const options=q.choices||[],rot=options.length?(ORDER.indexOf(id)+curQ)%options.length:0;
   const choices=options.slice(rot).concat(options.slice(0,rot)), missing=s.prereqs.filter(p=>!P.done[p]&&SHOWN.has(BY[p].unit));
   if(!cur) back=document.activeElement;
   cur=id;
@@ -156,8 +171,9 @@ function open(id){
         <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
       <p>${fmt(s.description)}</p>
       ${st==="locked"?`<div class="mx-hint">מומלץ לעבור קודם על: <span class="mx-chips">${chips(missing)}</span></div>`:""}
-      <div class="mx-q"><p>${fmt(s.sample.question)}</p>${s.sample.graph?plot(s.sample.graph):""}${s.sample.diagram?geometryDiagram(s.sample.diagram):""}
-        ${openEnded?'<div class="mx-answer"></div>':`<div class="mx-choices">${choices.map((c,i)=>`<button data-choice="${i}" data-m="${c.correct?"":esc(c.mistake)}">${fmt(c.text)}</button>`).join("")}</div>`}
+      <div class="mx-q">${n>1?`<div class="mx-qprog"><span>שאלה ${curQ+1} מתוך ${n}</span><span class="mx-qdots" aria-label="נפתרו ${got.size} מתוך ${n}">${all.map((_,i)=>`<i class="${got.has(i)?"ok":""}${i===curQ?" now":""}"></i>`).join("")}</span></div>`:""}
+        <p>${fmt(q.question)}</p>${q.graph?plot(q.graph):""}${q.diagram?geometryDiagram(q.diagram):""}
+        ${openEnded?'<div class="mx-answer"></div>':`<div class="mx-choices">${choices.map((c,i)=>`<button data-choice="${i}" data-m="${c.correct?"":esc(c.mistake)}"${c.correct?" data-right":""}>${fmt(c.text)}</button>`).join("")}</div>`}
         <div class="mx-fb" aria-live="polite"></div></div>
       <div class="mx-sec"><h4>דורשת</h4><div class="mx-chips">${chips(s.prereqs)}</div></div>
       <div class="mx-sec"><h4>פותחת</h4><div class="mx-chips">${chips(POST[id])}</div></div>
@@ -168,36 +184,54 @@ function open(id){
 }
 function closeSheet(){ stopPhone(); cancelAdvance(); if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
 
+// counts down, then opens `target` (a skill id); stops if the student moved on in the meantime
+function autoAdvance(id,target){
+  let seconds=3;
+  const countdown=sheet.querySelector(".mx-countdown");
+  const tick=()=>{
+    if(cur!==id||sheet.hidden||root.hidden) return cancelAdvance();
+    if(seconds===0) return open(target);
+    countdown.textContent=target===id?`השאלה הבאה בעוד ${seconds}…`:`התרגיל הבא בעוד ${seconds}…`;
+    seconds--;
+    advanceTimer=setTimeout(tick,1000);
+  };
+  tick();
+}
+
 function answer(btn){
   if(btn.disabled) return;
-  const id=cur, m=btn.dataset.m, fb=sheet.querySelector(".mx-fb");
-  sheet.querySelectorAll("[data-choice]").forEach(b=>b.classList.remove("right","wrong"));
+  const id=cur, m=btn.dataset.m, fb=sheet.querySelector(".mx-fb"), n=QS(BY[id]).length, qi=curQ;
+  const buttons=sheet.querySelectorAll("[data-choice]");
+  buttons.forEach(b=>b.classList.remove("right","wrong"));
   btn.classList.add(m?"wrong":"right");
   P.tries[id]=(P.tries[id]||0)+1;
+  if(n>1) P.at[id]=nextQ(id,qi);
   if(!m){
-    const first=!P.done[id]; P.done[id]=P.done[id]||new Date().toISOString(); save(); draw();
-    const nxt=next();
-    sheet.querySelectorAll("[data-choice]").forEach(b=>b.disabled=true);
-    fb.innerHTML=`<div class="mx-ok"><b>נכון!</b>${first?"<span>המיומנות סומנה כהושלמה.</span>":""}
-      ${nxt&&nxt!==id?`<span class="mx-countdown"></span><button class="mx-btn solid" data-id="${nxt}">המשך עכשיו: ${esc(BY[nxt].short)}</button>`:"<span>סיימתם את כל המסלול. כל הכבוד!</span>"}</div>`;
-    if(nxt&&nxt!==id){
-      let seconds=3;
-      const countdown=fb.querySelector(".mx-countdown");
-      const tick=()=>{
-        if(cur!==id||sheet.hidden||root.hidden) return cancelAdvance();
-        if(seconds===0) return open(nxt);
-        countdown.textContent=`התרגיל הבא בעוד ${seconds}…`;
-        seconds--;
-        advanceTimer=setTimeout(tick,1000);
-      };
-      tick();
+    const got=solvedOf(id); got.add(qi); P.solved[id]=[...got].sort((a,b)=>a-b);
+    const finished=got.size>=n, first=finished&&!P.done[id];
+    if(finished) P.done[id]=P.done[id]||new Date().toISOString();
+    save(); draw();
+    buttons.forEach(b=>b.disabled=true);
+    if(!P.done[id]){
+      fb.innerHTML=`<div class="mx-ok"><b>נכון!</b><span>פתרתם ${got.size} מתוך ${n} שאלות במיומנות הזו.</span>
+        <span class="mx-countdown"></span><button class="mx-btn solid" data-id="${id}">לשאלה הבאה</button></div>`;
+      return autoAdvance(id,id);
     }
+    const nxt=next();
+    fb.innerHTML=`<div class="mx-ok"><b>נכון!</b>${first?`<span>${n>1?`פתרתם את כל ${n} השאלות. `:""}המיומנות סומנה כהושלמה.</span>`:""}
+      ${nxt&&nxt!==id?`<span class="mx-countdown"></span><button class="mx-btn solid" data-id="${nxt}">המשך עכשיו: ${fmt(BY[nxt].short)}</button>`
+        :nxt?"":"<span>סיימתם את כל המסלול. כל הכבוד!</span>"}
+      ${n>1?`<button class="mx-btn" data-id="${id}">עוד שאלה במיומנות הזו</button>`:""}</div>`;
+    if(nxt&&nxt!==id) autoAdvance(id,nxt);
     return;
   }
   save();
   const M=G.mistakes[m], to=M.back&&M.back!==id?M.back:null;
+  // with a list of questions, a missed question is shown later again; trying again now would not count
+  if(n>1) buttons.forEach(b=>{ b.disabled=true; if(b.dataset.right!=null) b.classList.add("right"); });
   fb.innerHTML=`<div class="mx-bad"><b>${fmt(M.name)}</b><span>${fmt(M.tip)}</span>
-    ${to?`<button class="mx-btn" data-id="${to}">חזרה אל: ${esc(BY[to].short)}</button>`:"<span class=\"mx-small\">אפשר לבחור תשובה אחרת.</span>"}</div>`;
+    ${n>1?`<span class="mx-small">השאלה הזו תחזור אחרי שאר השאלות.</span><button class="mx-btn solid" data-id="${id}">לשאלה הבאה</button>`:""}
+    ${to?`<button class="mx-btn" data-id="${to}">חזרה אל: ${fmt(BY[to].short)}</button>`:n>1?"":"<span class=\"mx-small\">אפשר לבחור תשובה אחרת.</span>"}</div>`;
 }
 
 function onClick(e){
@@ -228,7 +262,7 @@ let MANAGED_CLASSES=[], MANAGE_MODE="classes", MANAGE_BUSY=false;
 const manageTabs=[
   ["classes","כיתות","פתיחה, עריכה ומחיקה"],
   ["students","תלמידים","רשימה ומסנן כיתות"],
-  ["content","תוכן","נושאים, סרטונים וטקסטים"],
+  ["content","תוכן","מקצועות, יחידות ותת־נושאים"],
   ["flags","ניטור","פעילות ודיווחי ציונים"],
   ["access","הרשאות","תפקידים וגישה"]
 ];
@@ -309,10 +343,7 @@ function showManageMode(mode){
     box.innerHTML=`<div class="mx-manage-title"><h4>תלמידים</h4><span>${students.size} תלמידים · ${MANAGED_CLASSES.length} כיתות</span></div>${students.size?`<div class="mx-manage-list">${[...students].map(([email,classes])=>`<article><b dir="ltr">${esc(email)}</b><small>${esc(classes.join(" · "))}</small></article>`).join("")}</div>`:'<p class="mx-note">עדיין לא נוספו תלמידים לכיתות.</p>'}`;
     return;
   }
-  if(mode==="content"){
-    box.innerHTML=`<div class="mx-manage-title"><h4>תוכן לימודי</h4><span>${G.units.length} נושאים במסלול</span></div><div class="mx-manage-list">${G.units.map(unit=>{const skills=G.skills.filter(skill=>skill.unit===unit.id);const count=MANAGED_CLASSES.filter(row=>(row.lessons||[]).includes(unit.id)).length;return `<article class="u-${unit.id}"><b>${esc(unit.name)}</b><small>${skills.length} מיומנויות · פעיל ב־${count} כיתות</small></article>`}).join("")}</div>`;
-    return;
-  }
+  if(mode==="content") return drawContent(box);
   if(mode==="flags"){
     const done=Object.keys(P.done||{}).length, tries=Object.values(P.tries||{}).reduce((sum,n)=>sum+(+n||0),0);
     box.innerHTML=`<div class="mx-manage-title"><h4>ניטור</h4><span>פעילות ודיווחי ציונים</span></div><div class="mx-manage-stats"><article><b>${MANAGED_CLASSES.length}</b><small>כיתות פעילות</small></article><article><b>${done}</b><small>מיומנויות שהושלמו במכשיר זה</small></article><article><b>${tries}</b><small>ניסיונות במכשיר זה</small></article></div><p class="mx-note">נתוני התקדמות כיתתיים יופיעו כאן כאשר שירות דיווחי הציונים יחובר.</p>`;
@@ -324,6 +355,26 @@ function showManageMode(mode){
     return;
   }
   box.innerHTML='<div class="mx-manage-title"><h4>מעבדה</h4><span>כלים לבדיקה ופיתוח</span></div><p class="mx-note">כלי המעבדה למתמטיקה יתווספו כאן. אפשר לחזור לכל אזור ניהול מהכרטיסיות למעלה.</p>';
+}
+
+// every subject a class meets: those with units, then those that so far only have exams
+const contentSubjects=()=>[...new Set([...G.units.map(unit=>unit.subject),
+  ...MANAGED_CLASSES.flatMap(row=>(row.exams||[]).map(exam=>exam.subject))].filter(Boolean))];
+const unitSkills=id=>ORDER.filter(sid=>BY[sid].unit===id).map(sid=>BY[sid]);
+const questionCount=skills=>skills.reduce((sum,skill)=>sum+QS(skill).length,0);
+function drawContent(box){
+  const subjects=contentSubjects();
+  box.innerHTML=`<div class="mx-manage-title"><h4>תוכן לימודי</h4><span>${subjects.length} מקצועות · ${G.units.length} יחידות · ${G.skills.length} תת־נושאים · ${questionCount(G.skills)} שאלות</span></div>
+    ${subjects.map(subject=>{
+      const units=G.units.filter(unit=>unit.subject===subject), [icon,tone]=examLooks[subject]||["●","other"];
+      return `<section class="mx-content-subject exam-${tone}"><h5><span aria-hidden="true">${icon}</span>${esc(subject)}<small>${units.length?`${units.length} יחידות`:"עוד אין יחידות במסלול"}</small></h5>
+        ${units.map(unit=>{
+          const skills=unitSkills(unit.id), classes=MANAGED_CLASSES.filter(row=>(row.lessons||[]).includes(unit.id)).length;
+          return `<details class="mx-content-unit u-${unit.id}"><summary><b>${esc(unit.name)}</b>
+            <small>${unit.when?`${esc(unit.when)} · `:""}${skills.length} תת־נושאים · ${questionCount(skills)} שאלות · פעיל ב־${classes} כיתות</small></summary>
+            <ol>${skills.map(skill=>`<li><span>${fmt(skill.name)}</span><small>${esc(skill.subject||subject)} › ${esc(unit.name)}${skill.month?` · ${esc(skill.month)}`:""} · ${QS(skill).length===1?"שאלה אחת":`${QS(skill).length} שאלות`}</small></li>`).join("")}</ol></details>`;
+        }).join("")}</section>`;
+    }).join("")}`;
 }
 
 function drawManagedClasses(box){
@@ -354,7 +405,7 @@ function openClassEditor(row){
   const selected=new Set(row?.lessons||G.units.map(unit=>unit.id));
   box.innerHTML=`<div class="mx-manage-title"><h4>${creating?"כיתה חדשה":`עריכת ${esc(row.name)}`}</h4><button class="mx-btn" type="button" data-class-action="cancel">חזרה לכיתות</button></div>
     <form class="mx-class-form"><label>שם הכיתה<input name="name" required maxlength="80" autocomplete="off" placeholder="למשל: ט׳ 1" value="${esc(row?.name||"")}"></label>
-      <fieldset><legend>יחידות הלימוד<small>התלמידים יראו במסלול רק את המיומנויות של היחידות שסומנו. מקצוע היחידה קובע אילו מבחנים יוצגו במסלול.</small></legend><div class="mx-unit-picks">${G.units.map(unit=>`<label class="u-${unit.id}"><input type="checkbox" name="unit" value="${esc(unit.id)}"${selected.has(unit.id)?" checked":""}><span>${esc(unit.name)}<small>${esc(unit.subject)} · ${G.skills.filter(skill=>skill.unit===unit.id).length} מיומנויות</small></span></label>`).join("")}</div></fieldset>
+      <fieldset><legend>יחידות הלימוד<small>התלמידים יראו במסלול רק את המיומנויות של היחידות שסומנו. מקצוע היחידה קובע אילו מבחנים יוצגו במסלול.</small></legend>${[...new Set(G.units.map(unit=>unit.subject))].map(subject=>`<h6 class="mx-pick-subject">${esc(subject)}</h6><div class="mx-unit-picks">${G.units.filter(unit=>unit.subject===subject).map(unit=>{const skills=unitSkills(unit.id);return `<label class="u-${unit.id}"><input type="checkbox" name="unit" value="${esc(unit.id)}"${selected.has(unit.id)?" checked":""}><span>${esc(unit.name)}<small>${skills.length} תת־נושאים · ${questionCount(skills)} שאלות</small></span></label>`}).join("")}</div>`).join("")}</fieldset>
       <label>התלמידים<small>כתובת דוא״ל אחת בכל שורה. תלמיד יכול להשתייך ליותר מכיתה אחת.</small><textarea name="emails" dir="ltr" spellcheck="false" placeholder="student@example.com">${esc((row?.emails||[]).join("\n"))}</textarea></label>
       <label>מורי הכיתה<small>כתובת דוא״ל אחת בכל שורה. למורים תהיה גישה לכיתה הזו.</small><textarea name="teachers" dir="ltr" spellcheck="false" placeholder="teacher@example.com">${esc((row?.teachers||[]).join("\n"))}</textarea></label>
       <div class="mx-class-form-actions"><button class="mx-btn solid" type="submit">${creating?"פתיחת הכיתה":"שמירת השינויים"}</button><button class="mx-btn" type="button" data-class-action="cancel">ביטול</button><span role="status" aria-live="polite"></span></div></form>`;

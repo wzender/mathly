@@ -109,7 +109,7 @@ def test_two_device_capture_retake_failure_retry_and_original_attempt(scan_serve
             phone.locator('[data-submit]').click()
             playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('מעלים את התשובה…', timeout=10000)
             assert started.is_set()
-            computer.locator('.mx-x').click();computer.locator('.mx-node[data-id="m_rect_area"]').click()
+            computer.locator('.mx-x').click();computer.locator('.mx-node[data-id="m_def"]').click()
             release.set()
             playwright.expect(phone.locator('[data-status]')).to_contain_text('הועלתה בהצלחה', timeout=10000)
             assert computer.locator('.mx-answer-image').count() == 0
@@ -187,9 +187,10 @@ def test_success_response_loss_is_safe_to_retry(scan_server):
             playwright.expect(phone.locator('[data-status]')).to_contain_text('הועלתה בהצלחה')
             with store.connect() as c:
                 assert c.execute('select count(*) from math_answer_attachments').fetchone()[0]==1
-            computer.locator('.mx-x').click();computer.locator('.mx-node[data-id="m_rect_area"]').click()
+            computer.locator('.mx-x').click();computer.locator('.mx-node[data-id="m_def"]').click()
             computer.locator('.mx-choices button[data-m=""]').click()
-            assert computer.evaluate("!!JSON.parse(localStorage.getItem('mathly.progress.v1:'+'%s@test.invalid')).done.m_rect_area" % OWNER)
+            # one right answer of ten is recorded, but does not finish the skill
+            assert computer.evaluate("JSON.parse(localStorage.getItem('mathly.progress.v1:'+'%s@test.invalid')).solved.m_def.length===1" % OWNER)
         finally:
             browser.close()
 

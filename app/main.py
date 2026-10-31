@@ -33,8 +33,11 @@ load_dotenv(ROOT / ".env")
 
 
 def units_of(row: dict) -> list[str]:
-    known = [unit["id"] for unit in algebra9()["units"]]
+    """A class's units. A unit split off an older one (its `from`) comes with it, so saved classes keep their content."""
+    units = algebra9()["units"]
+    known = [unit["id"] for unit in units]
     selected = set(row.get("lessons") or known)
+    selected |= {unit["id"] for unit in units if selected & set(unit.get("from", []))}
     return [unit for unit in known if unit in selected]
 
 
