@@ -143,3 +143,12 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-pair-content{display:flex;flex-direction:column;gap:14px;align-items:stretch}
 .mx-phone-qr{display:block;width:230px;max-width:100%;height:auto;background:white;margin:auto;border-radius:8px}
 .mx-phone-url{display:block;box-sizing:border-box;width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px;font:14px monospace}
+/* Handwritten answer scanning */
+.mx-answer{display:flex;flex-direction:column;gap:12px}
+.mx-answer [hidden]{display:none}
+.mx-answer-image{display:block;max-width:100%;max-height:420px;object-fit:contain;border-radius:12px;background:#fff}
+.mx-scan-inbox:empty{display:none}.mx-scan-inbox{display:flex;flex-direction:column;gap:12px;padding-top:24px}
+.mx-scan-inbox .mx-btn{display:flex;flex-direction:column;align-items:flex-start;text-align:start;white-space:normal;gap:8px}
+.mx-scan-overlay{position:fixed;inset:0;z-index:1000;background:#000c;overflow:auto;padding:20px;display:flex;align-items:flex-start;justify-content:center}
+.mx-scan-card{background:#141719;color:#f4f2ec;border:1px solid #485050;border-radius:18px;padding:24px;width:min(520px,100%);display:flex;flex-direction:column;gap:14px;line-height:1.6}
+.mx-scan-card p{margin:0}.mx-scan-card [hidden]{display:none}.mx-scan-card small{color:#adb7b1}

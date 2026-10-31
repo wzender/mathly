@@ -10,28 +10,13 @@ try{
 const camera=document.getElementById("camera"),take=document.getElementById("take"),send=document.getElementById("send"),
   preview=document.getElementById("preview"),status=document.getElementById("status");
 let photo=null,previewURL=null;
-async function loadPhoto(file){
-  try{return await createImageBitmap(file,{imageOrientation:"from-image"});}
-  catch{
-    // Safari can display some camera formats that createImageBitmap cannot decode.
-    const url=URL.createObjectURL(file),img=new Image();
-    try{
-      await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url;});
-      return img;
-    }finally{URL.revokeObjectURL(url);}
-  }
-}
 if(!token){status.textContent="סרקו שוב את הקוד שמופיע במחשב כדי להתחבר.";take.disabled=true;return;}
 take.onclick=()=>camera.click();
 camera.onchange=async()=>{
   const file=camera.files[0];camera.value=""; if(!file)return;
   photo=null;take.disabled=true;send.hidden=true;status.textContent="מכינים את התמונה…";
   try{
-    const bitmap=await loadPhoto(file);
-    const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement("canvas");
-    canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
-    canvas.getContext("2d").drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
-    photo=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",.85));
+    photo=await window.MathlyPhoto.prepare(file);
     if(!photo)throw Error("image");
   }catch{
     if(["image/jpeg","image/png","image/webp"].includes(file.type))photo=file;

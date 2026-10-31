@@ -28,6 +28,7 @@ let picker=null, PH=null;   // the photo file picker, and the photographed probl
 let advanceTimer=null;
 let phonePair=null;
 function stopPhone(){
+  window.MathlyAnswers?.closeQuestion();
   if(phonePair){clearTimeout(phonePair.timer);if(phonePair.qr)URL.revokeObjectURL(phonePair.qr);phonePair=null;}
 }
 function cancelAdvance(){ clearTimeout(advanceTimer); advanceTimer=null; }
@@ -70,6 +71,7 @@ async function show(){
     catch(e){ path.innerHTML=`<p class="mx-note">לא הצלחנו לטעון את המסלול: ${esc(e.message)}. רעננו את העמוד ונסו שוב.</p>`; return; }
   }
   P=Object.assign({done:{},tries:{}},load()); SHOWN=new Set(shownUnits().map(u=>u.id)); draw();
+  window.MathlyAnswers?.configure({api,account:CFG.userId,enabled:CFG.answerScans,root});
 }
 function hide(){ cancelAdvance(); if(root) root.hidden=true; document.documentElement.classList.remove("math-on"); }
 
@@ -110,8 +112,9 @@ function chips(ids){
 function open(id){
   stopPhone();
   cancelAdvance();
-  const s=BY[id], st=status(id), unit=G.units.find(u=>u.id===s.unit), rot=ORDER.indexOf(id)%s.sample.choices.length;
-  const choices=s.sample.choices.slice(rot).concat(s.sample.choices.slice(0,rot)), missing=s.prereqs.filter(p=>!P.done[p]&&SHOWN.has(BY[p].unit));
+  const s=BY[id], st=status(id), unit=G.units.find(u=>u.id===s.unit), openEnded=s.sample.type==="open-ended";
+  const options=s.sample.choices||[],rot=options.length?ORDER.indexOf(id)%options.length:0;
+  const choices=options.slice(rot).concat(options.slice(0,rot)), missing=s.prereqs.filter(p=>!P.done[p]&&SHOWN.has(BY[p].unit));
   if(!cur) back=document.activeElement;
   cur=id;
   sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
@@ -122,15 +125,16 @@ function open(id){
       <p>${fmt(s.description)}</p>
       ${st==="locked"?`<div class="mx-hint">מומלץ לעבור קודם על: <span class="mx-chips">${chips(missing)}</span></div>`:""}
       <div class="mx-q"><p>${fmt(s.sample.question)}</p>${s.sample.graph?plot(s.sample.graph):""}${s.sample.diagram?geometryDiagram(s.sample.diagram):""}
-        <div class="mx-choices">${choices.map((c,i)=>`<button data-choice="${i}" data-m="${c.correct?"":esc(c.mistake)}">${fmt(c.text)}</button>`).join("")}</div>
+        ${openEnded?'<div class="mx-answer"></div>':`<div class="mx-choices">${choices.map((c,i)=>`<button data-choice="${i}" data-m="${c.correct?"":esc(c.mistake)}">${fmt(c.text)}</button>`).join("")}</div>`}
         <div class="mx-fb" aria-live="polite"></div></div>
       <div class="mx-sec"><h4>דורשת</h4><div class="mx-chips">${chips(s.prereqs)}</div></div>
       <div class="mx-sec"><h4>פותחת</h4><div class="mx-chips">${chips(POST[id])}</div></div>
     </div>`;
   sheet.hidden=false; sheet.querySelector(".mx-sheet").scrollTop=0;
   sheet.querySelector(".mx-x").focus({preventScroll:true});
+  if(openEnded)window.MathlyAnswers?.mountQuestion(sheet.querySelector(".mx-answer"),id,s.question_version);
 }
-function closeSheet(){ stopPhone(); cancelAdvance(); sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
+function closeSheet(){ stopPhone(); cancelAdvance(); if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
 
 function answer(btn){
   if(btn.disabled) return;
@@ -176,19 +180,14 @@ function onClick(e){
     case "work": PH.works.add(+t.dataset.i); return drawPhoto();
     case "all": PH.all=true; return drawPhoto();
     case "close": return closeSheet();
-    case "out": return client?.auth.signOut().then(()=>location.reload());
+    case "out": window.MathlyAnswers?.reset();closeSheet();hide();return client?.auth.signOut().then(()=>location.reload());
   }
 }
 
 /* A photographed problem (/api/math/photo, app/math_photo.py): hints first. The sheet shows the problem as it was
    read (a wrong reading is the student's cue to photograph again), then one hint; each further hint, each step and
    the whole solution with its answer come only when the student asks for them. */
-async function shrink(file){   // a phone photo is several MB: about 1600 px on its long side is enough to read it
-  const bmp=await createImageBitmap(file,{imageOrientation:"from-image"}), k=Math.min(1,1600/Math.max(bmp.width,bmp.height));
-  const c=document.createElement("canvas"); c.width=Math.round(bmp.width*k); c.height=Math.round(bmp.height*k);
-  c.getContext("2d").drawImage(bmp,0,0,c.width,c.height); bmp.close?.();
-  return new Promise((ok,no)=>c.toBlob(b=>b?ok(b):no(new Error("toBlob")),"image/jpeg",.85));
-}
+async function shrink(file){ return window.MathlyPhoto.prepare(file); }
 async function photo(file){
   stopPhone();
   cancelAdvance();
@@ -342,6 +341,12 @@ async function boot(){
   if(AUTH_URL){
     if(!window.supabase){ state.className="error"; state.textContent="לא ניתן לטעון את שירות הכניסה."; return; }
     client=window.supabase.createClient(AUTH_URL,CFG.supabaseKey);
+    client.auth.onAuthStateChange((event,session)=>{
+      CFG.token=session?.access_token||"";
+      if(event==="SIGNED_OUT"||(CFG.userId&&session?.user?.id&&session.user.id!==CFG.userId)){
+        window.MathlyAnswers?.reset();closeSheet();hide();location.reload();
+      }
+    });
     const {data}=await client.auth.getSession(), session=data.session;
     if(!session){
       state.textContent="יש להיכנס כדי לפתוח את מסלול המתמטיקה."; login.hidden=false;
@@ -351,7 +356,7 @@ async function boot(){
     CFG.token=session.access_token;
     const response=await api("/api/me");
     if(!response.ok){ state.className="error"; state.textContent=response.status===403?"החשבון אינו משויך לכיתת מתמטיקה.":"לא ניתן להשלים את הכניסה."; return; }
-    const me=await response.json(); ME_EMAIL=me.email||""; MY_CLASSES=me.classes||[]; MY_CLASS=MY_CLASSES.length===1?MY_CLASSES[0]:null;
+    const me=await response.json();CFG.userId=me.user_id;CFG.answerScans=me.answer_scans; ME_EMAIL=me.email||""; MY_CLASSES=me.classes||[]; MY_CLASS=MY_CLASSES.length===1?MY_CLASSES[0]:null;
     CFG.permissions=me.permissions||[];
   }
   document.getElementById("boot").hidden=true;

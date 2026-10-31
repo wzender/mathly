@@ -17,10 +17,11 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from .access import has_permission, resolve_access
+from .answer_routes import install_answer_routes
 from .auth import AuthUnavailable, ClassConflict, SupabaseAuth, load_auth
 from .math_photo import (DAILY_PHOTOS, MAX_PHOTO, MEDIA_TYPES as PHOTO_TYPES,
                          PhotoSolver, PhotoUnavailable, math_model, photo_client)
-from .math_skills import algebra9
+from .math_skills import algebra9, practice_graph
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("mathly")
@@ -97,7 +98,9 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
     async def me(user: dict | None = Depends(signed_in)):
         mine = (user or {}).get("classes", [])
         email = (user or {}).get("email", "")
-        return {"email": email, "roles": (user or {}).get("roles", []),
+        return {"email": email, "user_id": (user or {}).get("id"),
+                "answer_scans": app.state.answers.configured,
+                "roles": (user or {}).get("roles", []),
                 "permissions": (user or {}).get("permissions", []),
                 "teacher": bool((user or {}).get("teacher")),
                 "classes": [{"id": row["id"], "name": row["name"], "lessons": units_of(row),
@@ -105,7 +108,7 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
 
     @app.get("/api/math/skills")
     async def math_skills():
-        return algebra9()
+        return JSONResponse(practice_graph(app.state.answers.configured), headers={"Cache-Control": "no-store"})
 
     @app.get("/api/classes")
     async def classes(_user: dict = Depends(manager)):
@@ -256,6 +259,7 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
         session.update(state="done", result=result)
         return {"ok": True, "readable": result.get("readable", False)}
 
+    install_answer_routes(app, signed_in)
     return app
 
 

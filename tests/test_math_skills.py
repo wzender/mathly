@@ -4,7 +4,30 @@ import asyncio
 import httpx
 
 from app.main import create_app
-from app.math_skills import algebra9, problems
+from app.math_skills import algebra9, practice_graph, problems, question_version
+
+
+def test_open_ended_samples_and_content_identity():
+    graph = copy.deepcopy(algebra9())
+    sample = graph["skills"][0]["sample"] = {"type": "open-ended", "version": 1,
+                                           "question": "Draw a triangle."}
+    assert problems(graph) == []
+    original = question_version(sample)
+    sample["question"] = "Draw a rectangle."
+    assert question_version(sample) != original
+    sample["choices"] = []
+    assert any("cannot have choices" in item for item in problems(graph))
+    sample.pop("choices")
+    sample["version"] = True
+    assert any("version" in item for item in problems(graph))
+    sample["type"] = "unknown"
+    assert any("unknown question type" in item for item in problems(graph))
+
+
+def test_choice_samples_still_require_one_correct_choice():
+    graph = copy.deepcopy(algebra9())
+    graph["skills"][0]["sample"]["choices"] = []
+    assert any("exactly one correct choice" in item for item in problems(graph))
 
 
 def test_the_algebra_graph_is_whole():
@@ -26,7 +49,7 @@ def test_math_is_the_only_page_and_api():
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=create_app()), base_url="http://test") as client:
             assert "מתמטיקה בכיף" in (await client.get("/")).text
             assert "מתמטיקה בכיף" in (await client.get("/math")).text
-            assert (await client.get("/api/math/skills")).json() == algebra9()
+            assert (await client.get("/api/math/skills")).json() == practice_graph(False)
             assert (await client.get("/api/health")).json() == {"ok": True, "app": "mathly"}
     asyncio.run(check())
 
@@ -48,3 +71,14 @@ def test_a_photographed_problem_is_solved(monkeypatch):
             assert response.json()["answer"] == "$x = ±3$"
             assert response.json()["left"] is None
     asyncio.run(check())
+
+
+def test_rollout_and_rollback_question_variants():
+    enabled, disabled = practice_graph(True), practice_graph(False)
+    assert problems(enabled) == problems(disabled) == []
+    opened = next(s for s in enabled['skills'] if s['id']=='g_triangle_area')
+    fallback = next(s for s in disabled['skills'] if s['id']=='g_triangle_area')
+    assert opened['sample']['type']=='open-ended' and 'choices' not in opened['sample']
+    assert opened['question_version']==question_version(opened['sample'])
+    assert len(fallback['sample']['choices']) == 3
+    assert all('fallback_sample' not in s for s in enabled['skills'])
