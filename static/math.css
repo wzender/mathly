@@ -6,7 +6,8 @@
   --ok:#6CC08A; --ok-bg:#12291B; --sumac:#F08A96; --sumac-bg:#33161B; --amber:#E0B45A; --amber-bg:#2E2512;
   --olive:#A6C77A; --olive-soft:#1E2618;
   --mx-accent:#7FA6F0; --mx-accent-soft:#18243A; --mx-on-accent:#06101F;
-  --u-f:#A3AD9F; --u-t:#93B85F; --u-n:#5CC2B2; --u-q:#6FB3D2; --u-p:#E0B45A; --u-w:#D98AAE;
+  --u-t:#93B85F; --u-k:#B89BEB; --u-q:#6FB3D2; --u-e:#7C9BE6; --u-a:#C99BD8; --u-z:#9C8FD6; --u-r:#C8C26A;
+  --u-h:#E0915A; --u-s:#5CA8C2; --u-m:#D6A3E0; --u-n:#5CC2B2; --u-p:#E0B45A; --u-w:#D98AAE; --u-d:#A9B7F2;
   --mx-scrim:rgb(0 0 0 / .7);
   --f-math:"STIX Two Text","Cambria Math","Times New Roman",serif;
 }
@@ -15,8 +16,10 @@ html.math-on, html.math-on body{overflow:hidden}
   padding-block:max(12px, env(safe-area-inset-top, 0px)) calc(32px + env(safe-area-inset-bottom, 0px));
   padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
 #mathView[hidden]{display:none}
-#mathView .u-f{--uc:var(--u-f)} #mathView .u-t{--uc:var(--u-t)} #mathView .u-n{--uc:var(--u-n)}
-#mathView .u-q{--uc:var(--u-q)} #mathView .u-p{--uc:var(--u-p)} #mathView .u-w{--uc:var(--u-w)}
+#mathView .u-t{--uc:var(--u-t)} #mathView .u-k{--uc:var(--u-k)} #mathView .u-q{--uc:var(--u-q)} #mathView .u-e{--uc:var(--u-e)}
+#mathView .u-a{--uc:var(--u-a)} #mathView .u-z{--uc:var(--u-z)} #mathView .u-r{--uc:var(--u-r)} #mathView .u-h{--uc:var(--u-h)}
+#mathView .u-s{--uc:var(--u-s)} #mathView .u-m{--uc:var(--u-m)} #mathView .u-n{--uc:var(--u-n)} #mathView .u-p{--uc:var(--u-p)}
+#mathView .u-w{--uc:var(--u-w)} #mathView .u-d{--uc:var(--u-d)}
 #mathView h1,#mathView h2,#mathView h3{font-family:var(--f-display);font-weight:400;margin:0;text-wrap:balance}
 #mathView button{font-family:var(--f-body)}
 #mathView button:focus-visible{outline:3px solid var(--mx-accent);outline-offset:2px}
@@ -134,7 +137,6 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-work{margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--mx-accent-soft)}
 .mx-row{display:flex;gap:8px;flex-wrap:wrap}
 @media (prefers-reduced-motion:no-preference){.mx-sheet{animation:mx-up .22s ease-out}@keyframes mx-up{from{transform:translateY(30px);opacity:.4}}}
-.u-g{--uc:#B89BEB}
 .mx-geometry{direction:ltr;align-self:center;width:100%;max-width:320px;text-align:center}
 .mx-geometry svg{display:block;width:100%;height:auto}
 .mx-geometry path{stroke:var(--uc);stroke-width:2;fill:none}

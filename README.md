@@ -10,7 +10,7 @@ pinned: false
 
 # Mathly
 
-Mathly is a Hebrew ninth-grade algebra and geometry practice path. It contains 59 skills across seven units, immediate feedback for known mistakes, and optional photographed-problem help.
+Mathly is a Hebrew ninth-grade algebra and geometry practice path. It contains 140 skills across 14 units that follow the Ministry of Education's 9th-grade teaching schedule (see `docs/prisa_9A.md`), ten per unit, immediate feedback for known mistakes, and optional photographed-problem help.
 
 Choose **צילום בטלפון, פתרון במחשב** on the computer, scan the QR code with your phone, take a photo, and confirm sending it. The answer and worked solution appear automatically on the computer. Links last 15 minutes and accept one exercise; the phone does not need a separate login. Geometry practice includes diagrams for rectangle area, triangle area, and Pythagoras.
 

@@ -48,7 +48,7 @@ def session(browser, owner=OWNER, mobile=False):
 
 
 def open_question(page):
-    page.locator('.mx-node[data-id="g_triangle_area"]').click()
+    page.locator('.mx-node[data-id="a_30_side"]').click()
     playwright.expect(page.locator('.mx-answer')).to_be_visible()
     playwright.expect(page.locator('.mx-choices')).to_have_count(0)
 
@@ -109,7 +109,7 @@ def test_two_device_capture_retake_failure_retry_and_original_attempt(scan_serve
             phone.locator('[data-submit]').click()
             playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('מעלים את התשובה…', timeout=10000)
             assert started.is_set()
-            computer.locator('.mx-x').click();computer.locator('.mx-node[data-id="g_rectangle"]').click()
+            computer.locator('.mx-x').click();computer.locator('.mx-node[data-id="m_rect_area"]').click()
             release.set()
             playwright.expect(phone.locator('[data-status]')).to_contain_text('הועלתה בהצלחה', timeout=10000)
             assert computer.locator('.mx-answer-image').count() == 0
@@ -118,7 +118,7 @@ def test_two_device_capture_retake_failure_retry_and_original_attempt(scan_serve
             playwright.expect(computer.locator('.mx-answer-image')).to_be_visible()
             assert computer.locator('.mx-answer-image').evaluate('img=>img.complete&&img.naturalWidth>0')
             computer.screenshot(path='/tmp/mathly-answer-computer.png', full_page=True, animations='disabled')
-            assert computer.evaluate("!JSON.parse(localStorage.getItem('mathly.progress.v1:'+'%s@test.invalid')||'{}').done?.g_triangle_area" % OWNER)
+            assert computer.evaluate("!JSON.parse(localStorage.getItem('mathly.progress.v1:'+'%s@test.invalid')||'{}').done?.a_30_side" % OWNER)
             computer.reload();open_question(computer)
             playwright.expect(computer.locator('.mx-answer-image')).to_be_visible()
             foreign = session(browser, OTHER, mobile=True).new_page();foreign.goto(url)
@@ -155,7 +155,7 @@ def test_expiry_renewal_reconnect_and_account_change(scan_server):
             playwright.expect(computer.locator('.mx-answer-image')).to_be_visible(timeout=10000)
             # Account change removes the photograph and all old-account continuations.
             computer.evaluate("localStorage.setItem('test.account','%s');window.testAuthEvent('SIGNED_IN',{access_token:'%s',user:{id:'%s'}})" % (OTHER, OTHER, OTHER))
-            playwright.expect(computer.locator('.mx-node[data-id="g_triangle_area"]')).to_be_visible()
+            playwright.expect(computer.locator('.mx-node[data-id="a_30_side"]')).to_be_visible()
             assert computer.locator('.mx-answer-image').count() == 0
             open_question(computer)
             playwright.expect(computer.locator('[data-request]')).to_be_enabled()
@@ -187,9 +187,9 @@ def test_success_response_loss_is_safe_to_retry(scan_server):
             playwright.expect(phone.locator('[data-status]')).to_contain_text('הועלתה בהצלחה')
             with store.connect() as c:
                 assert c.execute('select count(*) from math_answer_attachments').fetchone()[0]==1
-            computer.locator('.mx-x').click();computer.locator('.mx-node[data-id="g_rectangle"]').click()
+            computer.locator('.mx-x').click();computer.locator('.mx-node[data-id="m_rect_area"]').click()
             computer.locator('.mx-choices button[data-m=""]').click()
-            assert computer.evaluate("!!JSON.parse(localStorage.getItem('mathly.progress.v1:'+'%s@test.invalid')).done.g_rectangle" % OWNER)
+            assert computer.evaluate("!!JSON.parse(localStorage.getItem('mathly.progress.v1:'+'%s@test.invalid')).done.m_rect_area" % OWNER)
         finally:
             browser.close()
 
@@ -216,7 +216,7 @@ def test_check_feedback_progress_reload_and_retake(scan_server, monkeypatch, ver
     monkeypatch.setattr('app.answer_routes.AnswerGrader', Grader)
     from test_answer_scans import begin, finish
     from app.math_skills import algebra9, question_version
-    skill = next(s for s in algebra9()['skills'] if s['id'] == 'g_triangle_area')
+    skill = next(s for s in algebra9()['skills'] if s['id'] == 'a_30_side')
     done = store.action(OWNER, 'resume', question_id=skill['id'],
                         question_version=question_version(skill['sample']), snapshot=skill['sample'])
     done = finish(store, begin(store, store.action(OWNER, 'create_scan', attempt_id=done['attempt']['id'])))
@@ -241,7 +241,7 @@ def test_check_feedback_progress_reload_and_retake(scan_server, monkeypatch, ver
             if verdict in ('unreadable', 'needs_review'):
                 assert '/100' not in panel.inner_text()
             key = 'mathly.progress.v1:' + OWNER + '@test.invalid'
-            assert computer.evaluate("key=>!!JSON.parse(localStorage.getItem(key)||'{}').done?.g_triangle_area", key) == (verdict == 'correct')
+            assert computer.evaluate("key=>!!JSON.parse(localStorage.getItem(key)||'{}').done?.a_30_side", key) == (verdict == 'correct')
             computer.reload();open_question(computer)
             playwright.expect(computer.locator('.mx-grade')).to_be_visible()
             playwright.expect(computer.locator('.mx-answer-image')).to_be_visible()

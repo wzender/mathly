@@ -3,9 +3,9 @@
 Each skill names its prerequisites and a sample question. Choice samples identify mistakes;
 open-ended samples name their type and revision and accept a photographed answer.
 A mistake sends the student back to the skill it comes from (`back`), or keeps them on the same skill (`null`).
-The graph follows the Ministry of Education's 9th-grade teaching schedule (2026/27) and the summer review for
-students placed in 5 units; `core` marks what that review stresses. The questions are written for the app, and
-every skill, link and mistake still needs a 5-unit teacher's review.
+The units follow the Ministry of Education's 9th-grade teaching schedule for 2026/27 (`docs/prisa_9A.md`), with
+ten skills in each; `month` is when the schedule teaches a skill. The questions are written for the app, and
+every skill, link and mistake still needs a teacher's review.
 
 `problems` is run by the tests and on loading: a broken graph is refused before a student meets it.
 """

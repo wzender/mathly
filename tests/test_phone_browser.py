@@ -102,7 +102,7 @@ def test_phone_refresh_upload_and_desktop_network_recovery(phone_server):
 def test_class_management_geometry_and_permissions(phone_server, manager):
     import json
 
-    row = {"id": 7, "name": "כיתת תרגול", "lessons": ["f"],
+    row = {"id": 7, "name": "כיתת תרגול", "lessons": ["t"],
            "emails": ["student@example.com"], "teachers": ["teacher@example.com"]}
     writes = []
     with playwright.sync_playwright() as p:
@@ -144,7 +144,7 @@ def test_class_management_geometry_and_permissions(phone_server, manager):
                 playwright.expect(button).to_have_count(0)
                 return
             button.click()
-            geometry = page.locator('input[name="unit"][value="g"]')
+            geometry = page.locator('input[name="unit"][value="a"]')
             geometry.check()
             page.get_by_role("button", name="שמירת השינויים").click()
             playwright.expect(page.get_by_role("status")).to_contain_text("לא הצלחנו לשמור")
@@ -152,10 +152,10 @@ def test_class_management_geometry_and_permissions(phone_server, manager):
             page.get_by_role("button", name="שמירת השינויים").click()
             playwright.expect(page.get_by_role("status")).to_contain_text("השינויים נשמרו")
             assert writes[-1] == {"name": row["name"], "emails": row["emails"],
-                                  "teachers": row["teachers"], "lessons": ["f", "g"]}
+                                  "teachers": row["teachers"], "lessons": ["t", "a"]}
             page.locator('.mx-x').click()
-            playwright.expect(page.locator('[data-id="g_triangle_area"]')).to_be_visible()
+            playwright.expect(page.locator('[data-id="a_30_side"]')).to_be_visible()
             page.reload()
-            playwright.expect(page.locator('[data-id="g_triangle_area"]')).to_be_visible()
+            playwright.expect(page.locator('[data-id="a_30_side"]')).to_be_visible()
         finally:
             browser.close()
