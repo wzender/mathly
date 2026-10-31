@@ -96,3 +96,66 @@ def test_phone_refresh_upload_and_desktop_network_recovery(phone_server):
             assert len(polls) >= 2
         finally:
             browser.close()
+
+
+@pytest.mark.parametrize("manager", [True, False])
+def test_class_management_geometry_and_permissions(phone_server, manager):
+    import json
+
+    row = {"id": 7, "name": "כיתת תרגול", "lessons": ["f"],
+           "emails": ["student@example.com"], "teachers": ["teacher@example.com"]}
+    writes = []
+    with playwright.sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page()
+            page.route("https://cdn.jsdelivr.net/**", lambda route: route.abort())
+            page.add_init_script('''window.supabase={createClient:()=>({auth:{
+                getSession:async()=>({data:{session:{access_token:"test",user:{id:"test"}}}}),
+                onAuthStateChange:()=>{},signOut:async()=>{}
+            }})};''')
+
+            def index(route):
+                response = route.fetch()
+                route.fulfill(response=response, body=response.text().replace(
+                    'supabaseUrl:""', 'supabaseUrl:"https://auth.invalid"'))
+
+            page.route(phone_server + "/", index)
+            page.route("**/api/me", lambda route: route.fulfill(json={
+                "email": "student@example.com", "user_id": "test", "answer_scans": False,
+                "permissions": ["management.access", "classes.manage"] if manager else ["path.use"],
+                "classes": [row]}))
+            page.route("**/api/classes", lambda route: route.fulfill(json={"classes": [row]}))
+
+            def save(route):
+                body = json.loads(route.request.post_data)
+                writes.append(body)
+                if len(writes) == 1:
+                    route.fulfill(status=503, json={"detail": "temporary failure"})
+                else:
+                    row.update(body)
+                    route.fulfill(json={"ok": True})
+
+            page.route("**/api/classes/7", save)
+            page.goto(phone_server)
+            button = page.locator('[data-act="manage"]')
+            if not manager:
+                playwright.expect(page.locator('.mx-top')).to_be_visible()
+                playwright.expect(button).to_have_count(0)
+                return
+            button.click()
+            geometry = page.locator('input[name="unit"][value="g"]')
+            geometry.check()
+            page.get_by_role("button", name="שמירת השינויים").click()
+            playwright.expect(page.get_by_role("status")).to_contain_text("לא הצלחנו לשמור")
+            playwright.expect(geometry).to_be_checked()
+            page.get_by_role("button", name="שמירת השינויים").click()
+            playwright.expect(page.get_by_role("status")).to_contain_text("השינויים נשמרו")
+            assert writes[-1] == {"name": row["name"], "emails": row["emails"],
+                                  "teachers": row["teachers"], "lessons": ["f", "g"]}
+            page.locator('.mx-x').click()
+            playwright.expect(page.locator('[data-id="g_triangle_area"]')).to_be_visible()
+            page.reload()
+            playwright.expect(page.locator('[data-id="g_triangle_area"]')).to_be_visible()
+        finally:
+            browser.close()

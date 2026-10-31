@@ -152,3 +152,8 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-scan-overlay{position:fixed;inset:0;z-index:1000;background:#000c;overflow:auto;padding:20px;display:flex;align-items:flex-start;justify-content:center}
 .mx-scan-card{background:#141719;color:#f4f2ec;border:1px solid #485050;border-radius:18px;padding:24px;width:min(520px,100%);display:flex;flex-direction:column;gap:14px;line-height:1.6}
 .mx-scan-card p{margin:0}.mx-scan-card [hidden]{display:none}.mx-scan-card small{color:#adb7b1}
+.mx-management,.mx-class-editor form{display:flex;flex-direction:column;gap:16px}
+.mx-management select{display:block;width:100%;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.mx-management fieldset{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:12px}
+.mx-management input{accent-color:var(--mx-accent)}
+.mx-management button:disabled{opacity:.6;cursor:wait}

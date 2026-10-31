@@ -10,7 +10,7 @@ document.head.append(css);
 
 const CFG=window.MATHLY||{}, AUTH_URL=CFG.supabaseUrl||"";
 let ME_EMAIL="", MY_CLASSES=[], MY_CLASS=null, client=null;
-const can=permission=>CFG.permissions.includes("*")||CFG.permissions.includes(permission);
+const can=permission=>(CFG.permissions||[]).includes("*")||(CFG.permissions||[]).includes(permission);
 const api=(url,options={})=>fetch(url,{...options,headers:{...(options.headers||{}),...(CFG.token?{Authorization:`Bearer ${CFG.token}`}:{})}});
 
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -79,7 +79,7 @@ function draw(){
   const UNITS=G.units.filter(u=>SHOWN.has(u.id)), mine=G.skills.filter(s=>SHOWN.has(s.unit));
   const total=mine.length, doneN=mine.filter(s=>P.done[s.id]).length, nxt=next();
   const cls=typeof MY_CLASS!=="undefined"&&MY_CLASS?` · כיתת ${esc(MY_CLASS.name)}`:"";
-  const manage=false, pct=Math.round(100*doneN/total);
+  const manage=can("management.access"), pct=Math.round(100*doneN/total);
   const units=UNITS.map(u=>{
     const ids=ORDER.filter(id=>BY[id].unit===u.id), d=ids.filter(id=>P.done[id]).length;
     return `<div class="mx-su u-${u.id}"><b>${esc(u.name)}</b><span class="mx-bar"><i style="width:${Math.round(100*d/ids.length)}%"></i></span><small>${d} מתוך ${ids.length}</small></div>`;
@@ -173,6 +173,7 @@ function onClick(e){
   if(t.dataset.choice!=null) return answer(t);
   if(t.dataset.id) return open(t.dataset.id);
   switch(t.dataset.act){
+    case "manage": return manageClasses();
     case "phone": return pairPhone();
     case "copy-phone": return copyPhone(t);
     case "photo": case "retake": return picker.click();
@@ -182,6 +183,51 @@ function onClick(e){
     case "close": return closeSheet();
     case "out": window.MathlyAnswers?.reset();closeSheet();hide();return client?.auth.signOut().then(()=>location.reload());
   }
+}
+
+async function manageClasses(){
+  if(!can("management.access")) return;
+  closeSheet(); back=document.activeElement; cur="management";
+  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
+    <div class="mx-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-shtop"><h3 id="mxTitle">ניהול כיתות</h3><button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+      <div class="mx-management"><p role="status">טוענים את הכיתות…</p></div></div>`;
+  sheet.hidden=false; sheet.querySelector(".mx-x").focus();
+  const box=sheet.querySelector(".mx-management");
+  try{
+    const response=await api("/api/classes");
+    if(!response.ok) throw new Error("לא הצלחנו לטעון את הכיתות. נסו שוב.");
+    const {classes}=await response.json();
+    if(!box.isConnected) return;
+    if(!classes.length){box.innerHTML='<p>אין כיתות לניהול.</p>';return;}
+    box.innerHTML=`<label>כיתה<select class="mx-class-picker">${classes.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("")}</select></label><div class="mx-class-editor"></div>`;
+    const select=box.querySelector("select"), editor=box.querySelector(".mx-class-editor");
+    if(MY_CLASS&&classes.some(c=>c.id===MY_CLASS.id)) select.value=String(MY_CLASS.id);
+    function edit(){
+      const row=classes.find(c=>String(c.id)===select.value);
+      editor.innerHTML=`<form><fieldset><legend>יחידות הלימוד בכיתה</legend>${G.units.map(u=>`<label><input type="checkbox" name="unit" value="${esc(u.id)}"${row.lessons.includes(u.id)?" checked":""}> ${esc(u.name)}</label>`).join("")}</fieldset>
+        <button class="mx-btn solid" type="submit">שמירת השינויים</button><p role="status" aria-live="polite"></p></form>`;
+      const form=editor.querySelector("form"), message=form.querySelector('[role="status"]'), submit=form.querySelector('button');
+      form.onsubmit=async event=>{
+        event.preventDefault();
+        const lessons=[...form.querySelectorAll('input:checked')].map(input=>input.value);
+        if(!lessons.length){message.textContent="בחרו לפחות יחידת לימוד אחת.";return;}
+        submit.disabled=true; select.disabled=true; message.textContent="שומרים…";
+        try{
+          const saved=await api(`/api/classes/${encodeURIComponent(row.id)}`,{method:"PUT",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({name:row.name,emails:row.emails||[],teachers:row.teachers||[],lessons})});
+          if(!saved.ok) throw new Error("לא הצלחנו לשמור את השינויים. נסו שוב.");
+          row.lessons=lessons;
+          MY_CLASSES.forEach(c=>{if(c.id===row.id)c.lessons=lessons;});
+          if(MY_CLASS?.id===row.id) MY_CLASS.lessons=lessons;
+          SHOWN=new Set(shownUnits().map(u=>u.id)); draw();
+          message.textContent="השינויים נשמרו. אפשר לחזור למסלול.";
+        }catch(error){message.textContent=error.message;}
+        finally{submit.disabled=false;select.disabled=false;}
+      };
+    }
+    select.onchange=edit; edit();
+  }catch(error){box.textContent=error.message;}
 }
 
 /* A photographed problem (/api/math/photo, app/math_photo.py): hints first. The sheet shows the problem as it was
