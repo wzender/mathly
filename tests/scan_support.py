@@ -58,18 +58,25 @@ class DatabaseAnswers(AnswerScans):
         return psycopg.connect(self.uri, autocommit=True)
 
     def action(self, user_id, action, **data):
+        return self.rpc('math_answer_action', user_id, action, data)
+
+    def grade(self, user_id, action, **data):
+        return self.rpc('math_grade_action', user_id, action, data)
+
+    def rpc(self, name, user_id, action, data):
         import psycopg
         if self.fail_finalize and action == 'finalize':
             raise ScanError(503, 'answer_storage_unavailable')
         with self.connect() as c:
             c.execute('set role service_role')
             try:
-                return c.execute('select public.math_answer_action(%s,%s,%s::jsonb)',
+                return c.execute(f'select public.{name}(%s,%s,%s::jsonb)',
                                  (user_id, action, json.dumps(data))).fetchone()[0]
             except psycopg.errors.NoDataFound as exc:
                 raise ScanError(404, 'not_found') from exc
             except psycopg.errors.RaiseException as exc:
-                raise ScanError(409, str(exc).splitlines()[0]) from exc
+                message = str(exc).splitlines()[0]
+                raise ScanError(429 if message == 'grading_limit' else 409, message) from exc
 
     def put(self, key, data):
         if self.fail_put:
@@ -110,6 +117,8 @@ def answer_store(postgres_server, tmp_path):
     with store.connect() as c:
         c.execute(BOOTSTRAP)
         c.execute(Path('supabase/migrations/20261031133254_math_answer_scans.sql').read_text())
+        for migration in sorted(Path('supabase/migrations').glob('*_math_answer_grading.sql')):
+            c.execute(migration.read_text())
         c.execute('insert into auth.users values(%s),(%s)', (OWNER, OTHER))
     yield store
     with psycopg.connect(postgres_server.get_uri(), autocommit=True) as c:

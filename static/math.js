@@ -71,7 +71,11 @@ async function show(){
     catch(e){ path.innerHTML=`<p class="mx-note">לא הצלחנו לטעון את המסלול: ${esc(e.message)}. רעננו את העמוד ונסו שוב.</p>`; return; }
   }
   P=Object.assign({done:{},tries:{}},load()); SHOWN=new Set(shownUnits().map(u=>u.id)); draw();
-  window.MathlyAnswers?.configure({api,account:CFG.userId,enabled:CFG.answerScans,root});
+  window.MathlyAnswers?.configure({api,account:CFG.userId,enabled:CFG.answerScans,root,onGraded:({questionId,grading})=>{
+    if(grading.result.verdict!=="correct"||P.done[questionId])return;
+    P.done[questionId]=grading.finished_at||new Date().toISOString();
+    P.tries[questionId]=(P.tries[questionId]||0)+1;save();draw();
+  }});
 }
 function hide(){ cancelAdvance(); if(root) root.hidden=true; document.documentElement.classList.remove("math-on"); }
 

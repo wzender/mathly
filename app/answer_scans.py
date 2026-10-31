@@ -70,6 +70,13 @@ class AnswerScans:
         raw = self._request("/rest/v1/rpc/math_answer_action", "POST", json.dumps(body).encode(), "application/json")
         return json.loads(raw)
 
+    def grade(self, user_id: str, action: str, **data):
+        if not self.configured:
+            raise ScanError(503, "answer_storage_unavailable")
+        body = {"p_user": user_id, "p_action": action, "p_data": data}
+        raw = self._request("/rest/v1/rpc/math_grade_action", "POST", json.dumps(body).encode(), "application/json")
+        return json.loads(raw)
+
     def _request(self, path, method="GET", data=None, content_type=None):
         headers = {"Authorization": "Bearer " + self.auth.secret, "apikey": self.auth.secret,
                    "User-Agent": "mathly/1.0"}
@@ -88,7 +95,10 @@ class AnswerScans:
             code, message = error.get("code"), error.get("message", "")
             if code == "P0002":
                 raise ScanError(404, "not_found") from exc
-            if code == "P0001" and message in {"superseded", "invalid_upload", "upload_in_progress", "confirmation_required"}:
+            if code == "P0001" and message == "grading_limit":
+                raise ScanError(429, message) from exc
+            if code == "P0001" and message in {"superseded", "invalid_upload", "upload_in_progress", "confirmation_required",
+                                               "answer_required", "grading_busy", "grading_interrupted"}:
                 raise ScanError(409, message) from exc
             raise ScanError(503, "answer_storage_unavailable") from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
@@ -122,6 +132,9 @@ def public_result(result):
             result["scan"].pop(key, None)
     if result.get("attachment"):
         result["attachment"].pop("object_key", None)
+    if result.get("grading"):
+        result["grading"].pop("lease_id", None)
+        result["grading"].pop("lease_until", None)
     return result
 
 

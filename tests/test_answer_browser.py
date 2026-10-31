@@ -9,6 +9,9 @@ import uvicorn
 from app.main import create_app
 from scan_support import OWNER, OTHER, ScanAuth, answer_store, postgres_server
 from test_answer_scans import png, request
+from test_answer_grading import assessment
+from app.answer_grading import validate_assessment
+from app.math_photo import PhotoUnavailable
 
 playwright = pytest.importorskip('playwright.sync_api')
 
@@ -189,3 +192,68 @@ def test_success_response_loss_is_safe_to_retry(scan_server):
             assert computer.evaluate("!!JSON.parse(localStorage.getItem('mathly.progress.v1:'+'%s@test.invalid')).done.g_rectangle" % OWNER)
         finally:
             browser.close()
+
+
+@pytest.mark.parametrize('verdict', ['correct', 'partial', 'incorrect', 'unreadable', 'needs_review'])
+def test_check_feedback_progress_reload_and_retake(scan_server, monkeypatch, verdict):
+    url, store = scan_server
+    monkeypatch.setenv('ANTHROPIC_API_KEY', 'browser-test-key')
+    calls = []
+    started, release = threading.Event(), threading.Event()
+    class Grader:
+        def __init__(self, key):
+            pass
+        def grade(self, image, snapshot):
+            calls.append(snapshot)
+            if len(calls) == 1:
+                raise PhotoUnavailable('temporary failure')
+            started.set(); assert release.wait(timeout=15)
+            changes = {'correct': {}, 'partial': {'complete': False, 'score': 60},
+                       'incorrect': {'answer_correct': False, 'score': 0},
+                       'unreadable': {'readable': False}, 'needs_review': {'confident': False}}[verdict]
+            # Verify that model text is escaped before rendering.
+            return validate_assessment(assessment(feedback='משוב <script>bad()</script> על הפתרון', **changes))
+    monkeypatch.setattr('app.answer_routes.AnswerGrader', Grader)
+    from test_answer_scans import begin, finish
+    from app.math_skills import algebra9, question_version
+    skill = next(s for s in algebra9()['skills'] if s['id'] == 'g_triangle_area')
+    done = store.action(OWNER, 'resume', question_id=skill['id'],
+                        question_version=question_version(skill['sample']), snapshot=skill['sample'])
+    done = finish(store, begin(store, store.action(OWNER, 'create_scan', attempt_id=done['attempt']['id'])))
+    with playwright.sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            computer = session(browser).new_page(); errors=[]
+            computer.on('pageerror', lambda error: errors.append(str(error)))
+            computer.goto(url); open_question(computer)
+            playwright.expect(computer.locator('.mx-answer-image')).to_be_visible()
+            playwright.expect(computer.locator('[data-grade]')).to_be_enabled()
+            computer.locator('[data-grade]').click()
+            playwright.expect(computer.locator('[data-grade]')).to_have_text('ניסיון בדיקה נוסף')
+            computer.locator('[data-grade]').click()
+            playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('בודקים את התשובה…')
+            assert started.wait(timeout=5)
+            playwright.expect(computer.locator('[data-new-attempt]')).to_be_disabled()
+            release.set()
+            panel = computer.locator('.mx-grade')
+            playwright.expect(panel).to_be_visible(timeout=10000)
+            playwright.expect(panel).to_contain_text('<script>bad()</script>')
+            assert panel.locator('script').count() == 0
+            if verdict in ('unreadable', 'needs_review'):
+                assert '/100' not in panel.inner_text()
+            key = 'mathly.progress.v1:' + OWNER + '@test.invalid'
+            assert computer.evaluate("key=>!!JSON.parse(localStorage.getItem(key)||'{}').done?.g_triangle_area", key) == (verdict == 'correct')
+            computer.reload();open_question(computer)
+            playwright.expect(computer.locator('.mx-grade')).to_be_visible()
+            playwright.expect(computer.locator('.mx-answer-image')).to_be_visible()
+            assert len(calls) == 2
+            computer.locator('[data-new-attempt]').click()
+            playwright.expect(computer.locator('[data-request]')).to_be_enabled()
+            assert computer.locator('.mx-grade').count() == 0
+            assert computer.locator('.mx-answer-image').count() == 0
+            # The old attempt, photograph, and grade remain recoverable.
+            assert store.grade(OWNER, 'get', attempt_id=done['attempt']['id'])['result']['verdict'] == verdict
+            assert store.read(done['attachment']['object_key'])
+            assert not errors
+        finally:
+            release.set(); browser.close()

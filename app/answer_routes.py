@@ -1,6 +1,8 @@
 """Authenticated student-facing API for photographed answers."""
 from __future__ import annotations
 
+import logging
+import os
 import uuid
 
 from fastapi import Depends, File, UploadFile
@@ -8,8 +10,11 @@ from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 
 from .answer_scans import AnswerScans, MAX_IMAGE, ScanError, clean_image, public_result, uuid_text
+from .answer_grading import AnswerGrader
+from .math_photo import PhotoUnavailable
 from .math_skills import algebra9, question_version
 
+log = logging.getLogger("mathly.answer_routes")
 
 def install_answer_routes(app, signed_in):
     if not hasattr(app.state, "answers"):
@@ -28,7 +33,16 @@ def install_answer_routes(app, signed_in):
         return user["id"]
 
     def call(user, action, **data):
-        return app.state.answers.action(user, action, **data)
+        result = app.state.answers.action(user, action, **data)
+        if isinstance(result, dict) and result.get("attachment"):
+            result["grading_available"] = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
+            try:
+                result["grading"] = app.state.answers.grade(user, "get", attempt_id=result["attempt"]["id"])
+            except ScanError:
+                # A staged deployment must not block saved images or upload receipt.
+                result["grading"] = None
+                result["grading_available"] = False
+        return result
 
     def reply(result):
         return JSONResponse(public_result(result), headers={"Cache-Control": "no-store"})
@@ -55,6 +69,40 @@ def install_answer_routes(app, signed_in):
     @app.get("/api/math/answer-attempts/{attempt_id}")
     def get_attempt(attempt_id: str, user=Depends(student)):
         return reply(call(user, "get", attempt_id=uuid_text(attempt_id)))
+
+    @app.post("/api/math/answer-attempts/{attempt_id}/grade")
+    def grade_answer(attempt_id: str, user=Depends(student)):
+        aid = uuid_text(attempt_id)
+        result = app.state.answers.action(user, "get", attempt_id=aid)
+        if not result.get("attachment"):
+            raise ScanError(409, "answer_required")
+        existing = app.state.answers.grade(user, "get", attempt_id=aid)
+        if existing and existing["state"] in ("grading", "completed"):
+            return reply(call(user, "get", attempt_id=aid))
+        key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        if not key:
+            raise ScanError(503, "grading_unavailable")
+        lease = str(uuid.uuid4())
+        grading = app.state.answers.grade(user, "start", attempt_id=aid, lease_id=lease)
+        if grading["state"] != "grading" or grading["lease_id"] != lease:
+            return reply(call(user, "get", attempt_id=aid))
+        try:
+            grader = getattr(app.state, "answer_grader", None) or AnswerGrader(key)
+            assessment = grader.grade(app.state.answers.read(result["attachment"]["object_key"]),
+                                      result["attempt"]["snapshot"])
+            app.state.answers.grade(user, "complete", attempt_id=aid, lease_id=lease, result=assessment)
+        except Exception as exc:
+            # Retain both the image and a retryable failure; never award credit on error.
+            try:
+                app.state.answers.grade(user, "fail", attempt_id=aid, lease_id=lease)
+            except ScanError:
+                pass  # an uncertain commit may already have stored the successful check
+            if isinstance(exc, ScanError):
+                raise
+            if not isinstance(exc, PhotoUnavailable):
+                log.error("answer grader failed: %s", type(exc).__name__)
+            raise ScanError(503, "grading_failed") from exc
+        return reply(call(user, "get", attempt_id=aid))
 
     @app.post("/api/math/answer-attempts/{attempt_id}/scans")
     def create_scan(attempt_id: str, body: dict, user=Depends(student)):

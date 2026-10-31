@@ -42,7 +42,7 @@ venv/bin/python -m pytest
 
 Open-ended questions support handwritten calculations and drawings. On the computer, open the question and select **סריקת התשובה שלי בטלפון** (“Scan my answer with my phone”). Open the same site or installed Mathly PWA on your phone and sign in to the **same account**. Pending requests appear with the question and attempt identifier; choose one and confirm. Select **צילום התשובה**, allow the camera if asked, review the photograph, and use **צילום מחדש** to retake it before selecting **שליחת התשובה למחשב**. No image is uploaded before submission.
 
-The computer shows waiting, uploading, answer received, upload failed, or request expired. After receipt, it displays the saved image on the original attempt, including after refresh. Receipt means the answer was saved; it does **not** award correctness or mark the skill mastered. Existing multiple-choice practice and photographed-problem AI help remain separate.
+The computer shows waiting, uploading, answer received, upload failed, or request expired. After receipt, it displays the saved image on the original attempt, including after refresh. Receipt means the answer was saved; it does **not** award correctness or mark the skill mastered. Select **בדיקת התשובה** to check the handwritten solution, as described below. Existing multiple-choice practice and photographed-problem AI help remain separate.
 
 Requests last **15 minutes**. A failed upload can be retried on the phone without taking another photo while that page remains open. An expired request offers **יצירת בקשת צילום חדשה** on either device; this keeps the attempt and invalidates the old request. A lost success response can safely be retried. Closing or refreshing the phone page discards an unsubmitted preview. If camera access is denied or capture is cancelled, retry the camera button and allow camera access in the site's browser settings. Camera behavior varies by platform; deploy over **HTTPS** and test on the phones you support.
 
@@ -53,7 +53,15 @@ Requests last **15 minutes**. A failed upload can be retried on the phone withou
 3. Set `MATHLY_ANSWER_SCANS_ENABLED=1` and restart the app after the migration succeeds. The scan feature needs no AI key. With the flag off or credentials absent, scan APIs fail closed; guest practice and AI problem help still work.
 4. Run `python -m app.answer_cleanup` hourly with the same server environment. It removes unreferenced private objects older than **24 hours** using the Storage API, including images orphaned by failed commits or account/attempt deletion. Referenced answers remain with their attempts; deleting an account/attempt cascades its records and cleanup removes the bytes after the grace period. The maintenance command continues to work when the student-facing feature flag is off. Monitor nonzero cleanup exit codes.
 
-Upload leases last at most **3 minutes**, bounded by request expiry. Interrupted leases become retryable failures on the next status/discovery check. Images are limited to 5 MB JPEG/PNG/WebP, decoded and re-encoded as JPEG to remove metadata, and accessed through owner-checked authenticated endpoints. Images and private storage URLs are never sent to the AI solver. The new flow works across workers and server restarts.
+Upload leases last at most **3 minutes**, bounded by request expiry. Interrupted leases become retryable failures on the next status/discovery check. Images are limited to 5 MB JPEG/PNG/WebP, decoded and re-encoded as JPEG to remove metadata, and accessed through owner-checked authenticated endpoints. Uploading alone does not send an image to AI. Selecting **בדיקת התשובה** sends the saved image bytes and original question snapshot to the AI grader; private storage URLs are never sent. The flow works across workers and server restarts.
+
+### Check a handwritten answer
+
+Apply [the additive grading migration](supabase/migrations/20261031193200_math_answer_grading.sql) **after** the answer-scan migration and **before** deploying the grading code. It adds a private grading table and service-only RPC; it preserves existing classes, attempts, and photographs. Configure the server's `ANTHROPIC_API_KEY`; the grader uses `MATH_MODEL` or the same default model as photographed-problem help. Without that key, photographs remain usable and the UI explains that grading is unavailable. If the grading migration has not yet been applied, photo receipt and viewing remain available, with grading hidden.
+
+After a photograph is received, click **בדיקת התשובה**. The page explains that this sends the photograph to AI for checking. The grader evaluates the original question, mathematical result, reasoning, required drawing, units, and completeness. It returns Hebrew feedback, a score out of 100 where the work can be assessed, a next step, a transcription you can check, and an expandable worked solution. Unreadable or uncertain work receives no score and never completes the skill. A correct, complete solution completes the skill in the current account's device-local progress; receiving the image alone still does not. AI grading can make mistakes; the feedback panel identifies it as automatic and shows the transcription for review.
+
+Checks and feedback are stored privately against the original attempt and photo, surviving refresh and server restarts. Repeated clicks or a lost response reuse a running/completed check. A failed check can be retried with **ניסיון בדיקה נוסף**, keeping the image. Interrupted checks become retryable after **5 minutes**. Each account can start **20 checks per Jerusalem calendar day**, including failed checks, with at most two running simultaneously. Completed checks remain readable without another AI call or daily charge. Select **ניסיון חדש וצילום מחדש** to create a fresh attempt and send a corrected or clearer photograph; the previous attempt, photo, and feedback remain stored.
 
 For rollback, turn `MATHLY_ANSWER_SCANS_ENABLED` off and restart; preserve the new tables and private bucket. The skills API serves the original multiple-choice geometry sample while scanning is disabled, including for guest practice and older frontends. Enabling scanning again restores open-ended presentation and access to saved answers. Keep stored answer records for recovery. No destructive down migration is needed.
 
@@ -62,7 +70,7 @@ Integration tests use bundled disposable PostgreSQL and local private test blobs
 ```bash
 .venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt
 .venv/bin/python -m playwright install chromium
-.venv/bin/python -m pytest tests/test_answer_scans.py tests/test_answer_browser.py
+.venv/bin/python -m pytest tests/test_answer_scans.py tests/test_answer_grading.py tests/test_answer_browser.py
 ```
 
 See [scan verification](docs/answer-scan-verification.md) for coverage and device checks.

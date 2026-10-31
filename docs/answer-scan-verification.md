@@ -15,6 +15,17 @@ The automated database tests run the actual additive migration in disposable Pos
 | Restart persistence; deletion cleanup | New application instance against the same database and private files |
 | No grading or mastery from upload | Browser progress assertion |
 | AI solver remains independent | Existing photo API and phone browser regressions |
+| Correct, partial, incorrect, unreadable, uncertain checks | Structured-output validation and browser feedback/progress checks |
+| Private durable feedback; no forged credit | Owner-checked grading API, service-only grading table/RPC, restart checks |
+| Duplicate checks; interrupted/failed retries; daily allowance | Concurrent database/API checks, stale leases, durable per-account quota |
+
+## Handwritten-answer grading verification
+
+The grading tests apply both migrations to disposable PostgreSQL, use real app APIs, and stub only the external AI service. They verify the original snapshot and stored image are used; a client-supplied score or replacement prompt is ignored. A failure leaves the photograph attached, retry creates a new check, completed checks are reused, concurrent requests invoke the provider once, and another account cannot inspect or check the attempt. Browser checks cover the Hebrew feedback panel, safe escaping of model text, score suppression for unreadable/uncertain work, refresh persistence, credit only for correct complete work, and creating a new attempt while retaining the old photo and grade.
+
+These checks validate application behavior, not the model's real handwriting recognition or grading accuracy. Deployment smoke check: apply the grading migration, configure `ANTHROPIC_API_KEY`, submit one correct worked solution, one incorrect/partial solution, and one illegible image. Select **בדיקת התשובה** for each, verify the transcription and feedback, and confirm only the correct complete solution completes the skill. Test a retry and reopen the page to confirm persistence. No real-provider accuracy evaluation or physical-device certification is implied by the automated tests.
+
+Grading implementation verification on 2026-10-31: `.venv/bin/python -m pytest -q` completed with **54 passed**. Both migrations applied successfully to a disposable PostgreSQL database; `supabase db advisors --type all --fail-on warn` against that database reported **no issues**. Python compilation and `git diff --check` passed. No hosted project was modified and no real AI grading request was made.
 
 ## Local verification record — 2026-10-31
 

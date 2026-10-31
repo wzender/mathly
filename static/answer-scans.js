@@ -5,7 +5,9 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const fmt=s=>esc(s).replace(/\$([^$]+)\$/g,'<span class="m">$1</span>');
 const states={waiting:"ממתינים לטלפון",confirmed:"ממתינים לטלפון",uploading:"מעלים את התשובה…",received:"התשובה התקבלה",failed:"ההעלאה נכשלה",expired:"בקשת הצילום פגה",superseded:"הבקשה הוחלפה"};
 const errors={expired:"בקשת הצילום פגה. צרו בקשה חדשה ונסו שוב.",superseded:"הבקשה הוחלפה. בחרו את הבקשה העדכנית.",upload_in_progress:"העלאה כבר מתבצעת. ממתינים לעדכון…",confirmation_required:"יש לאשר את בקשת הצילום תחילה.",invalid_upload:"ההעלאה הופסקה. נסו שוב.",question_changed:"השאלה השתנתה. רעננו את העמוד ופתחו אותה מחדש.",invalid_image:"לא ניתן לקרוא את התמונה. צלמו שוב.",image_too_large:"התמונה גדולה מדי. צלמו שוב.",unsupported_image:"בחרו תמונת JPEG, PNG או WebP.",answer_storage_unavailable:"שמירת תשובות אינה זמינה כרגע. נסו שוב מאוחר יותר.",sign_in_required:"יש להיכנס לאותו חשבון בשני המכשירים."};
-let api=null,account=null,epoch=0,question=null,inbox=null,inboxTimer=null,inboxPoll=null,capture=null,visibleRoot=null;
+Object.assign(errors,{grading_unavailable:"בדיקת תשובות אינה זמינה כרגע באתר.",grading_failed:"הבדיקה נכשלה. התמונה נשמרה; אפשר לנסות שוב.",grading_interrupted:"הבדיקה הופסקה. אפשר לנסות שוב.",grading_limit:"הגעתם למכסת 20 הבדיקות היומית. נסו שוב מחר.",grading_busy:"כבר מתבצעות בדיקות בחשבון. נסו שוב בעוד רגע.",answer_required:"יש לצלם ולשלוח תשובה לפני הבדיקה."});
+const verdicts={correct:"נכון! הפתרון מלא",partial:"פתרון נכון בחלקו",incorrect:"יש לתקן את הפתרון",unreadable:"לא ניתן לקרוא את התשובה",needs_review:"נדרשת הבהרה לפני מתן ציון"};
+let api=null,account=null,epoch=0,question=null,inbox=null,inboxTimer=null,inboxPoll=null,capture=null,visibleRoot=null,onGraded=null;
 const live=(e)=>e===epoch&&!!account;
 async function json(url,options={}){
   const r=await api(url,{cache:"no-store",...options});
@@ -22,10 +24,10 @@ function closeCapture(){
 }
 function reset(){
   epoch++;if(question)question.node.replaceChildren();closeQuestion();closeCapture();clearTimeout(inboxTimer);inboxTimer=null;
-  inbox?.remove();inbox=null;account=null;
+  inbox?.remove();inbox=null;account=null;onGraded=null;
 }
 function configure(options){
-  reset();api=options.api;account=options.enabled?options.account:null;visibleRoot=options.root;
+  reset();api=options.api;account=options.enabled?options.account:null;visibleRoot=options.root;onGraded=options.onGraded;
   if(!account)return;
   // Foreground discovery is available in the responsive phone app/PWA.
   if(matchMedia("(max-width: 700px)").matches||navigator.maxTouchPoints){
@@ -53,12 +55,12 @@ async function pollInbox(e){
   }finally{if(inboxPoll===e)inboxPoll=null;}
   if(live(e))inboxTimer=setTimeout(()=>pollInbox(e),delay);
 }
-async function mountQuestion(node,id,version){
+async function mountQuestion(node,id,version,fresh=false){
   closeQuestion();const e=epoch;
   if(!account){node.innerHTML='<p>כדי לסרוק תשובה בטלפון, היכנסו לאותו חשבון בשני המכשירים. שמירת תשובות צריכה להיות זמינה באתר.</p>';return;}
-  const q=question={node,id,e,timer:null,image:null,busy:false,result:null};
+  const q=question={node,id,version,e,timer:null,image:null,busy:false,result:null,grading:false};
   node.innerHTML='<p role="status">טוענים את ניסיון התשובה…</p>';
-  try{const r=await post("/api/math/answer-attempts",{question_id:id,question_version:version});if(!current(q))return;q.result=r;await renderQuestion(q);schedule(q);}
+  try{const r=await post("/api/math/answer-attempts",{question_id:id,question_version:version,new:fresh});if(!current(q))return;q.result=r;await renderQuestion(q);schedule(q);}
   catch(error){if(current(q)){node.innerHTML=`<p role="status">${esc(error.message)}</p><button class="mx-btn" data-reload>ניסיון נוסף</button>`;node.querySelector("button").onclick=()=>error.code==="question_changed"?location.reload():mountQuestion(node,id,version);}}
 }
 const current=q=>question===q&&live(q.e)&&q.node.isConnected;
@@ -75,13 +77,16 @@ async function pollQuestion(q){
 }
 async function renderQuestion(q){
   if(!current(q))return;
-  const r=q.result,s=r.scan,state=s?.state,received=!!r.attachment;
+  const r=q.result,s=r.scan,state=s?.state,received=!!r.attachment,g=r.grading;
+  const checking=q.grading||g?.state==="grading";
+  const statusText=checking?"בודקים את התשובה…":g?.state==="completed"?verdicts[g.result.verdict]:g?.state==="failed"?errors[g.error]||errors.grading_failed:states[state]||"כתבו את הפתרון על דף וצלמו אותו בטלפון.";
   // Rebuilding controls on every poll would steal focus and race a button click.
-  const signature=[state,r.attachment?.id].join(":");
+  const signature=[state,r.attachment?.id,g?.id,g?.state,r.grading_available].join(":");
   if(q.signature!==signature){
     q.signature=signature;
-    q.node.innerHTML=`<small>ניסיון ${esc(r.attempt.id.slice(0,8))}</small><p role="status" aria-live="polite">${esc(states[state]||"כתבו את הפתרון על דף וצלמו אותו בטלפון.")}</p>
-      ${received?'<p>התמונה נשמרה כתשובה. היא עדיין לא נבדקה.</p><img class="mx-answer-image" alt="התשובה המצולמת שלכם" hidden>':`<button class="mx-btn solid" data-request>${s?["expired","superseded"].includes(state)?"יצירת בקשת צילום חדשה":state==="failed"?"ניסיון נוסף":"פתחו את Mathly בטלפון באותו חשבון":"סריקת התשובה שלי בטלפון"}</button>`}`;
+    q.node.innerHTML=`<small>ניסיון ${esc(r.attempt.id.slice(0,8))}</small><p role="status" aria-live="polite">${esc(statusText)}</p>
+      ${received?`<img class="mx-answer-image" alt="התשובה המצולמת שלכם" hidden>${gradingPanel(r,checking)}
+        <button class="mx-btn" data-new-attempt ${checking?"disabled":""}>ניסיון חדש וצילום מחדש</button>`:`<button class="mx-btn solid" data-request>${s?["expired","superseded"].includes(state)?"יצירת בקשת צילום חדשה":state==="failed"?"ניסיון נוסף":"פתחו את Mathly בטלפון באותו חשבון":"סריקת התשובה שלי בטלפון"}</button>`}`;
     if(!received){
       const b=q.node.querySelector("[data-request]");b.disabled=["uploading","waiting","confirmed"].includes(state);
       b.onclick=async()=>{
@@ -91,7 +96,13 @@ async function renderQuestion(q){
         catch(error){if(current(q)){q.node.querySelector("[role=status]").textContent=error.message;b.disabled=false;}}
       };
     }
-  }else q.node.querySelector("[role=status]").textContent=states[state]||"כתבו את הפתרון על דף וצלמו אותו בטלפון.";
+    if(received){
+      const gradeButton=q.node.querySelector("[data-grade]");
+      if(gradeButton)gradeButton.onclick=()=>checkAnswer(q);
+      q.node.querySelector("[data-new-attempt]").onclick=()=>mountQuestion(q.node,q.id,q.version,true);
+    }
+  }else q.node.querySelector("[role=status]").textContent=statusText;
+  if(g?.state==="completed"&&q.notified!==g.id){q.notified=g.id;onGraded?.({questionId:q.id,grading:g});}
   if(received&&!q.image&&!q.loadingImage){
     q.loadingImage=true;
     try{
@@ -102,7 +113,37 @@ async function renderQuestion(q){
       img.onload=()=>{if(current(q))img.hidden=false;};img.src=q.image;
     }catch(error){if(current(q))q.node.querySelector("[role=status]").textContent=error.message;}
     finally{q.loadingImage=false;}
-  }else if(q.image&&q.node.querySelector("img"))q.node.querySelector("img").src=q.image;
+  }else if(q.image&&q.node.querySelector("img")){const img=q.node.querySelector("img");img.src=q.image;img.hidden=false;}
+}
+function gradingPanel(r,checking){
+  const g=r.grading;
+  if(g?.state==="completed"){
+    const a=g.result;
+    return `<section class="mx-grade ${a.verdict==="correct"?"mx-grade-correct":""}" aria-label="תוצאות בדיקת התשובה">
+      <h4>${esc(verdicts[a.verdict])}${a.score==null?"":` · <span class="m">${esc(a.score)}/100</span>`}</h4>
+      <p>${fmt(a.feedback)}</p>${a.next_step?`<p><b>הצעד הבא: </b>${fmt(a.next_step)}</p>`:""}
+      ${a.transcription?`<details><summary>מה קראנו בתמונה</summary><p>${fmt(a.transcription)}</p></details>`:""}
+      ${a.solution?`<details><summary>הפתרון המלא</summary><p class="mx-grade-solution">${fmt(a.solution)}</p></details>`:""}
+      <small>בדיקה אוטומטית באמצעות AI. בדקו שהתמלול תואם למה שכתבתם.</small></section>`;
+  }
+  if(!r.grading_available&&!checking)return '<p>התמונה נשמרה כתשובה. בדיקה אוטומטית אינה זמינה כרגע באתר.</p>';
+  return `<p>לחיצה על בדיקה תשלח את צילום התשובה לשירות ה־AI לצורך בדיקת הפתרון.</p>
+    <button class="mx-btn solid" data-grade ${checking?"disabled":""}>${checking?"בודקים את התשובה…":g?.state==="failed"?"ניסיון בדיקה נוסף":"בדיקת התשובה"}</button>`;
+}
+async function checkAnswer(q){
+  if(!current(q)||q.grading)return;
+  q.grading=true;q.signature=null;await renderQuestion(q);schedule(q);
+  try{
+    const r=await post(`/api/math/answer-attempts/${q.result.attempt.id}/grade`);
+    if(!current(q))return;q.result=r;
+  }catch(error){if(current(q))q.gradeError=error.message;}
+  finally{
+    if(current(q)){
+      q.grading=false;q.signature=null;await renderQuestion(q);
+      if(q.gradeError){q.node.querySelector("[role=status]").textContent=q.gradeError;q.gradeError=null;}
+      schedule(q);
+    }
+  }
 }
 function openCapture(result){
   closeCapture();const e=epoch;
