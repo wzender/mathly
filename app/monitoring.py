@@ -9,7 +9,7 @@ import hashlib
 import os
 import subprocess
 import time
-from collections import Counter
+from collections import Counter, deque
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -26,6 +26,29 @@ LOCAL_TZ = ZoneInfo("Asia/Jerusalem")
 # period -> (minutes per bar, number of bars)
 PERIODS = {"day": (15, 96), "week": (60, 168), "month": (24 * 60, 30)}
 SEEN_KEEP = 24 * 3600
+RETURN_GAP = 30 * 60  # a sign-in after this long away counts as a new visit
+ACTION_KINDS = frozenset({"visit", "photo", "answer_upload", "answer_graded", "class_saved", "class_deleted"})
+
+
+class ActionLog:
+    """The latest actions on the server: what was done, by which account, and when. Kept in memory only,
+    so it starts empty after a restart. Labels name the question or class, never a student's answer."""
+
+    def __init__(self, keep: int = 200):
+        self._items: deque[dict] = deque(maxlen=keep)
+        self.emails: dict[str, str] = {}  # user id -> email, learned at sign-in
+
+    def record(self, user: dict | str | None, kind: str, label: str = "") -> None:
+        if isinstance(user, dict):
+            if user.get("id") and user.get("email"):
+                self.emails[user["id"]] = user["email"]
+            email = user.get("email", "")
+        else:
+            email = self.emails.get(user or "", "")
+        self._items.append({"at": time.time(), "kind": kind, "email": email, "label": str(label or "")[:120]})
+
+    def recent(self, limit: int = 20) -> list[dict]:
+        return list(reversed(self._items))[:limit]
 
 
 def build_metadata() -> dict[str, str]:
@@ -117,13 +140,15 @@ def install_monitoring_routes(app, manager) -> None:
         app.state.seen = {}
     if not hasattr(app.state, "photo_counts"):
         app.state.photo_counts = {}
+    if not hasattr(app.state, "actions"):
+        app.state.actions = ActionLog()
 
     @app.get("/api/monitor/summary")
     def monitor_summary(_user: dict = Depends(manager)):
         """Everything the Monitoring summary can tell without a network call."""
         answers = app.state.answers
         return {"build": build_metadata(), "errors": log_errors.COUNTER.summary(),
-                "seen": seen_summary(app.state.seen), "photos": photo_summary(app.state.photo_counts),
+                "seen": seen_summary(app.state.seen), "actions": app.state.actions.recent(), "photos": photo_summary(app.state.photo_counts),
                 "answers": {"storage": answers.configured, "open_ended_locked": open_ended_locked(),
                             "grading": bool(grading_key())},
                 "photo_help": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()

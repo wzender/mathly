@@ -15,6 +15,8 @@ from .math_photo import PhotoUnavailable
 from .math_skills import algebra9, question_version
 
 log = logging.getLogger("mathly.answer_routes")
+VERDICTS = {"correct": "נכונה", "partial": "נכונה חלקית", "incorrect": "שגויה",
+            "unreadable": "לא קריאה", "needs_review": "דורשת בדיקה"}
 
 
 def open_ended_locked():
@@ -56,6 +58,13 @@ def install_answer_routes(app, signed_in):
                 result["grading"] = None
                 result["grading_available"] = False
         return result
+
+    def note(user, kind, result, extra=""):
+        """Adds to Monitoring's recent actions: the question's name, and the verdict of a check."""
+        actions = getattr(app.state, "actions", None)
+        if actions is not None:
+            name = ((result.get("attempt") or {}).get("snapshot") or {}).get("name", "")
+            actions.record(user, kind, " · ".join(filter(None, [name, extra])))
 
     def reply(result):
         return JSONResponse(public_result(result), headers={"Cache-Control": "no-store"})
@@ -108,6 +117,7 @@ def install_answer_routes(app, signed_in):
             assessment = grader.grade(app.state.answers.read(result["attachment"]["object_key"]),
                                       result["attempt"]["snapshot"])
             app.state.answers.grade(user, "complete", attempt_id=aid, lease_id=lease, result=assessment)
+            note(user, "answer_graded", result, VERDICTS.get(assessment.get("verdict"), ""))
         except Exception as exc:
             # Retain both the image and a retryable failure; never award credit on error.
             try:
@@ -161,6 +171,7 @@ def install_answer_routes(app, signed_in):
         sid, lease = uuid_text(scan_id), uuid_text(lease_id)
         data = await photo.read(MAX_IMAGE + 1)
         result = await run_in_threadpool(submit, user, sid, lease, data, photo.content_type)
+        note(user, "answer_upload", result)
         if result.get("grading_available") and not result.get("grading"):
             background_tasks.add_task(automatic_grade, user, result["attempt"]["id"])
         return reply(result)

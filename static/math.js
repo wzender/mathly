@@ -524,6 +524,7 @@ function showManageMode(mode){
 /* Monitoring (ניטור): a snapshot of the system, open-answer activity, and the server's latest warnings.
    Each source loads and fails on its own, so a slow Supabase does not hold up the rest. */
 const MON_RANGES={day:["יום","24 השעות האחרונות","15 דקות"],week:["שבוע","7 הימים האחרונים","שעה"],month:["חודש","30 הימים האחרונים","יום"]};
+const MON_ACTIONS={visit:["👋","נכנס/ה לאפליקציה"],photo:["📷","צילם/ה תרגיל לעזרה"],answer_upload:["📝","שלח/ה תשובה פתוחה"],answer_graded:["✔️","תשובה נבדקה"],class_saved:["🏫","שמר/ה כיתה"],class_deleted:["🗑️","מחק/ה כיתה"]};
 const VERDICTS={correct:"נכונות",partial:"נכונות חלקית",incorrect:"שגויות",unreadable:"לא קריאות",needs_review:"דורשות בדיקה",grading:"בבדיקה",failed:"הבדיקה נכשלה"};
 let MON={}, MON_RANGE=(()=>{try{return localStorage.getItem("mathly.monRange")}catch{return null}})();
 if(!MON_RANGES[MON_RANGE]) MON_RANGE="week";
@@ -589,8 +590,12 @@ function drawMonSummary(){
   const lines=sum?.errors?.recent;
   const logs=loading?'<p class="mx-note">טוען…</p>':err?`<p class="mx-note">לא ניתן לטעון: ${esc(err)}</p>`:!lines?.length?'<p class="mx-note">אין אזהרות או שגיאות מאז הפעלת השרת.</p>':
     lines.map(line=>`<div class="mx-mon-log"><div><span class="mx-mon-level ${(line.level||"").toLowerCase()==="warning"?"warn":"bad"}">${esc(line.level)}</span><code dir="ltr">${esc(line.logger)}</code>${monAgo(new Date(line.at*1000).toISOString())}</div><code class="mx-mon-msg" dir="ltr">${esc(line.message)}</code></div>`).join("");
+  // the latest actions: what, who, when (kept in server memory since its last start)
+  const acts=sum?.actions;
+  const actions=loading?'<p class="mx-note">טוען…</p>':err?`<p class="mx-note">לא ניתן לטעון: ${esc(err)}</p>`:!acts?.length?'<p class="mx-note">עדיין לא נרשמו פעולות מאז הפעלת השרת.</p>':
+    acts.slice(0,10).map(a=>{ const [icon,what]=MON_ACTIONS[a.kind]||["•",a.kind]; return `<div class="mx-mon-action"><i aria-hidden="true">${icon}</i><div><b>${esc(what)}</b><small><span dir="ltr">${esc(a.email||"משתמש לא ידוע")}</span>${a.label?` · ${esc(a.label)}`:""}</small></div>${monAgo(new Date(a.at*1000).toISOString())}</div>`; }).join("");
   box.innerHTML=`<h5>תמונת מצב</h5><div class="mx-mon-tiles">${tiles.join("")}</div>
-    <div class="mx-mon-lower"><div class="mx-mon-panel"><h6>תשובות פתוחות</h6>${answers}</div><div class="mx-mon-panel mx-mon-logs"><h6>5 שורות הלוג האחרונות (אזהרה ומעלה)</h6>${logs}</div></div>`;
+    <div class="mx-mon-lower"><div class="mx-mon-panel"><h6>פעולות אחרונות</h6>${actions}</div><div class="mx-mon-panel"><h6>תשובות פתוחות</h6>${answers}</div><div class="mx-mon-panel mx-mon-logs"><h6>5 שורות הלוג האחרונות (אזהרה ומעלה)</h6>${logs}</div></div>`;
 }
 
 function drawMonActivity(){

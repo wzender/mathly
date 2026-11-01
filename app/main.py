@@ -22,7 +22,7 @@ from .auth import AuthUnavailable, ClassConflict, SupabaseAuth, load_auth
 from .math_photo import (DAILY_PHOTOS, MAX_PHOTO, MEDIA_TYPES as PHOTO_TYPES,
                          PhotoSolver, PhotoUnavailable, math_model, photo_client)
 from .math_skills import algebra9, practice_graph
-from .monitoring import install_monitoring_routes
+from .monitoring import ActionLog, RETURN_GAP, install_monitoring_routes
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("mathly")
@@ -58,6 +58,7 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
     app.state.photo = None
     app.state.photo_key = None
     app.state.seen = {}
+    app.state.actions = ActionLog()
     app.state.photo_counts = {}
     app.mount("/static", FreshStatic(directory=STATIC), name="static")
 
@@ -76,7 +77,10 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
             raise HTTPException(401, "sign in required")
         if user.get("denied"):
             raise HTTPException(403, "this account is not in a math class")
-        app.state.seen[user.get("id") or user.get("email", "")] = time.time()  # for Monitoring's "signed in lately"
+        key, now = user.get("id") or user.get("email", ""), time.time()
+        if now - app.state.seen.get(key, 0) > RETURN_GAP:
+            app.state.actions.record(user, "visit")
+        app.state.seen[key] = now  # for Monitoring's "signed in lately"
         return user
 
     async def manager(user: dict | None = Depends(signed_in)) -> dict:
@@ -175,17 +179,23 @@ self.addEventListener("activate", event => event.waitUntil((async () => {
         return {"ok": True, "id": class_id, "name": name, "lessons": selected}
 
     @app.post("/api/classes")
-    async def create_class(body: dict, _user: dict = Depends(manager)):
-        return save_class(None, body)
+    async def create_class(body: dict, user: dict = Depends(manager)):
+        result = save_class(None, body)
+        app.state.actions.record(user, "class_saved", f"נפתחה: {result['name']}")
+        return result
 
     @app.put("/api/classes/{class_id}")
-    async def update_class(class_id: int, body: dict, _user: dict = Depends(manager)):
-        return save_class(class_id, body)
+    async def update_class(class_id: int, body: dict, user: dict = Depends(manager)):
+        result = save_class(class_id, body)
+        app.state.actions.record(user, "class_saved", f"נערכה: {result['name']}")
+        return result
 
     @app.delete("/api/classes/{class_id}")
-    async def delete_class(class_id: int, _user: dict = Depends(manager)):
+    async def delete_class(class_id: int, user: dict = Depends(manager)):
         try:
+            name = next((row["name"] for row in app.state.auth.classes() if row.get("id") == class_id), f"#{class_id}")
             app.state.auth.delete_class(class_id)
+            app.state.actions.record(user, "class_deleted", name)
         except AuthUnavailable as exc:
             raise HTTPException(503, str(exc)) from exc
         return {"ok": True}
@@ -274,6 +284,8 @@ self.addEventListener("activate", event => event.waitUntil((async () => {
             raise
         if counter and not result.get("readable"):
             photo_counts[counter] -= 1
+        skill = next((s["name"] for s in algebra9()["skills"] if s["id"] == result.get("skill")), "")
+        app.state.actions.record(user, "photo", skill if result.get("readable") else "התמונה לא נקראה")
         return {**result, "left": DAILY_PHOTOS - photo_counts.get(counter, 0) if counter else None}
 
     @app.post("/api/math/phone-photo")

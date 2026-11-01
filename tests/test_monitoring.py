@@ -91,3 +91,14 @@ def test_small_summaries():
     assert photo_summary({("a", "d"): 20, ("b", "d"): 1, ("c", "e"): 3}, today="d") == {
         "today": 21, "students": 2, "at_limit": 1, "daily_limit": photo_summary({}, "d")["daily_limit"]}
     assert log_errors.COUNTER in logging.getLogger().handlers
+
+
+def test_recent_actions_name_the_action_and_the_user():
+    app = create_app(MonitorAuth())
+    get(app, "/api/me", STUDENT)
+    get(app, "/api/me", STUDENT)  # a page reload soon after is the same visit
+    app.state.actions.record("s", "answer_upload", "Question 1")  # answer routes pass the user id
+    actions = get(app, "/api/monitor/summary", TEACHER).json()["actions"]
+    assert [(a["kind"], a["email"], a["label"]) for a in actions] == [
+        ("visit", "t@test.invalid", ""), ("answer_upload", "s@test.invalid", "Question 1"),
+        ("visit", "s@test.invalid", "")]
