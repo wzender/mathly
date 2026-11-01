@@ -4,8 +4,8 @@ Each skill names its prerequisites and either one `sample` question or a list of
 Choice samples identify mistakes; open-ended samples name their type and revision and accept a photographed answer.
 A mistake sends the student back to the skill it comes from (`back`), or keeps them on the same skill (`null`).
 The units follow the Ministry of Education's 9th-grade teaching schedule for 2026/27 (`docs/prisa_9A.md`).
-Units already split by the schedule's topics (טכניקה אלגברית, פונקציה ריבועית) have ten questions per skill;
-the other units still have ten skills with one question each. `month` is when the schedule teaches a skill.
+A unit has at most six skills: a longer one is split in two (טכניקה אלגברית 1 and 2), and a split-off unit names
+the one it came from (`from`) so classes that chose it keep their content. `month` is when the schedule teaches a skill.
 The questions are written for the app, and every skill, link and mistake still needs a teacher's review.
 
 `problems` is run by the tests and on loading: a broken graph is refused before a student meets it.

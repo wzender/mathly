@@ -32,7 +32,7 @@ def test_choice_samples_still_require_one_correct_choice():
     assert "t_ext question 4: needs exactly one correct choice" in problems(graph)
 
 
-GEOMETRY_UNITS = {"k", "i", "a", "l", "z", "g", "m", "b", "c", "o", "d"}
+GEOMETRY_UNITS = {"k", "i", "a", "l", "z", "z2", "g", "m", "b", "c", "o", "d"}
 
 
 def test_every_geometry_question_has_a_figure():
@@ -73,7 +73,7 @@ def test_the_algebra_graph_is_whole():
     graph = algebra9()
     assert problems(graph) == []
     assert len(graph["skills"]) == 96
-    assert {unit["id"] for unit in graph["units"]} == set("tkiqalzevgrmhsnbcopwd")
+    assert {unit["id"] for unit in graph["units"]} == set("tkiqalzevgrmhsnbcopwd") | {"t2", "q2", "z2"}
     assert {unit["subject"] for unit in graph["units"]} == {"מתמטיקה"}
 
 
@@ -133,8 +133,9 @@ def test_each_subunit_names_its_units_subject():
 def test_a_class_of_a_split_unit_keeps_its_content():
     from app.main import units_of
     assert units_of({"lessons": ["k"]}) == ["k", "i"]                       # דלתון ומשולש שווה שוקיים
-    assert units_of({"lessons": ["m", "t"]}) == ["t", "m", "b", "c"]        # מלבן, מעוין וריבוע
+    assert units_of({"lessons": ["m", "t"]}) == ["t", "t2", "m", "b", "c"]       # מלבן, מעוין וריבוע
     assert units_of({"lessons": ["i"]}) == ["i"]
+    assert units_of({"lessons": ["t", "z"]}) == ["t", "t2", "z", "z2", "g"]  # both parts of a long unit
     assert units_of({}) == [unit["id"] for unit in algebra9()["units"]]
 
 
@@ -155,3 +156,10 @@ def test_open_ended_questions_are_locked_by_default(monkeypatch):
             skills = (await client.get("/api/math/skills")).json()["skills"]
             assert all(not s.get("locked") for s in skills)   # without answer storage the choice version is served
     asyncio.run(check())
+
+
+def test_no_unit_has_more_than_six_subunits():
+    from collections import Counter
+    graph = algebra9()
+    count = Counter(skill["unit"] for skill in graph["skills"])
+    assert all(1 <= count[unit["id"]] <= 6 for unit in graph["units"]), count

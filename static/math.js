@@ -118,20 +118,19 @@ function drawSubjectPicker(){
 }
 function selectSubject(subject){
   ACTIVE_SUBJECT=subject;
-  if(subject==="מתמטיקה")return draw();
+  if(subject==="מתמטיקה")return setView(VIEW);
   nav.hidden=true;
   const [icon,tone]=examLooks[subject]||["●","other"];
   path.innerHTML=`<header class="mx-top"><div><h1>${esc(subject)}</h1><p class="mx-sub">המקצועות שלי</p></div><button class="mx-btn" data-act="subjects">לכל המקצועות</button></header><section class="mx-subject-empty exam-${tone}"><span aria-hidden="true">${icon}</span><h2>המסלול של ${esc(subject)} עדיין לא זמין</h2><p>לוח המבחנים של המקצוע כבר מחובר לכיתה. כשהמסלול יתווסף, הוא ייפתח מכאן.</p><button class="mx-btn solid" data-act="subjects">חזרה למקצועות</button></section>`;
 }
 
-/* The math screens: home (what to do now), the path (each unit a constellation of its skills) and the collection.
+/* The math screens: home (what you gathered and your streak on top, the path below it) and the collection.
    The rules of the stars, the streak and the comets, and their pictures, are in math-sky.js. */
 const Sky=window.MathlySky;
-let VIEW="home", TRAIL=null;   // TRAIL: watches the path's size to redraw its line
+let VIEW="path", TRAIL=null;   // TRAIL: watches the path's size to redraw its line
 const SOUND_ON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const SOUND_OFF='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-const TABS=[["home","בית",'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 11h2.7v9.5h5.3v-6h3v6h5.3V11h2.7Z"/></svg>'],
-  ["path","המסלול",`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${Sky.SPARK}" transform="translate(6 1) scale(.42)"/><path d="${Sky.SPARK}" transform="translate(1 12) scale(.4)"/><path d="${Sky.SPARK}" transform="translate(13 13) scale(.45)"/><path d="M9 7 5.5 15M14 6.5l3.5 9" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2" fill="none"/></svg>`],
+const TABS=[["path","בית",'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 11h2.7v9.5h5.3v-6h3v6h5.3V11h2.7Z"/></svg>'],
   ["sky","האוסף",`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" opacity=".35"/><path d="${Sky.SPARK}" transform="translate(12.5 12.5) scale(.33)"/><path d="${Sky.SPARK}" transform="translate(3.5 3.5) scale(.33)"/></svg>`]];
 const STATE_NAME={gold:"כוכב זהב",lit:"הושלמה",fading:"הושלמה, הכוכב דועך",next:"הכוכב הבא",open:"פתוחה",off:"סגורה כרגע"};
 const mineUnits=()=>G.units.filter(u=>SHOWN.has(u.id));
@@ -164,10 +163,13 @@ function nextExam(){
 function topBar(){
   const st=skyStats(), hot=Sky.today(P)>=Sky.GOAL, manage=can("management.access"), on=Sky.soundOn(), streak=Sky.streak(P);
   return `<header class="mx-top"><div class="mx-brand">${Sky.spark()}<span>מתמטיקה</span></div>
-    <div class="mx-stats"><span class="sky-chip flame${hot?"":" cold"}" title="${streak} ימים ברצף">${Sky.FLAME}<b>${streak}</b><span class="mx-sr">ימים ברצף</span></span>
+    <div class="mx-acts">${subjectOptions().length?'<button class="mx-btn" data-act="subjects">מקצועות</button>':""}${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
+    <div class="mx-hud"><div class="mx-stats">
+      <button class="sky-chip flame${hot?"":" cold"}" data-act="streak" title="${streak} ימים ברצף">${Sky.FLAME}<b>${streak}</b><span class="mx-sr">ימים ברצף</span></button>
       <span class="sky-chip stars" title="${st.lit} כוכבים">${Sky.spark()}<b>${st.lit}</b><span class="mx-sr">כוכבים</span></span>
-      <button class="sky-chip snd" data-act="sound" aria-pressed="${on}" aria-label="צלילים">${on?SOUND_ON:SOUND_OFF}</button></div>
-    <div class="mx-acts">${subjectOptions().length?'<button class="mx-btn" data-act="subjects">מקצועות</button>':""}${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>`;
+      <span class="sky-chip golds" title="${st.gold} כוכבי זהב">${Sky.spark()}<b>${st.gold}</b><span class="mx-sr">כוכבי זהב</span></span>
+      <span class="sky-chip comets" title="${P.comets.length} שביטים"><i aria-hidden="true">☄</i><b>${P.comets.length}</b><span class="mx-sr">שביטים</span></span>
+      <button class="sky-chip snd" data-act="sound" aria-pressed="${on}" aria-label="צלילים">${on?SOUND_ON:SOUND_OFF}</button></div></div>`;
 }
 function counts(st){
   return `<div class="mx-counts"><div><b>${st.lit}</b><small>מתוך ${st.total} כוכבים</small></div><div class="g"><b>${st.gold}</b><small>כוכבי זהב</small></div>
@@ -183,40 +185,53 @@ function conSvg(u,animate=false){
 }
 const pips=(u,fresh)=>`<div class="sky-pips" aria-hidden="true">${unitIds(u).filter(live).map(id=>Sky.spark(`${P.gold[id]?"g":P.done[id]?"l":""}${id===fresh?" new":""}`)).join("")}</div>`;
 
-function homeView(){
-  const st=skyStats(), nxt=next(), exam=nextExam(), n=Sky.today(P), goal=Sky.GOAL, done=n>=goal, streak=Sky.streak(P);
-  const hour=new Date().getHours(), hi=hour<5?"לילה טוב":hour<12?"בוקר טוב":hour<17?"צהריים טובים":"ערב טוב", who=CFG.name?`, ${esc(CFG.name)}`:"";
-  const soon=exam&&exam.days<=14, fade=st.fading.length;
-  const say=done?`${hi}${who}! היעד של היום הושלם: <b>${streak===1?"יום אחד":`${streak} ימים`} ברצף</b>. עוד כוכב לפני שמסיימים?`
-    :soon?`${hi}${who}! המבחן ב${esc(exam.subject)} <b>${inDays(exam.days)}</b>. נתחיל בחימום קצר?`
-    :fade?`${hi}${who}! ${fade===1?"כוכב אחד התחיל":`${fade} כוכבים התחילו`} לדעוך. חזרה קצרה תחזיר להם את האור.`
-    :!st.lit?`${hi}${who}! אני הינשוף, ואלווה אתכם במסלול. כל מיומנות היא כוכב. בואו נדליק את הראשון.`
-    :`${hi}${who}! כבר יש לכם <b>${st.lit} כוכבים</b>. בואו נדליק עוד אחד.`;
-  // what to do now, at most three: the next star, the faded stars, a star that can turn gold
-  const acts=[], qn=id=>QS(BY[id]).length===1?"שאלה אחת":`${QS(BY[id]).length} שאלות`;
-  if(nxt) acts.push({id:nxt,tag:soon?`הכנה למבחן · ${inDays(exam.days)}`:"הכוכב הבא",title:fmt(BY[nxt].name),meta:`${esc(unitOf(nxt).name)} · ${qn(nxt)}`});
-  if(fade) acts.push({id:st.fading[0],tag:"חזרה קצרה",title:fade===1?"להאיר כוכב דועך":`להאיר ${fade} כוכבים דועכים`,meta:`מתחילים ב: ${fmt(BY[st.fading[0]].short)}`});
-  const hunt=ORDER.filter(id=>SHOWN.has(BY[id].unit)&&live(id)&&P.done[id]&&!P.gold[id]&&!Sky.fading(P,id)).sort((a,b)=>seenAt(b)-seenAt(a))[0];
-  if(hunt) acts.push({id:hunt,tag:"מטרה: כוכב זהב",title:fmt(BY[hunt].name),meta:goldNeed(hunt)===1?"תשובה נכונה בניסיון הראשון הופכת אותו לזהב":`${goldNeed(hunt)} תשובות נכונות ברצף הופכות אותו לזהב`});
-  const units=mineUnits(), at=nxt?units.findIndex(u=>u.id===BY[nxt].unit):units.length-1, from=Math.max(0,Math.min(at-1,units.length-4));
-  const examRows=(MY_CLASS?[MY_CLASS]:MY_CLASSES).filter(row=>(row.exams||[]).length);
-  return `${topBar()}
-    <section class="mx-greet"><div class="mx-owl">${Sky.owl(84)}</div><p class="mx-bubble">${say}</p></section>
-    <section class="mx-todo" aria-labelledby="mxTodo"><h2 id="mxTodo">מה עושים עכשיו</h2>
-      ${acts.length?acts.map((a,i)=>`<button class="mx-task u-${BY[a.id].unit}${i?"":" hero"}" data-id="${a.id}">
-        <span class="mx-ticon">${Sky.spark()}</span><span class="mx-tbody"><small>${a.tag}</small><b>${a.title}</b><span>${a.meta}</span></span>
-        <span class="mx-tgo" aria-hidden="true">${i?"‹":"להתחיל"}</span></button>`).join("")
-        :'<p class="mx-note">כל הכוכבים דולקים בזהב. איזה שמיים! אפשר לחזור לכל מיומנות מהמסלול.</p>'}
-    </section>
-    <section class="mx-goal"><div class="mx-goalring${done?" done":""}" style="--p:${Math.min(100,Math.round(100*n/goal))}"><div>${Sky.FLAME}<b>${Math.min(n,goal)}/${goal}</b></div></div>
-      <div><h3>${done?"היעד היומי הושלם":`היעד היומי: ${goal} תשובות נכונות`}</h3>
-        <p>${done?"הרצף נשמר. נתראה מחר.":`עוד ${goal-n} והרצף ממשיך. יום אחד שמפספסים לא שובר אותו.`}</p>
-        <div class="mx-week">${Sky.week(P).map(d=>`<span class="${d.on?"on":""}${d.today?" today":""}"><i></i>${d.label}</span>`).join("")}</div></div></section>
-    ${examRows.map(row=>examBoard(row,true)).join("")}
-    <button class="mx-mysky" data-view="sky"><span class="mx-sh"><b>השמיים שלי</b><span>לאוסף ‹</span></span>
-      <span class="mx-minis">${units.slice(from,from+4).map(u=>{const lit=unitIds(u).some(id=>P.done[id]);
-        return `<span class="u-${u.id}">${conSvg(u)}<small>${lit?esc(Sky.shape(u.id,1,u.name).name):"?"}</small></span>`;}).join("")}</span>
-      ${counts(st)}</button>`;
+// today's goal: right answers so far; opens the streak calendar
+function daily(){
+  const n=Sky.today(P), goal=Sky.GOAL, done=n>=goal, streak=Sky.streak(P);
+  return `<button class="mx-daily${done?" done":""}" data-act="streak"><span class="mx-dline">${Sky.FLAME}
+      <b>${done?"היעד היומי הושלם":`היעד היומי: ${Math.min(n,goal)}/${goal} תשובות נכונות`}</b><span class="mx-dgo">לוח הרצף ‹</span></span>
+    <span class="mx-meter" aria-hidden="true"><i style="width:${Math.min(100,Math.round(100*n/goal))}%"></i></span>
+    <small>${done?`${streak===1?"יום אחד":`${streak} ימים`} ברצף. נתראה מחר!`:`עוד ${goal-n} והרצף ${streak?"ממשיך":"מתחיל"}.`}</small></button>`;
+}
+/* The streak calendar, a month at a time: days whose goal was met are joined in one band, a forgiven day sits
+   in the band in ice, practice short of the goal is a small dot. */
+let CAL=null;   // the month shown: {y,m}
+const MONTH=new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"});
+function showStreak(step=0){
+  const now=new Date();
+  if(!step||!CAL) CAL={y:now.getFullYear(),m:now.getMonth()};
+  else{ const d=new Date(CAL.y,CAL.m+step,1); CAL={y:d.getFullYear(),m:d.getMonth()}; }
+  const keys=Object.keys(P.days||{}).sort(), first=keys[0]?keys[0].slice(0,7):Sky.dayKey(now).slice(0,7);
+  const ym=`${CAL.y}-${String(CAL.m+1).padStart(2,"0")}`, atStart=ym<=first, atNow=ym>=Sky.dayKey(now).slice(0,7);
+  const streak=Sky.streak(P), best=Math.max(Sky.best(P),streak), n=Sky.today(P), goal=Sky.GOAL;
+  const cells=Sky.month(P,CAL.y,CAL.m,now), on=c=>c&&(c.state==="met"||c.state==="saved");
+  const metHere=cells.filter(c=>c?.state==="met").length;
+  const grid=cells.map((c,i)=>{
+    if(!c) return '<span class="mx-cday blank"></span>';
+    const col=i%7, prev=col>0&&on(cells[i-1]), nxt=col<6&&on(cells[i+1]);
+    const cls=["mx-cday",c.state&&`s-${c.state}`,on(c)&&prev&&"jp",on(c)&&nxt&&"jn",c.today&&"today",c.future&&"future"].filter(Boolean).join(" ");
+    const say=c.state==="met"?"היעד הושלם":c.state==="saved"?"יום שנסלח":c.state==="some"?"תרגול בלי יעד":"";
+    return `<span class="${cls}"${say?` title="${say}"`:""}><b>${c.day}</b>${say?`<span class="mx-sr">${say}</span>`:""}</span>`;
+  }).join("");
+  if(!cur) back=document.activeElement;
+  cur="streak";
+  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div><div class="mx-sheet mx-streak-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+    <div class="mx-shtop"><h3 id="mxTitle">הרצף שלי</h3><button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+    <div class="mx-shero${n>=goal?"":" cold"}">${Sky.FLAME}<div><b>${streak}</b><span>${streak===1?"יום ברצף":"ימים ברצף"}</span></div></div>
+    <p class="mx-ssay">${n>=goal?"היעד של היום הושלם. הרצף נשמר!":`עוד ${goal-n} תשובות נכונות היום כדי ${streak?"להמשיך":"להתחיל"} את הרצף.`}</p>
+    <div class="mx-sstats"><div><b>${best}</b><small>הרצף הארוך ביותר</small></div><div><b>${metHere}</b><small>ימי יעד בחודש</small></div></div>
+    <div class="mx-cal"><div class="mx-calhead"><button class="mx-calnav" data-act="cal-prev" aria-label="החודש הקודם"${atStart?" disabled":""}>›</button>
+        <b aria-live="polite">${MONTH.format(new Date(CAL.y,CAL.m,1))}</b>
+        <button class="mx-calnav" data-act="cal-next" aria-label="החודש הבא"${atNow?" disabled":""}>‹</button></div>
+      <div class="mx-calgrid">${["א","ב","ג","ד","ה","ו","ש"].map(d=>`<span class="mx-cdow">${d}</span>`).join("")}${grid}</div>
+      <div class="mx-calkey"><span><i class="k-met"></i>יעד הושלם</span><span><i class="k-saved"></i>יום שנסלח</span><span><i class="k-some"></i>תרגול בלי יעד</span></div></div>
+    <p class="mx-note">יום נספר ברצף כשעונים בו נכון על ${goal} שאלות. יום אחד שמפספסים לא שובר את הרצף, ושניים ברצף כן.</p></div>`;
+  sheet.hidden=false; sheet.querySelector(step>0?"[data-act=cal-next]":step<0?"[data-act=cal-prev]":".mx-x").focus({preventScroll:true});
+}
+// a short line about the class's next exam, when it is two weeks away or less
+function examSoon(){
+  const exam=nextExam();
+  return exam&&exam.days<=14?`<button class="mx-examsoon" data-view="sky"><b>המבחן ב${esc(exam.subject)} ${inDays(exam.days)}</b><span>ללוח המבחנים ‹</span></button>`:"";
 }
 
 /* The path: one winding trail from the start through every skill, unit after unit (a banner opens each unit).
@@ -234,7 +249,7 @@ function pathView(){
     return `<section class="mx-unit u-${u.id}${unitDone(u)?" full":""}" id="mx-unit-${u.id}"><div class="mx-uhead">
       <h2>${esc(u.name)}</h2><span class="mx-pill">${lit}/${act.length}</span>${u.when?`<span class="mx-usub">${esc(u.when)}</span>`:""}</div></section>${steps}`;
   }).join("");
-  return `${topBar()}<div class="mx-pghead"><h1>המסלול שלי</h1><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
+  return `${topBar()}${daily()}${examSoon()}<div class="mx-pghead"><h2>המסלול שלי</h2><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
     <div class="mx-trail"><svg class="mx-line" aria-hidden="true"></svg>
       <div class="mx-start"><span class="mx-flag">${Sky.owl(40)}</span><b>התחלה</b></div>${units}
       <div class="mx-finish" aria-hidden="true">${Sky.spark()}<b>סוף המסלול</b></div></div>
@@ -264,12 +279,13 @@ function collectionView(){
     <div class="mx-sh"><h2>שביטים נדירים</h2><span>${P.comets.length} מתוך ${Sky.COMETS.length}</span></div>
     <p class="mx-note">שביטים חולפים לפעמים על המסך בזמן תרגול. מי שלוחץ עליהם בזמן תופס אותם.</p>
     <div class="mx-comets">${Sky.COMETS.map(c=>{ const have=P.comets.includes(c.id);
-      return `<button class="mx-comet${have?" have":""}" data-comet="${c.id}" aria-label="${have?esc(c.name):"שביט שעוד לא נתפס"}"><span class="sym">${have?esc(c.sym):"?"}</span><small>${have?esc(c.name):"עוד לא נתפס"}</small></button>`; }).join("")}</div>`;
+      return `<button class="mx-comet${have?" have":""}" data-comet="${c.id}" aria-label="${have?esc(c.name):"שביט שעוד לא נתפס"}"><span class="sym">${have?esc(c.sym):"?"}</span><small>${have?esc(c.name):"עוד לא נתפס"}</small></button>`; }).join("")}</div>
+    ${(MY_CLASS?[MY_CLASS]:MY_CLASSES).filter(row=>(row.exams||[]).length).map(row=>examBoard(row,true)).join("")}`;
 }
 
 function draw(){
   Sky.ensure(P);
-  path.innerHTML=VIEW==="path"?pathView():VIEW==="sky"?collectionView():homeView();
+  path.innerHTML=VIEW==="sky"?collectionView():pathView();
   TRAIL?.disconnect(); TRAIL=null;
   if(VIEW==="path"){ const box=path.querySelector(".mx-trail"); TRAIL=new ResizeObserver(()=>trail(box)); TRAIL.observe(box); }
   nav.hidden=false;
@@ -414,6 +430,9 @@ function onClick(e){
     case "manage-lab": return showManageMode("lab");
     case "manage-practice": return closeSheet();
     case "subjects": return drawSubjectPicker();
+    case "streak": return showStreak();
+    case "cal-prev": return showStreak(-1);
+    case "cal-next": return showStreak(1);
     case "sound": Sky.setSound(!Sky.soundOn()); Sky.sound.tap(); return draw();
     case "phone": return pairPhone();
     case "copy-phone": return copyPhone(t);

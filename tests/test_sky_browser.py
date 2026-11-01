@@ -55,7 +55,7 @@ def page_with(browser, server, progress=None, no_chance=False):
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(server)
-    playwright.expect(page.locator(".mx-greet")).to_be_visible()
+    playwright.expect(page.locator(".mx-trail")).to_be_visible()   # home is the path
     return page, errors
 
 
@@ -78,9 +78,8 @@ def answer_skill_right(page):
 
 def test_clean_run_turns_the_next_star_gold(browser, server):
     page, errors = page_with(browser, server)
-    playwright.expect(page.locator(".mx-task.hero small")).to_have_text("הכוכב הבא")
-    nxt = page.locator(".mx-task.hero").get_attribute("data-id")
-    page.locator(".mx-task.hero").click()
+    nxt = page.locator(".mx-star.st-next").get_attribute("data-id")
+    page.locator(".mx-star.st-next").click()
     answer_skill_right(page)
     playwright.expect(page.locator(".sky-cele h2").first).to_have_text("כוכב זהב!")
     while page.locator(".sky-cele [data-sky=go]").count():
@@ -98,9 +97,6 @@ def test_clean_run_turns_the_next_star_gold(browser, server):
 def test_a_faded_star_comes_first_and_one_answer_brightens_it(browser, server):
     old = (datetime.now(timezone.utc) - timedelta(days=20)).isoformat()
     page, errors = page_with(browser, server, {"done": {"t_ext": old}, "seen": {"t_ext": old}, "solved": {"t_ext": list(range(10))}})
-    task = page.locator(".mx-task", has_text="להאיר כוכב דועך")
-    playwright.expect(task).to_have_attribute("data-id", "t_ext")
-    page.locator('.mx-nav [data-view="path"]').click()
     playwright.expect(page.locator('.mx-star[data-id="t_ext"]')).to_have_class("mx-node mx-star st-fading")
     page.locator('.mx-star[data-id="t_ext"]').click()
     page.locator(".mx-choices button[data-right]").first.click()
@@ -114,12 +110,24 @@ def test_streak_forgives_one_missed_day_not_two(browser, server):
     day = lambda n: (date.today() - timedelta(days=n)).isoformat()
     page, _ = page_with(browser, server, {"days": {day(1): 5, day(3): 6, day(4): 5, day(7): 5}})
     playwright.expect(page.locator(".sky-chip.flame b")).to_have_text("3")   # 1, 3, 4; days 5 and 6 both missed
-    playwright.expect(page.locator(".mx-week .on")).to_have_count(3)
+    page.locator(".mx-hud .sky-chip.flame").click()                     # the streak calendar
+    sheet = page.locator(".mx-streak-sheet")
+    playwright.expect(sheet.locator(".mx-shero b")).to_have_text("3")
+    playwright.expect(sheet.locator(".mx-sstats b").first).to_have_text("3")   # the longest streak
+    met = saved = 0
+    for _ in range(2):   # the last week can start in the month before
+        met += sheet.locator(".mx-cday.s-met").count()
+        saved += sheet.locator(".mx-cday.s-saved").count()
+        prev = sheet.locator("[data-act=cal-prev]")
+        if prev.is_disabled():
+            break
+        prev.click()
+    assert (met, saved) == (4, 1)   # day 2 is forgiven; days 5 and 6 are not
 
 
 def test_a_caught_comet_joins_the_collection(browser, server):
     page, errors = page_with(browser, server, no_chance=True)
-    page.locator(".mx-task.hero").click()
+    page.locator(".mx-star.st-next").click()
     answer_skill_right(page)                                 # the first gold star of all brings a comet
     while page.locator(".sky-cele [data-sky=go]").count():
         page.locator(".sky-cele [data-sky=go]").first.click()
@@ -132,4 +140,19 @@ def test_a_caught_comet_joins_the_collection(browser, server):
     page.locator(".mx-x").click()
     page.locator('.mx-nav [data-view="sky"]').click()
     playwright.expect(page.locator(".mx-comet.have")).to_have_count(1)
+    assert not errors
+
+
+def test_home_shows_the_tally_on_top_and_opens_at_the_next_skill(browser, server):
+    done = {i: "2026-01-01T00:00:00+00:00" for i in ["t_ext"]}
+    page, errors = page_with(browser, server, {"done": done, "solved": {"t_ext": list(range(10))}})
+    playwright.expect(page.locator(".mx-hud .sky-chip.stars b")).to_have_text("1")
+    playwright.expect(page.locator(".mx-hud .sky-chip.flame")).to_be_visible()
+    playwright.expect(page.locator(".mx-nav button")).to_have_count(2)
+    nxt = page.locator(".mx-star.st-next")
+    playwright.expect(nxt).to_be_in_viewport()
+    page.evaluate("document.getElementById('mathView').scrollTo(0, 99999)")   # the tally stays on top while scrolling
+    playwright.expect(page.locator(".mx-hud")).to_be_in_viewport()
+    page.locator(".mx-daily").click()
+    playwright.expect(page.locator(".mx-streak-sheet .mx-cday.today")).to_have_count(1)
     assert not errors

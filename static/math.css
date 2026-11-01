@@ -28,7 +28,7 @@ html.math-on, html.math-on body{overflow:hidden}
 #mathView .u-w{--uc:var(--u-w)} #mathView .u-d{--uc:var(--u-d)}
 /* units split off an older unit keep its colour */
 #mathView .u-i{--uc:var(--u-k)} #mathView .u-l,#mathView .u-o{--uc:var(--u-a)} #mathView .u-v{--uc:var(--u-e)}
-#mathView .u-g{--uc:var(--u-z)} #mathView .u-b,#mathView .u-c{--uc:var(--u-m)}
+#mathView .u-g,#mathView .u-z2{--uc:var(--u-z)} #mathView .u-t2{--uc:var(--u-t)} #mathView .u-q2{--uc:var(--u-q)} #mathView .u-b,#mathView .u-c{--uc:var(--u-m)}
 #mathView h1,#mathView h2,#mathView h3{font-family:var(--f-display);font-weight:400;margin:0;text-wrap:balance}
 #mathView button{font-family:var(--f-body)}
 #mathView button:focus-visible{outline:3px solid var(--mx-accent);outline-offset:2px}
@@ -306,13 +306,16 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-brand{display:flex;align-items:center;gap:8px;font:400 24px/1 var(--f-display)}
 .mx-brand svg{width:22px;height:22px;fill:var(--gold);filter:drop-shadow(0 0 6px var(--gold))}
 .mx-stats{display:flex;gap:6px;margin-inline-start:auto}
-.mx-top .mx-acts{width:100%;justify-content:flex-start}
 .mx-top .mx-acts:empty{display:none}
-@media (min-width:600px){.mx-top .mx-acts{width:auto}}
+/* what was gathered and the streak: stays on top while the path scrolls under it */
+.mx-hud{position:sticky;top:calc(-1 * max(12px, env(safe-area-inset-top, 0px)));z-index:5;margin:-6px -16px 0;padding:max(12px, env(safe-area-inset-top, 0px)) 16px 10px;
+  background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.mx-hud .mx-stats{justify-content:space-between;margin:0;flex-wrap:wrap}
 .sky-chip{display:flex;align-items:center;gap:5px;padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font:700 15px/1 var(--f-body);font-variant-numeric:tabular-nums}
 .sky-chip svg{width:17px;height:17px;fill:currentColor}
 .sky-chip.flame svg{fill:var(--ember)}.sky-chip.flame.cold svg{fill:var(--dim)}
-.sky-chip.stars svg{fill:var(--gold)}
+.sky-chip.stars svg{fill:var(--starlight)}.sky-chip.golds svg{fill:var(--gold);filter:drop-shadow(0 0 4px var(--gold))}
+.sky-chip.comets i{font-style:normal;font-size:16px;line-height:1;color:var(--aurora)}
 button.sky-chip{padding:6px 9px;color:var(--muted);cursor:pointer}
 
 /* the owl */
@@ -324,46 +327,10 @@ button.sky-chip{padding:6px 9px;color:var(--muted);cursor:pointer}
 .sky-owl .o-lid{fill:var(--owl);transform-box:fill-box;transform-origin:center;transform:scaleY(0);animation:sky-blink 5.5s infinite}
 @keyframes sky-blink{0%,94%,100%{transform:scaleY(0)}96%,98%{transform:scaleY(1)}}
 
-/* home */
-.mx-greet{display:grid;grid-template-columns:84px minmax(0,1fr);gap:10px;align-items:end}
-.mx-owl .sky-owl{animation:sky-hop .7s .2s cubic-bezier(.3,1.8,.5,1) both}
-@keyframes sky-hop{0%{transform:translateY(12px);opacity:0}100%{transform:none;opacity:1}}
-.mx-bubble{position:relative;margin:0;padding:12px 14px;border-radius:18px 18px 4px 18px;background:var(--surface-2);border:1px solid var(--line);font-size:16px;line-height:1.5}
-.mx-bubble b{color:var(--gold)}
-.mx-todo{display:flex;flex-direction:column;gap:10px}
-.mx-todo h2,.mx-sh h2{font-size:21px}
-.mx-task{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 14px;border:1px solid var(--line);border-radius:18px;background:var(--surface);color:var(--ink);text-align:start;cursor:pointer;transition:transform .15s,border-color .15s}
-.mx-task:hover{transform:translateY(-2px);border-color:var(--uc)}
-.mx-task:active{transform:scale(.98)}
-.mx-ticon{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--uc) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--uc) 40%,transparent)}
-.mx-ticon svg{width:26px;height:26px;fill:var(--uc);filter:drop-shadow(0 0 6px var(--uc))}
-.mx-tbody{display:flex;flex-direction:column;gap:2px;min-width:0}
-.mx-tbody small{color:var(--uc);font-weight:700;font-size:12.5px}
-.mx-tbody b{font-size:16.5px;line-height:1.3}
-.mx-tbody span{color:var(--muted);font-size:13px}
-.mx-tgo{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);color:var(--muted);font-size:18px}
-.mx-task.hero{padding:16px;border-color:color-mix(in srgb,var(--aurora) 50%,var(--line));background:linear-gradient(160deg,color-mix(in srgb,var(--aurora) 12%,var(--surface)),var(--surface) 60%)}
-.mx-task.hero .mx-tgo{width:auto;height:auto;padding:9px 15px;border-radius:12px;background:var(--aurora);color:var(--on-aurora);font-weight:700;font-size:15px;box-shadow:0 4px 0 color-mix(in srgb,var(--aurora) 45%,#000)}
-.mx-goal{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
-.mx-goal h3{font-size:18px}.mx-goal p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
-.mx-goalring{width:78px;height:78px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(closest-side,var(--surface) 80%,transparent 82%),conic-gradient(var(--ember) calc(var(--p)*1%),var(--ember-bg) 0)}
-.mx-goalring.done{background:radial-gradient(closest-side,var(--surface) 80%,transparent 82%),var(--gold);box-shadow:0 0 18px color-mix(in srgb,var(--gold) 45%,transparent)}
-.mx-goalring div{text-align:center;line-height:1}
-.mx-goalring svg{width:24px;height:24px;fill:var(--ember);display:block;margin:0 auto 2px}
-.mx-goalring.done svg{fill:var(--gold)}
-.mx-goalring b{font:700 17px/1 var(--f-body);font-variant-numeric:tabular-nums}
-.mx-week{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
-.mx-week span{width:26px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--muted)}
-.mx-week i{width:20px;height:20px;border-radius:50%;border:2px solid var(--line)}
-.mx-week .on i{background:var(--ember);border-color:var(--ember);box-shadow:0 0 8px color-mix(in srgb,var(--ember) 60%,transparent)}
-.mx-week .today i{border-color:var(--ember);border-style:dashed}.mx-week .today.on i{border-style:solid}
-.mx-mysky{display:flex;flex-direction:column;gap:12px;padding:14px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,var(--night-2),var(--surface));color:var(--ink);text-align:start;cursor:pointer}
+.mx-sh h2{font-size:21px}
 .mx-sh{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
 .mx-sh b{font:400 21px/1.15 var(--f-display)}
 .mx-sh>span{color:var(--aurora);font-size:14px}
-.mx-minis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.mx-minis .mx-con{height:64px}
-.mx-minis>span{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted);font-size:12px;text-align:center}
 .mx-counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;text-align:center}
 .mx-counts div{padding:8px 4px;border-radius:12px;background:var(--surface-2)}
 .mx-counts b{display:block;font:400 22px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
@@ -382,7 +349,55 @@ line.draw{stroke-dasharray:500;stroke-dashoffset:500;animation:sky-draw 1.1s eas
 
 /* the path */
 .mx-pghead{display:flex;flex-direction:column;gap:2px}
-.mx-pghead h1{font-size:30px;color:var(--ink)}
+.mx-pghead h1,.mx-pghead h2{font-size:26px;color:var(--ink)}
+/* today's goal, above the path; opens the streak calendar */
+.mx-daily{display:flex;flex-direction:column;gap:8px;width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:18px;background:var(--surface);color:var(--ink);font:inherit;text-align:start;cursor:pointer;transition:border-color .15s}
+.mx-daily:hover{border-color:var(--ember)}
+.mx-daily small{color:var(--muted);font-size:13px}
+.mx-dline{display:flex;align-items:center;gap:8px;font-size:15px}
+.mx-dline b{flex:1;min-width:0}
+.mx-dgo{color:var(--muted);font-size:13px;white-space:nowrap}
+.mx-dline svg{width:20px;height:20px;fill:var(--ember)}.mx-daily.done .mx-dline svg{fill:var(--gold)}
+.mx-meter{display:block;height:10px;border-radius:999px;background:var(--ember-bg);overflow:hidden}
+.mx-meter i{display:block;height:100%;border-radius:inherit;background:var(--ember);transition:width .4s}
+.mx-daily.done .mx-meter i{background:var(--gold)}
+button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
+/* the streak calendar */
+.mx-streak-sheet{--ice:#8FD3FF;--ice-bg:#16304A}
+.mx-shero{display:flex;align-items:center;justify-content:center;gap:12px;padding:6px 0}
+.mx-shero svg{width:64px;height:64px;fill:var(--ember);filter:drop-shadow(0 0 14px color-mix(in srgb,var(--ember) 60%,transparent))}
+.mx-shero.cold svg{fill:var(--dim);filter:none}
+.mx-shero div{display:flex;flex-direction:column;line-height:1}
+.mx-shero b{font:400 54px/1 var(--f-display);color:var(--ember);font-variant-numeric:tabular-nums}
+.mx-shero.cold b{color:var(--ink)}
+.mx-shero span{color:var(--muted);font-size:15px;margin-top:4px}
+.mx-ssay{text-align:center;color:var(--ink)}
+.mx-sstats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mx-sstats div{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+.mx-sstats b{font:700 22px/1 var(--f-body);font-variant-numeric:tabular-nums}.mx-sstats small{color:var(--muted);font-size:12.5px}
+.mx-cal{padding:12px;border:1px solid var(--line);border-radius:16px;background:var(--bg)}
+.mx-calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.mx-calhead b{font:400 18px/1.2 var(--f-display)}
+.mx-calnav{width:36px;height:36px;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--ink);font-size:20px;line-height:1;cursor:pointer}
+.mx-calnav:disabled{opacity:.3;cursor:default}
+.mx-calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));row-gap:6px}
+.mx-cdow{text-align:center;color:var(--muted);font-size:12px;padding-bottom:4px}
+.mx-cday{position:relative;display:grid;place-items:center;height:40px}
+.mx-cday b{position:relative;z-index:1;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;font:500 14px/1 var(--f-body);font-variant-numeric:tabular-nums;color:var(--muted)}
+.mx-cday.jp::before,.mx-cday.jn::after{content:"";position:absolute;top:3px;bottom:3px;width:50%;background:color-mix(in srgb,var(--ember) 32%,transparent)}
+.mx-cday.jp::before{inset-inline-start:0}.mx-cday.jn::after{inset-inline-end:0}
+.mx-cday.s-met b{background:var(--ember);color:#2A0E05;font-weight:700}
+.mx-cday.s-saved b{background:var(--ice-bg);color:var(--ice);box-shadow:inset 0 0 0 2px var(--ice);font-weight:700}
+.mx-cday.s-some b::after{content:"";position:absolute;bottom:4px;width:5px;height:5px;border-radius:50%;background:var(--ember)}
+.mx-cday.today b{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--aurora);color:var(--ink)}
+.mx-cday.today.s-met b{color:#2A0E05}
+.mx-cday.future b{color:var(--dim)}
+.mx-calkey{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 14px;margin-top:10px;color:var(--muted);font-size:12px}
+.mx-calkey span{display:flex;align-items:center;gap:5px}
+.mx-calkey i{width:12px;height:12px;border-radius:50%}
+.k-met{background:var(--ember)}.k-saved{background:var(--ice-bg);box-shadow:inset 0 0 0 2px var(--ice)}.k-some{width:6px!important;height:6px!important;background:var(--ember)}
+.mx-examsoon{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;border:1px solid color-mix(in srgb,var(--ember) 50%,var(--line));border-radius:14px;background:var(--ember-bg);color:var(--ink);font-size:15px;text-align:start;cursor:pointer}
+.mx-examsoon span{color:var(--muted);font-size:13px;white-space:nowrap}
 /* one winding trail: start, then each unit's banner and its skills, then the finish; the line is drawn behind */
 .mx-trail{position:relative;display:flex;flex-direction:column;align-items:center;gap:22px;padding-block:6px 10px;--amp:min(90px,22vw)}
 .mx-line{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
@@ -392,7 +407,7 @@ line.draw{stroke-dasharray:500;stroke-dashoffset:500;animation:sky-draw 1.1s eas
 .mx-flag{display:grid;place-items:center;width:64px;height:64px;border-radius:50%;background:var(--surface-2);border:3px solid var(--aurora)}
 .mx-start b{color:var(--aurora)}
 .mx-finish>svg{width:30px;height:30px;fill:var(--dim)}
-.mx-unit{position:relative;width:100%;padding:12px 16px;border-radius:16px;background:var(--surface);border:1px solid color-mix(in srgb,var(--uc) 45%,var(--line));scroll-margin-top:12px}
+.mx-unit{position:relative;width:100%;padding:12px 16px;border-radius:16px;background:var(--surface);border:1px solid color-mix(in srgb,var(--uc) 45%,var(--line));scroll-margin-top:72px}
 .mx-uhead{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap}
 .mx-uhead h2{font-size:20px;color:var(--uc);flex:1;min-width:0}
 .mx-unit.full .mx-uhead h2::after{content:" ✦";color:var(--gold)}
@@ -445,7 +460,7 @@ line.draw{stroke-dasharray:500;stroke-dashoffset:500;animation:sky-draw 1.1s eas
 .mx-nav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);
   padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
 .mx-nav[hidden]{display:none}
-.mx-nav>div{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr)}
+.mx-nav>div{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(2,1fr)}
 .mx-nav button{border:0;background:none;padding:10px 4px 12px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font:500 12.5px/1 var(--f-body);cursor:pointer}
 .mx-nav svg{width:24px;height:24px;fill:currentColor}
 .mx-nav button[aria-current=page]{color:var(--gold)}

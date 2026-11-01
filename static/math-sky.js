@@ -48,9 +48,32 @@ function streak(P,now=new Date()){
   return n;
 }
 const DAY_NAMES=["א","ב","ג","ד","ה","ו","ש"];
-function week(P,now=new Date()){
-  const days=P.days||{};
-  return Array.from({length:7},(_,k)=>{const d=daysBack(6-k,now);return {label:k===6?"היום":DAY_NAMES[d.getDay()],on:(days[dayKey(d)]||0)>=GOAL,today:k===6}});
+/* A day on the streak calendar: "met" (the goal was reached), "saved" (missed, but the streak went on over it:
+   the day before was met and the day after is met, or is today and still open), "some" (practised, short of the
+   goal) or "" (nothing). Today and later are "met" or "" only, since the day is not over. */
+function dayState(P,d,now=new Date()){
+  const days=P.days||{}, n=k=>days[dayKey(k)]||0, met=k=>n(k)>=GOAL, t=dayKey(now), key=dayKey(d);
+  if(met(d)) return "met";
+  if(key>=t) return "";
+  const after=daysBack(-1,d);
+  if(met(daysBack(1,d))&&(met(after)||dayKey(after)===t)) return "saved";
+  return n(d)?"some":"";
+}
+// a month for the calendar, weeks from Sunday: blanks before the 1st, then {day,key,state,today,future}
+function month(P,y,m,now=new Date()){
+  const first=new Date(y,m,1), len=new Date(y,m+1,0).getDate(), t=dayKey(now), cells=Array(first.getDay()).fill(null);
+  for(let i=1;i<=len;i++){ const d=new Date(y,m,i), key=dayKey(d); cells.push({day:i,key,state:dayState(P,d,now),today:key===t,future:key>t}); }
+  return cells;
+}
+// the longest streak ever, by the same rule as streak(): one missed day between met days does not break it
+function best(P,now=new Date()){
+  const keys=Object.keys(P.days||{}).filter(k=>P.days[k]>=GOAL).sort(); if(!keys.length) return 0;
+  const [y,m,d]=keys[0].split("-").map(Number);
+  let top=0, run=0, missed=0;
+  for(const day=new Date(y,m-1,d);dayKey(day)<=dayKey(now);day.setDate(day.getDate()+1)){
+    if((P.days[dayKey(day)]||0)>=GOAL){ run++; missed=0; top=Math.max(top,run); } else if(++missed>1) run=0;
+  }
+  return top;
 }
 
 /* ---------- comets ---------- */
@@ -85,12 +108,15 @@ function catchComet(P){
 const curve=(f,n=48)=>Array.from({length:n+1},(_,i)=>f(i/n));
 const SHAPES={
   t:{name:"הקערה",aspect:.9,pts:curve(s=>[1-s,1-(2*s-1)**2])},
+  t2:{name:"המדרגות",aspect:.75,corners:1,pts:[[1,1],[1,.5],[.5,.5],[.5,0],[0,0]]},
   k:{name:"הדלתון",aspect:1.15,closed:1,corners:1,pts:[[.5,0],[1,.36],[.5,1],[0,.36]],inner:[[[.5,0],[.5,1]],[[0,.36],[1,.36]]]},
   i:{name:"המשולש",aspect:.9,closed:1,corners:1,pts:[[.5,0],[1,1],[0,1]],inner:[[[.5,0],[.5,1]]]},
   q:{name:"הקשת",aspect:.75,pts:curve(s=>[1-s,(2*s-1)**2])},
+  q2:{name:"הפרבולה",aspect:.85,pts:curve(s=>[1-s,1-(2*s-1)**2]),inner:[[[.5,0],[.5,1]]]},
   a:{name:"הזווית",aspect:.7,closed:1,corners:1,pts:[[1,0],[1,1],[0,1]]},
   l:{name:"המשולש הישר",aspect:.75,closed:1,corners:1,pts:[[1,0],[1,1],[0,1]]},
   z:{name:"הטרפז",aspect:.6,closed:1,corners:1,pts:[[.72,0],[1,1],[0,1],[.28,0]]},
+  z2:{name:"הטרפז הישר",aspect:.6,closed:1,corners:1,pts:[[.6,0],[1,1],[0,1],[0,0]]},
   e:{name:"הגבעה",aspect:.55,pts:curve(s=>[1-s,1-Math.sin(Math.PI*s)])},
   v:{name:"החץ",aspect:.8,corners:1,pts:[[0,0],[1,.5],[0,1]]},
   g:{name:"המקבילית",aspect:.6,closed:1,corners:1,pts:[[1,0],[.72,1],[0,1],[.28,0]]},
@@ -263,6 +289,6 @@ function comet(onCatch){
 }
 const cometCard=c=>`<div class="sky-card"><span class="sym">${esc(c.sym)}</span><b>${esc(c.name)}</b></div>`;
 
-window.MathlySky={GOAL,FADE_DAYS,COMETS,SPARK,spark,FLAME,owl,praise,dayKey,ensure,correct,wrong,fading,star,today,streak,week,
+window.MathlySky={GOAL,FADE_DAYS,COMETS,SPARK,spark,FLAME,owl,praise,dayKey,ensure,correct,wrong,fading,star,today,streak,dayState,month,best,
   cometDue,catchComet,shape,labels,mount,burst,burstAt,sound,buzz,soundOn,setSound,toast,celebrate,comet,cometCard};
 })();
