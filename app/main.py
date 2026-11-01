@@ -41,13 +41,22 @@ def units_of(row: dict) -> list[str]:
     return [unit for unit in known if unit in selected]
 
 
+class FreshStatic(StaticFiles):
+    """Static files the browser checks with the server before reusing, so a new deploy shows up on the next visit."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
     """Build the Mathly application."""
     app = FastAPI(title="Mathly")
     app.state.auth = auth or load_auth()
     app.state.photo = None
     app.state.photo_key = None
-    app.mount("/static", StaticFiles(directory=STATIC), name="static")
+    app.mount("/static", FreshStatic(directory=STATIC), name="static")
 
     async def signed_in(request: Request) -> dict | None:
         store: SupabaseAuth | None = app.state.auth
