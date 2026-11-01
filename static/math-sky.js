@@ -1,13 +1,16 @@
 /* The night sky: Mathly's rewards and the pictures behind them.
-   A skill is a star and a unit is a constellation. A finished skill lights its star; a skill answered right three
-   times in a row (or every one of its questions, when it has fewer) turns gold; a finished skill not practised for
+   A skill is a star and a unit is a constellation. A skill is finished (its star lit) once every question was answered
+   right and the last MASTER_RUN answers were right at the first try, so a lucky guess or a remembered answer is not
+   enough; GOLD_RUN first-try answers in a row (or every question, when it has fewer) turn it gold. A finished skill
+   comes back for spaced review (`review`, after 1, 3, 7, 14, 30 and 60 days; a miss starts over). A finished skill not practised for
    FADE_DAYS fades until one correct answer brightens it again. GOAL correct answers make a day; days in a row make the
    streak, and one missed day does not break it. Now and then a comet crosses the screen and can be caught for the
    collection. All of it lives in the student's progress (P, see math.js): run, gold, seen, days, comets, cometDay.
    Pure rules first, then the drawings (owl, constellations), then the effects (sound, sparkles, overlays). */
 (function(){
 "use strict";
-const GOAL=5, FADE_DAYS=14, DAY=86400000, LABEL_W=96;
+const GOAL=5, FADE_DAYS=14, DAY=86400000, LABEL_W=96, MASTER_RUN=3, GOLD_RUN=5, INTERVALS=[1,3,7,14,30,60];
+const masterNeed=n=>Math.min(MASTER_RUN,Math.max(1,n)), goldNeed=n=>Math.min(GOLD_RUN,Math.max(1,n));
 const SPARK="M12 1.5C13.1 9 15 10.9 22.5 12C15 13.1 13.1 15 12 22.5C10.9 15 9 13.1 1.5 12C9 10.9 10.9 9 12 1.5Z";
 const spark=(cls="")=>`<svg viewBox="0 0 24 24" class="${cls}" aria-hidden="true"><path d="${SPARK}"/></svg>`;
 const FLAME=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.6 1.8c.6 4.3 6.4 6.6 6.4 12.2a7 7 0 0 1-14 0c0-3 1.6-5 3-6.2-.1 2.4.9 4 2.4 4.4-.5-3.9-.1-7.6 2.2-10.4z"/></svg>`;
@@ -16,7 +19,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 /* ---------- rules ---------- */
 const dayKey=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const daysBack=(n,from)=>{const d=new Date(from);d.setDate(d.getDate()-n);return d};
-function ensure(P){ for(const k of ["run","gold","seen","days"]) if(!P[k]||typeof P[k]!=="object") P[k]={}; if(!Array.isArray(P.comets)) P.comets=[]; return P; }
+function ensure(P){ for(const k of ["run","gold","seen","days","review","missed"]) if(!P[k]||typeof P[k]!=="object") P[k]={}; if(!Array.isArray(P.comets)) P.comets=[]; return P; }
 function fading(P,id,now=new Date()){
   if(!P.done?.[id]) return false;
   const t=Date.parse(P.seen?.[id]||P.done[id]);
@@ -29,11 +32,27 @@ function correct(P,id,{first,n,finished,now=new Date()}){
   const revived=fading(P,id,now), k=dayKey(now), t=now.toISOString();
   P.days[k]=(P.days[k]||0)+1; P.seen[id]=t;
   P.run[id]=first?(P.run[id]||0)+1:0;
-  const gold=!!finished&&!P.gold[id]&&P.run[id]>=Math.min(3,Math.max(1,n));
+  const gold=!!finished&&!P.gold[id]&&P.run[id]>=goldNeed(n);
   if(gold) P.gold[id]=t;
   return {gold,goal:P.days[k]===GOAL,revived};
 }
 function wrong(P,id){ ensure(P); P.run[id]=0; }
+
+/* ---------- spaced review ---------- */
+const later=(days,now)=>dayKey(daysBack(-days,now));
+// a skill just finished: first review tomorrow
+function mastered(P,id,now=new Date()){ ensure(P); P.review[id]={box:0,due:later(INTERVALS[0],now)}; }
+// a review answer: right moves the next review further away, wrong brings it back tomorrow
+function reviewed(P,id,ok,now=new Date()){
+  ensure(P); const box=ok?Math.min((P.review[id]?.box??-1)+1,INTERVALS.length-1):0;
+  P.review[id]={box,due:later(INTERVALS[box],now)};
+}
+// is a finished skill due for review today? (one finished before reviews existed: a day after it was last seen)
+function due(P,id,now=new Date()){
+  if(!P.done?.[id]) return false;
+  const r=P.review?.[id]; if(r?.due) return r.due<=dayKey(now);
+  const t=Date.parse(P.seen?.[id]||P.done[id]); return !isNaN(t)&&now-t>=DAY;
+}
 /* a star's look: gold, lit, fading (finished), next, open, locked, off */
 function star(P,id,status,isNext){
   if(status==="done") return P.gold?.[id]?"gold":fading(P,id)?"fading":"lit";
@@ -196,8 +215,15 @@ const owl=(w=80,cls="")=>`<svg class="sky-owl ${cls}" width="${w}" height="${Mat
   <path d="M48 42q2-2 4 0" class="o-glass"/>
   <path d="M45 56h10l-5 9Z" class="o-beak"/>
   <path d="M38 99l-3 4M44 100v4M56 100v4M62 99l3 4" class="o-feet"/></svg>`;
-const PRAISE=["יפה מאוד!","בול!","מדויק!","ככה עושים את זה!","איזה כוכב!","מצוין!"];
-const praise=()=>PRAISE[Math.floor(Math.random()*PRAISE.length)];
+/* Praise names what the student did, never what they are: fixing an earlier mistake is praised most. */
+const PRAISE=["נכון. עבודה מדויקת.","נכון. חישוב זהיר.","נכון, שלב אחרי שלב.","נכון. בדקתם עד הסוף."];
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function praise({recovered=false,persisted=false,combo=0}={}){
+  if(recovered) return pick(["תיקנתם שאלה שטעיתם בה קודם. ככה לומדים!","הפעם זה יצא נכון. הטעות מקודם עזרה."]);
+  if(persisted) return "נכון. ההתמדה השתלמה.";
+  if(combo>=3) return "נכון, ובעקביות.";
+  return pick(PRAISE);
+}
 
 /* ---------- effects ---------- */
 const RM=()=>matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -289,6 +315,6 @@ function comet(onCatch){
 }
 const cometCard=c=>`<div class="sky-card"><span class="sym">${esc(c.sym)}</span><b>${esc(c.name)}</b></div>`;
 
-window.MathlySky={GOAL,FADE_DAYS,COMETS,SPARK,spark,FLAME,owl,praise,dayKey,ensure,correct,wrong,fading,star,today,streak,dayState,month,best,
+window.MathlySky={GOAL,FADE_DAYS,MASTER_RUN,GOLD_RUN,masterNeed,goldNeed,mastered,reviewed,due,COMETS,SPARK,spark,FLAME,owl,praise,dayKey,ensure,correct,wrong,fading,star,today,streak,dayState,month,best,
   cometDue,catchComet,shape,labels,mount,burst,burstAt,sound,buzz,soundOn,setSound,toast,celebrate,comet,cometCard};
 })();

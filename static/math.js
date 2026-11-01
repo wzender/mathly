@@ -2,8 +2,10 @@
    The skill graph comes from /api/math/skills (app/math_skills.py). Every skill is open; the path walks them in
    order, and the first one not done yet is where the student goes on.
    A skill has one sample question or a list of questions. It is done once every one of its questions has been
-   answered correctly; after each answer the student moves to the next unsolved question, so a missed question comes
-   back after the others. Progress is kept on this device, per account (mathly.progress.v1:<email>): `done` per
+   answered correctly and the last few answers (Sky.masterNeed) were right at the first try; after each answer the
+   student moves to the next unsolved question, so a missed question comes back after the others. The choices are
+   shuffled each time a question is shown, and a wrong answer does not reveal the right one, so a question that comes
+   back is solved again, not remembered. Finished skills come back in a mixed review (see "spaced review" below). Progress is kept on this device, per account (mathly.progress.v1:<email>): `done` per
    skill, and `solved` (indexes answered correctly) and `at` (the question to show) for skills with a list. */
 (()=>{
 const css=document.createElement("link"); css.rel="stylesheet"; css.href=document.currentScript.src.replace("math.js","math.css");
@@ -25,7 +27,7 @@ const load=()=>{ try{ return JSON.parse(localStorage.getItem(key())||"{}"); }cat
 const save=()=>{ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} };
 
 let G=null, BY={}, POST={}, ORDER=[], P={done:{},tries:{},solved:{},at:{}}, root=null, curQ=0, path=null, sheet=null, cur=null, back=null, ACTIVE_SUBJECT="";
-let nav=null, FIRST=true, COMBO=0;   // the tab bar; whether the shown question is still at its first try; first-try answers in a row
+let nav=null, FIRST=true, COMBO=0, REV=null;   // the tab bar; whether the shown question is still at its first try; first-try answers in a row
 let picker=null, PH=null, resPicker=null, RES=null;   // RES: the open lesson-resources sheet (see openResources())   // the photo file picker, and the photographed problem on the sheet (see photo())
 let advanceTimer=null;
 let phonePair=null;
@@ -61,6 +63,10 @@ const status=id=>P.done[id]?"done":BY[id].locked?"off":"open";
 const next=()=>ORDER.find(id=>SHOWN.has(BY[id].unit)&&status(id)==="open")||null;
 const QS=s=>s.questions||[s.sample];
 const solvedOf=id=>new Set(P.solved[id]||[]);
+const shuffled=a=>{ const out=a.slice(); for(let i=out.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [out[i],out[j]]=[out[j],out[i]]; } return out; };
+// a multiple-choice question's buttons, in a new order each time it is shown
+const choiceButtons=q=>`<div class="mx-choices">${shuffled(q.choices||[]).map((c,i)=>`<button data-choice="${i}" data-m="${c.correct?"":esc(c.mistake)}"${c.correct?" data-right":""}>${fmt(c.text)}</button>`).join("")}</div>`;
+const figures=q=>`${q.graph?plot(q.graph):""}${q.diagram?geometryDiagram(q.diagram):""}${q.figure?figure(q.figure):""}`;
 // the question after `from` that is not solved yet; once all are solved, simply the next one
 const nextQ=(id,from)=>{ const n=QS(BY[id]).length, got=solvedOf(id);
   for(let k=1;k<=n;k++){ const j=(from+k)%n; if(!got.has(j)) return j; } return (from+1)%n; };
@@ -93,7 +99,7 @@ async function show(){
   window.MathlyAnswers?.configure({api,account:CFG.userId,enabled:CFG.answerScans,root,onGraded:({questionId,grading})=>{
     if(grading.result.verdict!=="correct"||P.done[questionId])return;
     const unitWas=unitDone(unitOf(questionId));
-    P.done[questionId]=grading.finished_at||new Date().toISOString();
+    P.done[questionId]=grading.finished_at||new Date().toISOString(); Sky.mastered(P,questionId);
     P.tries[questionId]=(P.tries[questionId]||0)+1;
     const r=Sky.correct(P,questionId,{first:true,n:QS(BY[questionId]).length,finished:true});
     save();draw();rewards(questionId,{r,lit:true,unitWas});
@@ -141,7 +147,7 @@ const unitOf=id=>G.units.find(u=>u.id===BY[id].unit);
 const unitIds=u=>ORDER.filter(id=>BY[id].unit===u.id);
 const live=id=>!BY[id].locked;
 const seenAt=id=>Date.parse(P.seen?.[id]||P.done[id]||0)||0;
-const goldNeed=id=>Math.min(3,QS(BY[id]).length);
+const goldNeed=id=>Sky.goldNeed(QS(BY[id]).length);
 const inDays=d=>d===0?"היום":d===1?"מחר":`בעוד ${d} ימים`;
 function unitDone(u){ const ids=unitIds(u).filter(live); return ids.length>0&&ids.every(id=>P.done[id]); }
 function skyStats(){
@@ -254,7 +260,7 @@ function pathView(){
       <h2>${esc(u.name)}</h2><span class="mx-pill">${lit}/${act.length}</span>${u.when?`<span class="mx-usub">${esc(u.when)}</span>`:""}
       ${teach?`<button class="mx-res-open"${res} aria-label="משאבי השיעור ${esc(u.name)}">📷 משאבים</button>`:""}</div></section>${steps}`;
   }).join("");
-  return `${topBar()}${daily()}${examSoon()}<div class="mx-pghead"><h2>המסלול שלי</h2><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
+  return `${topBar()}${daily()}${reviewCard()}${examSoon()}<div class="mx-pghead"><h2>המסלול שלי</h2><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
     <div class="mx-trail"><svg class="mx-line" aria-hidden="true"></svg>
       <div class="mx-start"><span class="mx-flag">${Sky.owl(40)}</span><b>התחלה</b></div>${units}
       <div class="mx-finish" aria-hidden="true">${Sky.spark()}<b>סוף המסלול</b></div></div>
@@ -341,10 +347,8 @@ function open(id){
   const s=BY[id], st=status(id), unit=G.units.find(u=>u.id===s.unit), all=QS(s), n=all.length;
   curQ=Math.min(P.at[id]||0,n-1);
   const q=all[curQ], openEnded=q.type==="open-ended", got=solvedOf(id);
-  const options=q.choices||[],rot=options.length?(ORDER.indexOf(id)+curQ)%options.length:0;
-  const choices=options.slice(rot).concat(options.slice(0,rot));
   if(!cur) back=document.activeElement;
-  cur=id; FIRST=true;
+  cur=id; FIRST=true; REV=null;
   sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
     <div class="mx-sheet u-${s.unit}" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
       <div class="mx-shtop"><div><span class="mx-uchip">${esc(unit.name)}</span>${s.core?' <span class="mx-core">ליבה 5 יח״ל</span>':""}
@@ -352,8 +356,8 @@ function open(id){
         <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
       <p>${fmt(s.description)}</p>
       <div class="mx-q">${n>1?`<div class="mx-qprog"><span>שאלה ${curQ+1} מתוך ${n}</span><span class="mx-qdots" aria-label="נפתרו ${got.size} מתוך ${n}">${all.map((_,i)=>`<i class="${got.has(i)?"ok":""}${i===curQ?" now":""}"></i>`).join("")}</span></div>`:""}
-        <p>${fmt(q.question)}</p>${q.graph?plot(q.graph):""}${q.diagram?geometryDiagram(q.diagram):""}${q.figure?figure(q.figure):""}
-        ${st==="off"?'<p class="mx-note mx-off">השאלה הזו סגורה כרגע לתשובות. היא לא נדרשת כדי להתקדם במסלול.</p>':openEnded?'<div class="mx-answer"></div>':`<div class="mx-choices">${choices.map((c,i)=>`<button data-choice="${i}" data-m="${c.correct?"":esc(c.mistake)}"${c.correct?" data-right":""}>${fmt(c.text)}</button>`).join("")}</div>`}
+        <p>${fmt(q.question)}</p>${figures(q)}
+        ${st==="off"?'<p class="mx-note mx-off">השאלה הזו סגורה כרגע לתשובות. היא לא נדרשת כדי להתקדם במסלול.</p>':openEnded?'<div class="mx-answer"></div>':choiceButtons(q)}
         <div class="mx-fb" aria-live="polite"></div></div>
       <div class="mx-sec"><h4>דורשת</h4><div class="mx-chips">${chips(s.prereqs)}</div></div>
       <div class="mx-sec"><h4>פותחת</h4><div class="mx-chips">${chips(POST[id])}</div></div>
@@ -362,7 +366,7 @@ function open(id){
   sheet.querySelector(".mx-x").focus({preventScroll:true});
   if(openEnded&&st!=="off")window.MathlyAnswers?.mountQuestion(sheet.querySelector(".mx-answer"),id,s.question_version);
 }
-function closeSheet(){ stopPhone(); dropResources(); cancelAdvance(); if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
+function closeSheet(){ stopPhone(); dropResources(); cancelAdvance(); REV=null; if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
 
 // counts down, then opens `target` (a skill id); stops if the student moved on in the meantime
 function autoAdvance(id,target){
@@ -380,6 +384,7 @@ function autoAdvance(id,target){
 
 function answer(btn){
   if(btn.disabled) return;
+  if(REV) return reviewAnswer(btn);
   const id=cur, m=btn.dataset.m, fb=sheet.querySelector(".mx-fb"), n=QS(BY[id]).length, qi=curQ;
   const buttons=sheet.querySelectorAll("[data-choice]");
   buttons.forEach(b=>b.classList.remove("right","wrong"));
@@ -388,19 +393,26 @@ function answer(btn){
   if(n>1) P.at[id]=nextQ(id,qi);
   if(!m){
     const got=solvedOf(id); got.add(qi); P.solved[id]=[...got].sort((a,b)=>a-b);
-    const finished=got.size>=n, first=finished&&!P.done[id], unitWas=unitDone(unitOf(id));
-    if(finished) P.done[id]=P.done[id]||new Date().toISOString();
+    const missed=new Set(P.missed[id]||[]), recovered=missed.delete(qi); P.missed[id]=[...missed];
+    // done once every question is solved and the last answers were right at the first try
+    const run=FIRST?(P.run[id]||0)+1:0, need=Sky.masterNeed(n);
+    const first=!P.done[id]&&got.size>=n&&run>=need, unitWas=unitDone(unitOf(id));
+    if(first){ P.done[id]=new Date().toISOString(); Sky.mastered(P,id); }
     COMBO=FIRST?COMBO+1:0;
+    const persisted=!FIRST;
     const r=Sky.correct(P,id,{first:FIRST,n,finished:!!P.done[id]}); FIRST=false;
     save(); draw();
     buttons.forEach(b=>b.disabled=true);
     COMBO>=2?Sky.sound.combo(COMBO):Sky.sound.ok(); Sky.buzz(25); Sky.burstAt(btn,14);
-    const ok=`<b>${Sky.praise()}</b>${COMBO>=2?`<span class="mx-combo">${Sky.FLAME}${COMBO} ברצף</span>`:""}`;
+    const ok=`<b>${Sky.praise({recovered,persisted,combo:COMBO})}</b>${COMBO>=2?`<span class="mx-combo">${Sky.FLAME}${COMBO} ברצף</span>`:""}`;
     const after=rewards(id,{r,lit:first,unitWas}), then=go=>after.then(()=>{ if(cur===id&&!sheet.hidden&&fb.isConnected) go(); });   // not once another question is shown
     if(!P.done[id]){
-      fb.innerHTML=`<div class="mx-ok">${ok}<span>פתרתם ${got.size} מתוך ${n} שאלות במיומנות הזו.</span>
-        <span class="mx-countdown"></span><button class="mx-btn solid" data-id="${id}">לשאלה הבאה</button></div>`;
-      return then(()=>autoAdvance(id,id));
+      const left=need-run, say=got.size<n?`פתרתם ${got.size} מתוך ${n} שאלות במיומנות הזו.`
+        :n===1?"כדי לסיים צריך לענות נכון בניסיון הראשון. נסו את השאלה שוב, הפעם בסדר אחר."
+        :`כל השאלות נפתרו. עוד ${left===1?"תשובה נכונה אחת":`${left} תשובות נכונות`} ברצף, בניסיון הראשון, כדי לסיים.`;
+      fb.innerHTML=`<div class="mx-ok">${ok}<span>${say}</span>
+        <span class="mx-countdown"></span><button class="mx-btn solid" data-id="${id}">${n===1?"לנסות שוב":"לשאלה הבאה"}</button></div>`;
+      return n===1?then(()=>{}):then(()=>autoAdvance(id,id));
     }
     const nxt=next();
     fb.innerHTML=`<div class="mx-ok">${ok}${first?`<span>${n>1?`פתרתם את כל ${n} השאלות. `:""}המיומנות סומנה כהושלמה.</span>`:""}
@@ -410,14 +422,85 @@ function answer(btn){
     if(nxt&&nxt!==id) then(()=>autoAdvance(id,nxt));
     return;
   }
-  Sky.wrong(P,id); FIRST=false; COMBO=0; Sky.sound.bad(); Sky.buzz([20,40,20]);
+  // a mistake is quiet: no sound, no vibration, and words about the mistake, not about the student
+  Sky.wrong(P,id); FIRST=false; COMBO=0;
+  const missed=new Set(P.missed[id]||[]); missed.add(qi); P.missed[id]=[...missed];
   save();
   const M=G.mistakes[m], to=M.back&&M.back!==id?M.back:null;
-  // with a list of questions, a missed question is shown later again; trying again now would not count
-  if(n>1) buttons.forEach(b=>{ b.disabled=true; if(b.dataset.right!=null) b.classList.add("right"); });
-  fb.innerHTML=`<div class="mx-bad"><b>${fmt(M.name)}</b><span>${fmt(M.tip)}</span>
-    ${n>1?`<span class="mx-small">השאלה הזו תחזור אחרי שאר השאלות.</span><button class="mx-btn solid" data-id="${id}">לשאלה הבאה</button>`:""}
-    ${to?`<button class="mx-btn" data-id="${to}">חזרה אל: ${fmt(BY[to].short)}</button>`:n>1?"":"<span class=\"mx-small\">אפשר לבחור תשובה אחרת.</span>"}</div>`;
+  // with a list of questions, a missed question comes back later, shuffled; the right answer is not shown,
+  // so solving it then shows understanding, not memory
+  if(n>1) buttons.forEach(b=>b.disabled=true); else btn.disabled=true;
+  fb.innerHTML=`<div class="mx-bad"><small class="mx-small">טעות נפוצה, וטוב שהיא עולה עכשיו</small><b>${fmt(M.name)}</b><span>${fmt(M.tip)}</span>
+    ${n>1?`<span class="mx-small">השאלה תחזור אחרי שאר השאלות, ותוכלו לנסות אותה שוב.</span><button class="mx-btn solid" data-id="${id}">לשאלה הבאה</button>`:""}
+    ${to?`<button class="mx-btn" data-id="${to}">לחזק קודם את: ${fmt(BY[to].short)}</button>`:n>1?"":"<span class=\"mx-small\">אפשר לבחור תשובה אחרת.</span>"}</div>`;
+}
+
+/* ---------- spaced review ----------
+   Finished skills come back after growing gaps (Sky.mastered/reviewed/due). A review is a few questions from different
+   units, mixed, and the skill's name is shown only after the answer: choosing the method is part of the question. */
+const REVIEW_SIZE=3;
+const choiceSkill=id=>QS(BY[id]).some(q=>q.choices);
+const dueReviews=()=>ORDER.filter(id=>SHOWN.has(BY[id].unit)&&live(id)&&choiceSkill(id)&&Sky.due(P,id))
+  .sort((a,b)=>(P.review[a]?.due||"").localeCompare(P.review[b]?.due||"")||seenAt(a)-seenAt(b));
+function reviewCard(){
+  const n=dueReviews().length; if(!n) return "";
+  return `<button class="mx-review" data-act="review"><b>חזרה מעורבת</b>
+    <span>${n===1?"מיומנות אחת מחכה":`${n} מיומנויות מחכות`} לחזרה. ${Math.min(n,REVIEW_SIZE)} שאלות מנושאים שונים, מעורבבות, כדי שמה שלמדתם יישאר.</span>
+    <span class="mx-dgo">להתחיל ‹</span></button>`;
+}
+// the oldest due skills, one per unit first, in a mixed order; a random multiple-choice question of each
+function startReview(){
+  const due=dueReviews(), pick=[], units=new Set();
+  for(const id of due) if(pick.length<REVIEW_SIZE&&!units.has(BY[id].unit)){ pick.push(id); units.add(BY[id].unit); }
+  for(const id of due) if(pick.length<REVIEW_SIZE&&!pick.includes(id)) pick.push(id);
+  if(!pick.length) return;
+  const items=shuffled(pick).map(id=>{ const qs=QS(BY[id]).map((q,i)=>i).filter(i=>QS(BY[id])[i].choices); return {id,qi:qs[Math.floor(Math.random()*qs.length)]}; });
+  if(!cur) back=document.activeElement;
+  REV={items,i:0,right:0}; openReview();
+}
+function openReview(){
+  cancelAdvance();
+  const {items,i}=REV, it=items[i], q=QS(BY[it.id])[it.qi];
+  cur="review"; FIRST=true;
+  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
+    <div class="mx-sheet mx-review-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-shtop"><div><span class="mx-uchip">חזרה מעורבת</span><h3 id="mxTitle">שאלה ${i+1} מתוך ${items.length}</h3>
+        <small class="mx-src">מאיזה נושא השאלה? זה חלק מהתרגול.</small></div>
+        <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+      <div class="mx-q"><p>${fmt(q.question)}</p>${figures(q)}${choiceButtons(q)}<div class="mx-fb" aria-live="polite"></div></div></div>`;
+  sheet.hidden=false; sheet.querySelector(".mx-sheet").scrollTop=0;
+  sheet.querySelector(".mx-x").focus({preventScroll:true});
+}
+const inDaysWord=d=>d===1?"מחר":`בעוד ${d} ימים`;
+function reviewAnswer(btn){
+  const it=REV.items[REV.i], id=it.id, m=btn.dataset.m, ok=!m, fb=sheet.querySelector(".mx-fb"), s=BY[id];
+  sheet.querySelectorAll("[data-choice]").forEach(b=>b.disabled=true);
+  btn.classList.add(ok?"right":"wrong");
+  P.tries[id]=(P.tries[id]||0)+1;
+  Sky.reviewed(P,id,ok);
+  const gap=Math.round((Date.parse(P.review[id].due)-Date.parse(Sky.dayKey()))/86400000);
+  const last=REV.i+1>=REV.items.length, go=`<button class="mx-btn solid" data-act="review-next">${last?"לסיכום":"לשאלה הבאה"}</button>`;
+  if(ok){
+    REV.right++;
+    const r=Sky.correct(P,id,{first:true,n:QS(s).length,finished:true});
+    save(); draw(); Sky.sound.ok(); Sky.burstAt(btn,14);
+    fb.innerHTML=`<div class="mx-ok"><b>${Sky.praise()}</b><span>הנושא: ${fmt(s.name)}. החזרה הבאה עליו ${inDaysWord(gap)}.</span>${go}</div>`;
+    rewards(id,{r,lit:false,unitWas:true});
+    return;
+  }
+  Sky.wrong(P,id); save(); draw();
+  const M=G.mistakes[m];
+  fb.innerHTML=`<div class="mx-bad"><small class="mx-small">הנושא: ${fmt(s.name)}</small><b>${fmt(M.name)}</b><span>${fmt(M.tip)}</span>
+    <span class="mx-small">שכחה היא חלק מהלמידה. הנושא יחזור מחר.</span>${go}
+    <button class="mx-btn" data-id="${id}">לתרגל את ${fmt(s.short)}</button></div>`;
+}
+function reviewNext(){
+  if(REV.i+1<REV.items.length){ REV.i++; return openReview(); }
+  const {right,items}=REV, more=dueReviews().length;
+  sheet.querySelector(".mx-q").innerHTML=`<div class="mx-ok"><b>החזרה הסתיימה</b>
+    <span>${right} מתוך ${items.length} נכונות. ${right===items.length?"הכול נשמר בזיכרון.":"מה שלא הצליח יחזור מחר, וזה בדיוק מה שמחזק אותו."}</span>
+    ${more?`<button class="mx-btn solid" data-act="review">עוד חזרה (${more})</button>`:""}<button class="mx-btn" data-act="close">חזרה למסלול</button></div>`;
+  REV=null;
 }
 
 function onClick(e){
@@ -436,6 +519,8 @@ function onClick(e){
     case "manage-practice": return closeSheet();
     case "subjects": return drawSubjectPicker();
     case "streak": return showStreak();
+    case "review": return startReview();
+    case "review-next": return REV&&reviewNext();
     case "cal-prev": return showStreak(-1);
     case "cal-next": return showStreak(1);
     case "sound": Sky.setSound(!Sky.soundOn()); Sky.sound.tap(); return draw();

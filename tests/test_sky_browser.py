@@ -1,6 +1,7 @@
 """Browser checks of the night sky (static/math-sky.js): stars, gold, fading, the streak and comets.
 Optional, like the other browser tests: pip install playwright && playwright install chromium."""
 import json
+import re
 import socket
 import threading
 import time
@@ -155,4 +156,58 @@ def test_home_shows_the_tally_on_top_and_opens_at_the_next_skill(browser, server
     playwright.expect(page.locator(".mx-hud")).to_be_in_viewport()
     page.locator(".mx-daily").click()
     playwright.expect(page.locator(".mx-streak-sheet .mx-cday.today")).to_have_count(1)
+    assert not errors
+
+
+def test_a_mistake_is_quiet_hides_the_answer_and_needs_a_clean_run_to_finish(browser, server):
+    page, errors = page_with(browser, server, no_chance=True)
+    page.locator('.mx-star[data-id="t_ext"]').click()
+    for _ in range(9):   # questions 1-9 right
+        page.locator(".mx-choices button[data-right]").first.click()
+        page.locator(".mx-ok button[data-id]").first.click()
+    page.locator(".mx-choices button:not([data-right])").first.click()   # question 10 wrong
+    playwright.expect(page.locator(".mx-bad")).to_be_visible()
+    assert page.locator(".mx-choices button.right").count() == 0         # the right answer is not revealed
+    assert page.locator(".mx-choices button:not([disabled])").count() == 0
+    page.locator(".mx-bad button[data-id=t_ext]").first.click()
+    page.locator(".mx-choices button[data-right]").first.click()         # it comes back and is solved
+    playwright.expect(page.locator(".mx-ok b")).to_have_text(re.compile("תיקנתם|הטעות מקודם"))   # fixing is praised
+    playwright.expect(page.locator(".mx-ok")).to_contain_text("עוד 2 תשובות נכונות ברצף")
+    assert not progress_of(page)["done"].get("t_ext")                   # all solved, but not yet a clean run
+    for _ in range(2):
+        page.locator(".mx-ok button[data-id]").first.click()
+        page.locator(".mx-choices button[data-right]").first.click()
+    playwright.expect(page.locator(".sky-cele h2").first).to_have_text("כוכב חדש!")
+    p = progress_of(page)
+    assert p["done"]["t_ext"] and not p["gold"].get("t_ext")
+    assert p["review"]["t_ext"]["box"] == 0                              # the first review is tomorrow
+    assert not errors
+
+
+def test_a_due_skill_comes_back_in_a_mixed_review(browser, server):
+    old = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    later = (date.today() + timedelta(days=3)).isoformat()
+    progress = {"done": {"t_ext": old, "t_simplify": old, "k_def": old}, "seen": {"t_ext": old, "t_simplify": old, "k_def": old},
+                "review": {"t_ext": {"box": 1, "due": yesterday}, "t_simplify": {"box": 0, "due": later}}}
+    page, errors = page_with(browser, server, progress, no_chance=True)
+    card = page.locator(".mx-review")
+    playwright.expect(card).to_contain_text("2 מיומנויות")              # t_ext is due, k_def is old; t_simplify is not yet
+    card.click()
+    sheet = page.locator(".mx-review-sheet")
+    playwright.expect(sheet.locator("h3")).to_have_text("שאלה 1 מתוך 2")
+    sheet.locator(".mx-choices button[data-right]").first.click()
+    playwright.expect(sheet.locator(".mx-ok")).to_contain_text("הנושא:")
+    sheet.locator("[data-act=review-next]").click()
+    sheet.locator(".mx-choices button:not([data-right])").first.click()
+    playwright.expect(sheet.locator(".mx-bad")).to_contain_text("יחזור מחר")
+    sheet.locator("[data-act=review-next]").click()
+    playwright.expect(sheet.locator(".mx-ok b")).to_have_text("החזרה הסתיימה")
+    p = progress_of(page)
+    boxes = sorted(p["review"][i]["box"] for i in ("t_ext", "k_def"))
+    assert boxes in ([0, 0], [0, 2])                                     # the right one moved on, the wrong one starts over
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    assert tomorrow in {p["review"][i]["due"] for i in ("t_ext", "k_def")}
+    page.locator(".mx-x").click()
+    playwright.expect(page.locator(".mx-review")).to_have_count(0)      # nothing is due any more today
     assert not errors
