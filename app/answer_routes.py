@@ -17,7 +17,14 @@ from .math_skills import algebra9, question_version
 log = logging.getLogger("mathly.answer_routes")
 
 
+def open_ended_locked():
+    """Open-ended questions stay locked (no AI grading, no API tokens) unless MATHLY_OPEN_ENDED_LOCKED=0."""
+    return os.environ.get("MATHLY_OPEN_ENDED_LOCKED", "1").strip() != "0"
+
+
 def grading_key():
+    if open_ended_locked():
+        return ""
     return (os.environ.get("ANTHROPIC_API_KEY", "").strip()
             or os.environ.get("CLAUDE_API_KEY", "").strip())
 
@@ -81,6 +88,8 @@ def install_answer_routes(app, signed_in):
         return evaluate_answer(user, uuid_text(attempt_id), automatic=bool(body and body.get("automatic") is True))
 
     def evaluate_answer(user, aid, *, automatic=False):
+        if open_ended_locked():
+            raise ScanError(403, "open_ended_locked")   # before any storage read or provider call
         result = app.state.answers.action(user, "get", attempt_id=aid)
         if not result.get("attachment"):
             raise ScanError(409, "answer_required")

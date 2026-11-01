@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from .access import has_permission, resolve_access
-from .answer_routes import install_answer_routes
+from .answer_routes import install_answer_routes, open_ended_locked
 from .auth import AuthUnavailable, ClassConflict, SupabaseAuth, load_auth
 from .math_photo import (DAILY_PHOTOS, MAX_PHOTO, MEDIA_TYPES as PHOTO_TYPES,
                          PhotoSolver, PhotoUnavailable, math_model, photo_client)
@@ -113,7 +113,8 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
 
     @app.get("/api/math/skills")
     async def math_skills():
-        return JSONResponse(practice_graph(app.state.answers.configured), headers={"Cache-Control": "no-store"})
+        return JSONResponse(practice_graph(app.state.answers.configured, open_ended_locked()),
+                            headers={"Cache-Control": "no-store"})
 
     @app.get("/api/classes")
     async def classes(_user: dict = Depends(manager)):

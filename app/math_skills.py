@@ -156,11 +156,12 @@ def algebra9() -> dict:
     return graph
 
 
-def practice_graph(answer_scans_enabled: bool) -> dict:
+def practice_graph(answer_scans_enabled: bool, open_ended_locked: bool = False) -> dict:
     """Keep practice usable during a scan rollout or rollback.
 
     Public responses never expose fallback choices for an open-ended question.
     The original choice sample is served when authenticated storage is disabled.
+    A locked open-ended question is shown but cannot be answered, so it is never graded.
     """
     graph = copy.deepcopy(algebra9())
     subject = {unit["id"]: unit["subject"] for unit in graph["units"]}
@@ -171,4 +172,6 @@ def practice_graph(answer_scans_enabled: bool) -> dict:
             skill["sample"] = fallback
         if "sample" in skill:   # identifies an open-ended question's uploaded answers
             skill["question_version"] = question_version(skill["sample"])
+            if open_ended_locked and skill["sample"].get("type") == "open-ended":
+                skill["locked"] = True
     return graph

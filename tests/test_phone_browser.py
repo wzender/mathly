@@ -177,8 +177,11 @@ def test_class_management_geometry_and_permissions(phone_server, manager):
             assert writes[-1] == {"name": row["name"], "emails": row["emails"],
                                   "teachers": row["teachers"], "lessons": ["t", "a"]}
             page.locator('.mx-x').click()
+            page.locator('.mx-nav [data-view="path"]').click()
             playwright.expect(page.locator('[data-id="a_30_side"]')).to_be_visible()
             page.reload()
+            page.locator('[data-subject="מתמטיקה"]').click()
+            page.locator('.mx-nav [data-view="path"]').click()
             playwright.expect(page.locator('[data-id="a_30_side"]')).to_be_visible()
         finally:
             browser.close()

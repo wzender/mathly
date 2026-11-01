@@ -16,6 +16,12 @@ from scan_support import OWNER, OTHER, ScanAuth, answer_store, postgres_server
 from test_answer_scans import attempt, begin, finish, request
 
 
+@pytest.fixture(autouse=True)
+def unlocked_open_ended(monkeypatch):
+    """These tests check grading itself, so open-ended questions are unlocked here."""
+    monkeypatch.setenv('MATHLY_OPEN_ENDED_LOCKED', '0')
+
+
 def assessment(**overrides):
     return {"readable": True, "confident": True, "answer_correct": True,
             "reasoning_correct": True, "drawing_correct": True, "units_correct": True,
@@ -143,6 +149,12 @@ def test_grade_api_ownership_failure_retry_cache_and_restart(answer_store, monke
             assert (await c.post('/api/math/answer-attempts/invalid/grade')).status_code == 404
             assert (await c.post(f'/api/math/answer-attempts/{draft}/grade')).status_code == 409
             assert not calls
+            monkeypatch.setenv('MATHLY_OPEN_ENDED_LOCKED', '1')   # locked: refused before any AI call
+            locked = await c.post(url)
+            assert (locked.status_code, locked.json()['detail']) == (403, 'open_ended_locked')
+            assert not calls and store.grade(OWNER, 'get', attempt_id=aid) is None
+            assert (await c.get(f'/api/math/answer-attempts/{aid}')).json()['grading_available'] is False
+            monkeypatch.setenv('MATHLY_OPEN_ENDED_LOCKED', '0')
             monkeypatch.delenv('ANTHROPIC_API_KEY')
             assert (await c.post(url)).status_code == 503
             assert store.grade(OWNER, 'get', attempt_id=aid) is None

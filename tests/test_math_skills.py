@@ -4,6 +4,7 @@ import asyncio
 import httpx
 
 from app.main import create_app
+from app.answer_routes import grading_key, open_ended_locked
 from app.math_skills import algebra9, practice_graph, problems, question_version
 
 
@@ -135,3 +136,22 @@ def test_a_class_of_a_split_unit_keeps_its_content():
     assert units_of({"lessons": ["m", "t"]}) == ["t", "m", "b", "c"]        # מלבן, מעוין וריבוע
     assert units_of({"lessons": ["i"]}) == ["i"]
     assert units_of({}) == [unit["id"] for unit in algebra9()["units"]]
+
+
+def test_open_ended_questions_are_locked_by_default(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
+    monkeypatch.delenv("MATHLY_OPEN_ENDED_LOCKED", raising=False)
+    assert open_ended_locked() and grading_key() == ""   # no key, so no grading call can start
+    locked = [s["id"] for s in practice_graph(True, True)["skills"] if s.get("locked")]
+    assert locked == ["a_30_side"]
+    assert not any(s.get("locked") for s in practice_graph(False, True)["skills"])   # a choice question is never locked
+    monkeypatch.setenv("MATHLY_OPEN_ENDED_LOCKED", "0")
+    assert not open_ended_locked() and grading_key() == "test"
+    assert not any(s.get("locked") for s in practice_graph(True, False)["skills"])
+    app = create_app()
+    async def check():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            monkeypatch.delenv("MATHLY_OPEN_ENDED_LOCKED")
+            skills = (await client.get("/api/math/skills")).json()["skills"]
+            assert all(not s.get("locked") for s in skills)   # without answer storage the choice version is served
+    asyncio.run(check())

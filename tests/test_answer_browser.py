@@ -48,6 +48,7 @@ def session(browser, owner=OWNER, mobile=False):
 
 
 def open_question(page):
+    page.locator('.mx-nav [data-view="path"]').click()   # the app opens on the home screen
     page.locator('.mx-node[data-id="a_30_side"]').click()
     playwright.expect(page.locator('.mx-answer')).to_be_visible()
     playwright.expect(page.locator('.mx-choices')).to_have_count(0)

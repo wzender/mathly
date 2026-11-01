@@ -1,7 +1,6 @@
 /* The Mathly path.
-   The skill graph comes from /api/math/skills (app/math_skills.py). A skill is open once every skill it needs is
-   done, and the first open one is where the student goes on. A student may still open a locked skill: without a
-   placement test, one who already knows the foundations should not have to answer them first.
+   The skill graph comes from /api/math/skills (app/math_skills.py). Every skill is open; the path walks them in
+   order, and the first one not done yet is where the student goes on.
    A skill has one sample question or a list of questions. It is done once every one of its questions has been
    answered correctly; after each answer the student moves to the next unsolved question, so a missed question comes
    back after the others. Progress is kept on this device, per account (mathly.progress.v1:<email>): `done` per
@@ -26,6 +25,7 @@ const load=()=>{ try{ return JSON.parse(localStorage.getItem(key())||"{}"); }cat
 const save=()=>{ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} };
 
 let G=null, BY={}, POST={}, ORDER=[], P={done:{},tries:{},solved:{},at:{}}, root=null, curQ=0, path=null, sheet=null, cur=null, back=null, ACTIVE_SUBJECT="";
+let nav=null, FIRST=true, COMBO=0;   // the tab bar; whether the shown question is still at its first try; first-try answers in a row
 let picker=null, PH=null;   // the photo file picker, and the photographed problem on the sheet (see photo())
 let advanceTimer=null;
 let phonePair=null;
@@ -56,7 +56,8 @@ const shownUnits=()=>{
   const units=G.units.filter(u=>ids.has(u.id)); return units.length?units:G.units;
 };
 let SHOWN=new Set();
-const status=id=>P.done[id]?"done":BY[id].prereqs.every(p=>P.done[p]||!SHOWN.has(BY[p].unit))?"open":"locked";
+// a skill the server locked (an open-ended question while AI grading is off) is "off": shown, never asked, never blocking
+const status=id=>P.done[id]?"done":BY[id].locked?"off":"open";
 const next=()=>ORDER.find(id=>SHOWN.has(BY[id].unit)&&status(id)==="open")||null;
 const QS=s=>s.questions||[s.sample];
 const solvedOf=id=>new Set(P.solved[id]||[]);
@@ -73,7 +74,8 @@ async function show(){
     // no capture attribute: the phone offers the camera and the gallery both
     picker=document.createElement("input"); picker.type="file"; picker.accept="image/*"; picker.hidden=true;
     picker.onchange=()=>{ const f=picker.files[0]; picker.value=""; if(f) photo(f); };
-    root.append(path,sheet,picker); document.body.append(root);
+    nav=document.createElement("nav"); nav.className="mx-nav"; nav.setAttribute("aria-label","ניווט"); nav.hidden=true;
+    root.append(path,sheet,picker,nav); document.body.append(root); window.MathlySky.mount(root);
     root.addEventListener("click",onClick);
     document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&cur) closeSheet(); });
   }
@@ -83,12 +85,15 @@ async function show(){
     try{ const r=await fetch("/api/math/skills"); if(!r.ok) throw new Error(`השרת ענה ${r.status}`); index(await r.json()); }
     catch(e){ path.innerHTML=`<p class="mx-note">לא הצלחנו לטעון את המסלול: ${esc(e.message)}. רעננו את העמוד ונסו שוב.</p>`; return; }
   }
-  P=Object.assign({done:{},tries:{},solved:{},at:{}},load()); SHOWN=new Set(shownUnits().map(u=>u.id));
+  P=window.MathlySky.ensure(Object.assign({done:{},tries:{},solved:{},at:{}},load())); SHOWN=new Set(shownUnits().map(u=>u.id));
   subjectOptions().length?drawSubjectPicker():selectSubject("מתמטיקה");
   window.MathlyAnswers?.configure({api,account:CFG.userId,enabled:CFG.answerScans,root,onGraded:({questionId,grading})=>{
     if(grading.result.verdict!=="correct"||P.done[questionId])return;
+    const unitWas=unitDone(unitOf(questionId));
     P.done[questionId]=grading.finished_at||new Date().toISOString();
-    P.tries[questionId]=(P.tries[questionId]||0)+1;save();draw();
+    P.tries[questionId]=(P.tries[questionId]||0)+1;
+    const r=Sky.correct(P,questionId,{first:true,n:QS(BY[questionId]).length,finished:true});
+    save();draw();rewards(questionId,{r,lit:true,unitWas});
   }});
 }
 function hide(){ cancelAdvance(); if(root) root.hidden=true; document.documentElement.classList.remove("math-on"); }
@@ -103,7 +108,7 @@ function subjectOptions(){
   return [...bySubject.values()].map(item=>({...item,dates:item.dates.sort()})).sort((a,b)=>a.dates[0].localeCompare(b.dates[0]));
 }
 function drawSubjectPicker(){
-  ACTIVE_SUBJECT="";
+  ACTIVE_SUBJECT=""; nav.hidden=true;
   const manage=can("management.access"), subjects=subjectOptions(), today=new Date();today.setHours(0,0,0,0);
   path.innerHTML=`<header class="mx-top"><div><h1>המקצועות שלי</h1><p class="mx-sub">בחרו מקצוע כדי לפתוח את המסלול שלו</p></div><div class="mx-acts">${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
     <section class="mx-subject-grid" aria-label="מקצועות הכיתה">${subjects.map(item=>{
@@ -114,39 +119,196 @@ function drawSubjectPicker(){
 function selectSubject(subject){
   ACTIVE_SUBJECT=subject;
   if(subject==="מתמטיקה")return draw();
+  nav.hidden=true;
   const [icon,tone]=examLooks[subject]||["●","other"];
   path.innerHTML=`<header class="mx-top"><div><h1>${esc(subject)}</h1><p class="mx-sub">המקצועות שלי</p></div><button class="mx-btn" data-act="subjects">לכל המקצועות</button></header><section class="mx-subject-empty exam-${tone}"><span aria-hidden="true">${icon}</span><h2>המסלול של ${esc(subject)} עדיין לא זמין</h2><p>לוח המבחנים של המקצוע כבר מחובר לכיתה. כשהמסלול יתווסף, הוא ייפתח מכאן.</p><button class="mx-btn solid" data-act="subjects">חזרה למקצועות</button></section>`;
 }
 
-function draw(){
-  const UNITS=G.units.filter(u=>SHOWN.has(u.id)), mine=G.skills.filter(s=>SHOWN.has(s.unit));
-  const total=mine.length, doneN=mine.filter(s=>P.done[s.id]).length, nxt=next();
-  const cls=typeof MY_CLASS!=="undefined"&&MY_CLASS?` · כיתת ${esc(MY_CLASS.name)}`:"";
-  const manage=can("management.access"), pct=Math.round(100*doneN/total);
+/* The math screens: home (what to do now), the path (each unit a constellation of its skills) and the collection.
+   The rules of the stars, the streak and the comets, and their pictures, are in math-sky.js. */
+const Sky=window.MathlySky;
+let VIEW="home", TRAIL=null;   // TRAIL: watches the path's size to redraw its line
+const SOUND_ON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const SOUND_OFF='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const TABS=[["home","בית",'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 11h2.7v9.5h5.3v-6h3v6h5.3V11h2.7Z"/></svg>'],
+  ["path","המסלול",`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${Sky.SPARK}" transform="translate(6 1) scale(.42)"/><path d="${Sky.SPARK}" transform="translate(1 12) scale(.4)"/><path d="${Sky.SPARK}" transform="translate(13 13) scale(.45)"/><path d="M9 7 5.5 15M14 6.5l3.5 9" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2" fill="none"/></svg>`],
+  ["sky","האוסף",`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" opacity=".35"/><path d="${Sky.SPARK}" transform="translate(12.5 12.5) scale(.33)"/><path d="${Sky.SPARK}" transform="translate(3.5 3.5) scale(.33)"/></svg>`]];
+const STATE_NAME={gold:"כוכב זהב",lit:"הושלמה",fading:"הושלמה, הכוכב דועך",next:"הכוכב הבא",open:"פתוחה",off:"סגורה כרגע"};
+const mineUnits=()=>G.units.filter(u=>SHOWN.has(u.id));
+const unitOf=id=>G.units.find(u=>u.id===BY[id].unit);
+const unitIds=u=>ORDER.filter(id=>BY[id].unit===u.id);
+const live=id=>!BY[id].locked;
+const seenAt=id=>Date.parse(P.seen?.[id]||P.done[id]||0)||0;
+const goldNeed=id=>Math.min(3,QS(BY[id]).length);
+const inDays=d=>d===0?"היום":d===1?"מחר":`בעוד ${d} ימים`;
+function unitDone(u){ const ids=unitIds(u).filter(live); return ids.length>0&&ids.every(id=>P.done[id]); }
+function skyStats(){
+  let lit=0, gold=0, total=0, cons=0;
+  const units=mineUnits();
+  for(const u of units){
+    const ids=unitIds(u).filter(live); total+=ids.length;
+    for(const id of ids) if(P.done[id]){ lit++; if(P.gold[id]) gold++; }
+    if(unitDone(u)) cons++;
+  }
+  const fading=ORDER.filter(id=>SHOWN.has(BY[id].unit)&&Sky.fading(P,id)).sort((a,b)=>seenAt(a)-seenAt(b));
+  return {lit,gold,total,cons,units:units.length,fading};
+}
+// the class's next exam in a subject of its units
+function nextExam(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const exams=(MY_CLASS?[MY_CLASS]:MY_CLASSES).flatMap(row=>{ const subjects=classSubjects(row); return (row.exams||[]).filter(e=>e?.date&&subjects.includes(e.subject)); })
+    .filter(e=>examDate(e.date)>=today).sort((a,b)=>a.date.localeCompare(b.date));
+  return exams.length?{...exams[0],days:Math.round((examDate(exams[0].date)-today)/86400000)}:null;
+}
+
+function topBar(){
+  const st=skyStats(), hot=Sky.today(P)>=Sky.GOAL, manage=can("management.access"), on=Sky.soundOn(), streak=Sky.streak(P);
+  return `<header class="mx-top"><div class="mx-brand">${Sky.spark()}<span>מתמטיקה</span></div>
+    <div class="mx-stats"><span class="sky-chip flame${hot?"":" cold"}" title="${streak} ימים ברצף">${Sky.FLAME}<b>${streak}</b><span class="mx-sr">ימים ברצף</span></span>
+      <span class="sky-chip stars" title="${st.lit} כוכבים">${Sky.spark()}<b>${st.lit}</b><span class="mx-sr">כוכבים</span></span>
+      <button class="sky-chip snd" data-act="sound" aria-pressed="${on}" aria-label="צלילים">${on?SOUND_ON:SOUND_OFF}</button></div>
+    <div class="mx-acts">${subjectOptions().length?'<button class="mx-btn" data-act="subjects">מקצועות</button>':""}${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>`;
+}
+function counts(st){
+  return `<div class="mx-counts"><div><b>${st.lit}</b><small>מתוך ${st.total} כוכבים</small></div><div class="g"><b>${st.gold}</b><small>כוכבי זהב</small></div>
+    <div class="k"><b>${st.cons}</b><small>קבוצות כוכבים</small></div><div class="c"><b>${P.comets.length}</b><small>שביטים</small></div></div>`;
+}
+/* a unit's constellation as one picture: its outline (whole once the unit is done) and its stars */
+function conSvg(u,animate=false){
+  const ids=unitIds(u), shp=Sky.shape(u.id,ids.length,u.name), nxt=next(), full=unitDone(u);
+  const lines=[...shp.lines,...(full?shp.inner:[])].map(([a,b],k)=>`<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" class="${full?"on":"ghost"}${animate?" draw":""}"${animate?` style="animation-delay:${(k*.1).toFixed(2)}s"`:""}/>`).join("");
+  const stars=ids.map((id,i)=>{ const st=Sky.star(P,id,status(id),id===nxt), [x,y]=shp.stars[i], r=st==="gold"?18:["lit","fading","next"].includes(st)?13:7;
+    return `<path d="${Sky.SPARK}" transform="translate(${(x-r).toFixed(1)} ${(y-r).toFixed(1)}) scale(${(r/12).toFixed(3)})" class="c-${st}"/>`; }).join("");
+  return `<svg class="mx-con" viewBox="34 22 292 ${shp.H-56}" aria-hidden="true">${lines}${stars}</svg>`;
+}
+const pips=(u,fresh)=>`<div class="sky-pips" aria-hidden="true">${unitIds(u).filter(live).map(id=>Sky.spark(`${P.gold[id]?"g":P.done[id]?"l":""}${id===fresh?" new":""}`)).join("")}</div>`;
+
+function homeView(){
+  const st=skyStats(), nxt=next(), exam=nextExam(), n=Sky.today(P), goal=Sky.GOAL, done=n>=goal, streak=Sky.streak(P);
+  const hour=new Date().getHours(), hi=hour<5?"לילה טוב":hour<12?"בוקר טוב":hour<17?"צהריים טובים":"ערב טוב", who=CFG.name?`, ${esc(CFG.name)}`:"";
+  const soon=exam&&exam.days<=14, fade=st.fading.length;
+  const say=done?`${hi}${who}! היעד של היום הושלם: <b>${streak===1?"יום אחד":`${streak} ימים`} ברצף</b>. עוד כוכב לפני שמסיימים?`
+    :soon?`${hi}${who}! המבחן ב${esc(exam.subject)} <b>${inDays(exam.days)}</b>. נתחיל בחימום קצר?`
+    :fade?`${hi}${who}! ${fade===1?"כוכב אחד התחיל":`${fade} כוכבים התחילו`} לדעוך. חזרה קצרה תחזיר להם את האור.`
+    :!st.lit?`${hi}${who}! אני הינשוף, ואלווה אתכם במסלול. כל מיומנות היא כוכב. בואו נדליק את הראשון.`
+    :`${hi}${who}! כבר יש לכם <b>${st.lit} כוכבים</b>. בואו נדליק עוד אחד.`;
+  // what to do now, at most three: the next star, the faded stars, a star that can turn gold
+  const acts=[], qn=id=>QS(BY[id]).length===1?"שאלה אחת":`${QS(BY[id]).length} שאלות`;
+  if(nxt) acts.push({id:nxt,tag:soon?`הכנה למבחן · ${inDays(exam.days)}`:"הכוכב הבא",title:fmt(BY[nxt].name),meta:`${esc(unitOf(nxt).name)} · ${qn(nxt)}`});
+  if(fade) acts.push({id:st.fading[0],tag:"חזרה קצרה",title:fade===1?"להאיר כוכב דועך":`להאיר ${fade} כוכבים דועכים`,meta:`מתחילים ב: ${fmt(BY[st.fading[0]].short)}`});
+  const hunt=ORDER.filter(id=>SHOWN.has(BY[id].unit)&&live(id)&&P.done[id]&&!P.gold[id]&&!Sky.fading(P,id)).sort((a,b)=>seenAt(b)-seenAt(a))[0];
+  if(hunt) acts.push({id:hunt,tag:"מטרה: כוכב זהב",title:fmt(BY[hunt].name),meta:goldNeed(hunt)===1?"תשובה נכונה בניסיון הראשון הופכת אותו לזהב":`${goldNeed(hunt)} תשובות נכונות ברצף הופכות אותו לזהב`});
+  const units=mineUnits(), at=nxt?units.findIndex(u=>u.id===BY[nxt].unit):units.length-1, from=Math.max(0,Math.min(at-1,units.length-4));
   const examRows=(MY_CLASS?[MY_CLASS]:MY_CLASSES).filter(row=>(row.exams||[]).length);
-  const units=UNITS.map(u=>{
-    const ids=ORDER.filter(id=>BY[id].unit===u.id), d=ids.filter(id=>P.done[id]).length;
-    return `<div class="mx-su u-${u.id}"><b>${esc(u.name)}</b><span class="mx-bar"><i style="width:${Math.round(100*d/ids.length)}%"></i></span><small>${d} מתוך ${ids.length}</small></div>`;
-  }).join("");
-  const trail=UNITS.map(u=>{
-    const ids=ORDER.filter(id=>BY[id].unit===u.id);
-    return `<section class="mx-unit u-${u.id}"><div class="mx-uhead"><h2>${esc(u.name)}</h2><span>${esc(u.source)}${u.when?" · "+esc(u.when):""}</span></div>
-      <div class="mx-trail">${ids.map((id,i)=>{
-        const s=BY[id], st=status(id), here=id===nxt, n=QS(s).length, k=solvedOf(id).size;
-        return `<button class="mx-node st-${st}${here?" here":""}" data-id="${id}" aria-label="${esc(plain(s.name))}, ${st==="done"?"הושלמה":st==="open"?"פתוחה":"נעולה"}">
-          <span class="mx-dot">${st==="done"?"✓":i+1}</span>
-          <span class="mx-lbl"><b>${fmt(s.name)}</b><small>${s.core?'<span class="mx-core">ליבה 5 יח״ל</span>':""}${n>1&&st!=="done"&&k?`<span class="mx-count">${k}/${n}</span>`:""}${here?'<span class="mx-go">ממשיכים כאן</span>':""}</small></span></button>`;
-      }).join("")}</div></section>`;
-  }).join("");
-  path.innerHTML=`<header class="mx-top"><div><h1>המסלול שלי</h1><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
-      <div class="mx-acts">${subjectOptions().length?'<button class="mx-btn" data-act="subjects">מקצועות</button>':""}${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
-    <section class="mx-progress" aria-label="ההתקדמות שלי">
-      <div class="mx-ring" style="--p:${pct}"><b>${doneN}</b><small>מתוך ${total}</small></div>
-      <div class="mx-units">${units}</div></section>
+  return `${topBar()}
+    <section class="mx-greet"><div class="mx-owl">${Sky.owl(84)}</div><p class="mx-bubble">${say}</p></section>
+    <section class="mx-todo" aria-labelledby="mxTodo"><h2 id="mxTodo">מה עושים עכשיו</h2>
+      ${acts.length?acts.map((a,i)=>`<button class="mx-task u-${BY[a.id].unit}${i?"":" hero"}" data-id="${a.id}">
+        <span class="mx-ticon">${Sky.spark()}</span><span class="mx-tbody"><small>${a.tag}</small><b>${a.title}</b><span>${a.meta}</span></span>
+        <span class="mx-tgo" aria-hidden="true">${i?"‹":"להתחיל"}</span></button>`).join("")
+        :'<p class="mx-note">כל הכוכבים דולקים בזהב. איזה שמיים! אפשר לחזור לכל מיומנות מהמסלול.</p>'}
+    </section>
+    <section class="mx-goal"><div class="mx-goalring${done?" done":""}" style="--p:${Math.min(100,Math.round(100*n/goal))}"><div>${Sky.FLAME}<b>${Math.min(n,goal)}/${goal}</b></div></div>
+      <div><h3>${done?"היעד היומי הושלם":`היעד היומי: ${goal} תשובות נכונות`}</h3>
+        <p>${done?"הרצף נשמר. נתראה מחר.":`עוד ${goal-n} והרצף ממשיך. יום אחד שמפספסים לא שובר אותו.`}</p>
+        <div class="mx-week">${Sky.week(P).map(d=>`<span class="${d.on?"on":""}${d.today?" today":""}"><i></i>${d.label}</span>`).join("")}</div></div></section>
     ${examRows.map(row=>examBoard(row,true)).join("")}
-    ${nxt?`<button class="mx-next" data-id="${nxt}"><small>ממשיכים מכאן</small><b>${fmt(BY[nxt].name)}</b></button>`:'<p class="mx-note">סיימתם את כל המסלול. כל הכבוד!</p>'}
-    ${trail}
-    <p class="mx-note">מיומנות מסומנת כהושלמה כשעונים נכון על כל השאלות שלה. ההתקדמות נשמרת במכשיר הזה.</p>`;
+    <button class="mx-mysky" data-view="sky"><span class="mx-sh"><b>השמיים שלי</b><span>לאוסף ‹</span></span>
+      <span class="mx-minis">${units.slice(from,from+4).map(u=>{const lit=unitIds(u).some(id=>P.done[id]);
+        return `<span class="u-${u.id}">${conSvg(u)}<small>${lit?esc(Sky.shape(u.id,1,u.name).name):"?"}</small></span>`;}).join("")}</span>
+      ${counts(st)}</button>`;
+}
+
+/* The path: one winding trail from the start through every skill, unit after unit (a banner opens each unit).
+   The nodes sway left and right; trail() then draws the line through their centres, lit up to the last skill done. */
+const SWAY=[0,.55,.9,.55,0,-.55,-.9,-.55];
+function pathView(){
+  const nxt=next(), cls=MY_CLASS?` · כיתת ${esc(MY_CLASS.name)}`:"";
+  let k=0;
+  const units=mineUnits().map(u=>{
+    const ids=unitIds(u), act=ids.filter(live), lit=act.filter(id=>P.done[id]).length;
+    const steps=ids.map(id=>{ const st=Sky.star(P,id,status(id),id===nxt), tag=st==="next"?"ממשיכים כאן":st==="fading"?"דועך":"";
+      return `<div class="mx-step u-${u.id}" style="--x:${SWAY[k++%SWAY.length]}">
+        <button class="mx-node mx-star st-${st}" data-id="${id}" aria-label="${esc(plain(BY[id].name))}: ${STATE_NAME[st]}">${Sky.spark()}${st==="next"?`<span class="mx-perch">${Sky.owl(34)}</span>`:""}</button>
+        <span class="mx-lbl l-${st}">${fmt(BY[id].short)}${tag?`<em>${tag}</em>`:""}</span></div>`; }).join("");
+    return `<section class="mx-unit u-${u.id}${unitDone(u)?" full":""}" id="mx-unit-${u.id}"><div class="mx-uhead">
+      <h2>${esc(u.name)}</h2><span class="mx-pill">${lit}/${act.length}</span>${u.when?`<span class="mx-usub">${esc(u.when)}</span>`:""}</div></section>${steps}`;
+  }).join("");
+  return `${topBar()}<div class="mx-pghead"><h1>המסלול שלי</h1><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
+    <div class="mx-trail"><svg class="mx-line" aria-hidden="true"></svg>
+      <div class="mx-start"><span class="mx-flag">${Sky.owl(40)}</span><b>התחלה</b></div>${units}
+      <div class="mx-finish" aria-hidden="true">${Sky.spark()}<b>סוף המסלול</b></div></div>
+    <p class="mx-note">כל השיעורים פתוחים. כוכב נדלק כשעונים נכון על כל השאלות של המיומנות, והופך לזהב אחרי ${3} תשובות נכונות ברצף (או כל השאלות, כשיש פחות). כוכב שלא תרגלו ${Sky.FADE_DAYS} יום דועך, ותשובה נכונה אחת מחזירה לו את האור. ההתקדמות נשמרת במכשיר הזה.</p>`;
+}
+// the trail's line: a smooth curve from the start through each node to the finish; a stretch is lit once the skill it reaches is done
+function trail(box){
+  if(!box?.isConnected) return;
+  const svg=box.querySelector(".mx-line"), at=box.getBoundingClientRect(), W=box.clientWidth, H=box.scrollHeight;
+  const mid=el=>{ const r=el.getBoundingClientRect(); return [r.left+r.width/2-at.left,r.top+r.height/2-at.top]; };
+  const pts=[box.querySelector(".mx-start .mx-flag"),...box.querySelectorAll(".mx-star"),box.querySelector(".mx-finish svg")].map(el=>({p:mid(el),el}));
+  const f=n=>n.toFixed(1);
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  svg.innerHTML=pts.slice(1).map(({p:[x1,y1],el},i)=>{ const [x0,y0]=pts[i].p, my=(y0+y1)/2, st=el.classList;
+    const on=st.contains("st-lit")||st.contains("st-gold")||st.contains("st-fading"), u=el.closest(".mx-step")?.className.match(/u-\w+/)?.[0]||"";
+    return `<path class="${u}${on?" on":""}" d="M${f(x0)} ${f(y0)}C${f(x0)} ${f(my)} ${f(x1)} ${f(my)} ${f(x1)} ${f(y1)}"/>`; }).join("");
+}
+
+function collectionView(){
+  const st=skyStats();
+  return `${topBar()}<div class="mx-pghead"><h1>האוסף שלי</h1><p class="mx-sub">כל מיומנות היא כוכב. כל יחידה שמסיימים מציירת קבוצת כוכבים.</p></div>
+    ${counts(st)}
+    <div class="mx-sh"><h2>קבוצות כוכבים</h2><span>${st.cons} מתוך ${st.units}</span></div>
+    <div class="mx-cons">${mineUnits().map(u=>{ const ids=unitIds(u).filter(live), lit=ids.filter(id=>P.done[id]).length, full=unitDone(u);
+      return `<button class="mx-con-card u-${u.id}${full?" full":lit?"":" unknown"}" data-view="path" data-unit="${u.id}">${conSvg(u)}
+        <b>${lit?esc(Sky.shape(u.id,1,u.name).name):"?"}</b><small>${esc(u.name)} · ${full?"הושלמה":`${lit}/${ids.length}`}</small></button>`; }).join("")}</div>
+    <div class="mx-sh"><h2>שביטים נדירים</h2><span>${P.comets.length} מתוך ${Sky.COMETS.length}</span></div>
+    <p class="mx-note">שביטים חולפים לפעמים על המסך בזמן תרגול. מי שלוחץ עליהם בזמן תופס אותם.</p>
+    <div class="mx-comets">${Sky.COMETS.map(c=>{ const have=P.comets.includes(c.id);
+      return `<button class="mx-comet${have?" have":""}" data-comet="${c.id}" aria-label="${have?esc(c.name):"שביט שעוד לא נתפס"}"><span class="sym">${have?esc(c.sym):"?"}</span><small>${have?esc(c.name):"עוד לא נתפס"}</small></button>`; }).join("")}</div>`;
+}
+
+function draw(){
+  Sky.ensure(P);
+  path.innerHTML=VIEW==="path"?pathView():VIEW==="sky"?collectionView():homeView();
+  TRAIL?.disconnect(); TRAIL=null;
+  if(VIEW==="path"){ const box=path.querySelector(".mx-trail"); TRAIL=new ResizeObserver(()=>trail(box)); TRAIL.observe(box); }
+  nav.hidden=false;
+  nav.innerHTML=`<div>${TABS.map(([v,label,icon])=>`<button data-view="${v}"${VIEW===v?' aria-current="page"':""}>${icon}<span>${label}</span></button>`).join("")}</div>`;
+}
+function setView(view,unit){
+  VIEW=view; draw(); root.scrollTop=0;
+  const target=view!=="path"?null:unit?root.querySelector(`#mx-unit-${CSS.escape(unit)}`):root.querySelector(".mx-star.st-next")||root.querySelector(".mx-star.st-open");
+  if(target) target.scrollIntoView({block:unit?"start":"center"});
+}
+function showComet(cid){
+  const c=Sky.COMETS.find(x=>x.id===cid), have=P.comets.includes(cid);
+  if(!c) return;
+  if(!cur) back=document.activeElement;
+  cur="comet";
+  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div><div class="mx-sheet mx-comet-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+    <div class="mx-shtop"><h3 id="mxTitle">${have?esc(c.name):"שביט שעוד לא נתפס"}</h3><button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+    ${have?`${Sky.cometCard(c)}<p>${esc(c.fact)}</p>`:"<p>שביטים חולפים לפעמים על המסך בזמן תרגול. מי שלוחץ עליהם בזמן תופס אותם, והם נשמרים כאן.</p>"}</div>`;
+  sheet.hidden=false; sheet.querySelector(".mx-x").focus({preventScroll:true});
+}
+function launchComet(){
+  Sky.comet(()=>{
+    cancelAdvance();
+    const c=Sky.catchComet(P); save(); draw();
+    if(c) Sky.celebrate({kind:"gold",title:"תפסתם שביט נדיר!",sub:esc(c.fact),art:Sky.cometCard(c)});
+  });
+}
+/* After a correct answer in `id`: the celebrations it earned, one after another, then a comet perhaps.
+   `r`: what Sky.correct changed; `lit`: the skill was finished just now; `unitWas`: its unit was complete before.
+   Resolves when the student has seen them all (at once when there was nothing to celebrate). */
+function rewards(id,{r,lit,unitWas}){
+  const u=unitOf(id), steps=[], name=Sky.shape(u.id,1,u.name).name;
+  if(r.gold) steps.push(()=>Sky.celebrate({kind:"gold",title:"כוכב זהב!",sub:`${fmt(BY[id].short)} · ${goldNeed(id)===1?"נכון בניסיון הראשון":`${goldNeed(id)} נכונות ברצף`}`,extra:pips(u,id)}));
+  else if(lit) steps.push(()=>Sky.celebrate({kind:"lit",title:"כוכב חדש!",sub:fmt(BY[id].short),extra:pips(u,id)}));
+  if(unitDone(u)&&!unitWas) steps.push(()=>Sky.celebrate({kind:"con",title:`קבוצת ${name} הושלמה!`,sub:`כל הכוכבים של ${esc(u.name)} דולקים.`,art:conSvg(u,true)}));
+  if(r.revived&&!steps.length) Sky.toast(`<b>${fmt(BY[id].short)}</b> זורח שוב`);
+  if(r.goal) steps.push(async()=>{ Sky.sound.goal(); Sky.toast(`יעד יומי הושלם · <b>${Sky.streak(P)} ימים ברצף</b>`); });
+  if(Sky.cometDue(P,{gold:r.gold})){ P.cometDay=Sky.dayKey(); save(); steps.push(()=>new Promise(res=>setTimeout(()=>{ launchComet(); res(); },600))); }
+  return steps.reduce((p,step)=>p.then(step),Promise.resolve()).then(()=>{ if(steps.length) draw(); });
 }
 
 function chips(ids){
@@ -159,26 +321,25 @@ function open(id){
   curQ=Math.min(P.at[id]||0,n-1);
   const q=all[curQ], openEnded=q.type==="open-ended", got=solvedOf(id);
   const options=q.choices||[],rot=options.length?(ORDER.indexOf(id)+curQ)%options.length:0;
-  const choices=options.slice(rot).concat(options.slice(0,rot)), missing=s.prereqs.filter(p=>!P.done[p]&&SHOWN.has(BY[p].unit));
+  const choices=options.slice(rot).concat(options.slice(0,rot));
   if(!cur) back=document.activeElement;
-  cur=id;
+  cur=id; FIRST=true;
   sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
     <div class="mx-sheet u-${s.unit}" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
       <div class="mx-shtop"><div><span class="mx-uchip">${esc(unit.name)}</span>${s.core?' <span class="mx-core">ליבה 5 יח״ל</span>':""}
         <h3 id="mxTitle">${fmt(s.name)}</h3><small class="mx-src">${s.month?`בפריסה: ${esc(s.month)}`:esc(unit.source)}${st==="done"?" · הושלמה ✓":""}</small></div>
         <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
       <p>${fmt(s.description)}</p>
-      ${st==="locked"?`<div class="mx-hint">מומלץ לעבור קודם על: <span class="mx-chips">${chips(missing)}</span></div>`:""}
       <div class="mx-q">${n>1?`<div class="mx-qprog"><span>שאלה ${curQ+1} מתוך ${n}</span><span class="mx-qdots" aria-label="נפתרו ${got.size} מתוך ${n}">${all.map((_,i)=>`<i class="${got.has(i)?"ok":""}${i===curQ?" now":""}"></i>`).join("")}</span></div>`:""}
         <p>${fmt(q.question)}</p>${q.graph?plot(q.graph):""}${q.diagram?geometryDiagram(q.diagram):""}${q.figure?figure(q.figure):""}
-        ${openEnded?'<div class="mx-answer"></div>':`<div class="mx-choices">${choices.map((c,i)=>`<button data-choice="${i}" data-m="${c.correct?"":esc(c.mistake)}"${c.correct?" data-right":""}>${fmt(c.text)}</button>`).join("")}</div>`}
+        ${st==="off"?'<p class="mx-note mx-off">השאלה הזו סגורה כרגע לתשובות. היא לא נדרשת כדי להתקדם במסלול.</p>':openEnded?'<div class="mx-answer"></div>':`<div class="mx-choices">${choices.map((c,i)=>`<button data-choice="${i}" data-m="${c.correct?"":esc(c.mistake)}"${c.correct?" data-right":""}>${fmt(c.text)}</button>`).join("")}</div>`}
         <div class="mx-fb" aria-live="polite"></div></div>
       <div class="mx-sec"><h4>דורשת</h4><div class="mx-chips">${chips(s.prereqs)}</div></div>
       <div class="mx-sec"><h4>פותחת</h4><div class="mx-chips">${chips(POST[id])}</div></div>
     </div>`;
   sheet.hidden=false; sheet.querySelector(".mx-sheet").scrollTop=0;
   sheet.querySelector(".mx-x").focus({preventScroll:true});
-  if(openEnded)window.MathlyAnswers?.mountQuestion(sheet.querySelector(".mx-answer"),id,s.question_version);
+  if(openEnded&&st!=="off")window.MathlyAnswers?.mountQuestion(sheet.querySelector(".mx-answer"),id,s.question_version);
 }
 function closeSheet(){ stopPhone(); cancelAdvance(); if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
 
@@ -206,23 +367,29 @@ function answer(btn){
   if(n>1) P.at[id]=nextQ(id,qi);
   if(!m){
     const got=solvedOf(id); got.add(qi); P.solved[id]=[...got].sort((a,b)=>a-b);
-    const finished=got.size>=n, first=finished&&!P.done[id];
+    const finished=got.size>=n, first=finished&&!P.done[id], unitWas=unitDone(unitOf(id));
     if(finished) P.done[id]=P.done[id]||new Date().toISOString();
+    COMBO=FIRST?COMBO+1:0;
+    const r=Sky.correct(P,id,{first:FIRST,n,finished:!!P.done[id]}); FIRST=false;
     save(); draw();
     buttons.forEach(b=>b.disabled=true);
+    COMBO>=2?Sky.sound.combo(COMBO):Sky.sound.ok(); Sky.buzz(25); Sky.burstAt(btn,14);
+    const ok=`<b>${Sky.praise()}</b>${COMBO>=2?`<span class="mx-combo">${Sky.FLAME}${COMBO} ברצף</span>`:""}`;
+    const after=rewards(id,{r,lit:first,unitWas}), then=go=>after.then(()=>{ if(cur===id&&!sheet.hidden&&fb.isConnected) go(); });   // not once another question is shown
     if(!P.done[id]){
-      fb.innerHTML=`<div class="mx-ok"><b>נכון!</b><span>פתרתם ${got.size} מתוך ${n} שאלות במיומנות הזו.</span>
+      fb.innerHTML=`<div class="mx-ok">${ok}<span>פתרתם ${got.size} מתוך ${n} שאלות במיומנות הזו.</span>
         <span class="mx-countdown"></span><button class="mx-btn solid" data-id="${id}">לשאלה הבאה</button></div>`;
-      return autoAdvance(id,id);
+      return then(()=>autoAdvance(id,id));
     }
     const nxt=next();
-    fb.innerHTML=`<div class="mx-ok"><b>נכון!</b>${first?`<span>${n>1?`פתרתם את כל ${n} השאלות. `:""}המיומנות סומנה כהושלמה.</span>`:""}
+    fb.innerHTML=`<div class="mx-ok">${ok}${first?`<span>${n>1?`פתרתם את כל ${n} השאלות. `:""}המיומנות סומנה כהושלמה.</span>`:""}
       ${nxt&&nxt!==id?`<span class="mx-countdown"></span><button class="mx-btn solid" data-id="${nxt}">המשך עכשיו: ${fmt(BY[nxt].short)}</button>`
         :nxt?"":"<span>סיימתם את כל המסלול. כל הכבוד!</span>"}
       ${n>1?`<button class="mx-btn" data-id="${id}">עוד שאלה במיומנות הזו</button>`:""}</div>`;
-    if(nxt&&nxt!==id) autoAdvance(id,nxt);
+    if(nxt&&nxt!==id) then(()=>autoAdvance(id,nxt));
     return;
   }
+  Sky.wrong(P,id); FIRST=false; COMBO=0; Sky.sound.bad(); Sky.buzz([20,40,20]);
   save();
   const M=G.mistakes[m], to=M.back&&M.back!==id?M.back:null;
   // with a list of questions, a missed question is shown later again; trying again now would not count
@@ -236,6 +403,8 @@ function onClick(e){
   const t=e.target.closest("button,[data-act]"); if(!t||!root.contains(t)) return;
   if(t.dataset.choice!=null) return answer(t);
   if(t.dataset.subject) return selectSubject(t.dataset.subject);
+  if(t.dataset.view){ closeSheet(); return setView(t.dataset.view,t.dataset.unit); }
+  if(t.dataset.comet) return showComet(t.dataset.comet);
   if(t.dataset.id) return open(t.dataset.id);
   if(t.dataset.manageMode) return showManageMode(t.dataset.manageMode);
   if(t.dataset.classAction) return manageClassAction(t.dataset.classAction,t.dataset.classId);
@@ -245,6 +414,7 @@ function onClick(e){
     case "manage-lab": return showManageMode("lab");
     case "manage-practice": return closeSheet();
     case "subjects": return drawSubjectPicker();
+    case "sound": Sky.setSound(!Sky.soundOn()); Sky.sound.tap(); return draw();
     case "phone": return pairPhone();
     case "copy-phone": return copyPhone(t);
     case "photo": case "retake": return picker.click();
@@ -703,6 +873,7 @@ async function boot(){
       return;
     }
     CFG.token=session.access_token;
+    const meta=session.user?.user_metadata||{}; CFG.name=meta.given_name||String(meta.full_name||meta.name||"").trim().split(/\s+/)[0]||"";
     const response=await api("/api/me");
     if(!response.ok){ state.className="error"; state.textContent=response.status===403?"החשבון אינו משויך לכיתת מתמטיקה.":"לא ניתן להשלים את הכניסה."; return; }
     const me=await response.json();CFG.userId=me.user_id;CFG.answerScans=me.answer_scans; ME_EMAIL=me.email||""; MY_CLASSES=me.classes||[]; MY_CLASS=MY_CLASSES.length===1?MY_CLASSES[0]:null;
