@@ -97,6 +97,21 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
         return HTMLResponse((STATIC / "phone.html").read_text(encoding="utf-8"),
                             headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
+    @app.get("/service-worker.js", include_in_schema=False)
+    async def retired_service_worker():
+        # An older version installed a service worker that served /static/ from its own cache forever.
+        # Browsers that still have it fetch this file to update it: the new one clears that cache,
+        # removes itself and reloads the open pages, so they get the current app.
+        script = """
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", event => event.waitUntil((async () => {
+  await Promise.all((await caches.keys()).map(key => caches.delete(key)));
+  await self.registration.unregister();
+  for (const client of await self.clients.matchAll({type: "window"})) client.navigate(client.url);
+})()));
+"""
+        return Response(script, media_type="text/javascript", headers={"Cache-Control": "no-store"})
+
     @app.get("/manifest.webmanifest", include_in_schema=False)
     async def manifest():
         return Response((STATIC / "manifest.webmanifest").read_text(encoding="utf-8"),
