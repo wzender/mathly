@@ -6,6 +6,8 @@ import logging
 import os
 import re
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 import time
 import urllib.error
 import urllib.parse
@@ -116,6 +118,47 @@ class SupabaseAuth:
     def delete_class(self, class_id: int) -> None:
         self._admin(f"/rest/v1/classes?id=eq.{int(class_id)}", "DELETE")
         self._classes = None
+
+    def ping(self, timeout: float = 8) -> dict:
+        """How Supabase answers right now, for Monitoring: its sign-in service and its database, each timed in ms.
+        A part that fails holds {"ok": False, "error"} and does not hide the other."""
+        def timed(path: str, key: str) -> dict:
+            request = urllib.request.Request(self.url + path, headers={
+                "apikey": key, "Authorization": f"Bearer {key}", "User-Agent": "mathly/1.0"})
+            start = time.monotonic()
+            try:
+                with urllib.request.urlopen(request, timeout=timeout) as response:
+                    response.read()
+                return {"ok": True, "ms": round((time.monotonic() - start) * 1000)}
+            except urllib.error.HTTPError as exc:
+                return {"ok": False, "ms": round((time.monotonic() - start) * 1000), "error": f"HTTP {exc.code}"}
+            except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+                return {"ok": False, "error": str(exc) or type(exc).__name__}
+        with ThreadPoolExecutor(2) as pool:
+            auth = pool.submit(timed, "/auth/v1/health", self.key)
+            db = pool.submit(timed, "/rest/v1/classes?select=id&limit=1", self.secret) if self.secret else None
+            return {"auth": auth.result(),
+                    "db": db.result() if db else {"ok": False, "error": "SUPABASE_SECRET_KEY is not set"}}
+
+    def answer_activity(self, since: datetime, limit: int = 10_000) -> dict | None:
+        """Open-answer attempts and photo checks since a time: user, time and verdict only, never the answer.
+        None when the answer tables are not installed."""
+        stamp = urllib.parse.quote(since.isoformat())
+        try:
+            attempts = self._admin(f"/rest/v1/math_question_attempts?select=user_id,question_id,created_at"
+                                   f"&created_at=gte.{stamp}&order=created_at.asc&limit={limit}") or []
+        except AuthUnavailable as exc:
+            if "answered 404" in str(exc):
+                return None
+            raise
+        try:
+            grades = self._admin(f"/rest/v1/math_answer_grades?select=user_id,state,created_at,verdict:result->>verdict"
+                                 f"&created_at=gte.{stamp}&order=created_at.asc&limit={limit}") or []
+        except AuthUnavailable as exc:
+            if "answered 404" not in str(exc):
+                raise
+            grades = []
+        return {"attempts": attempts, "grades": grades}
 
     def access_for(self, user_id: str, fresh: bool = False) -> dict | None:
         if not self.secret:

@@ -22,6 +22,7 @@ from .auth import AuthUnavailable, ClassConflict, SupabaseAuth, load_auth
 from .math_photo import (DAILY_PHOTOS, MAX_PHOTO, MEDIA_TYPES as PHOTO_TYPES,
                          PhotoSolver, PhotoUnavailable, math_model, photo_client)
 from .math_skills import algebra9, practice_graph
+from .monitoring import install_monitoring_routes
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("mathly")
@@ -56,6 +57,8 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
     app.state.auth = auth or load_auth()
     app.state.photo = None
     app.state.photo_key = None
+    app.state.seen = {}
+    app.state.photo_counts = {}
     app.mount("/static", FreshStatic(directory=STATIC), name="static")
 
     async def signed_in(request: Request) -> dict | None:
@@ -73,6 +76,7 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
             raise HTTPException(401, "sign in required")
         if user.get("denied"):
             raise HTTPException(403, "this account is not in a math class")
+        app.state.seen[user.get("id") or user.get("email", "")] = time.time()  # for Monitoring's "signed in lately"
         return user
 
     async def manager(user: dict | None = Depends(signed_in)) -> dict:
@@ -186,7 +190,7 @@ self.addEventListener("activate", event => event.waitUntil((async () => {
             raise HTTPException(503, str(exc)) from exc
         return {"ok": True}
 
-    photo_counts: dict[tuple[str, str], int] = {}
+    photo_counts: dict[tuple[str, str], int] = app.state.photo_counts
     photo_sessions: dict[str, dict] = {}
 
     def session_for(token: str) -> dict:
@@ -290,6 +294,7 @@ self.addEventListener("activate", event => event.waitUntil((async () => {
         return {"ok": True, "readable": result.get("readable", False)}
 
     install_answer_routes(app, signed_in)
+    install_monitoring_routes(app, manager)
     return app
 
 

@@ -431,7 +431,7 @@ const manageTabs=[
   ["classes","כיתות","פתיחה, עריכה ומחיקה"],
   ["students","תלמידים","רשימה ומסנן כיתות"],
   ["content","תוכן","מקצועות, יחידות ותת־נושאים"],
-  ["flags","ניטור","פעילות ודיווחי ציונים"],
+  ["flags","ניטור","מצב המערכת ופעילות"],
   ["access","הרשאות","תפקידים וגישה"]
 ];
 
@@ -512,17 +512,115 @@ function showManageMode(mode){
     return;
   }
   if(mode==="content") return drawContent(box);
-  if(mode==="flags"){
-    const done=Object.keys(P.done||{}).length, tries=Object.values(P.tries||{}).reduce((sum,n)=>sum+(+n||0),0);
-    box.innerHTML=`<div class="mx-manage-title"><h4>ניטור</h4><span>פעילות ודיווחי ציונים</span></div><div class="mx-manage-stats"><article><b>${MANAGED_CLASSES.length}</b><small>כיתות פעילות</small></article><article><b>${done}</b><small>מיומנויות שהושלמו במכשיר זה</small></article><article><b>${tries}</b><small>ניסיונות במכשיר זה</small></article></div><p class="mx-note">נתוני התקדמות כיתתיים יופיעו כאן כאשר שירות דיווחי הציונים יחובר.</p>`;
-    return;
-  }
+  if(mode==="flags") return drawMonitoring(box);
   if(mode==="access"){
     const roles=CFG.roles||[], permissions=CFG.permissions||[];
     box.innerHTML=`<div class="mx-manage-title"><h4>הרשאות</h4><span>תפקידים וגישה</span></div><div class="mx-access-card"><small>התפקידים שלך</small><div class="mx-tag-row">${roles.length?roles.map(role=>`<span>${esc(role)}</span>`).join(""):'<span>מנהל/ת</span>'}</div><small>הרשאות פעילות</small><div class="mx-tag-row">${permissions.map(permission=>`<span dir="ltr">${esc(permission)}</span>`).join("")}</div></div>`;
     return;
   }
   box.innerHTML='<div class="mx-manage-title"><h4>מעבדה</h4><span>כלים לבדיקה ופיתוח</span></div><p class="mx-note">כלי המעבדה למתמטיקה יתווספו כאן. אפשר לחזור לכל אזור ניהול מהכרטיסיות למעלה.</p>';
+}
+
+/* Monitoring (ניטור): a snapshot of the system, open-answer activity, and the server's latest warnings.
+   Each source loads and fails on its own, so a slow Supabase does not hold up the rest. */
+const MON_RANGES={day:["יום","24 השעות האחרונות","15 דקות"],week:["שבוע","7 הימים האחרונים","שעה"],month:["חודש","30 הימים האחרונים","יום"]};
+const VERDICTS={correct:"נכונות",partial:"נכונות חלקית",incorrect:"שגויות",unreadable:"לא קריאות",needs_review:"דורשות בדיקה",grading:"בבדיקה",failed:"הבדיקה נכשלה"};
+let MON={}, MON_RANGE=(()=>{try{return localStorage.getItem("mathly.monRange")}catch{return null}})();
+if(!MON_RANGES[MON_RANGE]) MON_RANGE="week";
+const monRel=new Intl.RelativeTimeFormat("he",{numeric:"auto"});
+function monAgo(stamp){
+  const when=new Date(stamp), seconds=Math.max(0,(Date.now()-when.getTime())/1000);
+  if(!stamp||Number.isNaN(when.getTime())) return "";
+  const [value,unit]=seconds<60?[Math.max(1,Math.floor(seconds)),"second"]:seconds<3600?[Math.floor(seconds/60),"minute"]:seconds<86400?[Math.floor(seconds/3600),"hour"]:seconds<2592000?[Math.floor(seconds/86400),"day"]:[Math.floor(seconds/2592000),"month"];
+  return `<time datetime="${esc(when.toISOString())}" title="${esc(when.toLocaleString("he-IL",{dateStyle:"medium",timeStyle:"short",timeZone:"Asia/Jerusalem"}))}">${esc(monRel.format(-value,unit))}</time>`;
+}
+async function monGet(url){
+  try{ const res=await api(url), data=await res.json().catch(()=>({})); if(!res.ok) throw new Error(data.detail||res.status); return data; }
+  catch(err){ return {error:err.message||"לא זמין"}; }
+}
+function drawMonitoring(box){
+  box.innerHTML=`<div class="mx-manage-title"><h4>ניטור</h4><span>מצב המערכת ופעילות · מתעדכן פעם בדקה</span></div>
+    <section class="mx-mon-card mx-mon-summary"></section><section class="mx-mon-card mx-mon-activity"></section>`;
+  drawMonSummary(); drawMonActivity(); loadMonitoring();
+}
+function loadMonitoring(){
+  const redraw=draw=>{ if(cur==="management"&&MANAGE_MODE==="flags") draw(); };
+  monGet("/api/monitor/summary").then(data=>{ MON.summary=data; redraw(drawMonSummary); });
+  monGet("/api/monitor/supabase").then(data=>{ MON.supabase=data; redraw(drawMonSummary); });
+  loadMonActivity().then(()=>{ redraw(drawMonActivity); redraw(drawMonSummary); });
+}
+async function loadMonActivity(){ const range=MON_RANGE, data=await monGet(`/api/monitor/activity?period=${range}`); if(range===MON_RANGE) MON.activity=data; }
+setInterval(()=>{ if(cur==="management"&&MANAGE_MODE==="flags"&&!document.hidden) loadMonitoring(); },60000);
+
+function drawMonSummary(){
+  const box=sheet.querySelector(".mx-mon-summary"); if(!box) return;
+  const sum=MON.summary, sb=MON.supabase, loading=!sum, err=sum?.error;
+  const tile=(value,label,sub,tone="",cls="")=>`<article class="mx-mon-tile ${tone} ${cls}"><b>${value}</b><small>${esc(label)}</small>${sub?`<span>${sub}</span>`:""}</article>`;
+  const tiles=[];
+  { const seen=sum?.seen, n=seen?.last_5m;
+    tiles.push(tile(loading?"…":err?"–":n?`${n} ${n===1?"משתמש/ת":"משתמשים"}`:"אין משתמשים","נכנסו ב־5 הדקות האחרונות",
+      loading?"טוען…":err?esc(err):`${seen.last_hour} בשעה האחרונה · ${seen.last_24h} ב־24 שעות · ${n?"כדאי לחכות עם פריסה":"אפשר לפרוס גרסה חדשה"}`,
+      loading||err?"":n?"busy":"ready","mx-mon-live")); }
+  { const b=sum?.build||{};
+    tiles.push(tile(loading?"…":monAgo(b.updated_at)||"–","עדכון אחרון",err?esc(err):esc([b.version,b.commit_message].filter(Boolean).join(" · ")))); }
+  { const ph=sum?.photos;
+    tiles.push(tile(loading||err?"–":String(ph.today),"תרגילים מצולמים היום",loading?"":err?esc(err):!sum.photo_help?"עזרה בצילום אינה מוגדרת":
+      `${ph.students} תלמידים · ${ph.at_limit} הגיעו למכסה (${ph.daily_limit} ליום)`,!loading&&!err&&ph.at_limit?"warn":"")); }
+  { const e=sum?.errors||{}, tone=loading||err?"":e.last_hour?"bad":e.last_24h?"warn":"ready";
+    tiles.push(tile(loading||err?"–":String(e.last_24h??0),"שגיאות בלוג ב־24 השעות האחרונות",loading?"":err?esc(err):
+      `${e.since_start??0} מאז הפעלת השרת${e.last_at?` · אחרונה ${monAgo(new Date(e.last_at*1000).toISOString())}`:""}`,tone)); }
+  { const parts=sb&&!sb.error?[["התחברות",sb.auth||{}],["מסד נתונים",sb.db||{}]]:[];
+    const down=parts.some(([,x])=>!x.ok), slow=parts.some(([,x])=>x.ok&&x.ms>2000);
+    const sub=!sb?"בודק…":sb.error?esc(sb.error):parts.map(([name,x])=>x.ok?`${name} ${(x.ms/1000).toFixed(1)} ש׳`:`${name}: ${esc(x.error||"לא עונה")}`).join(" · ");
+    tiles.push(tile(!sb?"…":sb.error?"–":down?"לא זמין":slow?"איטי":"תקין","Supabase",sub,!sb||sb.error?"":down?"bad":slow?"warn":"ready")); }
+
+  // open answers: what is switched on, and how this period's photo checks came out
+  const ans=sum?.answers, act=MON.activity, verdicts=act?.summary?.verdicts||{};
+  let answers;
+  if(loading) answers='<p class="mx-note">טוען…</p>';
+  else if(err) answers=`<p class="mx-note">לא ניתן לטעון: ${esc(err)}</p>`;
+  else{
+    const flag=(on,yes,no)=>`<li class="${on?"on":"off"}">${on?yes:no}</li>`;
+    answers=`<ul class="mx-mon-flags">${flag(ans.storage,"שמירת תשובות מצולמות פעילה","שמירת תשובות מצולמות כבויה")}${flag(!ans.open_ended_locked,"שאלות פתוחות פתוחות לתלמידים","שאלות פתוחות נעולות")}${flag(ans.grading,"בדיקה אוטומטית של תשובות פעילה","בדיקה אוטומטית כבויה")}</ul>`;
+    const total=Object.values(verdicts).reduce((a,b)=>a+b,0);
+    if(act&&!act.error&&!act.unavailable) answers+=total?`<p class="mx-note">${total} בדיקות ב־${MON_RANGES[MON_RANGE][1]}:</p><ul class="mx-mon-verdicts">${Object.entries(verdicts).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<li><span>${esc(VERDICTS[k]||k)}</span><b>${n}</b></li>`).join("")}</ul>`:`<p class="mx-note">אין בדיקות תשובות ב־${MON_RANGES[MON_RANGE][1]}.</p>`;
+  }
+  // the last WARNING-or-worse log lines of this server process
+  const lines=sum?.errors?.recent;
+  const logs=loading?'<p class="mx-note">טוען…</p>':err?`<p class="mx-note">לא ניתן לטעון: ${esc(err)}</p>`:!lines?.length?'<p class="mx-note">אין אזהרות או שגיאות מאז הפעלת השרת.</p>':
+    lines.map(line=>`<div class="mx-mon-log"><div><span class="mx-mon-level ${(line.level||"").toLowerCase()==="warning"?"warn":"bad"}">${esc(line.level)}</span><code dir="ltr">${esc(line.logger)}</code>${monAgo(new Date(line.at*1000).toISOString())}</div><code class="mx-mon-msg" dir="ltr">${esc(line.message)}</code></div>`).join("");
+  box.innerHTML=`<h5>תמונת מצב</h5><div class="mx-mon-tiles">${tiles.join("")}</div>
+    <div class="mx-mon-lower"><div class="mx-mon-panel"><h6>תשובות פתוחות</h6>${answers}</div><div class="mx-mon-panel mx-mon-logs"><h6>5 שורות הלוג האחרונות (אזהרה ומעלה)</h6>${logs}</div></div>`;
+}
+
+function drawMonActivity(){
+  const box=sheet.querySelector(".mx-mon-activity"); if(!box) return;
+  const [,title,bucket]=MON_RANGES[MON_RANGE], data=MON.activity;
+  const ranges=Object.entries(MON_RANGES).map(([key,[label]])=>`<button type="button" data-mon-range="${key}" aria-pressed="${key===MON_RANGE}">${label}</button>`).join("");
+  let body;
+  if(!data) body='<p class="mx-note">טוען את נתוני הפעילות…</p>';
+  else if(data.error) body=`<p class="mx-note">גרף הפעילות אינו זמין: ${esc(data.error)}</p>`;
+  else if(data.unavailable) body=`<p class="mx-note">גרף הפעילות אינו זמין (${esc(data.unavailable)}).</p>`;
+  else{
+    const rows=data.buckets||[], s=data.summary||{}, avg=s.active_students?Math.round(s.attempts/s.active_students*10)/10:"–";
+    const stats=[[s.active_students,"תלמידים פעילים"],[s.attempts,"תשובות פתוחות"],[avg,"תשובות לתלמיד/ה"],[s.returning_students,"חזרו ביום נוסף"],[s.active_days,"ימים עם פעילות"]]
+      .map(([n,label])=>`<article><b>${n??"–"}</b><small>${label}</small></article>`).join("");
+    const W=720,H=190,left=32,top=10,width=678,height=145, max=Math.max(1,...rows.map(r=>r.attempts)), maxA=Math.max(1,...rows.map(r=>r.active_students)), bw=width/Math.max(1,rows.length);
+    const days=MON_RANGE==="month", when=t=>new Date(t).toLocaleString("he-IL",days?{day:"numeric",month:"numeric",timeZone:"Asia/Jerusalem"}:MON_RANGE==="week"?{weekday:"short",hour:"2-digit",minute:"2-digit",timeZone:"Asia/Jerusalem"}:{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Jerusalem"});
+    const tick=(m,f,attrs)=>Number.isInteger(m*f)?`<text ${attrs}>${m*f}</text>`:"";   // whole counts only
+    const grid=[0,.5,1].map(f=>{ const y=top+height*(1-f); return `<line class="grid" x1="${left}" x2="${left+width}" y1="${y}" y2="${y}"/>${tick(max,f,`x="0" y="${y+4}"`)}${tick(maxA,f,`class="active-axis" x="${W-2}" y="${y+4}" text-anchor="end"`)}`; }).join("");
+    const points=[], bars=rows.map((r,i)=>{ const x=left+i*bw, h=r.attempts/max*height; points.push(`${x+bw/2},${top+height-r.active_students/maxA*height}`);
+      return r.attempts?`<rect class="bar" x="${x+bw*.08}" y="${top+height-h}" width="${Math.max(.5,bw*.84)}" height="${h}"><title>${esc(when(r.bucket))}: ${r.attempts} תשובות, ${r.active_students} תלמידים</title></rect>`:""; }).join("");
+    const labels=rows.length?[[0,"start"],[Math.floor((rows.length-1)/2),"middle"],[rows.length-1,"end"]].map(([i,a])=>`<text x="${left+width*(i/(Math.max(1,rows.length-1)))}" y="${H-10}" text-anchor="${a}">${esc(when(rows[i].bucket))}</text>`).join(""):"";
+    body=`<div class="mx-mon-stats">${stats}</div><div class="mx-mon-legend"><span><i></i>תשובות פתוחות</span><span class="students"><i></i>תלמידים פעילים</span></div>
+      <svg class="mx-mon-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="גרף פעילות: ${s.attempts||0} תשובות פתוחות ב־${title}">${grid}${bars}<path class="active-line" d="${points.length?"M"+points.join("L"):""}"/>${labels}</svg>
+      ${s.attempts?"":'<p class="mx-note">עוד לא נשלחו תשובות פתוחות בטווח הזה.</p>'}`;
+  }
+  box.innerHTML=`<div class="mx-mon-head"><div><h5>פעילות ב־${title}</h5><p>תשובות פתוחות שנשלחו · כל עמודה מייצגת ${bucket}. התרגול עצמו נשמר במכשיר של כל תלמיד/ה ולא נספר כאן.</p></div><div class="mx-mon-ranges">${ranges}</div></div>${body}`;
+  box.querySelectorAll("[data-mon-range]").forEach(button=>button.onclick=async()=>{
+    MON_RANGE=button.dataset.monRange; try{localStorage.setItem("mathly.monRange",MON_RANGE)}catch{}
+    MON.activity=null; drawMonActivity(); await loadMonActivity(); drawMonActivity(); drawMonSummary();
+  });
 }
 
 // every subject a class meets: those with units, then those that so far only have exams
