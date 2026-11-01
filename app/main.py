@@ -23,6 +23,7 @@ from .math_photo import (DAILY_PHOTOS, MAX_PHOTO, MEDIA_TYPES as PHOTO_TYPES,
                          PhotoSolver, PhotoUnavailable, math_model, photo_client)
 from .math_skills import algebra9, practice_graph
 from .monitoring import ActionLog, RETURN_GAP, install_monitoring_routes
+from .unit_resources import install_resource_routes
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("mathly")
@@ -306,6 +307,7 @@ self.addEventListener("activate", event => event.waitUntil((async () => {
         return {"ok": True, "readable": result.get("readable", False)}
 
     install_answer_routes(app, signed_in)
+    install_resource_routes(app, signed_in)
     install_monitoring_routes(app, manager)
     return app
 

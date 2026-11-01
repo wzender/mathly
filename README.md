@@ -65,6 +65,10 @@ Checks and feedback are stored privately against the original attempt and photo,
 
 For rollback, turn `MATHLY_ANSWER_SCANS_ENABLED` off and restart; preserve the new tables and private bucket. The skills API serves the original multiple-choice geometry sample while scanning is disabled, including for guest practice and older frontends. Enabling scanning again restores open-ended presentation and access to saved answers. Keep stored answer records for recovery. No destructive down migration is needed.
 
+### Lesson resources (teachers)
+
+A teacher taps a unit's title on the path (for example **טכניקה אלגברית 1**), photographs an exercise or an explanation, and saves it to that lesson's resources. Each photo is marked as **תרגיל חדש**, **הסבר תיאורטי**, or **אחר** (with a short free-text description), and can optionally name the topic it belongs to (for example **פילוג מורחב**). Apply [the additive resources migration](supabase/migrations/20261101090000_math_unit_resources.sql); it adds the `math_unit_resources` table and the private `mathly-resources` bucket. Only accounts with the teacher role see, add, or open resources, and only the teacher who added a photo (or a manager) can delete it. Students do not see resources yet.
+
 Integration tests use bundled disposable PostgreSQL and local private test blobs, without project credentials or Docker:
 
 ```bash

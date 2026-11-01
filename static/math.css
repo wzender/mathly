@@ -411,6 +411,29 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
 .mx-uhead{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap}
 .mx-uhead h2{font-size:20px;color:var(--uc);flex:1;min-width:0}
 .mx-unit.full .mx-uhead h2::after{content:" ✦";color:var(--gold)}
+/* lesson resources: a teacher opens them from a unit's title (static/math.js, openResources) */
+.mx-uhead.is-teach{cursor:pointer}
+.mx-res-open{border:1px solid color-mix(in srgb,var(--uc) 55%,var(--line));background:var(--bg);color:var(--ink);border-radius:999px;padding:6px 12px;font:600 13px/1 var(--f-body);cursor:pointer;min-height:32px}
+.mx-res-take{align-self:stretch;min-height:52px;font-size:17px}
+.mx-res-msg{min-height:1.3em;color:var(--muted);font-size:14px}
+.mx-res-form{display:flex;flex-direction:column;gap:14px}
+.mx-res-form .mx-thumb{max-height:260px}
+.mx-res-form fieldset{margin:0;padding:0;border:0;display:flex;flex-direction:column;gap:10px}
+.mx-res-form legend,.mx-res-form>label{font-weight:700;margin-bottom:6px}
+.mx-res-form>label{display:flex;flex-direction:column;gap:6px}.mx-res-form>label small{color:var(--muted);font-weight:500}
+.mx-res-kinds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mx-res-kinds label{display:flex;align-items:center;justify-content:center;gap:6px;min-height:48px;border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center;cursor:pointer;font-weight:600}
+.mx-res-kinds label:has(input:checked){border-color:var(--mx-accent);background:var(--mx-accent-soft)}
+.mx-res-kinds input{position:absolute;opacity:0;pointer-events:none}
+.mx-res-kinds label:has(input:focus-visible){outline:2px solid var(--mx-accent);outline-offset:2px}
+.mx-res-form input[name="note"],.mx-res-form select{box-sizing:border-box;width:100%;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);padding:11px 12px;font:inherit}
+.mx-res-list{display:flex;flex-direction:column;gap:10px}
+.mx-res-item{display:grid;grid-template-columns:88px 1fr auto;gap:12px;align-items:start;border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:10px}
+.mx-res-img{display:block;width:88px;height:88px;border-radius:8px;overflow:hidden;background:var(--surface-2)}
+.mx-res-img img{width:100%;height:100%;object-fit:cover;display:block}
+.mx-res-item>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.mx-res-item p{margin:0;overflow-wrap:anywhere}.mx-res-item small{color:var(--muted);overflow-wrap:anywhere}
+@media (max-width:380px){.mx-res-kinds{grid-template-columns:1fr}}
 .mx-pill{padding:3px 10px;border-radius:999px;font:700 12px/1.4 var(--f-body);background:color-mix(in srgb,var(--uc) 18%,transparent);color:var(--uc);font-variant-numeric:tabular-nums}
 .mx-usub{width:100%;color:var(--muted);font-size:13px}
 .mx-step{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;width:150px;transform:translateX(calc(var(--x) * var(--amp)))}

@@ -26,7 +26,7 @@ const save=()=>{ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} };
 
 let G=null, BY={}, POST={}, ORDER=[], P={done:{},tries:{},solved:{},at:{}}, root=null, curQ=0, path=null, sheet=null, cur=null, back=null, ACTIVE_SUBJECT="";
 let nav=null, FIRST=true, COMBO=0;   // the tab bar; whether the shown question is still at its first try; first-try answers in a row
-let picker=null, PH=null;   // the photo file picker, and the photographed problem on the sheet (see photo())
+let picker=null, PH=null, resPicker=null, RES=null;   // RES: the open lesson-resources sheet (see openResources())   // the photo file picker, and the photographed problem on the sheet (see photo())
 let advanceTimer=null;
 let phonePair=null;
 function stopPhone(){
@@ -74,8 +74,11 @@ async function show(){
     // no capture attribute: the phone offers the camera and the gallery both
     picker=document.createElement("input"); picker.type="file"; picker.accept="image/*"; picker.hidden=true;
     picker.onchange=()=>{ const f=picker.files[0]; picker.value=""; if(f) photo(f); };
+    resPicker=document.createElement("input"); resPicker.type="file"; resPicker.accept="image/*"; resPicker.hidden=true;
+    resPicker.setAttribute("capture","environment");   // a lesson resource is photographed: the phone opens its camera
+    resPicker.onchange=()=>{ const f=resPicker.files[0]; resPicker.value=""; if(f) resourcePhoto(f); };
     nav=document.createElement("nav"); nav.className="mx-nav"; nav.setAttribute("aria-label","ניווט"); nav.hidden=true;
-    root.append(path,sheet,picker,nav); document.body.append(root); window.MathlySky.mount(root);
+    root.append(path,sheet,picker,resPicker,nav); document.body.append(root); window.MathlySky.mount(root);
     root.addEventListener("click",onClick);
     document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&cur) closeSheet(); });
   }
@@ -238,7 +241,7 @@ function examSoon(){
    The nodes sway left and right; trail() then draws the line through their centres, lit up to the last skill done. */
 const SWAY=[0,.55,.9,.55,0,-.55,-.9,-.55];
 function pathView(){
-  const nxt=next(), cls=MY_CLASS?` · כיתת ${esc(MY_CLASS.name)}`:"";
+  const nxt=next(), cls=MY_CLASS?` · כיתת ${esc(MY_CLASS.name)}`:"", teach=can("students.view");
   let k=0;
   const units=mineUnits().map(u=>{
     const ids=unitIds(u), act=ids.filter(live), lit=act.filter(id=>P.done[id]).length;
@@ -246,8 +249,10 @@ function pathView(){
       return `<div class="mx-step u-${u.id}" style="--x:${SWAY[k++%SWAY.length]}">
         <button class="mx-node mx-star st-${st}" data-id="${id}" aria-label="${esc(plain(BY[id].name))}: ${STATE_NAME[st]}">${Sky.spark()}${st==="next"?`<span class="mx-perch">${Sky.owl(34)}</span>`:""}</button>
         <span class="mx-lbl l-${st}">${fmt(BY[id].short)}${tag?`<em>${tag}</em>`:""}</span></div>`; }).join("");
-    return `<section class="mx-unit u-${u.id}${unitDone(u)?" full":""}" id="mx-unit-${u.id}"><div class="mx-uhead">
-      <h2>${esc(u.name)}</h2><span class="mx-pill">${lit}/${act.length}</span>${u.when?`<span class="mx-usub">${esc(u.when)}</span>`:""}</div></section>${steps}`;
+    const res=teach?` data-act="resources" data-unit="${u.id}"`:"";   // a teacher opens the lesson's resources from its title
+    return `<section class="mx-unit u-${u.id}${unitDone(u)?" full":""}" id="mx-unit-${u.id}"><div class="mx-uhead${teach?" is-teach":""}"${res}>
+      <h2>${esc(u.name)}</h2><span class="mx-pill">${lit}/${act.length}</span>${u.when?`<span class="mx-usub">${esc(u.when)}</span>`:""}
+      ${teach?`<button class="mx-res-open"${res} aria-label="משאבי השיעור ${esc(u.name)}">📷 משאבים</button>`:""}</div></section>${steps}`;
   }).join("");
   return `${topBar()}${daily()}${examSoon()}<div class="mx-pghead"><h2>המסלול שלי</h2><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
     <div class="mx-trail"><svg class="mx-line" aria-hidden="true"></svg>
@@ -357,7 +362,7 @@ function open(id){
   sheet.querySelector(".mx-x").focus({preventScroll:true});
   if(openEnded&&st!=="off")window.MathlyAnswers?.mountQuestion(sheet.querySelector(".mx-answer"),id,s.question_version);
 }
-function closeSheet(){ stopPhone(); cancelAdvance(); if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
+function closeSheet(){ stopPhone(); dropResources(); cancelAdvance(); if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
 
 // counts down, then opens `target` (a skill id); stops if the student moved on in the meantime
 function autoAdvance(id,target){
@@ -435,6 +440,10 @@ function onClick(e){
     case "cal-next": return showStreak(1);
     case "sound": Sky.setSound(!Sky.soundOn()); Sky.sound.tap(); return draw();
     case "phone": return pairPhone();
+    case "resources": return openResources(t.dataset.unit);
+    case "res-take": case "res-retake": return resPicker.click();
+    case "res-cancel": RES.photo=null; RES.msg=""; return drawResources();
+    case "res-delete": return deleteResource(t.dataset.res);
     case "copy-phone": return copyPhone(t);
     case "photo": case "retake": return picker.click();
     case "hint": PH.shown++; return drawPhoto();
@@ -543,7 +552,7 @@ function showManageMode(mode){
 /* Monitoring (ניטור): a snapshot of the system, open-answer activity, and the server's latest warnings.
    Each source loads and fails on its own, so a slow Supabase does not hold up the rest. */
 const MON_RANGES={day:["יום","24 השעות האחרונות","15 דקות"],week:["שבוע","7 הימים האחרונים","שעה"],month:["חודש","30 הימים האחרונים","יום"]};
-const MON_ACTIONS={visit:["👋","נכנס/ה לאפליקציה"],photo:["📷","צילם/ה תרגיל לעזרה"],answer_upload:["📝","שלח/ה תשובה פתוחה"],answer_graded:["✔️","תשובה נבדקה"],class_saved:["🏫","שמר/ה כיתה"],class_deleted:["🗑️","מחק/ה כיתה"]};
+const MON_ACTIONS={visit:["👋","נכנס/ה לאפליקציה"],photo:["📷","צילם/ה תרגיל לעזרה"],answer_upload:["📝","שלח/ה תשובה פתוחה"],answer_graded:["✔️","תשובה נבדקה"],class_saved:["🏫","שמר/ה כיתה"],class_deleted:["🗑️","מחק/ה כיתה"],resource_added:["🖼️","הוסיף/ה תמונה למשאבי שיעור"]};
 const VERDICTS={correct:"נכונות",partial:"נכונות חלקית",incorrect:"שגויות",unreadable:"לא קריאות",needs_review:"דורשות בדיקה",grading:"בבדיקה",failed:"הבדיקה נכשלה"};
 let MON={}, MON_RANGE=(()=>{try{return localStorage.getItem("mathly.monRange")}catch{return null}})();
 if(!MON_RANGES[MON_RANGE]) MON_RANGE="week";
@@ -874,6 +883,143 @@ async function pairPhone(){
       content.querySelector(".mx-qr-slot").innerHTML=`<img class="mx-phone-qr" src="${pair.qr}" alt="סרקו בטלפון כדי לצלם תרגיל">`;
     }catch{if(phonePair===pair)content.querySelector(".mx-qr-slot").textContent="הקוד לא נטען. אפשר להעתיק את הקישור לטלפון.";}
   }catch(error){if(phonePair===pair)message.textContent=error.message;}
+}
+
+/* Lesson resources (app/unit_resources.py). A teacher taps a unit's title on the path, photographs an exercise or an
+   explanation, says what it shows (a new exercise, a theory explanation, or other words) and, if they like, which of
+   the unit's topics it belongs to. Images come through the API with the teacher's sign-in, so each is a blob URL. */
+const RES_KINDS={exercise:"תרגיל חדש",theory:"הסבר תיאורטי",other:"אחר"};
+const resError=(status,fallback)=>({401:"צריך להיכנס מחדש.",403:"רק מורים יכולים לראות ולהוסיף משאבים.",404:"השיעור או התמונה לא נמצאו.",
+  413:"התמונה גדולה מדי. נסו לצלם שוב.",415:"לא הצלחנו לקרוא את התמונה. צלמו שוב או בחרו JPEG, PNG או WebP.",
+  503:"שמירת משאבים עדיין לא זמינה בשרת. נסו שוב מאוחר יותר."}[status]||fallback);
+function dropResources(){
+  if(!RES) return;
+  Object.values(RES.urls).forEach(url=>URL.revokeObjectURL(url));
+  if(RES.preview) URL.revokeObjectURL(RES.preview);
+  RES=null;
+}
+function openResources(unitId){
+  const unit=G.units.find(u=>u.id===unitId);
+  if(!unit||!can("students.view")) return;
+  stopPhone(); cancelAdvance(); dropResources();
+  if(!cur) back=document.activeElement;
+  cur="resources";
+  RES={unit,items:null,error:"",urls:{},photo:null,preview:null,busy:false,msg:"",fresh:true};
+  drawResources();
+  loadResources(RES);
+}
+async function loadResources(mine){
+  try{
+    const res=await api(`/api/math/units/${encodeURIComponent(mine.unit.id)}/resources`,{cache:"no-store"}), data=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(resError(res.status,"לא הצלחנו לטעון את המשאבים."));
+    mine.items=data.resources||[]; mine.error="";
+  }catch(e){ mine.items=mine.items||[]; mine.error=e.message; }
+  if(RES===mine&&cur==="resources") drawResources();
+}
+function resourceForm(){
+  const skills=unitSkills(RES.unit.id);
+  return `<form class="mx-res-form" novalidate>
+    <img class="mx-thumb" src="${RES.preview}" alt="התמונה שצילמתם">
+    <fieldset><legend>מה בתמונה?</legend><div class="mx-res-kinds">
+      ${Object.entries(RES_KINDS).map(([k,label])=>`<label><input type="radio" name="kind" value="${k}"><span>${label}</span></label>`).join("")}</div>
+      <input name="note" maxlength="200" autocomplete="off" placeholder="כתבו מה יש בתמונה" aria-label="תיאור חופשי של התמונה" hidden></fieldset>
+    <label>נושא <small>(לא חובה)</small><select name="skill"><option value="">ללא נושא מסוים</option>
+      ${skills.map(s=>`<option value="${esc(s.id)}">${esc(plain(s.name))}</option>`).join("")}</select></label>
+    <div class="mx-row"><button type="submit" class="mx-btn solid"${RES.busy?" disabled":""}>${RES.busy?"שומרים…":"שמירה במשאבים"}</button>
+      <button type="button" class="mx-btn" data-act="res-retake"${RES.busy?" disabled":""}>צילום מחדש</button>
+      <button type="button" class="mx-btn" data-act="res-cancel"${RES.busy?" disabled":""}>ביטול</button></div></form>`;
+}
+function resourceItem(r){
+  const skill=r.skill_id&&BY[r.skill_id], mine=r.created_by===CFG.userId||can("management.access");
+  const when=new Date(r.created_at), date=Number.isNaN(when.getTime())?"":when.toLocaleDateString("he-IL",{day:"numeric",month:"short",year:"numeric"});
+  return `<article class="mx-res-item"><a class="mx-res-img" data-res-link="${esc(r.id)}" target="_blank" rel="noopener" aria-label="פתיחת התמונה בגודל מלא">
+      <img data-res-img="${esc(r.id)}" alt="${esc(r.kind==="other"?r.note:RES_KINDS[r.kind]||"")}"${RES.urls[r.id]?` src="${RES.urls[r.id]}"`:""}></a>
+    <div><b>${esc(RES_KINDS[r.kind]||r.kind)}</b>${r.kind==="other"&&r.note?`<p>${esc(r.note)}</p>`:""}
+      <small>${skill?`${fmt(skill.short||skill.name)} · `:""}${esc(date)}${r.created_email?` · <span dir="ltr">${esc(r.created_email)}</span>`:""}</small></div>
+    ${mine?`<button class="mx-link" data-act="res-delete" data-res="${esc(r.id)}">מחיקה</button>`:""}</article>`;
+}
+function drawResources(){
+  const items=RES.items, was=sheet.querySelector(".mx-res-form");   // a redraw keeps what was filled in
+  const filled=was&&{kind:was.elements.kind.value,note:was.elements.note.value,skill:was.elements.skill.value};
+  const list=items===null?'<p class="mx-note">טוענים את המשאבים…</p>':items.length?`<div class="mx-res-list">${items.map(resourceItem).join("")}</div>`
+    :'<p class="mx-note">עוד אין משאבים לשיעור הזה. צלמו תרגיל או הסבר כדי להוסיף.</p>';
+  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
+    <div class="mx-sheet mx-res u-${RES.unit.id}" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-shtop"><div><span class="mx-uchip">${esc(RES.unit.name)}</span><h3 id="mxTitle">משאבי השיעור</h3>
+        <small class="mx-src">תמונות של תרגילים והסברים לשיעור הזה</small></div>
+        <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+      ${RES.photo?resourceForm():'<button class="mx-btn solid mx-res-take" data-act="res-take">📷 צילום תמונה</button>'}
+      <p class="mx-res-msg" role="status" aria-live="polite">${esc(RES.msg)}</p>
+      ${RES.error?`<p class="mx-bad">${esc(RES.error)}</p>`:""}
+      <div class="mx-sec"><h4>משאבים${items?.length?` (${items.length})`:""}</h4>${list}</div></div>`;
+  sheet.hidden=false;
+  if(RES.fresh){ RES.fresh=false; sheet.querySelector(".mx-x").focus({preventScroll:true}); }
+  const form=sheet.querySelector(".mx-res-form");
+  if(form){
+    const note=form.elements.note;
+    if(filled){ form.querySelectorAll('[name="kind"]').forEach(r=>r.checked=r.value===filled.kind); note.value=filled.note; form.elements.skill.value=filled.skill; note.hidden=filled.kind!=="other"; }
+    form.addEventListener("change",()=>{ note.hidden=form.elements.kind.value!=="other"; if(!note.hidden) note.focus(); });
+    form.onsubmit=event=>{ event.preventDefault(); saveResource(form); };
+  }
+  (items||[]).forEach(r=>{ if(r.id in RES.urls) showResourceImage(r.id); else loadResourceImage(RES,r.id); });
+}
+function showResourceImage(id){
+  const url=RES.urls[id], img=sheet.querySelector(`[data-res-img="${CSS.escape(id)}"]`), link=sheet.querySelector(`[data-res-link="${CSS.escape(id)}"]`);
+  if(!url) return;
+  if(img) img.src=url;
+  if(link) link.href=url;
+}
+async function loadResourceImage(mine,id){
+  mine.urls[id]=null;   // asked for once
+  try{
+    const res=await api(`/api/math/resources/${encodeURIComponent(id)}/image`);
+    if(!res.ok) return;
+    const url=URL.createObjectURL(await res.blob());
+    if(RES!==mine){ URL.revokeObjectURL(url); return; }
+    mine.urls[id]=url; showResourceImage(id);
+  }catch{}
+}
+async function resourcePhoto(file){
+  if(!RES||cur!=="resources") return;
+  const mine=RES;
+  mine.msg="מכינים את התמונה…"; drawResources();
+  let blob=null;
+  try{ blob=await window.MathlyPhoto.prepare(file); }catch{}
+  if(!blob&&["image/jpeg","image/png","image/webp"].includes(file.type)) blob=file;
+  if(RES!==mine) return;
+  if(!blob||blob.size>5000000){ mine.msg="לא הצלחנו להכין את התמונה. צלמו שוב."; return drawResources(); }
+  if(mine.preview) URL.revokeObjectURL(mine.preview);
+  mine.photo=blob; mine.preview=URL.createObjectURL(blob); mine.msg="בחרו מה יש בתמונה, ואם תרצו גם את הנושא.";
+  drawResources();
+  sheet.querySelector(".mx-res-form")?.scrollIntoView({block:"start"});
+}
+async function saveResource(form){
+  const mine=RES, kind=form.elements.kind.value, note=form.elements.note.value.trim(), skill=form.elements.skill.value;
+  const status=sheet.querySelector(".mx-res-msg");
+  if(!kind){ status.textContent="בחרו מה יש בתמונה: תרגיל חדש, הסבר תיאורטי או אחר."; return; }
+  if(kind==="other"&&!note){ status.textContent="כתבו בכמה מילים מה יש בתמונה."; form.elements.note.focus(); return; }
+  mine.busy=true; form.querySelectorAll("button").forEach(b=>b.disabled=true); status.textContent="שומרים…";
+  try{
+    const body=new FormData(); body.append("photo",mine.photo,"resource.jpg"); body.append("kind",kind); body.append("note",kind==="other"?note:""); body.append("skill",skill);
+    const res=await api(`/api/math/units/${encodeURIComponent(mine.unit.id)}/resources`,{method:"POST",body}), data=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(resError(res.status,"לא הצלחנו לשמור. נסו שוב."));
+    mine.urls[data.id]=URL.createObjectURL(mine.photo);   // the saved photo, without downloading it again
+    mine.items=[data,...(mine.items||[])];
+    URL.revokeObjectURL(mine.preview); mine.photo=mine.preview=null; mine.msg="התמונה נשמרה במשאבי השיעור.";
+  }catch(e){ mine.msg=e.message; }
+  mine.busy=false;
+  if(RES===mine&&cur==="resources") drawResources();
+}
+async function deleteResource(id){
+  const mine=RES; if(!mine||!confirm("למחוק את התמונה ממשאבי השיעור?")) return;
+  try{
+    const res=await api(`/api/math/resources/${encodeURIComponent(id)}`,{method:"DELETE"});
+    if(!res.ok) throw new Error(resError(res.status,"לא הצלחנו למחוק. נסו שוב."));
+    mine.items=mine.items.filter(r=>r.id!==id);
+    if(mine.urls[id]) URL.revokeObjectURL(mine.urls[id]);
+    delete mine.urls[id]; mine.msg="התמונה נמחקה.";
+  }catch(e){ mine.msg=e.message; }
+  if(RES===mine&&cur==="resources") drawResources();
 }
 
 function geometryDiagram(diagram){
