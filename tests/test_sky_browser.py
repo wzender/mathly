@@ -211,3 +211,36 @@ def test_a_due_skill_comes_back_in_a_mixed_review(browser, server):
     page.locator(".mx-x").click()
     playwright.expect(page.locator(".mx-review")).to_have_count(0)      # nothing is due any more today
     assert not errors
+
+
+def test_a_round_asks_ten_of_thirty_and_a_finished_skill_gets_a_new_round(browser, server):
+    page, errors = page_with(browser, server, no_chance=True)
+    page.locator('.mx-star[data-id="t_ext"]').click()
+    playwright.expect(page.locator(".mx-qprog span").first).to_have_text("שאלה 1 מתוך 10")
+    page.locator(".mx-choices button[data-right]").first.click()
+    rnd = progress_of(page)["set"]["t_ext"]
+    assert len(rnd) == len(set(rnd)) == 10 and all(0 <= i < 30 for i in rnd)
+    page.locator(".mx-ok button[data-id]").first.click()
+    for _ in range(9):
+        page.locator(".mx-choices button[data-right]").first.click()
+        if page.locator(".sky-cele").count():
+            break
+        page.locator(".mx-ok button[data-id]").first.click()
+    while page.locator(".sky-cele [data-sky=go]").count():
+        page.locator(".sky-cele [data-sky=go]").first.click()
+    p = progress_of(page)
+    assert p["done"]["t_ext"] and sorted(p["solved"]["t_ext"]) == sorted(rnd)
+    page.locator(".mx-x").click()
+    page.locator('.mx-star[data-id="t_ext"]').click()   # practising it again: the questions not met yet come first
+    page.locator(".mx-choices button[data-right]").first.click()
+    again = progress_of(page)["set"]["t_ext"]
+    assert not set(again) & set(rnd)
+    assert not errors
+
+
+def test_progress_from_before_rounds_stays_on_the_first_ten(browser, server):
+    page, errors = page_with(browser, server, {"solved": {"t_ext": [0, 1, 2]}, "at": {"t_ext": 3}})
+    page.locator('.mx-star[data-id="t_ext"]').click()
+    playwright.expect(page.locator(".mx-qprog span").first).to_have_text("שאלה 4 מתוך 10")
+    playwright.expect(page.locator(".mx-qdots i.ok")).to_have_count(3)
+    assert not errors

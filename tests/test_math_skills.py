@@ -1,5 +1,8 @@
 import copy
 import asyncio
+import re
+
+import pytest
 
 import httpx
 
@@ -59,7 +62,11 @@ def test_question_lists():
     skill = lambda sid: next(item for item in graph["skills"] if item["id"] == sid)
     listed = [s for s in graph["skills"] if "questions" in s]
     assert [s["id"] for s in graph["skills"] if "sample" in s] == ["a_30_side"]   # the photographed answer
-    assert len(listed) == 95 and all(len(s["questions"]) == 10 for s in listed)
+    assert len(listed) == 95
+    # טכניקה אלגברית 1 has 30 questions a skill, a round asks a random 10 of them; the others have 10
+    assert {s["id"]: len(s["questions"]) for s in listed if s["unit"] == "t"} == dict.fromkeys(
+        ["t_ext", "t_simplify", "t_ext_eq", "t_area", "t_formulas"], 30)
+    assert all(len(s["questions"]) == 10 for s in listed if s["unit"] != "t")
     skill("t_ext")["sample"] = skill("t_ext")["questions"][0]
     skill("t_gcf")["questions"] = []
     skill("q_props")["questions"][0] = {"type": "open-ended", "version": 1, "question": "Sketch it."}
@@ -163,3 +170,45 @@ def test_no_unit_has_more_than_six_subunits():
     graph = algebra9()
     count = Counter(skill["unit"] for skill in graph["skills"])
     assert all(1 <= count[unit["id"]] <= 6 for unit in graph["units"]), count
+
+
+def test_unit_t_answers_are_right_and_no_wrong_choice_is_equivalent():
+    """Recomputes, independently of how they were written, every unit-t question that is a bare expression,
+    an expression to simplify, or an equation: the marked answer is right and every other choice is not."""
+    sp = pytest.importorskip("sympy")
+    from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication_application
+    tf = standard_transformations + (implicit_multiplication_application,)
+    x = sp.Symbol("x")
+    names = {v: sp.Symbol(v) for v in "xab"}
+
+    def expr(t):
+        t = t.strip().strip("$").replace("−", "-").replace("²", "**2").replace("·", "*").replace(" : 2", "/2")
+        return sp.nsimplify(parse_expr(t, local_dict=names, transformations=tf), rational=True)
+
+    def solution(text):
+        if "$" not in text:
+            return None   # "אין פתרון"
+        return expr(text.split("=")[1])
+
+    checked = 0
+    for skill in algebra9()["skills"]:
+        if skill["unit"] != "t":
+            continue
+        for q in skill["questions"]:
+            body = re.fullmatch(r"(?:פשטו: |איזה ביטוי שווה ל־)?\$([^$]+)\$\??", q["question"])
+            eq = re.fullmatch(r"פתרו: \$([^$=]+)=([^$=]+)\$", q["question"])
+            if body and body[1].endswith("= ?") and not re.search(r"\d{2,}[²·]|^\d+ ·", body[1]):
+                value = sp.expand(expr(body[1][:-3]))
+                same = lambda c: sp.expand(expr(c["text"]) - value) == 0
+            elif body and "=" not in body[1]:
+                value = sp.expand(expr(body[1]))
+                same = lambda c: sp.expand(expr(c["text"]) - value) == 0
+            elif eq:
+                roots = sp.solve(sp.Eq(expr(eq[1]), expr(eq[2])), x)
+                same = lambda c: (solution(c["text"]) is None and not roots) or (solution(c["text"]) is not None and roots == [solution(c["text"])])
+            else:
+                continue
+            for c in q["choices"]:
+                assert same(c) == bool(c.get("correct")), (skill["id"], q["question"], c["text"])
+            checked += 1
+    assert checked >= 90

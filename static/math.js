@@ -6,7 +6,8 @@
    student moves to the next unsolved question, so a missed question comes back after the others. The choices are
    shuffled each time a question is shown, and a wrong answer does not reveal the right one, so a question that comes
    back is solved again, not remembered. Finished skills come back in a mixed review (see "spaced review" below). Progress is kept on this device, per account (mathly.progress.v1:<email>): `done` per
-   skill, and `solved` (indexes answered correctly) and `at` (the question to show) for skills with a list. */
+   skill, and `solved` (indexes answered correctly), `at` (the question to show) and `set` (the round's questions, see round())
+   for skills with a list. */
 (()=>{
 const css=document.createElement("link"); css.rel="stylesheet"; css.href=document.currentScript.src.replace("math.js","math.css");
 document.head.append(css);
@@ -67,9 +68,24 @@ const shuffled=a=>{ const out=a.slice(); for(let i=out.length-1;i>0;i--){ const 
 // a multiple-choice question's buttons, in a new order each time it is shown
 const choiceButtons=q=>`<div class="mx-choices">${shuffled(q.choices||[]).map((c,i)=>`<button data-choice="${i}" data-m="${c.correct?"":esc(c.mistake)}"${c.correct?" data-right":""}>${fmt(c.text)}</button>`).join("")}</div>`;
 const figures=q=>`${q.graph?plot(q.graph):""}${q.diagram?geometryDiagram(q.diagram):""}${q.figure?figure(q.figure):""}`;
-// the question after `from` that is not solved yet; once all are solved, simply the next one
-const nextQ=(id,from)=>{ const n=QS(BY[id]).length, got=solvedOf(id);
-  for(let k=1;k<=n;k++){ const j=(from+k)%n; if(!got.has(j)) return j; } return (from+1)%n; };
+/* A round: a skill with more than ROUND questions asks a random ROUND of them (indexes into its list), the ones not
+   solved yet first. A round in progress keeps its questions (P.set); a finished skill gets a new one each time it is
+   opened. Progress from before rounds existed was on the first ROUND questions, so it stays there. */
+const ROUND=10;
+function round(id){
+  const n=QS(BY[id]).length; if(n<=ROUND) return [...Array(n).keys()];
+  let r=P.set[id];
+  if(!Array.isArray(r)||r.length!==ROUND||r.some(i=>!(Number.isInteger(i)&&i>=0&&i<n))){
+    if(!P.done[id]&&(P.solved[id]?.length||P.at[id]!=null)) r=[...Array(ROUND).keys()];
+    else { const got=solvedOf(id), all=shuffled([...Array(n).keys()]); r=[...all.filter(i=>!got.has(i)),...all.filter(i=>got.has(i))].slice(0,ROUND); }
+    P.set[id]=r;
+  }
+  return r;
+}
+const solvedIn=id=>{ const got=solvedOf(id); return round(id).filter(i=>got.has(i)).length; };
+// the round's question after `from` that is not solved yet; once all are solved, simply the next one
+const nextQ=(id,from)=>{ const r=round(id), got=solvedOf(id), at=r.indexOf(from), n=r.length;
+  for(let k=1;k<=n;k++){ const j=r[(at+k)%n]; if(!got.has(j)) return j; } return r[(at+1)%n]; };
 
 async function show(){
   document.documentElement.classList.add("math-on");
@@ -94,7 +110,7 @@ async function show(){
     try{ const r=await fetch("/api/math/skills"); if(!r.ok) throw new Error(`השרת ענה ${r.status}`); index(await r.json()); }
     catch(e){ path.innerHTML=`<p class="mx-note">לא הצלחנו לטעון את המסלול: ${esc(e.message)}. רעננו את העמוד ונסו שוב.</p>`; return; }
   }
-  P=window.MathlySky.ensure(Object.assign({done:{},tries:{},solved:{},at:{}},load())); SHOWN=new Set(shownUnits().map(u=>u.id));
+  P=window.MathlySky.ensure(Object.assign({done:{},tries:{},solved:{},at:{},set:{}},load())); if(!P.set||typeof P.set!=="object") P.set={}; SHOWN=new Set(shownUnits().map(u=>u.id));
   subjectOptions().length?drawSubjectPicker():selectSubject("מתמטיקה");
   window.MathlyAnswers?.configure({api,account:CFG.userId,enabled:CFG.answerScans,root,onGraded:({questionId,grading})=>{
     if(grading.result.verdict!=="correct"||P.done[questionId])return;
@@ -147,7 +163,7 @@ const unitOf=id=>G.units.find(u=>u.id===BY[id].unit);
 const unitIds=u=>ORDER.filter(id=>BY[id].unit===u.id);
 const live=id=>!BY[id].locked;
 const seenAt=id=>Date.parse(P.seen?.[id]||P.done[id]||0)||0;
-const goldNeed=id=>Sky.goldNeed(QS(BY[id]).length);
+const goldNeed=id=>Sky.goldNeed(Math.min(ROUND,QS(BY[id]).length));
 const inDays=d=>d===0?"היום":d===1?"מחר":`בעוד ${d} ימים`;
 function unitDone(u){ const ids=unitIds(u).filter(live); return ids.length>0&&ids.every(id=>P.done[id]); }
 function skyStats(){
@@ -344,9 +360,11 @@ function chips(ids){
 function open(id){
   stopPhone();
   cancelAdvance();
-  const s=BY[id], st=status(id), unit=G.units.find(u=>u.id===s.unit), all=QS(s), n=all.length;
-  curQ=Math.min(P.at[id]||0,n-1);
-  const q=all[curQ], openEnded=q.type==="open-ended", got=solvedOf(id);
+  const s=BY[id], st=status(id), unit=G.units.find(u=>u.id===s.unit), all=QS(s);
+  if(P.done[id]&&cur!==id) delete P.set[id];   // a finished skill opened again: a new round
+  const r=round(id), n=r.length;
+  curQ=r.includes(P.at[id])?P.at[id]:r[0];
+  const q=all[curQ], openEnded=q.type==="open-ended", got=solvedOf(id), gotN=r.filter(i=>got.has(i)).length;
   if(!cur) back=document.activeElement;
   cur=id; FIRST=true; REV=null;
   sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
@@ -355,7 +373,7 @@ function open(id){
         <h3 id="mxTitle">${fmt(s.name)}</h3><small class="mx-src">${s.month?`בפריסה: ${esc(s.month)}`:esc(unit.source)}${st==="done"?" · הושלמה ✓":""}</small></div>
         <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
       <p>${fmt(s.description)}</p>
-      <div class="mx-q">${n>1?`<div class="mx-qprog"><span>שאלה ${curQ+1} מתוך ${n}</span><span class="mx-qdots" aria-label="נפתרו ${got.size} מתוך ${n}">${all.map((_,i)=>`<i class="${got.has(i)?"ok":""}${i===curQ?" now":""}"></i>`).join("")}</span></div>`:""}
+      <div class="mx-q">${n>1?`<div class="mx-qprog"><span>שאלה ${r.indexOf(curQ)+1} מתוך ${n}</span><span class="mx-qdots" aria-label="נפתרו ${gotN} מתוך ${n}">${r.map(i=>`<i class="${got.has(i)?"ok":""}${i===curQ?" now":""}"></i>`).join("")}</span></div>`:""}
         <p>${fmt(q.question)}</p>${figures(q)}
         ${st==="off"?'<p class="mx-note mx-off">השאלה הזו סגורה כרגע לתשובות. היא לא נדרשת כדי להתקדם במסלול.</p>':openEnded?'<div class="mx-answer"></div>':choiceButtons(q)}
         <div class="mx-fb" aria-live="polite"></div></div>
@@ -385,18 +403,19 @@ function autoAdvance(id,target){
 function answer(btn){
   if(btn.disabled) return;
   if(REV) return reviewAnswer(btn);
-  const id=cur, m=btn.dataset.m, fb=sheet.querySelector(".mx-fb"), n=QS(BY[id]).length, qi=curQ;
+  const id=cur, m=btn.dataset.m, fb=sheet.querySelector(".mx-fb"), n=round(id).length, qi=curQ;
   const buttons=sheet.querySelectorAll("[data-choice]");
   buttons.forEach(b=>b.classList.remove("right","wrong"));
   btn.classList.add(m?"wrong":"right");
   P.tries[id]=(P.tries[id]||0)+1;
   if(n>1) P.at[id]=nextQ(id,qi);
   if(!m){
-    const got=solvedOf(id); got.add(qi); P.solved[id]=[...got].sort((a,b)=>a-b);
+    const all=solvedOf(id); all.add(qi); P.solved[id]=[...all].sort((a,b)=>a-b);
+    const gotN=solvedIn(id);   // solved in this round
     const missed=new Set(P.missed[id]||[]), recovered=missed.delete(qi); P.missed[id]=[...missed];
     // done once every question is solved and the last answers were right at the first try
     const run=FIRST?(P.run[id]||0)+1:0, need=Sky.masterNeed(n);
-    const first=!P.done[id]&&got.size>=n&&run>=need, unitWas=unitDone(unitOf(id));
+    const first=!P.done[id]&&gotN>=n&&run>=need, unitWas=unitDone(unitOf(id));
     if(first){ P.done[id]=new Date().toISOString(); Sky.mastered(P,id); }
     COMBO=FIRST?COMBO+1:0;
     const persisted=!FIRST;
@@ -407,7 +426,7 @@ function answer(btn){
     const ok=`<b>${Sky.praise({recovered,persisted,combo:COMBO})}</b>${COMBO>=2?`<span class="mx-combo">${Sky.FLAME}${COMBO} ברצף</span>`:""}`;
     const after=rewards(id,{r,lit:first,unitWas}), then=go=>after.then(()=>{ if(cur===id&&!sheet.hidden&&fb.isConnected) go(); });   // not once another question is shown
     if(!P.done[id]){
-      const left=need-run, say=got.size<n?`פתרתם ${got.size} מתוך ${n} שאלות במיומנות הזו.`
+      const left=need-run, say=gotN<n?`פתרתם ${gotN} מתוך ${n} שאלות במיומנות הזו.`
         :n===1?"כדי לסיים צריך לענות נכון בניסיון הראשון. נסו את השאלה שוב, הפעם בסדר אחר."
         :`כל השאלות נפתרו. עוד ${left===1?"תשובה נכונה אחת":`${left} תשובות נכונות`} ברצף, בניסיון הראשון, כדי לסיים.`;
       fb.innerHTML=`<div class="mx-ok">${ok}<span>${say}</span>

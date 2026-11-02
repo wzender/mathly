@@ -2,6 +2,7 @@ fastapi>=0.110
 python-multipart>=0.0.9
 httpx>=0.27
 pytest>=8
+sympy>=1.12  # recomputes the algebra answers in tests/test_math_skills.py
 # Optional local PostgreSQL integration checks (bundled server; no Docker or project credentials).
 pgserver==0.1.4; sys_platform == 'linux'
 psycopg[binary]==3.3.6

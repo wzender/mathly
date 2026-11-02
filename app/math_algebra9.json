@@ -418,6 +418,414 @@
        "mistake": "sign_product"
       }
      ]
+    },
+    {
+     "question": "$(x − 2)(x + 8) = ?$",
+     "choices": [
+      {
+       "text": "$x² + 6x − 16$",
+       "correct": true
+      },
+      {
+       "text": "$x² − 16$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$x² − 6x − 16$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$x² + 6x + 16$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(3x + 1)(2x − 3) = ?$",
+     "choices": [
+      {
+       "text": "$6x² − 7x − 3$",
+       "correct": true
+      },
+      {
+       "text": "$6x² − 3$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$6x² + 7x − 3$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$6x² − 7x + 3$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(3a + 2b)(a + 2b) = ?$",
+     "choices": [
+      {
+       "text": "$3a² + 8ab + 4b²$",
+       "correct": true
+      },
+      {
+       "text": "$3a² + 4b²$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$3a² − 8ab + 4b²$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "$(x + 5)(3x − 5) = ?$",
+     "choices": [
+      {
+       "text": "$3x² + 10x − 25$",
+       "correct": true
+      },
+      {
+       "text": "$3x² − 25$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$3x² − 10x − 25$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$3x² + 10x + 25$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(3a + 2b)(2a − 3b) = ?$",
+     "choices": [
+      {
+       "text": "$6a² − 5ab − 6b²$",
+       "correct": true
+      },
+      {
+       "text": "$6a² − 6b²$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$6a² + 5ab − 6b²$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$6a² − 5ab + 6b²$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(7 − x)(x + 2) = ?$",
+     "choices": [
+      {
+       "text": "$−x² + 5x + 14$",
+       "correct": true
+      },
+      {
+       "text": "$14 − x²$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−x² − 5x + 14$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$x² + 5x + 14$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(x + 3)(x + 9) = ?$",
+     "choices": [
+      {
+       "text": "$x² + 12x + 27$",
+       "correct": true
+      },
+      {
+       "text": "$x² + 27$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$x² + 12x + 12$",
+       "mistake": "const_added"
+      },
+      {
+       "text": "$x² + 27x + 12$",
+       "mistake": "const_added"
+      }
+     ]
+    },
+    {
+     "question": "$(x + 4)(x + 7) = ?$",
+     "choices": [
+      {
+       "text": "$x² + 11x + 28$",
+       "correct": true
+      },
+      {
+       "text": "$x² + 28$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$x² + 11x + 11$",
+       "mistake": "const_added"
+      },
+      {
+       "text": "$x² + 28x + 11$",
+       "mistake": "const_added"
+      }
+     ]
+    },
+    {
+     "question": "$(9 − x)(x + 3) = ?$",
+     "choices": [
+      {
+       "text": "$−x² + 6x + 27$",
+       "correct": true
+      },
+      {
+       "text": "$27 − x²$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−x² − 6x + 27$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$x² + 6x + 27$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(2a + 3b)(2a + b) = ?$",
+     "choices": [
+      {
+       "text": "$4a² + 8ab + 3b²$",
+       "correct": true
+      },
+      {
+       "text": "$4a² + 3b²$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$4a² − 8ab + 3b²$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "$(2a + b)(a + b) = ?$",
+     "choices": [
+      {
+       "text": "$2a² + 3ab + b²$",
+       "correct": true
+      },
+      {
+       "text": "$2a² + b²$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$2a² − 3ab + b²$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "$(x − 8)(2x + 7) = ?$",
+     "choices": [
+      {
+       "text": "$2x² − 9x − 56$",
+       "correct": true
+      },
+      {
+       "text": "$2x² − 56$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$2x² + 9x − 56$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$2x² − 9x + 56$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(a + 2b)(2a − 2b) = ?$",
+     "choices": [
+      {
+       "text": "$2a² + 2ab − 4b²$",
+       "correct": true
+      },
+      {
+       "text": "$2a² − 4b²$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$2a² − 2ab − 4b²$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$2a² + 2ab + 4b²$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(2x − 6)(x + 5) = ?$",
+     "choices": [
+      {
+       "text": "$2x² + 4x − 30$",
+       "correct": true
+      },
+      {
+       "text": "$2x² − 30$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$2x² − 4x − 30$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$2x² + 4x + 30$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(6 − x)(x + 8) = ?$",
+     "choices": [
+      {
+       "text": "$−x² − 2x + 48$",
+       "correct": true
+      },
+      {
+       "text": "$48 − x²$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−x² + 2x + 48$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$x² − 2x + 48$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(8 − x)(x + 4) = ?$",
+     "choices": [
+      {
+       "text": "$−x² + 4x + 32$",
+       "correct": true
+      },
+      {
+       "text": "$32 − x²$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−x² − 4x + 32$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$x² + 4x + 32$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(x − 9)(3x − 8) = ?$",
+     "choices": [
+      {
+       "text": "$3x² − 35x + 72$",
+       "correct": true
+      },
+      {
+       "text": "$3x² + 72$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$3x² + 35x + 72$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$3x² − 35x − 72$",
+       "mistake": "neg_times_neg"
+      }
+     ]
+    },
+    {
+     "question": "$(2x − 1)(x + 6) = ?$",
+     "choices": [
+      {
+       "text": "$2x² + 11x − 6$",
+       "correct": true
+      },
+      {
+       "text": "$2x² − 6$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$2x² − 11x − 6$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$2x² + 11x + 6$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(2 − x)(x + 1) = ?$",
+     "choices": [
+      {
+       "text": "$−x² + x + 2$",
+       "correct": true
+      },
+      {
+       "text": "$2 − x²$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−x² − x + 2$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$x² + x + 2$",
+       "mistake": "sign_product"
+      }
+     ]
+    },
+    {
+     "question": "$(x + 5)(x + 7) = ?$",
+     "choices": [
+      {
+       "text": "$x² + 12x + 35$",
+       "correct": true
+      },
+      {
+       "text": "$x² + 35$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$x² + 12x + 12$",
+       "mistake": "const_added"
+      },
+      {
+       "text": "$x² + 35x + 12$",
+       "mistake": "const_added"
+      }
+     ]
     }
    ]
   },
@@ -623,6 +1031,398 @@
       {
        "text": "$2x² − 6$",
        "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $(x + 7)(x − 5) + (x − 1)(x + 6)$",
+     "choices": [
+      {
+       "text": "$2x² + 7x − 41$",
+       "correct": true
+      },
+      {
+       "text": "$2x² − 41$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$2x² − 7x − 41$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $4(x + 7)(x − 2)$",
+     "choices": [
+      {
+       "text": "$4x² + 20x − 56$",
+       "correct": true
+      },
+      {
+       "text": "$4x² − 56$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$4x² + 20x − 14$",
+       "mistake": "partial_dist"
+      },
+      {
+       "text": "$16x² + 80x − 224$",
+       "mistake": "double_both"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $(x + 2)(x + 1) − x(x + 7)$",
+     "choices": [
+      {
+       "text": "$−4x + 2$",
+       "correct": true
+      },
+      {
+       "text": "$10x + 2$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$4x + 2$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$−7x + 2$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $(x − 7)(x + 5) − x(x + 1)$",
+     "choices": [
+      {
+       "text": "$−3x − 35$",
+       "correct": true
+      },
+      {
+       "text": "$−x − 35$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$3x − 35$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $(x + 3)(x + 2) − x(x + 2)$",
+     "choices": [
+      {
+       "text": "$3x + 6$",
+       "correct": true
+      },
+      {
+       "text": "$−3x + 6$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$−2x + 6$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$7x + 6$",
+       "mistake": "minus_paren"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $(x − 5)(x + 2) − (x + 7)(x + 4)$",
+     "choices": [
+      {
+       "text": "$−14x − 38$",
+       "correct": true
+      },
+      {
+       "text": "$−38$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$8x + 18$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$14x − 38$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "איזה ביטוי שווה ל־$(x − 5)(x + 7) − (x − 5)(x + 5)$?",
+     "choices": [
+      {
+       "text": "$2x − 10$",
+       "correct": true
+      },
+      {
+       "text": "$−10$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$2x − 60$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$−2x − 10$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $(x − 5)(x + 1) − (x + 5)(x − 4)$",
+     "choices": [
+      {
+       "text": "$−5x + 15$",
+       "correct": true
+      },
+      {
+       "text": "$5x + 15$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$15$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−3x − 25$",
+       "mistake": "minus_paren"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $(x − 6)(x − 7) − (x + 6)(x − 2)$",
+     "choices": [
+      {
+       "text": "$−17x + 54$",
+       "correct": true
+      },
+      {
+       "text": "$54$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−9x + 30$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$17x + 54$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "איזה ביטוי שווה ל־$(x − 2)(x + 3) − x(x − 3)$?",
+     "choices": [
+      {
+       "text": "$4x − 6$",
+       "correct": true
+      },
+      {
+       "text": "$−4x − 6$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$−2x − 6$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$3x − 6$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $3 − (x + 2)(x − 4)$",
+     "choices": [
+      {
+       "text": "$−x² + 2x + 11$",
+       "correct": true
+      },
+      {
+       "text": "$−x² + 11$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−x² − 2x − 5$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$−x² − 2x + 11$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "איזה ביטוי שווה ל־$(x + 7)(x − 5) + (x − 7)(x + 3)$?",
+     "choices": [
+      {
+       "text": "$2x² − 2x − 56$",
+       "correct": true
+      },
+      {
+       "text": "$2x² + 2x − 56$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$2x² − 56$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $(x + 3)(x − 4) − x²$",
+     "choices": [
+      {
+       "text": "$−x − 12$",
+       "correct": true
+      },
+      {
+       "text": "$x − 12$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$−12$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "איזה ביטוי שווה ל־$10 − (x − 5)(x − 1)$?",
+     "choices": [
+      {
+       "text": "$−x² + 6x + 5$",
+       "correct": true
+      },
+      {
+       "text": "$−x² − 6x + 5$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$−x² + 5$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−x² − 6x + 15$",
+       "mistake": "minus_paren"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $3(x − 2)(x − 5)$",
+     "choices": [
+      {
+       "text": "$3x² − 21x + 30$",
+       "correct": true
+      },
+      {
+       "text": "$3x² + 21x + 30$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$9x² − 63x + 90$",
+       "mistake": "double_both"
+      },
+      {
+       "text": "$3x² − 21x + 10$",
+       "mistake": "partial_dist"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $6 − (x − 6)(x + 1)$",
+     "choices": [
+      {
+       "text": "$−x² + 5x + 12$",
+       "correct": true
+      },
+      {
+       "text": "$−x² − 5x$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$−x² − 5x + 12$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$−x² + 12$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $(x − 6)(x + 7) + (x + 3)(x − 2)$",
+     "choices": [
+      {
+       "text": "$2x² + 2x − 48$",
+       "correct": true
+      },
+      {
+       "text": "$2x² − 48$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$2x² − 2x − 48$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $(3x − 2)(x + 6) − 3x²$",
+     "choices": [
+      {
+       "text": "$16x − 12$",
+       "correct": true
+      },
+      {
+       "text": "$−16x − 12$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$−12$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $5 − (x − 3)(x + 1)$",
+     "choices": [
+      {
+       "text": "$−x² + 2x + 8$",
+       "correct": true
+      },
+      {
+       "text": "$−x² + 8$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−x² − 2x + 2$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$−x² − 2x + 8$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "פשטו: $(x − 5)(x − 6) − x²$",
+     "choices": [
+      {
+       "text": "$−11x + 30$",
+       "correct": true
+      },
+      {
+       "text": "$30$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$11x + 30$",
+       "mistake": "sign_mid"
       }
      ]
     }
@@ -840,6 +1640,422 @@
        "mistake": "sign_mid"
       }
      ]
+    },
+    {
+     "question": "פתרו: $(2x − 6)(x + 1) = 2x² − 2$",
+     "choices": [
+      {
+       "text": "$x = −1$",
+       "correct": true
+      },
+      {
+       "text": "$x = 2$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "$x = 1$",
+       "mistake": "neg_divide"
+      },
+      {
+       "text": "$x = 4$",
+       "mistake": "forgot_divide"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x + 5)(x − 8) = x² − 31$",
+     "choices": [
+      {
+       "text": "$x = −3$",
+       "correct": true
+      },
+      {
+       "text": "$x = 9$",
+       "mistake": "forgot_divide"
+      },
+      {
+       "text": "$x = 3$",
+       "mistake": "neg_divide"
+      },
+      {
+       "text": "$x = 71/3$",
+       "mistake": "move_sign"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x + 3)(x + 2) = x² − 19$",
+     "choices": [
+      {
+       "text": "$x = −5$",
+       "correct": true
+      },
+      {
+       "text": "$x = −2.6$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "$x = 5$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$x = −25$",
+       "mistake": "forgot_divide"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x + 6)(x + 5) = x(x + 8)$",
+     "choices": [
+      {
+       "text": "$x = −10$",
+       "correct": true
+      },
+      {
+       "text": "$x = 10$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "$x = −30$",
+       "mistake": "forgot_divide"
+      },
+      {
+       "text": "$x = 3.75$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x + 3)(x − 7) − x² = 3$",
+     "choices": [
+      {
+       "text": "$x = −6$",
+       "correct": true
+      },
+      {
+       "text": "$x = 4.5$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "$x = 6$",
+       "mistake": "neg_divide"
+      },
+      {
+       "text": "$x = 24$",
+       "mistake": "forgot_divide"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x + 1)(x + 5) = x² + 2$",
+     "choices": [
+      {
+       "text": "$x = −0.5$",
+       "correct": true
+      },
+      {
+       "text": "$x = 0.5$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$x = −3$",
+       "mistake": "forgot_divide"
+      },
+      {
+       "text": "$x = 7/6$",
+       "mistake": "move_sign"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x − 5)(x − 3) = x² + 39$",
+     "choices": [
+      {
+       "text": "$x = −3$",
+       "correct": true
+      },
+      {
+       "text": "$x = 24$",
+       "mistake": "forgot_divide"
+      },
+      {
+       "text": "$x = 3$",
+       "mistake": "neg_divide"
+      },
+      {
+       "text": "$x = −6.75$",
+       "mistake": "move_sign"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(2x + 7)(x + 5) = 2x² + 1$",
+     "choices": [
+      {
+       "text": "$x = −2$",
+       "correct": true
+      },
+      {
+       "text": "$x = −34$",
+       "mistake": "forgot_divide"
+      },
+      {
+       "text": "$x = 36/17$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "$x = 2$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x − 1)(x + 8) = x(x + 3)$",
+     "choices": [
+      {
+       "text": "$x = 2$",
+       "correct": true
+      },
+      {
+       "text": "$x = −2$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$x = 8$",
+       "mistake": "forgot_divide"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x − 2)(x + 3) = x(x + 6)$",
+     "choices": [
+      {
+       "text": "$x = −1.2$",
+       "correct": true
+      },
+      {
+       "text": "$x = 1.2$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "$x = 6$",
+       "mistake": "forgot_divide"
+      },
+      {
+       "text": "$x = −1$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x − 8)(x + 3) − x² = −59$",
+     "choices": [
+      {
+       "text": "$x = 7$",
+       "correct": true
+      },
+      {
+       "text": "$x = −35$",
+       "mistake": "forgot_divide"
+      },
+      {
+       "text": "$x = −7$",
+       "mistake": "neg_divide"
+      },
+      {
+       "text": "$x = 16.6$",
+       "mistake": "move_sign"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x + 3)(x − 4) − x² = −6$",
+     "choices": [
+      {
+       "text": "$x = −6$",
+       "correct": true
+      },
+      {
+       "text": "$x = 6$",
+       "mistake": "neg_divide"
+      },
+      {
+       "text": "$x = 18$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "אין פתרון",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x + 4)(x + 2) − x² = −22$",
+     "choices": [
+      {
+       "text": "$x = −5$",
+       "correct": true
+      },
+      {
+       "text": "$x = −30$",
+       "mistake": "forgot_divide"
+      },
+      {
+       "text": "$x = −7/3$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "$x = 5$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x + 4)(x − 2) − x² = −7$",
+     "choices": [
+      {
+       "text": "$x = 0.5$",
+       "correct": true
+      },
+      {
+       "text": "$x = −7.5$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "$x = −0.5$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$x = 1$",
+       "mistake": "forgot_divide"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x − 4)(x − 3) = x(x + 8)$",
+     "choices": [
+      {
+       "text": "$x = 0.8$",
+       "correct": true
+      },
+      {
+       "text": "$x = −12$",
+       "mistake": "forgot_divide"
+      },
+      {
+       "text": "$x = −0.8$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "$x = 1.5$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x − 1)(x − 4) = x(x + 7) − 5$",
+     "choices": [
+      {
+       "text": "$x = 0.75$",
+       "correct": true
+      },
+      {
+       "text": "$x = −9$",
+       "mistake": "forgot_divide"
+      },
+      {
+       "text": "$x = −0.75$",
+       "mistake": "neg_divide"
+      },
+      {
+       "text": "$x = 1/12$",
+       "mistake": "move_sign"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x + 8)(x − 1) − x² = 48$",
+     "choices": [
+      {
+       "text": "$x = 8$",
+       "correct": true
+      },
+      {
+       "text": "$x = 40/7$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "$x = −8$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "אין פתרון",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "מכפלת $x + 4$ ב־$x − 2$ גדולה ב־$8$ מ־$x²$. מצאו את $x$.",
+     "choices": [
+      {
+       "text": "$x = 8$",
+       "correct": true
+      },
+      {
+       "text": "$x = 16$",
+       "mistake": "forgot_divide"
+      },
+      {
+       "text": "$x = 0$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "$x = −8$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "מכפלת $x + 1$ ב־$x + 6$ גדולה ב־$48$ מ־$x²$. מצאו את $x$.",
+     "choices": [
+      {
+       "text": "$x = 6$",
+       "correct": true
+      },
+      {
+       "text": "$x = −6$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$x = 54/7$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "אין פתרון",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "פתרו: $(x + 5)(x + 3) = x(x + 4) + 2$",
+     "choices": [
+      {
+       "text": "$x = −3.25$",
+       "correct": true
+      },
+      {
+       "text": "$x = −13$",
+       "mistake": "forgot_divide"
+      },
+      {
+       "text": "$x = 4.25$",
+       "mistake": "move_sign"
+      },
+      {
+       "text": "$x = 3.25$",
+       "mistake": "sign_mid"
+      }
+     ]
     }
    ]
   },
@@ -1037,6 +2253,374 @@
       {
        "text": "$(x² − 8) : 2$",
        "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "אורך מלבן $x + 9$ ורוחבו $x + 2$. מה שטחו?",
+     "choices": [
+      {
+       "text": "$x² + 11x + 18$",
+       "correct": true
+      },
+      {
+       "text": "$x² + 18$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$4x + 22$",
+       "mistake": "area_perimeter"
+      }
+     ]
+    },
+    {
+     "question": "אורך מלבן $x + 7$ ורוחבו $x + 9$. צלע ריבוע $x + 4$. בכמה שטח המלבן גדול משטח הריבוע?",
+     "choices": [
+      {
+       "text": "$8x + 47$",
+       "correct": true
+      },
+      {
+       "text": "$16x + 47$",
+       "mistake": "forgot_middle"
+      },
+      {
+       "text": "$−8x − 47$",
+       "mistake": "diff_order"
+      },
+      {
+       "text": "$16$",
+       "mistake": "area_perimeter"
+      }
+     ]
+    },
+    {
+     "question": "אורך מלבן $x + 4$ ורוחבו $x − 6$. מה שטחו?",
+     "choices": [
+      {
+       "text": "$x² − 2x − 24$",
+       "correct": true
+      },
+      {
+       "text": "$x² − 24$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$4x − 4$",
+       "mistake": "area_perimeter"
+      },
+      {
+       "text": "$x² + 2x − 24$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "מלבן שמידותיו $x + 1$ על $x + 9$, וריבוע שצלעו $x + 5$. איזה שטח גדול יותר, ובכמה?",
+     "choices": [
+      {
+       "text": "שטח הריבוע, ב־$16$",
+       "correct": true
+      },
+      {
+       "text": "שטח המלבן, ב־$16$",
+       "mistake": "diff_order"
+      },
+      {
+       "text": "השטחים שווים",
+       "mistake": "shift_balance"
+      }
+     ]
+    },
+    {
+     "question": "גינה מלבנית שמידותיה $x$ על $x + 9$ מוקפת בשביל ברוחב $1$ מכל צד. מה שטח השביל לבדו?",
+     "choices": [
+      {
+       "text": "$4x + 22$",
+       "correct": true
+      },
+      {
+       "text": "$22x + 22$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$2x + 10$",
+       "mistake": "frame_one_side"
+      }
+     ]
+    },
+    {
+     "question": "אורך מלבן $x + 7$ ורוחבו $x − 5$. מה שטחו?",
+     "choices": [
+      {
+       "text": "$x² + 2x − 35$",
+       "correct": true
+      },
+      {
+       "text": "$x² − 35$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$4x + 4$",
+       "mistake": "area_perimeter"
+      },
+      {
+       "text": "$x² − 2x − 35$",
+       "mistake": "sign_mid"
+      }
+     ]
+    },
+    {
+     "question": "צלע ריבוע היא $x$. אורך מלבן גדול ב־$8$ מצלע הריבוע, ורוחבו קטן ב־$6$ ממנה. בכמה שטח המלבן גדול משטח הריבוע?",
+     "choices": [
+      {
+       "text": "$2x − 48$",
+       "correct": true
+      },
+      {
+       "text": "$−48$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−2x − 48$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$4$",
+       "mistake": "area_perimeter"
+      }
+     ]
+    },
+    {
+     "question": "מלבן א׳: $x + 6$ על $x + 9$. מלבן ב׳: $x + 5$ על $x + 7$. בכמה שטח מלבן א׳ גדול משטח מלבן ב׳?",
+     "choices": [
+      {
+       "text": "$3x + 19$",
+       "correct": true
+      },
+      {
+       "text": "$27x + 89$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$19$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−3x − 19$",
+       "mistake": "diff_order"
+      }
+     ]
+    },
+    {
+     "question": "מלבן שמידותיו $x + 7$ על $x + 11$, וריבוע שצלעו $x + 9$. איזה שטח גדול יותר, ובכמה?",
+     "choices": [
+      {
+       "text": "שטח הריבוע, ב־$4$",
+       "correct": true
+      },
+      {
+       "text": "שטח המלבן, ב־$4$",
+       "mistake": "diff_order"
+      },
+      {
+       "text": "השטחים שווים",
+       "mistake": "shift_balance"
+      }
+     ]
+    },
+    {
+     "question": "צלע ריבוע היא $x$. אורך מלבן גדול ב־$5$ מצלע הריבוע, ורוחבו קטן ב־$4$ ממנה. בכמה שטח המלבן גדול משטח הריבוע?",
+     "choices": [
+      {
+       "text": "$x − 20$",
+       "correct": true
+      },
+      {
+       "text": "$−20$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−x − 20$",
+       "mistake": "sign_mid"
+      },
+      {
+       "text": "$2$",
+       "mistake": "area_perimeter"
+      }
+     ]
+    },
+    {
+     "question": "גינה מלבנית שמידותיה $x$ על $x + 7$ מוקפת בשביל ברוחב $2$ מכל צד. מה שטח השביל לבדו?",
+     "choices": [
+      {
+       "text": "$8x + 44$",
+       "correct": true
+      },
+      {
+       "text": "$22x + 44$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$4x + 18$",
+       "mistake": "frame_one_side"
+      }
+     ]
+    },
+    {
+     "question": "מלבן שמידותיו $x + 6$ על $x + 12$, וריבוע שצלעו $x + 9$. איזה שטח גדול יותר, ובכמה?",
+     "choices": [
+      {
+       "text": "שטח הריבוע, ב־$9$",
+       "correct": true
+      },
+      {
+       "text": "שטח המלבן, ב־$9$",
+       "mistake": "diff_order"
+      },
+      {
+       "text": "השטחים שווים",
+       "mistake": "shift_balance"
+      }
+     ]
+    },
+    {
+     "question": "גינה מלבנית שמידותיה $x$ על $x + 6$ מוקפת בשביל ברוחב $1$ מכל צד. מה שטח השביל לבדו?",
+     "choices": [
+      {
+       "text": "$4x + 16$",
+       "correct": true
+      },
+      {
+       "text": "$16x + 16$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$2x + 7$",
+       "mistake": "frame_one_side"
+      }
+     ]
+    },
+    {
+     "question": "ניצבי משולש ישר זווית הם $x + 3$ ו־$x + 2$. מה שטח המשולש?",
+     "choices": [
+      {
+       "text": "$(x² + 5x + 6) : 2$",
+       "correct": true
+      },
+      {
+       "text": "$x² + 5x + 6$",
+       "mistake": "forgot_half_area"
+      },
+      {
+       "text": "$(x² + 6) : 2$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "ניצבי משולש ישר זווית הם $x + 9$ ו־$x + 6$. מה שטח המשולש?",
+     "choices": [
+      {
+       "text": "$(x² + 15x + 54) : 2$",
+       "correct": true
+      },
+      {
+       "text": "$x² + 15x + 54$",
+       "mistake": "forgot_half_area"
+      },
+      {
+       "text": "$(x² + 54) : 2$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "גינה מלבנית שמידותיה $x$ על $x + 4$ מוקפת בשביל ברוחב $3$ מכל צד. מה השטח של הגינה יחד עם השביל?",
+     "choices": [
+      {
+       "text": "$x² + 16x + 60$",
+       "correct": true
+      },
+      {
+       "text": "$x² + 10x + 21$",
+       "mistake": "frame_one_side"
+      },
+      {
+       "text": "$x² + 60$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "גינה מלבנית שמידותיה $x$ על $x + 9$ מוקפת בשביל ברוחב $1$ מכל צד. מה השטח של הגינה יחד עם השביל?",
+     "choices": [
+      {
+       "text": "$x² + 13x + 22$",
+       "correct": true
+      },
+      {
+       "text": "$x² + 11x + 10$",
+       "mistake": "frame_one_side"
+      },
+      {
+       "text": "$x² + 22$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "ניצבי משולש ישר זווית הם $x + 6$ ו־$x − 2$. מה שטח המשולש?",
+     "choices": [
+      {
+       "text": "$(x² + 4x − 12) : 2$",
+       "correct": true
+      },
+      {
+       "text": "$x² + 4x − 12$",
+       "mistake": "forgot_half_area"
+      },
+      {
+       "text": "$(x² − 12) : 2$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "גינה מלבנית שמידותיה $x$ על $x + 8$ מוקפת בשביל ברוחב $1$ מכל צד. מה השטח של הגינה יחד עם השביל?",
+     "choices": [
+      {
+       "text": "$x² + 12x + 20$",
+       "correct": true
+      },
+      {
+       "text": "$x² + 10x + 9$",
+       "mistake": "frame_one_side"
+      },
+      {
+       "text": "$x² + 20$",
+       "mistake": "ext_partial"
+      }
+     ]
+    },
+    {
+     "question": "מלבן א׳: $x + 5$ על $x + 8$. מלבן ב׳: $x + 8$ על $x + 1$. בכמה שטח מלבן א׳ גדול משטח מלבן ב׳?",
+     "choices": [
+      {
+       "text": "$4x + 32$",
+       "correct": true
+      },
+      {
+       "text": "$22x + 48$",
+       "mistake": "minus_paren"
+      },
+      {
+       "text": "$32$",
+       "mistake": "ext_partial"
+      },
+      {
+       "text": "$−4x − 32$",
+       "mistake": "diff_order"
       }
      ]
     }
@@ -1248,6 +2832,410 @@
       {
        "text": "$9604$",
        "mistake": "diffsq_as_square"
+      }
+     ]
+    },
+    {
+     "question": "חשבו בעזרת נוסחת הכפל המקוצר: $52² = ?$",
+     "choices": [
+      {
+       "text": "$2704$",
+       "correct": true
+      },
+      {
+       "text": "$2504$",
+       "mistake": "forgot_middle"
+      },
+      {
+       "text": "$2604$",
+       "mistake": "middle_no_2"
+      }
+     ]
+    },
+    {
+     "question": "$(x + 2)² = ?$",
+     "choices": [
+      {
+       "text": "$x² + 4x + 4$",
+       "correct": true
+      },
+      {
+       "text": "$x² + 2x + 4$",
+       "mistake": "middle_no_2"
+      },
+      {
+       "text": "$x² + 4$",
+       "mistake": "forgot_middle"
+      }
+     ]
+    },
+    {
+     "question": "$(x + 4)² = ?$",
+     "choices": [
+      {
+       "text": "$x² + 8x + 16$",
+       "correct": true
+      },
+      {
+       "text": "$x² + 8x + 8$",
+       "mistake": "sq_as_double"
+      },
+      {
+       "text": "$x² + 4x + 16$",
+       "mistake": "middle_no_2"
+      },
+      {
+       "text": "$x² + 16$",
+       "mistake": "forgot_middle"
+      }
+     ]
+    },
+    {
+     "question": "$(x − 1)² = ?$",
+     "choices": [
+      {
+       "text": "$x² − 2x + 1$",
+       "correct": true
+      },
+      {
+       "text": "$x² − 1$",
+       "mistake": "diffsq_as_square"
+      },
+      {
+       "text": "$x² + 1$",
+       "mistake": "forgot_middle"
+      },
+      {
+       "text": "$x² − 2x + 2$",
+       "mistake": "sq_as_double"
+      }
+     ]
+    },
+    {
+     "question": "$(4x + 9)(4x − 9) = ?$",
+     "choices": [
+      {
+       "text": "$16x² − 81$",
+       "correct": true
+      },
+      {
+       "text": "$16x² + 81$",
+       "mistake": "diff_sign"
+      },
+      {
+       "text": "$16x² − 72x + 81$",
+       "mistake": "diffsq_as_square"
+      },
+      {
+       "text": "$4x² − 81$",
+       "mistake": "coef_not_raised"
+      }
+     ]
+    },
+    {
+     "question": "$(2x + 6)² = ?$",
+     "choices": [
+      {
+       "text": "$4x² + 24x + 36$",
+       "correct": true
+      },
+      {
+       "text": "$4x² + 12x + 36$",
+       "mistake": "middle_no_2"
+      },
+      {
+       "text": "$2x² + 24x + 36$",
+       "mistake": "coef_not_raised"
+      },
+      {
+       "text": "$4x² + 36$",
+       "mistake": "forgot_middle"
+      }
+     ]
+    },
+    {
+     "question": "$(a − 3b)² = ?$",
+     "choices": [
+      {
+       "text": "$a² − 6ab + 9b²$",
+       "correct": true
+      },
+      {
+       "text": "$a² − 3ab + 9b²$",
+       "mistake": "middle_no_2"
+      },
+      {
+       "text": "$a² − 6ab + 3b²$",
+       "mistake": "coef_not_raised"
+      },
+      {
+       "text": "$a² + 9b²$",
+       "mistake": "forgot_middle"
+      }
+     ]
+    },
+    {
+     "question": "$(5x − 1)(5x + 1) = ?$",
+     "choices": [
+      {
+       "text": "$25x² − 1$",
+       "correct": true
+      },
+      {
+       "text": "$25x² + 1$",
+       "mistake": "diff_sign"
+      },
+      {
+       "text": "$25x² − 10x + 1$",
+       "mistake": "diffsq_as_square"
+      },
+      {
+       "text": "$5x² − 1$",
+       "mistake": "coef_not_raised"
+      }
+     ]
+    },
+    {
+     "question": "$(a − 4b)² = ?$",
+     "choices": [
+      {
+       "text": "$a² − 8ab + 16b²$",
+       "correct": true
+      },
+      {
+       "text": "$a² − 4ab + 16b²$",
+       "mistake": "middle_no_2"
+      },
+      {
+       "text": "$a² − 8ab + 4b²$",
+       "mistake": "coef_not_raised"
+      },
+      {
+       "text": "$a² + 16b²$",
+       "mistake": "forgot_middle"
+      }
+     ]
+    },
+    {
+     "question": "חשבו בעזרת נוסחת הכפל המקוצר: $26 · 34 = ?$",
+     "choices": [
+      {
+       "text": "$884$",
+       "correct": true
+      },
+      {
+       "text": "$916$",
+       "mistake": "diff_sign"
+      },
+      {
+       "text": "$676$",
+       "mistake": "diffsq_as_square"
+      }
+     ]
+    },
+    {
+     "question": "$(5x − 9)(5x + 9) = ?$",
+     "choices": [
+      {
+       "text": "$25x² − 81$",
+       "correct": true
+      },
+      {
+       "text": "$25x² + 81$",
+       "mistake": "diff_sign"
+      },
+      {
+       "text": "$25x² − 90x + 81$",
+       "mistake": "diffsq_as_square"
+      },
+      {
+       "text": "$5x² − 81$",
+       "mistake": "coef_not_raised"
+      }
+     ]
+    },
+    {
+     "question": "חשבו בעזרת נוסחת הכפל המקוצר: $57 · 63 = ?$",
+     "choices": [
+      {
+       "text": "$3591$",
+       "correct": true
+      },
+      {
+       "text": "$3609$",
+       "mistake": "diff_sign"
+      },
+      {
+       "text": "$3249$",
+       "mistake": "diffsq_as_square"
+      }
+     ]
+    },
+    {
+     "question": "$(4x − 8)² = ?$",
+     "choices": [
+      {
+       "text": "$16x² − 64x + 64$",
+       "correct": true
+      },
+      {
+       "text": "$4x² − 64x + 64$",
+       "mistake": "coef_not_raised"
+      },
+      {
+       "text": "$16x² + 64$",
+       "mistake": "forgot_middle"
+      },
+      {
+       "text": "$16x² − 32x + 64$",
+       "mistake": "middle_no_2"
+      }
+     ]
+    },
+    {
+     "question": "$(8 − x)(8 + x) = ?$",
+     "choices": [
+      {
+       "text": "$64 − x²$",
+       "correct": true
+      },
+      {
+       "text": "$x² − 64$",
+       "mistake": "diffsq_order"
+      },
+      {
+       "text": "$64 − 16x + x²$",
+       "mistake": "diffsq_as_square"
+      },
+      {
+       "text": "$16 − x²$",
+       "mistake": "sq_as_double"
+      }
+     ]
+    },
+    {
+     "question": "$(a − 5b)² = ?$",
+     "choices": [
+      {
+       "text": "$a² − 10ab + 25b²$",
+       "correct": true
+      },
+      {
+       "text": "$a² − 5ab + 25b²$",
+       "mistake": "middle_no_2"
+      },
+      {
+       "text": "$a² − 10ab + 5b²$",
+       "mistake": "coef_not_raised"
+      },
+      {
+       "text": "$a² + 25b²$",
+       "mistake": "forgot_middle"
+      }
+     ]
+    },
+    {
+     "question": "$(2x + 6)(2x − 6) = ?$",
+     "choices": [
+      {
+       "text": "$4x² − 36$",
+       "correct": true
+      },
+      {
+       "text": "$4x² + 36$",
+       "mistake": "diff_sign"
+      },
+      {
+       "text": "$4x² − 24x + 36$",
+       "mistake": "diffsq_as_square"
+      },
+      {
+       "text": "$2x² − 36$",
+       "mistake": "coef_not_raised"
+      }
+     ]
+    },
+    {
+     "question": "$(a + 4b)² = ?$",
+     "choices": [
+      {
+       "text": "$a² + 8ab + 16b²$",
+       "correct": true
+      },
+      {
+       "text": "$a² + 4ab + 16b²$",
+       "mistake": "middle_no_2"
+      },
+      {
+       "text": "$a² + 8ab + 4b²$",
+       "mistake": "coef_not_raised"
+      },
+      {
+       "text": "$a² + 16b²$",
+       "mistake": "forgot_middle"
+      }
+     ]
+    },
+    {
+     "question": "$(3x − 2)² = ?$",
+     "choices": [
+      {
+       "text": "$9x² − 12x + 4$",
+       "correct": true
+      },
+      {
+       "text": "$9x² − 4$",
+       "mistake": "diffsq_as_square"
+      },
+      {
+       "text": "$9x² + 4$",
+       "mistake": "forgot_middle"
+      },
+      {
+       "text": "$3x² − 12x + 4$",
+       "mistake": "coef_not_raised"
+      }
+     ]
+    },
+    {
+     "question": "$(a + 5b)² = ?$",
+     "choices": [
+      {
+       "text": "$a² + 10ab + 25b²$",
+       "correct": true
+      },
+      {
+       "text": "$a² + 5ab + 25b²$",
+       "mistake": "middle_no_2"
+      },
+      {
+       "text": "$a² + 10ab + 5b²$",
+       "mistake": "coef_not_raised"
+      },
+      {
+       "text": "$a² + 25b²$",
+       "mistake": "forgot_middle"
+      }
+     ]
+    },
+    {
+     "question": "$(2x + 3)(2x − 3) = ?$",
+     "choices": [
+      {
+       "text": "$4x² − 9$",
+       "correct": true
+      },
+      {
+       "text": "$4x² + 9$",
+       "mistake": "diff_sign"
+      },
+      {
+       "text": "$4x² − 12x + 9$",
+       "mistake": "diffsq_as_square"
+      },
+      {
+       "text": "$2x² − 9$",
+       "mistake": "coef_not_raised"
       }
      ]
     }
