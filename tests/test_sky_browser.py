@@ -244,3 +244,12 @@ def test_progress_from_before_rounds_stays_on_the_first_ten(browser, server):
     playwright.expect(page.locator(".mx-qprog span").first).to_have_text("שאלה 4 מתוך 10")
     playwright.expect(page.locator(".mx-qdots i.ok")).to_have_count(3)
     assert not errors
+
+
+def test_answers_saved_by_a_page_from_before_rounds_are_kept(browser, server):
+    """A page that showed all 30 questions may have saved answers past the first ten: they join the round."""
+    page, errors = page_with(browser, server, {"solved": {"t_ext": [0, 1, 14, 22]}, "at": {"t_ext": 23}})
+    page.locator('.mx-star[data-id="t_ext"]').click()
+    playwright.expect(page.locator(".mx-qprog span").first).to_have_text("שאלה 5 מתוך 10")
+    playwright.expect(page.locator(".mx-qdots i.ok")).to_have_count(4)
+    assert not errors

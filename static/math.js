@@ -76,7 +76,8 @@ function round(id){
   const n=QS(BY[id]).length; if(n<=ROUND) return [...Array(n).keys()];
   let r=P.set[id];
   if(!Array.isArray(r)||r.length!==ROUND||r.some(i=>!(Number.isInteger(i)&&i>=0&&i<n))){
-    if(!P.done[id]&&(P.solved[id]?.length||P.at[id]!=null)) r=[...Array(ROUND).keys()];
+    if(!P.done[id]&&(P.solved[id]?.length||P.at[id]!=null))   // progress from before rounds: keep what was solved
+      r=[...new Set([...(P.solved[id]||[]),P.at[id],...Array(n).keys()].filter(i=>Number.isInteger(i)&&i>=0&&i<n))].slice(0,ROUND);
     else { const got=solvedOf(id), all=shuffled([...Array(n).keys()]); r=[...all.filter(i=>!got.has(i)),...all.filter(i=>got.has(i))].slice(0,ROUND); }
     P.set[id]=r;
   }
