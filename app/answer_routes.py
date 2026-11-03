@@ -213,7 +213,7 @@ def install_answer_routes(app, signed_in):
             raise ScanError(409, "invalid_upload")
         try:
             image = clean_image(data, content_type)
-            object_key = f"{user}/{sid}/{lease}/{uuid.uuid4()}.jpg"
+            object_key = app.state.answers.new_key(user, sid, lease)
             app.state.answers.put(object_key, image)
             result = usable(call(user, "finalize", scan_id=sid, lease_id=lease,
                                  object_key=object_key, byte_size=len(image)))

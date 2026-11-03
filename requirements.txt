@@ -7,3 +7,4 @@ anthropic>=1.0  # photographed-problem hints and solutions
 tzdata>=2024.1
 Pillow==12.3.0  # validate and strip metadata; compatible with Python 3.10 and 3.11
 pywebpush>=2.0,<3  # phone notifications for photo requests (app/push.py)
+huggingface_hub>=1.16,<2  # answer images in a private Hugging Face storage bucket (MATHLY_ANSWER_BUCKET)

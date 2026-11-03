@@ -149,7 +149,7 @@ def install_monitoring_routes(app, manager) -> None:
         answers = app.state.answers
         return {"build": build_metadata(), "errors": log_errors.COUNTER.summary(),
                 "seen": seen_summary(app.state.seen), "actions": app.state.actions.recent(), "photos": photo_summary(app.state.photo_counts),
-                "answers": {"storage": answers.configured, "open_ended_locked": open_ended_locked(),
+                "answers": {"storage": answers.configured, "images": "huggingface" if getattr(answers, "images", None) else "supabase", "open_ended_locked": open_ended_locked(),
                             "grading": bool(grading_key())},
                 "photo_help": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()
                                    or os.environ.get("CLAUDE_API_KEY", "").strip())}
