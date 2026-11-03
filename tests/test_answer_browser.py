@@ -332,3 +332,76 @@ def test_phone_declines_and_computer_withdraws(scan_server):
             assert not errors
         finally:
             browser.close()
+
+
+def test_phone_asks_once_for_notifications_and_the_bell_toggles(answer_store, monkeypatch):
+    """The phone asks once (אישור / לא, תודה); the 🔔 in the top bar turns notifications on and off later.
+    The browser's push service is stubbed: only the page's choices and what it sends the server are checked."""
+    from app.push import new_private_key
+    monkeypatch.setenv('VAPID_PRIVATE_KEY', new_private_key())
+    app = create_app(auth=ScanAuth()); app.state.answers = answer_store
+    saved = {}
+
+    class Push:   # the stored subscriptions, without Supabase
+        on, public, why = True, '', ''
+        def save(self, user, sub): saved[sub['endpoint']] = user
+        def delete(self, endpoint, user=None): saved.pop(endpoint, None)
+        def scan_requested(self, *a): return 0
+    app.state.push = Push()
+    from app.push import public_key
+    import os
+    app.state.push.public = public_key(os.environ['VAPID_PRIVATE_KEY'])
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1', 0))
+        server = uvicorn.Server(uvicorn.Config(app, log_level='error'))
+        thread = threading.Thread(target=server.run, kwargs={'sockets': [sock]}, daemon=True); thread.start()
+        while not server.started: time.sleep(.01)
+        url = f'http://127.0.0.1:{sock.getsockname()[1]}'
+        stub = '''(()=>{let perm=localStorage.getItem('test.perm')||'default',sub=null;
+          Object.defineProperty(window,'Notification',{value:{get permission(){return perm;},
+            requestPermission:async()=>(perm=localStorage.getItem('test.answer')||'granted')}});
+          const mk=()=>({endpoint:'https://push.test/'+Math.random(),toJSON(){return {endpoint:this.endpoint,keys:{p256dh:'p',auth:'a'}};},
+            unsubscribe:async()=>{sub=null;return true;}});
+          window.PushManager=function(){};
+          const reg={pushManager:{getSubscription:async()=>sub,subscribe:async()=>(sub=mk())},getNotifications:async()=>[]};
+          Object.defineProperty(navigator,'serviceWorker',{value:{register:async()=>reg,ready:Promise.resolve(reg),
+            getRegistration:async()=>reg,addEventListener(){}}});})();'''
+        with playwright.sync_playwright() as p:
+            browser = p.chromium.launch()
+            try:
+                ctx = session(browser, mobile=True); ctx.add_init_script(stub)
+                phone = ctx.new_page(); errors = []
+                phone.on('pageerror', lambda error: errors.append(str(error)))
+                phone.goto(url)
+                ask = phone.locator('.mx-push-ask')
+                playwright.expect(ask).to_contain_text('התראות מהמחשב')
+                ask.get_by_role('button', name='לא, תודה').click()
+                playwright.expect(ask).to_have_count(0)
+                bell = phone.locator('.mx-push-btn').first
+                playwright.expect(bell).to_have_text('🔕')
+                assert not saved
+                phone.reload()   # asked once: not again
+                playwright.expect(bell).to_have_text('🔕')
+                phone.wait_for_timeout(500); playwright.expect(ask).to_have_count(0)
+                bell.click()
+                phone.locator('.mx-push-ask').get_by_role('button', name='אישור').click()
+                playwright.expect(bell).to_have_text('🔔')
+                assert list(saved.values()) == [OWNER]
+                bell.click()
+                phone.locator('.mx-push-ask').get_by_role('button', name='כיבוי').click()
+                playwright.expect(bell).to_have_text('🔕')
+                assert not saved
+                # a refusal in the browser's own question: the window says so, and the bell then explains the block
+                phone.evaluate("localStorage.setItem('test.answer','denied')")
+                bell.click()
+                phone.locator('.mx-push-ask').get_by_role('button', name='אישור').click()
+                playwright.expect(phone.locator('.mx-push-ask')).to_contain_text('נחסמו')
+                phone.locator('.mx-push-ask').get_by_role('button', name='ביטול').click()
+                playwright.expect(bell).to_have_text('🔕')
+                assert errors == []
+                # a computer never shows the bell
+                computer = session(browser).new_page(); computer.goto(url)
+                playwright.expect(computer.locator('.mx-acts').first).to_be_visible()
+                assert computer.locator('.mx-push-btn:visible').count() == 0
+            finally:
+                browser.close(); server.should_exit = True; thread.join(timeout=5)

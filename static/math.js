@@ -136,7 +136,7 @@ function subjectOptions(){
 function drawSubjectPicker(){
   ACTIVE_SUBJECT=""; nav.hidden=true;
   const manage=can("management.access"), subjects=subjectOptions(), today=new Date();today.setHours(0,0,0,0);
-  path.innerHTML=`<header class="mx-top"><div><h1>המקצועות שלי</h1><p class="mx-sub">בחרו מקצוע כדי לפתוח את המסלול שלו</p></div><div class="mx-acts">${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
+  path.innerHTML=`<header class="mx-top"><div><h1>המקצועות שלי</h1><p class="mx-sub">בחרו מקצוע כדי לפתוח את המסלול שלו</p></div><div class="mx-acts">${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${window.MathlyAnswers?.pushButton?.()||""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
     <section class="mx-subject-grid" aria-label="מקצועות הכיתה">${subjects.map(item=>{
       const [icon,tone]=examLooks[item.name]||["●","other"],future=item.dates.find(date=>examDate(date)>=today),count=item.dates.length;
       return `<button class="mx-subject-card exam-${tone}" data-subject="${esc(item.name)}"><span class="mx-subject-icon" aria-hidden="true">${icon}</span><span><b>${esc(item.name)}</b><small>${count} מבחנים${future?` · הבא ${examDay(future)}`:" · הסתיימו"}</small></span><i aria-hidden="true">‹</i></button>`;
@@ -189,7 +189,7 @@ function nextExam(){
 function topBar(){
   const st=skyStats(), hot=Sky.today(P)>=Sky.GOAL, manage=can("management.access"), on=Sky.soundOn(), streak=Sky.streak(P);
   return `<header class="mx-top"><div class="mx-brand">${Sky.spark()}<span>מתמטיקה</span></div>
-    <div class="mx-acts">${subjectOptions().length?'<button class="mx-btn" data-act="subjects">מקצועות</button>':""}${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
+    <div class="mx-acts">${subjectOptions().length?'<button class="mx-btn" data-act="subjects">מקצועות</button>':""}${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${window.MathlyAnswers?.pushButton?.()||""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
     <div class="mx-hud"><div class="mx-stats">
       <button class="sky-chip flame${hot?"":" cold"}" data-act="streak" title="${streak} ימים ברצף">${Sky.FLAME}<b>${streak}</b><span class="mx-sr">ימים ברצף</span></button>
       <span class="sky-chip stars" title="${st.lit} כוכבים">${Sky.spark()}<b>${st.lit}</b><span class="mx-sr">כוכבים</span></span>
@@ -985,6 +985,7 @@ function onClick(e){
     case "review-next": return REV&&reviewNext();
     case "cal-prev": return showStreak(-1);
     case "cal-next": return showStreak(1);
+    case "push": return window.MathlyAnswers?.togglePush?.();
     case "sound": Sky.setSound(!Sky.soundOn()); Sky.sound.tap(); return draw();
     case "resources": return openResources(t.dataset.unit);
     case "res-take": case "res-retake": return resPicker.click();

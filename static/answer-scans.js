@@ -25,7 +25,7 @@ function closeCapture(){
 }
 function reset(){
   epoch++;if(question)question.node.replaceChildren();closeQuestion();closeCapture();closeWait();clearTimeout(inboxTimer);inboxTimer=null;
-  inbox=false;account=null;onGraded=null;
+  inbox=false;account=null;onGraded=null;PUSH_MODE="hidden";paintPush();document.querySelector(".mx-push-ask")?.remove();
 }
 function configure(options){
   reset();api=options.api;account=options.enabled?options.account:null;visibleRoot=options.root;onGraded=options.onGraded;
@@ -71,11 +71,69 @@ async function pushOff(sub){
 /* A phone's subscription belongs to the account signed in on it: on sign-in it moves to that account (or, notifications
    being allowed already, is made again after a sign-out), unless it was turned off here. */
 async function pushSync(e){
+  if(!PUSH_CAN){pushMode(PUSH_IOS&&!PUSH_STANDALONE?"ios":"hidden");return;}
   try{
-    const st=await pushState();if(!live(e)||!st.key)return;
-    if(st.sub)await api("/api/push/subscribe",subscribeBody(st.sub));
-    else if(Notification.permission==="granted"&&!pushOptOut())await pushOn(st.key);
-  }catch{}
+    const st=await pushState();if(!live(e))return;
+    if(!st.key){pushMode("hidden");return;}
+    let sub=st.sub;
+    if(sub)await api("/api/push/subscribe",subscribeBody(sub));
+    else if(Notification.permission==="granted"&&!pushOptOut())sub=await pushOn(st.key);
+    if(!live(e))return;
+    pushMode(sub?"on":Notification.permission==="denied"?"blocked":"off");
+    if(!sub&&Notification.permission==="default"&&!pushOptOut()&&!pushAsked())askPush(e);
+  }catch{if(live(e))pushMode(Notification.permission==="denied"?"blocked":"off");}
+}
+/* The 🔔 in the top bar (phones only): its state is kept here and painted into every .mx-push-btn, so the page can
+   draw it in its templates (pushButton) and it changes in place when the state does. */
+let PUSH_MODE="hidden";   // hidden | on | off | blocked | ios
+const PUSH_LOOK={on:["🔔","התראות פעילות. לחצו לכיבוי"],off:["🔕","התראות כבויות. לחצו להפעלה"],
+  blocked:["🔕","ההתראות חסומות בדפדפן"],ios:["🔕","התראות באייפון: מהאפליקציה שעל מסך הבית"]};
+function pushMode(m){PUSH_MODE=account&&inbox?m:"hidden";paintPush();}
+function pushButton(){   // drawn as it is now; paintPush changes it in place later
+  const look=PUSH_LOOK[PUSH_MODE];
+  return look?`<button class="mx-btn mx-push-btn" data-act="push" type="button" title="${look[1]}" aria-label="${look[1]}" aria-pressed="${PUSH_MODE==="on"}">${look[0]}</button>`
+    :'<button class="mx-btn mx-push-btn" data-act="push" type="button" hidden></button>';
+}
+function paintPush(){
+  for(const b of document.querySelectorAll(".mx-push-btn")){
+    const look=PUSH_LOOK[PUSH_MODE];b.hidden=!look;if(!look)continue;
+    b.textContent=look[0];b.title=look[1];b.setAttribute("aria-label",look[1]);b.setAttribute("aria-pressed",String(PUSH_MODE==="on"));
+  }
+}
+const pushAsked=()=>{try{return localStorage.getItem("mathly.pushAsked")==="1";}catch{return true;}};
+function pushNote(title,html,buttons){   // a small window on the phone: the question, or how to unblock
+  document.querySelector(".mx-push-ask")?.remove();
+  const node=document.createElement("div");node.className="mx-scan-overlay mx-push-ask";node.setAttribute("role","dialog");node.setAttribute("aria-modal","true");node.setAttribute("aria-labelledby","pushTitle");
+  node.innerHTML=`<div class="mx-scan-card"><h2 id="pushTitle">${title}</h2><p>${html}</p><p data-status role="status" aria-live="polite"></p><div class="mx-scan-actions"></div></div>`;
+  const row=node.querySelector(".mx-scan-actions"),close=()=>node.remove();
+  for(const [label,solid,act] of buttons){
+    const b=document.createElement("button");b.type="button";b.className="mx-btn"+(solid?" solid":" mx-btn-quiet");b.textContent=label;
+    b.onclick=async()=>{for(const x of row.children)x.disabled=true;try{if(await act?.(node)!==false)close();}finally{for(const x of row.children)x.disabled=false;}};row.append(b);
+  }
+  node.addEventListener("keydown",ev=>{if(ev.key==="Escape")close();});
+  (visibleRoot||document.body).append(node);row.firstChild?.focus();
+}
+async function enablePush(node){   // "אישור": the browser's own question follows; false keeps the window open with why
+  const say=t=>{const s=node?.querySelector("[data-status]");if(s)s.textContent=t;};
+  try{
+    const st=await pushState();const sub=st.key?await pushOn(st.key):null;
+    pushMode(sub?"on":Notification.permission==="denied"?"blocked":"off");
+    if(!sub){say(Notification.permission==="denied"?"ההתראות נחסמו. אפשר לאשר אותן בהגדרות האתר בדפדפן.":"ההתראות לא אושרו.");return false;}
+  }catch{say("לא הצלחנו להפעיל התראות. נסו שוב מאוחר יותר.");return false;}
+}
+function askPush(e){   // once per phone, after sign-in; "לא, תודה" is final (the 🔔 still turns them on)
+  if(capture||document.querySelector(".mx-push-ask"))return;
+  const done=()=>{try{localStorage.setItem("mathly.pushAsked","1");}catch{}};
+  pushNote("🔔 התראות מהמחשב","כשהמחשב מבקש לצלם תשובה, הטלפון יקבל התראה, גם כשהאפליקציה סגורה.",[
+    ["אישור",true,async node=>{done();if(!live(e))return;return enablePush(node);}],
+    ["לא, תודה",false,()=>{done();pushOptOut(true);pushMode("off");}]]);
+}
+async function togglePush(){   // the 🔔
+  if(PUSH_MODE==="ios")return pushNote("📱 התראות באייפון","באייפון ההתראות מגיעות רק מהאפליקציה שעל מסך הבית: לחצו על <b>שיתוף</b> ⬆️ ← <b>„הוספה למסך הבית”</b>, ופתחו את האפליקציה משם.",[["הבנתי",true]]);
+  if(PUSH_MODE==="blocked")return pushNote("🔕 ההתראות חסומות","הדפדפן חוסם התראות מהאתר. כדי לאשר: בכרום לחצו על הסמל שליד הכתובת ← <b>הרשאות</b> ← <b>התראות</b> ← <b>אישור</b>. באייפון: <b>הגדרות</b> ← <b>עדכונים</b> ← <b>לומדים בכיף</b>.",[["הבנתי",true]]);
+  if(PUSH_MODE==="on")return pushNote("🔔 לכבות התראות?","הטלפון לא יקבל התראה כשהמחשב מבקש צילום. אפשר להפעיל שוב מכאן.",[
+    ["כיבוי",true,async()=>{const st=await pushState().catch(()=>({}));if(st.sub)await pushOff(st.sub);pushOptOut(true);pushMode("off");}],["ביטול",false]]);
+  if(PUSH_MODE==="off")return pushNote("🔔 להפעיל התראות?","כשהמחשב מבקש לצלם תשובה, הטלפון יקבל התראה, גם כשהאפליקציה סגורה.",[["אישור",true,enablePush],["ביטול",false]]);
 }
 async function forgetPush(){   // signing out: the next account on this phone does not get this one's requests
   try{const st=await pushState();if(st.sub)await pushOff(st.sub);}catch{}
@@ -100,8 +158,8 @@ function pushOffer(node,e){
   pushState().then(st=>{
     if(!live(e)||!st.key||Notification.permission==="denied")return;
     const show=sub=>sub
-      ?draw("🔔 התראה תגיע לטלפון כשהמחשב מבקש צילום.","כיבוי ההתראות",async()=>{await pushOff(sub);pushOptOut(true);show(null);})
-      :draw("רוצים שהטלפון יודיע לכם בפעם הבאה שהמחשב מבקש צילום, גם כשהאפליקציה סגורה?","🔔 כן, להודיע לי",async()=>{const s=await pushOn(st.key);if(live(e))show(s);});
+      ?draw("🔔 התראה תגיע לטלפון כשהמחשב מבקש צילום.","כיבוי ההתראות",async()=>{await pushOff(sub);pushOptOut(true);pushMode("off");show(null);})
+      :draw("רוצים שהטלפון יודיע לכם בפעם הבאה שהמחשב מבקש צילום, גם כשהאפליקציה סגורה?","🔔 כן, להודיע לי",async()=>{const s=await pushOn(st.key);if(live(e)){pushMode(s?"on":Notification.permission==="denied"?"blocked":"off");show(s);}});
     show(st.sub);
   });
 }
@@ -249,7 +307,7 @@ function trapTab(node,event){
 
 /* ---------- the phone: a window for a request from the computer ---------- */
 function openCapture(result){
-  closeCapture();const e=epoch;
+  closeCapture();document.querySelector(".mx-push-ask")?.remove();const e=epoch;   // the request comes first
   if(!live(e))return;
   const node=document.createElement("div");node.className="mx-scan-overlay";node.setAttribute("role","alertdialog");node.setAttribute("aria-modal","true");node.setAttribute("aria-labelledby","scanTitle");
   node.innerHTML=`<div class="mx-scan-card mx-scan-ask">
@@ -405,5 +463,5 @@ document.addEventListener("visibilitychange",()=>{
   if(question?.result)pollQuestion(question);
 });
 window.addEventListener("online",()=>{if(account&&inbox)pollInbox(epoch);if(question?.result)pollQuestion(question);});
-window.MathlyAnswers={configure,mountQuestion,closeQuestion,reset,waitForPhone,forgetPush};
+window.MathlyAnswers={configure,mountQuestion,closeQuestion,reset,waitForPhone,forgetPush,pushButton,paintPush,togglePush};
 })();
