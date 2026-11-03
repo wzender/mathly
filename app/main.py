@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
+from . import ai_usage
 from .access import has_permission, resolve_access
 from .answer_routes import install_answer_routes, open_ended_locked
 from .auth import AuthUnavailable, ClassConflict, SupabaseAuth, load_auth
@@ -230,6 +231,7 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
             if counter:
                 photo_counts[counter] -= 1
             raise
+        ai_usage.record(app.state.auth, (user or {}).get("id"), "photo", result.pop("usage", None))
         if counter and not result.get("readable"):
             photo_counts[counter] -= 1
         skill = next((s["name"] for s in algebra9()["skills"] if s["id"] == result.get("skill")), "")

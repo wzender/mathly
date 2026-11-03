@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import Depends, HTTPException, Query
 
-from . import log_errors
+from . import ai_usage, log_errors
 from .answer_routes import grading_key, open_ended_locked
 from .auth import AuthUnavailable
 from .math_photo import DAILY_PHOTOS
@@ -162,6 +162,19 @@ def install_monitoring_routes(app, manager) -> None:
             missing = {"ok": False, "error": "Supabase is not configured"}
             return {"auth": missing, "db": missing}
         return store.ping()
+
+    @app.get("/api/monitor/ai-usage")
+    def monitor_ai_usage(days: int = Query(30, ge=1, le=365), _user: dict = Depends(manager)):
+        """Claude API calls, tokens and estimated dollars (ai_usage.py), per feature and per model."""
+        store = app.state.auth
+        if store is None or not store.secret:
+            return {"days": days, "unavailable": "Supabase is not configured"}
+        try:
+            return ai_usage.summary(store, days)
+        except AuthUnavailable as exc:
+            if "answered 404" in str(exc):
+                return {"days": days, "unavailable": f"apply {ai_usage.MIGRATION}"}
+            raise HTTPException(503, str(exc)) from exc
 
     @app.get("/api/monitor/activity")
     def monitor_activity(period: str = Query("week", pattern="^(day|week|month)$"), _user: dict = Depends(manager)):

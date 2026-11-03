@@ -924,7 +924,7 @@ async function uqUpload(i,file){
     const photo=await window.MathlyPhoto.prepare(file);
     if(photo.size>5000000) throw Error(UQ_ERRORS.image_too_large);
     const aid=await uqFresh(i);
-    const scan=(await uqPost(`${UQ_BASE}/${aid}/scans`,{renew:true})).scan;
+    const scan=(await uqPost(`${UQ_BASE}/${aid}/scans`,{renew:true,direct:true})).scan;   // this device's own upload: no phone is asked
     await uqPost(`/api/math/answer-scans/${scan.id}/confirm`);
     const lease=await uqPost(`/api/math/answer-scans/${scan.id}/uploads`,{key:crypto.randomUUID()});
     if(!lease.attachment){ const form=new FormData(); form.append("photo",photo,"answer.jpg");
@@ -1190,6 +1190,7 @@ function loadMonitoring(){
   const redraw=draw=>{ if(cur==="management"&&MANAGE_MODE==="flags") draw(); };
   monGet("/api/monitor/summary").then(data=>{ MON.summary=data; redraw(drawMonSummary); });
   monGet("/api/monitor/supabase").then(data=>{ MON.supabase=data; redraw(drawMonSummary); });
+  monGet("/api/monitor/ai-usage").then(data=>{ MON.ai=data; redraw(drawMonSummary); });
   loadMonActivity().then(()=>{ redraw(drawMonActivity); redraw(drawMonSummary); });
 }
 async function loadMonActivity(){ const range=MON_RANGE, data=await monGet(`/api/monitor/activity?period=${range}`); if(range===MON_RANGE) MON.activity=data; }
@@ -1216,6 +1217,12 @@ function drawMonSummary(){
     const down=parts.some(([,x])=>!x.ok), slow=parts.some(([,x])=>x.ok&&x.ms>2000);
     const sub=!sb?"בודק…":sb.error?esc(sb.error):parts.map(([name,x])=>x.ok?`${name} ${(x.ms/1000).toFixed(1)} ש׳`:`${name}: ${esc(x.error||"לא עונה")}`).join(" · ");
     tiles.push(tile(!sb?"…":sb.error?"–":down?"לא זמין":slow?"איטי":"תקין","Supabase",sub,!sb||sb.error?"":down?"bad":slow?"warn":"ready")); }
+  { const ai=MON.ai, t=ai?.total, f=ai?.by_feature||{};
+    const usd=x=>`$${(x||0).toFixed(x>=10?0:2)}`, tok=n=>n>=1e6?`${(n/1e6).toFixed(1)}M`:n>=1e3?`${Math.round(n/1e3)}K`:String(n||0);
+    tiles.push(tile(!ai?"…":t?usd(t.cost_usd):"–",`עלות Claude ב־${ai?.days||30} יום (הערכה)`,
+      !ai?"טוען…":ai.error?esc(ai.error):ai.unavailable?esc(ai.unavailable):
+      `${t.calls} קריאות · ${tok(t.input_tokens)} אסימוני קלט · ${tok(t.output_tokens)} פלט · היום ${usd(ai.today.cost_usd)}`+
+      ` · צילום ${usd(f.photo?.cost_usd)} · בדיקה ${usd(f.grading?.cost_usd)}`)); }
 
   // open answers: what is switched on, and how this period's photo checks came out
   const ans=sum?.answers, act=MON.activity, verdicts=act?.summary?.verdicts||{};

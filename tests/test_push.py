@@ -198,3 +198,27 @@ def test_migration_keeps_subscriptions_from_browsers(postgres_server):
     finally:
         with psycopg.connect(postgres_server.get_uri(), autocommit=True) as c:
             c.execute("drop database " + database + " with (force)")
+
+
+def test_a_devices_own_upload_rings_no_phone_and_is_offered_to_none(answer_store, sent, monkeypatch):
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", KEY)
+    app = create_app(auth=PushAuth())
+    app.state.answers = answer_store
+    app.state.push.save(OWNER, SUB)
+    own = answer_store.action(OWNER, "resume", question_id="quiz:t:0", question_version="v1",
+                              snapshot={"question": "Solve", "type": "open-ended"})["attempt"]["id"]
+    asked = answer_store.action(OWNER, "resume", question_id="quiz:t:1", question_version="v1",
+                                snapshot={"question": "Prove", "type": "open-ended"})["attempt"]["id"]
+
+    async def check():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test",
+                                     headers={"Authorization": f"Bearer {OWNER}"}) as c:
+            direct = (await c.post(f"/api/math/answer-attempts/{own}/scans", json={"renew": True, "direct": True})).json()
+            phone = (await c.post(f"/api/math/answer-attempts/{asked}/scans", json={"renew": True})).json()
+            listed = (await c.get("/api/math/answer-scans")).json()
+            return direct, phone, listed
+
+    direct, phone, listed = asyncio.run(check())
+    assert len(sent) == 1 and phone["scan"]["code"] in sent[0]["data"]["body"]   # only the request for the phone rang
+    assert [r["scan"]["id"] for r in listed] == [phone["scan"]["id"]]   # and only it waits for a phone
+    assert direct["scan"]["state"] == "waiting"   # the device's own request works as before

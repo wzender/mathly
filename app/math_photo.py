@@ -15,6 +15,8 @@ import json
 import logging
 import os
 
+from .ai_usage import usage_of
+
 log = logging.getLogger("ihki.math_photo")
 
 DEFAULT_MODEL = "claude-opus-5-5"
@@ -104,7 +106,7 @@ class PhotoSolver:
             log.warning("math photo: an answer that is not JSON: %r", text[:300])
             raise PhotoUnavailable("לא הצלחנו לפתור את התרגיל. נסו שוב.") from e
         log.info("math photo: %s, %d+%d tokens", res.model, res.usage.input_tokens, res.usage.output_tokens)
-        return out
+        return {**out, "usage": usage_of(res)}   # the route pops "usage" and records it (ai_usage.py)
 
 
 def photo_client(key: str):

@@ -5,6 +5,7 @@ import base64
 import json
 import logging
 
+from .ai_usage import usage_of
 from .math_photo import PhotoUnavailable, math_model, photo_client
 
 log = logging.getLogger("mathly.answer_grading")
@@ -96,4 +97,5 @@ class AnswerGrader:
             value = json.loads(next(b.text for b in response.content if b.type == "text"))
         except (ValueError, StopIteration) as exc:
             raise PhotoUnavailable("הבדיקה לא הושלמה. נסו שוב.") from exc
-        return {**validate_assessment(value), "model": response.model}
+        # The route pops "usage" before storing the result and records it (ai_usage.py).
+        return {**validate_assessment(value), "model": response.model, "usage": usage_of(response)}

@@ -9,6 +9,7 @@ from fastapi import BackgroundTasks, Depends, File, UploadFile
 from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 
+from . import ai_usage
 from .answer_scans import AnswerScans, MAX_IMAGE, ScanError, clean_image, public_result, uuid_text
 from .answer_grading import AnswerGrader
 from .math_photo import PhotoUnavailable
@@ -132,6 +133,7 @@ def install_answer_routes(app, signed_in):
             grader = getattr(app.state, "answer_grader", None) or AnswerGrader(key)
             assessment = grader.grade(app.state.answers.read(result["attachment"]["object_key"]),
                                       result["attempt"]["snapshot"])
+            ai_usage.record(app.state.auth, user, "grading", assessment.pop("usage", None))
             app.state.answers.grade(user, "complete", attempt_id=aid, lease_id=lease, result=assessment)
             note(user, "answer_graded", result, VERDICTS.get(assessment.get("verdict"), ""))
         except Exception as exc:
@@ -154,12 +156,22 @@ def install_answer_routes(app, signed_in):
             # Upload is already committed. Keep failures separate and retryable.
             log.info("automatic answer grading stopped: %s", exc.code)
 
+    # Requests a device makes for its own upload (a photo or the board, sent from the same screen): no other device
+    # is asked to answer them, so no phone rings and no phone lists them. Kept in memory like Push.notified: a request
+    # lives 15 minutes, so a restart only means one may show on a phone.
+    direct_scans: dict[str, None] = {}
+
     @app.post("/api/math/answer-attempts/{attempt_id}/scans")
     def create_scan(attempt_id: str, body: dict, background_tasks: BackgroundTasks, user=Depends(student)):
         fields = {"attempt_id": uuid_text(attempt_id), "renew": body.get("renew") is True}
         if "question_id" in body:
             fields["question_id"] = str(body["question_id"])
         result = call(user, "create_scan", **fields)
+        if body.get("direct") is True and (sid := (result.get("scan") or {}).get("id")):
+            direct_scans[sid] = None
+            while len(direct_scans) > 10_000:
+                del direct_scans[next(iter(direct_scans))]
+            return reply(result)
         push = getattr(app.state, "push", None)
         if push is not None and push.on:
             # the phone may be in a pocket with the app closed: a notification brings the student to the request
@@ -168,7 +180,7 @@ def install_answer_routes(app, signed_in):
 
     @app.get("/api/math/answer-scans")
     def pending(user=Depends(student)):
-        return reply(call(user, "pending"))
+        return reply([r for r in call(user, "pending") or [] if (r.get("scan") or {}).get("id") not in direct_scans])
 
     @app.get("/api/math/answer-scans/{scan_id}")
     def get_scan(scan_id: str, user=Depends(student)):
