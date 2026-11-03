@@ -5,7 +5,8 @@
    answered correctly and the last few answers (Sky.masterNeed) were right at the first try; after each answer the
    student moves to the next unsolved question, so a missed question comes back after the others. The choices are
    shuffled each time a question is shown, and a wrong answer does not reveal the right one, so a question that comes
-   back is solved again, not remembered. Finished skills come back in a mixed review (see "spaced review" below). Progress is kept on this device, per account (mathly.progress.v1:<email>): `done` per
+   back is solved again, not remembered. Finished skills come back in a mixed review (see "spaced review" below). Progress is kept on the device per account (mathly.progress.v1:<email>), and for a signed-in student also on
+   the server so it follows them to other devices (see "progress across devices"): `done` per
    skill, and `solved` (indexes answered correctly), `at` (the question to show) and `set` (the round's questions, see round())
    for skills with a list. Every tagged wrong answer is also kept in `slips` (see "misconception patterns" and math-sky.js),
    so the mistakes that keep coming back across skills can be shown with what to practise. */
@@ -27,7 +28,54 @@ const fmtLoose=s=>String(s??"").split("$").map((part,i)=>i%2?`<span class="m">${
   :esc(part).replace(/(^|[\s(־])([−-]\d+(?:[.,]\d+)?)/g,'$1<span class="m">$2</span>')).join("");
 const key=()=>"mathly.progress.v1:"+(ME_EMAIL||"guest");
 const load=()=>{ try{ return JSON.parse(localStorage.getItem(key())||"{}"); }catch{ return {}; } };
-const save=()=>{ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} };
+const save=()=>{ P.updated=Date.now(); try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} queuePush(); };
+
+/* Progress across devices: a signed-in student's progress is also kept on the server (app/progress.py). On sign-in the
+   server's copy is merged into this device's; after each save the merged copy is sent back, and coming back to the tab
+   merges again. mergeProgress keeps the work of both copies: finished skills, gold stars, solved questions, comets,
+   mistakes and exams are joined; counts keep the higher one; where a student is now (the round, the question, a
+   sitting, the run of first tries, spaced review) comes from the copy saved last (`updated`). */
+const isObj=v=>!!v&&typeof v==="object"&&!Array.isArray(v);
+function mergeProgress(a,b){
+  a=isObj(a)?a:{}; b=isObj(b)?b:{};
+  const [old,neu]=(+a.updated||0)>(+b.updated||0)?[b,a]:[a,b], out={...old,...neu};
+  const each=(k,pick)=>{ const o=isObj(old[k])?old[k]:{}, n=isObj(neu[k])?neu[k]:{}, r={...o,...n};
+    if(pick) for(const id in o) if(id in n) r[id]=pick(o[id],n[id]);
+    out[k]=r; };
+  const earliest=(x,y)=>String(x)<String(y)?x:y, latest=(x,y)=>String(x)>String(y)?x:y, most=(x,y)=>Math.max(+x||0,+y||0);
+  const list=k=>[...(Array.isArray(old[k])?old[k]:[]),...(Array.isArray(neu[k])?neu[k]:[])];
+  const joined=(k,id)=>{ const by=new Map(); for(const x of list(k)) by.set(id(x),x); return [...by.values()]; };
+  for(const k of new Set([...Object.keys(old),...Object.keys(neu)])) if(isObj(old[k])&&isObj(neu[k])) each(k);   // newer per key
+  each("done",earliest); each("gold",earliest); each("seen",latest); each("tries",most); each("days",most);
+  each("solved",(x,y)=>[...new Set([...(Array.isArray(x)?x:[]),...(Array.isArray(y)?y:[])])].sort((p,q)=>p-q));
+  out.comets=[...new Set(list("comets"))];
+  out.slips=joined("slips",s=>JSON.stringify([s?.at,s?.id,s?.q,s?.m])).sort((x,y)=>String(x?.at).localeCompare(String(y?.at))).slice(-500);
+  if(old.quizzes||neu.quizzes) out.quizzes=joined("quizzes",q=>String(q?.at)).sort((x,y)=>String(x?.at).localeCompare(String(y?.at))).slice(-20);
+  if(old.cometDay||neu.cometDay) out.cometDay=latest(old.cometDay||"",neu.cometDay||"");
+  out.updated=Math.max(+a.updated||0,+b.updated||0);
+  return out;
+}
+const synced=()=>false;
+let pushTimer=null;
+async function pullProgress(){
+  if(!synced()) return null;
+  try{ const r=await api("/api/math/progress"); return r.ok?(await r.json()).progress||{}:null; }catch{ return null; }
+}
+async function pushProgress(){
+  clearTimeout(pushTimer); pushTimer=null;
+  const remote=await pullProgress(); if(remote===null) return;
+  try{ await api("/api/math/progress",{method:"PUT",keepalive:true,headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({progress:mergeProgress(remote,P)})}); }catch{}
+}
+function queuePush(){ if(!synced()) return; clearTimeout(pushTimer); pushTimer=setTimeout(pushProgress,1500); }
+document.addEventListener("visibilitychange",async()=>{
+  if(!synced()||!G) return;
+  if(document.visibilityState==="hidden"){ if(pushTimer) pushProgress(); return; }
+  if(cur) return;   // a question or exam is open: take the other device's work next time
+  const remote=await pullProgress(); if(!remote||cur) return;
+  P=Sky.ensure(mergeProgress(P,remote)); try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{}
+  if(ACTIVE_SUBJECT==="מתמטיקה"&&!root?.hidden) draw();
+});
 
 let G=null, BY={}, POST={}, ORDER=[], P={done:{},tries:{},solved:{},at:{}}, root=null, curQ=0, path=null, sheet=null, cur=null, back=null, ACTIVE_SUBJECT="";
 let nav=null, FIRST=true, COMBO=0, REV=null, QZ=null, UQ=null;   // UQ: the unit quiz on the sheet (see unit quiz below)   // QZ: the practice exam in progress (see quiz below)   // the tab bar; whether the shown question is still at its first try; first-try answers in a row
@@ -111,8 +159,10 @@ async function show(){
     try{ const r=await fetch("/api/math/skills"); if(!r.ok) throw new Error(`השרת ענה ${r.status}`); index(await r.json()); }
     catch(e){ path.innerHTML=`<p class="mx-note">לא הצלחנו לטעון את המסלול: ${esc(e.message)}. רעננו את העמוד ונסו שוב.</p>`; return; }
   }
-  P=window.MathlySky.ensure(Object.assign({done:{},tries:{},solved:{},at:{},set:{}},load())); if(!P.set||typeof P.set!=="object") P.set={}; SHOWN=new Set(shownUnits().map(u=>u.id));
-  subjectOptions().length?drawSubjectPicker():selectSubject("מתמטיקה");
+  const remote=await pullProgress();
+  P=window.MathlySky.ensure(Object.assign({done:{},tries:{},solved:{},at:{},set:{}},remote?mergeProgress(load(),remote):load()));
+  if(remote){ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} queuePush(); }   // this device's own work goes up too if(!P.set||typeof P.set!=="object") P.set={}; SHOWN=new Set(shownUnits().map(u=>u.id));
+  hasExams()?drawSubjectPicker():selectSubject("מתמטיקה");   // no exams yet: straight to math, science is a tap away
   window.MathlyAnswers?.configure({api,account:CFG.userId,enabled:CFG.answerScans,root,onGraded:({questionId,grading})=>{
     if(grading.result.verdict!=="correct"||P.done[questionId])return;
     const unitWas=unitDone(unitOf(questionId));
@@ -124,14 +174,17 @@ async function show(){
 }
 function hide(){ cancelAdvance(); if(root) root.hidden=true; document.documentElement.classList.remove("math-on"); }
 
+// subjects with a path of their own: always offered, even before the class has an exam in them
+const PATH_SUBJECTS=["מתמטיקה","מדעים"];
+const hasExams=()=>MY_CLASSES.some(row=>(row.exams||[]).some(exam=>exam?.subject&&exam?.date));
 function subjectOptions(){
-  const bySubject=new Map();
+  const bySubject=new Map(PATH_SUBJECTS.map(name=>[name,{name,dates:[],classes:new Set()}]));
   MY_CLASSES.forEach(row=>(row.exams||[]).forEach(exam=>{
     if(!exam?.subject||!exam?.date)return;
     const item=bySubject.get(exam.subject)||{name:exam.subject,dates:[],classes:new Set()};
     item.dates.push(exam.date);item.classes.add(row.name);bySubject.set(exam.subject,item);
   }));
-  return [...bySubject.values()].map(item=>({...item,dates:item.dates.sort()})).sort((a,b)=>a.dates[0].localeCompare(b.dates[0]));
+  return [...bySubject.values()].map(item=>({...item,dates:item.dates.sort()})).sort((a,b)=>!a.dates.length-!b.dates.length||String(a.dates[0]||"").localeCompare(String(b.dates[0]||"")));
 }
 function drawSubjectPicker(){
   ACTIVE_SUBJECT=""; nav.hidden=true;
@@ -139,13 +192,14 @@ function drawSubjectPicker(){
   path.innerHTML=`<header class="mx-top"><div><h1>המקצועות שלי</h1><p class="mx-sub">בחרו מקצוע כדי לפתוח את המסלול שלו</p></div><div class="mx-acts">${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${window.MathlyAnswers?.pushButton?.()||""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
     <section class="mx-subject-grid" aria-label="מקצועות הכיתה">${subjects.map(item=>{
       const [icon,tone]=examLooks[item.name]||["●","other"],future=item.dates.find(date=>examDate(date)>=today),count=item.dates.length;
-      return `<button class="mx-subject-card exam-${tone}" data-subject="${esc(item.name)}"><span class="mx-subject-icon" aria-hidden="true">${icon}</span><span><b>${esc(item.name)}</b><small>${count} מבחנים${future?` · הבא ${examDay(future)}`:" · הסתיימו"}</small></span><i aria-hidden="true">‹</i></button>`;
+      return `<button class="mx-subject-card exam-${tone}" data-subject="${esc(item.name)}"><span class="mx-subject-icon" aria-hidden="true">${icon}</span><span><b>${esc(item.name)}</b><small>${count?`${count} מבחנים${future?` · הבא ${examDay(future)}`:" · הסתיימו"}`:item.name==="מדעים"?"חידות בהצבעה כיתתית":"מסלול תרגול"}</small></span><i aria-hidden="true">‹</i></button>`;
     }).join("")}</section>`;
 }
 function selectSubject(subject){
   ACTIVE_SUBJECT=subject;
   if(subject==="מתמטיקה")return setView(VIEW);
   nav.hidden=true;
+  if(subject==="מדעים"&&window.MathlyScience)return window.MathlyScience.show(path);
   const [icon,tone]=examLooks[subject]||["●","other"];
   path.innerHTML=`<header class="mx-top"><div><h1>${esc(subject)}</h1><p class="mx-sub">המקצועות שלי</p></div><button class="mx-btn" data-act="subjects">לכל המקצועות</button></header><section class="mx-subject-empty exam-${tone}"><span aria-hidden="true">${icon}</span><h2>המסלול של ${esc(subject)} עדיין לא זמין</h2><p>לוח המבחנים של המקצוע כבר מחובר לכיתה. כשהמסלול יתווסף, הוא ייפתח מכאן.</p><button class="mx-btn solid" data-act="subjects">חזרה למקצועות</button></section>`;
 }
@@ -189,7 +243,7 @@ function nextExam(){
 function topBar(){
   const st=skyStats(), hot=Sky.today(P)>=Sky.GOAL, manage=can("management.access"), on=Sky.soundOn(), streak=Sky.streak(P);
   return `<header class="mx-top"><div class="mx-brand">${Sky.spark()}<span>מתמטיקה</span></div>
-    <div class="mx-acts">${subjectOptions().length?'<button class="mx-btn" data-act="subjects">מקצועות</button>':""}${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${window.MathlyAnswers?.pushButton?.()||""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
+    <div class="mx-acts"><button class="mx-btn" data-act="subjects">מקצועות</button>${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${window.MathlyAnswers?.pushButton?.()||""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
     <div class="mx-hud"><div class="mx-stats">
       <button class="sky-chip flame${hot?"":" cold"}" data-act="streak" title="${streak} ימים ברצף">${Sky.FLAME}<b>${streak}</b><span class="mx-sr">ימים ברצף</span></button>
       <span class="sky-chip stars" title="${st.lit} כוכבים">${Sky.spark()}<b>${st.lit}</b><span class="mx-sr">כוכבים</span></span>

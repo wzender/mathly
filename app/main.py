@@ -20,9 +20,11 @@ from .auth import AuthUnavailable, ClassConflict, SupabaseAuth, load_auth
 from .math_photo import (DAILY_PHOTOS, MAX_PHOTO, MEDIA_TYPES as PHOTO_TYPES,
                          PhotoSolver, PhotoUnavailable, math_model, photo_client)
 from .math_skills import algebra9, practice_graph
+from .progress import install_progress_routes
 from .push import install_push_routes
 from .monitoring import ActionLog, RETURN_GAP, install_monitoring_routes
 from .unit_resources import install_resource_routes
+from .science import install_science_routes
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("mathly")
@@ -234,9 +236,11 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
         app.state.actions.record(user, "photo", skill if result.get("readable") else "התמונה לא נקראה")
         return {**result, "left": DAILY_PHOTOS - photo_counts.get(counter, 0) if counter else None}
 
+    install_progress_routes(app, signed_in)
     install_push_routes(app, signed_in)
     install_answer_routes(app, signed_in)
     install_resource_routes(app, signed_in)
+    install_science_routes(app)
     install_monitoring_routes(app, manager)
     return app
 

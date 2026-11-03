@@ -18,6 +18,10 @@ Photographed problems are sent to the configured AI provider for solving and are
 
 When the computer asks for a photo of a handwritten answer, the student's phone can get a notification, even with the app closed. The phone offers it after its first photo is sent. It needs `VAPID_PRIVATE_KEY` (make one with `python -m app.push`) and the migration `supabase/migrations/20261103180000_math_push_subs.sql`. On an iPhone it works only from the app added to the home screen.
 
+## Science riddles (class vote)
+
+The **מדעים** subject has a unit **חידות** with the skill **טיל**: the class guesses how much fuel a rocket needs. The teacher opens a vote and shows its 4-digit code; students join with the code on their own devices and vote. Votes stay hidden until the teacher presses check; the answer most students chose is launched, and the rocket flies, falls back (too little fuel) or stays on the pad (too heavy). A tie is not launched: students can change their vote and the teacher checks again. Riddles are in `app/science.json`. Votes live in the server's memory (the app runs as one process), so a restart ends the votes in progress. No sign-in or migration is needed.
+
 ## Run locally
 
 ```bash
