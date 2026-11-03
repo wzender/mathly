@@ -89,8 +89,8 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-plot svg{display:block;width:100%;height:auto}
 .mx-plot .g{stroke:var(--line);stroke-width:1}
 .mx-plot .a{stroke:var(--muted);stroke-width:1.5}
-.mx-plot .c{fill:none;stroke:var(--uc);stroke-width:2.5}
-.mx-plot circle{fill:var(--uc)}
+.mx-plot .c{fill:none;stroke:var(--uc,var(--starlight));stroke-width:2.5}
+.mx-plot circle{fill:var(--uc,var(--starlight))}
 .mx-plot text{font:11px var(--f-body);fill:var(--muted)}
 /* a photographed problem */
 .mx-thumb{display:block;max-width:100%;max-height:180px;object-fit:contain;align-self:center;border-radius:10px;border:1px solid var(--line)}
@@ -112,12 +112,12 @@ html.math-on, html.math-on body{overflow:hidden}
 @media (prefers-reduced-motion:no-preference){.mx-sheet{animation:mx-up .22s ease-out}@keyframes mx-up{from{transform:translateY(30px);opacity:.4}}}
 .mx-figure{direction:ltr;align-self:center;width:100%;max-width:340px;text-align:center}
 .mx-figure svg{display:block;width:100%;height:auto}
-.mx-figure .s{stroke:var(--uc);stroke-width:2.2;fill:none;stroke-linejoin:round;stroke-linecap:round}
-.mx-figure .d{stroke:var(--uc);stroke-width:1.6;stroke-dasharray:5 4;fill:none}
+.mx-figure .s{stroke:var(--uc,var(--starlight));stroke-width:2.2;fill:none;stroke-linejoin:round;stroke-linecap:round}
+.mx-figure .d{stroke:var(--uc,var(--starlight));stroke-width:1.6;stroke-dasharray:5 4;fill:none}
 .mx-figure .m{stroke:var(--ink);stroke-width:1.4;fill:none;opacity:.75}
 .mx-figure .g{stroke:var(--line);stroke-width:1}
 .mx-figure .ax{stroke:var(--muted);stroke-width:1.4}
-.mx-figure circle{fill:var(--uc)}
+.mx-figure circle{fill:var(--uc,var(--starlight))}
 .mx-figure text{text-anchor:middle;fill:var(--ink);font:600 13px var(--f-body)}
 .mx-figure .v{font:italic 700 15px var(--f-body)}
 .mx-figure .n{font:500 9px var(--f-body);fill:var(--muted)}
@@ -126,7 +126,7 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-figure small{font-size:12px;color:var(--muted)}
 .mx-geometry{direction:ltr;align-self:center;width:100%;max-width:320px;text-align:center}
 .mx-geometry svg{display:block;width:100%;height:auto}
-.mx-geometry path{stroke:var(--uc);stroke-width:2;fill:none}
+.mx-geometry path{stroke:var(--uc,var(--starlight));stroke-width:2;fill:none}
 .mx-geometry text{fill:var(--ink);font:16px var(--f-body)}
 .mx-geometry small{font-size:12px;color:var(--muted)}
 /* Handwritten answer scanning */
