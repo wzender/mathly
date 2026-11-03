@@ -657,3 +657,53 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
 .mx-star.fix{box-shadow:0 0 0 3px var(--gold),0 0 14px color-mix(in srgb,var(--gold) 55%,transparent)}
 .mx-lbl.l-fix em{background:var(--gold);color:#2A1B00}
 .mx-pattern-note{display:block;margin-top:6px;padding:8px 10px;border-inline-start:3px solid var(--gold);border-radius:8px;background:color-mix(in srgb,var(--gold) 10%,transparent);color:var(--ink);font-size:13.5px}
+
+/* the sketch board beside a skill's exercise (static/math-board.js): a desktop screen with a mouse or a pen only */
+.mx-shacts{display:flex;align-items:center;gap:6px}
+.mx-board-btn,.mx-board,.mx-board-only{display:none}
+.mx-board-btn{border:1px solid var(--line);background:none;color:var(--muted);font:700 14px/1 var(--f-body);padding:7px 12px;border-radius:999px;cursor:pointer}
+.mx-board-btn[aria-pressed="true"]{border-color:var(--mx-accent);background:var(--mx-accent-soft);color:var(--ink)}
+@media (min-width:1000px) and (any-pointer:fine){
+  .mx-board-btn,.mx-board-only{display:inline-block}
+  .mx-sheet.with-board{inset:16px 16px 16px auto;width:min(600px,42vw);max-height:none;border-radius:20px}
+  .mx-board{display:flex;flex-direction:column;position:fixed;z-index:62;top:16px;bottom:16px;left:16px;right:calc(min(600px,42vw) + 32px);
+    background:var(--surface);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 6px 30px rgb(0 0 0/.25)}
+}
+.mx-board-bar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.mx-board-bar button{display:inline-flex;align-items:center;gap:5px;border:1px solid transparent;background:none;color:var(--muted);
+  font:500 14px/1 var(--f-body);padding:7px 10px;border-radius:10px;cursor:pointer;min-height:34px}
+.mx-board-bar button i{font-style:normal;font-size:16px;line-height:1}
+.mx-board-bar button:hover{color:var(--ink);background:var(--surface-2)}
+.mx-board-bar button[hidden]{display:none}
+.mx-board-bar button[aria-pressed="true"]{color:var(--ink);border-color:var(--mx-accent);background:var(--mx-accent-soft)}
+@media (max-width:1280px){.mx-board-bar button span{display:none}}   /* a narrower board: icons only, names stay as tooltips */
+.mx-board-group{display:inline-flex;align-items:center;gap:3px}
+.mx-board-inks,.mx-board-sizes{padding-inline:6px;border-inline-start:1px solid var(--line)}
+.mx-board-inks button,.mx-board-sizes button{width:34px;padding:0;justify-content:center}
+.mx-board-inks button::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--dot);box-shadow:0 0 0 2px #fff}
+.mx-board-sizes button::before{content:"";width:var(--d);height:var(--d);border-radius:50%;border:1.5px solid currentColor}
+.mx-board:not([data-tool="eraser"]) .mx-board-sizes{display:none}   /* the sizes show with the eraser */
+.mx-board-gap{flex:1}
+.mx-board-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line)}
+.mx-board-row[hidden]{display:none}
+.mx-board-pages{display:flex;align-items:center;gap:4px;flex:1;color:var(--muted);font-size:13px}
+.mx-board-pages span{margin-inline-end:4px}
+.mx-board-pages button{min-width:30px;height:28px;border:1px solid var(--line);background:none;color:var(--muted);border-radius:8px;font:700 13px/1 var(--f-body);cursor:pointer}
+.mx-board-pages button.has{color:var(--ink)}
+.mx-board-pages button[aria-selected="true"]{border-color:var(--mx-accent);background:var(--mx-accent-soft);color:var(--ink)}
+.mx-board-stage{position:relative;flex:1;min-height:0}
+.mx-board canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair;
+  background-color:#F8F7F2;background-image:linear-gradient(rgb(27 33 64/.07) 1px,transparent 1px),linear-gradient(90deg,rgb(27 33 64/.07) 1px,transparent 1px);
+  background-size:28px 28px}
+.mx-board-del{position:absolute;z-index:1;border:1px solid #E7B3BB;background:#FFF1F3;color:#B4233A;font:700 13px/1 var(--f-body);
+  padding:7px 11px;border-radius:999px;cursor:pointer;box-shadow:0 2px 8px rgb(27 33 64/.15)}
+.mx-board-del[hidden]{display:none}
+
+.mx-board-send{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--mx-accent);background:var(--mx-accent);color:var(--mx-on-accent);
+  font:700 14px/1 var(--f-body);padding:8px 14px;border-radius:999px;cursor:pointer}
+.mx-board-send[hidden]{display:none}
+.mx-board-send:disabled{opacity:.7;cursor:progress}
+.mx-board-top{position:absolute;z-index:1;top:8px;left:50%;transform:translateX(-50%);border:1px solid #C5CBDF;background:#fff;color:#1B2140;
+  font:700 13px/1 var(--f-body);padding:7px 12px;border-radius:999px;cursor:pointer;box-shadow:0 2px 8px rgb(27 33 64/.15)}
+.mx-board-top[hidden]{display:none}
+.mx-uq-q{scroll-margin-top:90px}   /* a question scrolled to from the board's tabs shows below the quiz's sticky head */

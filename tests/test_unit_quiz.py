@@ -216,3 +216,56 @@ def test_when_the_time_and_the_photo_minutes_are_over_the_quiz_is_handed_in(quiz
             assert len(calls) == 1 and not errors
         finally:
             browser.close()
+
+
+def test_the_unit_quiz_has_a_board_with_a_tab_per_question(quiz_server):
+    from test_board_browser import draw_line, ink_pixels
+    url, _ = quiz_server
+    with playwright.sync_playwright() as p:
+        browser, page, errors = signed_in(p, url, mobile=False)
+        try:
+            page.set_viewport_size({"width": 1440, "height": 900})
+            page.locator('.mx-uquiz[data-uquiz="t"]').click()
+            page.locator("[data-act=uq-start]").click()
+            playwright.expect(page.locator(".mx-uq-paper .mx-uq-q")).to_have_count(4)
+            page.locator("[data-board-toggle]").click()
+            tabs = page.locator(".mx-board-pages [data-page]")
+            playwright.expect(tabs).to_have_count(4)
+            draw_line(page)
+            assert ink_pixels(page) > 50
+            tabs.nth(1).click()
+            assert ink_pixels(page) == 0
+            playwright.expect(tabs.nth(0)).to_have_class("has")   # the tab with a sketch stands out
+            tabs.nth(0).click()
+            assert ink_pixels(page) > 50
+            assert errors == []
+        finally:
+            browser.close()
+
+
+def test_a_unit_quiz_answer_is_handed_in_from_the_board(quiz_server):
+    from test_board_browser import draw_line
+    url, _ = quiz_server
+    with playwright.sync_playwright() as p:
+        browser, page, errors = signed_in(p, url, mobile=False)
+        try:
+            page.set_viewport_size({"width": 1440, "height": 900})
+            page.locator('.mx-uquiz[data-uquiz="t"]').click()
+            page.locator("[data-act=uq-start]").click()
+            page.locator('[data-uq-board="2"]').click()   # each question opens the board on its own page
+            playwright.expect(page.locator(".mx-board")).to_be_visible()
+            playwright.expect(page.locator('.mx-board-pages [data-page="2"]')).to_have_attribute("aria-selected", "true")
+            send = page.locator(".mx-board-send")
+            playwright.expect(send).to_have_text("📤הגשה לשאלה 3")
+            send.click()   # an empty page is not handed in
+            playwright.expect(send).to_contain_text("הלוח ריק")
+            draw_line(page)
+            page.wait_for_timeout(2600)
+            send.click()
+            playwright.expect(page.locator('[data-uq-i="2"] [role=status]')).to_have_text("✓ התשובה נשמרה", timeout=10000)
+            playwright.expect(page.locator('[data-uq-i="2"] img.mx-uq-img')).to_be_visible()
+            playwright.expect(send).to_contain_text("הוגשה לשאלה 3")
+            playwright.expect(page.locator("[data-uq-count]")).to_have_text("צולמו 1 מתוך 4 תשובות")
+            assert errors == []
+        finally:
+            browser.close()

@@ -55,7 +55,7 @@ function mergeProgress(a,b){
   out.updated=Math.max(+a.updated||0,+b.updated||0);
   return out;
 }
-const synced=()=>false;
+const synced=()=>!!(AUTH_URL&&CFG.token);
 let pushTimer=null;
 async function pullProgress(){
   if(!synced()) return null;
@@ -161,7 +161,8 @@ async function show(){
   }
   const remote=await pullProgress();
   P=window.MathlySky.ensure(Object.assign({done:{},tries:{},solved:{},at:{},set:{}},remote?mergeProgress(load(),remote):load()));
-  if(remote){ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} queuePush(); }   // this device's own work goes up too if(!P.set||typeof P.set!=="object") P.set={}; SHOWN=new Set(shownUnits().map(u=>u.id));
+  if(remote){ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} queuePush(); }   // this device's own work goes up too
+  if(!P.set||typeof P.set!=="object") P.set={}; SHOWN=new Set(shownUnits().map(u=>u.id));
   hasExams()?drawSubjectPicker():selectSubject("מתמטיקה");   // no exams yet: straight to math, science is a tap away
   window.MathlyAnswers?.configure({api,account:CFG.userId,enabled:CFG.answerScans,root,onGraded:({questionId,grading})=>{
     if(grading.result.verdict!=="correct"||P.done[questionId])return;
@@ -433,7 +434,7 @@ function open(id){
     <div class="mx-sheet u-${s.unit}" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
       <div class="mx-shtop"><div><span class="mx-uchip">${esc(unit.name)}</span>${s.core?' <span class="mx-core">ליבה 5 יח״ל</span>':""}
         <h3 id="mxTitle">${fmt(s.name)}</h3><small class="mx-src">${s.month?`בפריסה: ${esc(s.month)}`:esc(unit.source)}${st==="done"?" · הושלמה ✓":""}</small></div>
-        <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+        <div class="mx-shacts">${window.MathlyBoard?.button()||""}<button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div></div>
       <p>${fmt(s.description)}</p>
       <div class="mx-q">${n>1?`<div class="mx-qprog"><span>שאלה ${r.indexOf(curQ)+1} מתוך ${n}</span><span class="mx-qdots" aria-label="נפתרו ${gotN} מתוך ${n}">${r.map(i=>`<i class="${got.has(i)?"ok":""}${i===curQ?" now":""}"></i>`).join("")}</span></div>`:""}
         <p>${fmt(q.question)}</p>${figures(q)}
@@ -443,6 +444,7 @@ function open(id){
       <div class="mx-sec"><h4>פותחת</h4><div class="mx-chips">${chips(POST[id])}</div></div>
     </div>`;
   sheet.hidden=false; sheet.querySelector(".mx-sheet").scrollTop=0;
+  window.MathlyBoard?.mount(sheet,`${id}:${curQ}`,{question:()=>sheet.querySelector(".mx-q")});   // the sketch board beside the exercise, when the student has it on
   sheet.querySelector(".mx-x").focus({preventScroll:true});
   if(openEnded&&st!=="off")window.MathlyAnswers?.mountQuestion(sheet.querySelector(".mx-answer"),id,s.question_version);
 }
@@ -705,13 +707,14 @@ function quizShow(){
     <div class="mx-sheet mx-quiz-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
       <div class="mx-shtop"><div><span class="mx-uchip">מבחן תרגול</span><h3 id="mxTitle">שאלה ${i+1} מתוך ${items.length}</h3>
         <small class="mx-src">⏱ <span class="mx-quiz-clock">${mmss(Date.now()-QZ.started)}</span></small></div>
-        <button class="mx-x" data-act="quiz-quit" aria-label="יציאה מהמבחן">✕</button></div>
+        <div class="mx-shacts">${window.MathlyBoard?.button()||""}<button class="mx-x" data-act="quiz-quit" aria-label="יציאה מהמבחן">✕</button></div></div>
       <div class="mx-quiz-dots">${items.map((x,k)=>`<button data-quiz-go="${k}" class="${x.pick!=null?"done":""}${k===i?" now":""}" aria-label="שאלה ${k+1}${x.pick!=null?", נענתה":""}">${k+1}</button>`).join("")}</div>
       <div class="mx-q"><p>${fmt(q.question)}</p>${figures(q)}
         <div class="mx-choices">${it.order.map(k=>{ const c=q.choices[k]; return `<button data-choice="${k}" data-m="${c.correct?"":esc(c.mistake)}"${c.correct?" data-right":""} aria-pressed="${it.pick===k}">${fmt(c.text)}</button>`; }).join("")}</div></div>
       <div class="mx-quiz-nav"><button class="mx-btn" data-act="quiz-prev"${i?"":" disabled"}>הקודמת</button>
         ${last?`<button class="mx-btn solid" data-act="quiz-submit">הגשה</button>`:`<button class="mx-btn solid" data-act="quiz-next">הבאה</button>`}</div></div>`;
   sheet.hidden=false; sheet.querySelector(".mx-sheet").scrollTop=0;
+  window.MathlyBoard?.mount(sheet,`quiz:${QZ.started}:${i}`,{question:()=>sheet.querySelector(".mx-q")});   // a sketch per exam question
 }
 // a choice is only marked; it can be changed until the exam is handed in
 function quizPick(btn){
@@ -849,7 +852,7 @@ function uqOpen(uid){
     <div class="mx-sheet mx-uq-sheet mx-uq-paper u-${uid}" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
       <div class="mx-uq-head"><div><span class="mx-uchip">${esc(u.name)}</span><h3 id="mxTitle">בוחן מסכם</h3></div>
         <div class="mx-uq-clock" role="timer" aria-live="off"></div>
-        <button class="mx-x" data-act="close" aria-label="יציאה (השעון ממשיך)">✕</button></div>
+        <div class="mx-shacts">${window.MathlyBoard?.button()||""}<button class="mx-x" data-act="close" aria-label="יציאה (השעון ממשיך)">✕</button></div></div>
       <p class="mx-uq-banner" aria-live="polite"></p>
       <ol class="mx-uq-qs">${u.quiz.questions.map((q,i)=>`<li class="mx-uq-q" id="uq-q${i}">
         <div class="mx-uq-qhead"><b>שאלה ${i+1}</b><span>${q.points} נק׳</span></div>
@@ -858,6 +861,13 @@ function uqOpen(uid){
       <div class="mx-quiz-nav"><span class="mx-small" data-uq-count></span><button class="mx-btn solid" data-act="uq-submit">הגשת הבוחן</button></div>
       <input type="file" accept="image/*" capture="environment" hidden data-uq-file></div>`;
   sheet.hidden=false; sheet.querySelector(".mx-sheet").scrollTop=0;
+  // all the questions on one paper: the board has a page per question, and hands in that page as the question's answer
+  window.MathlyBoard?.mount(sheet,`uq:${uid}:${sit.started}`,{pages:u.quiz.questions.length,question:i=>sheet.querySelector(`#uq-q${i}`),
+    submit:async(i,picture)=>{
+      if(UQ?.uid!==uid||uqState(uid).sitting?.submitted) return {error:"הבוחן כבר הוגש"};
+      await uqUpload(i,picture); return UQ?.msg[i]?{error:UQ.msg[i]}:{};
+    },
+    turned:i=>sheet.querySelector(`#uq-q${i}`)?.scrollIntoView({block:"start",behavior:"smooth"})});
   sheet.querySelector("[data-uq-file]").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; if(f&&UQ?.pick!=null) uqUpload(UQ.pick,f); };
   uqTick(); UQ.clock=setInterval(uqTick,1000);
   sit.attempts.forEach((_,i)=>uqRefresh(i));
@@ -894,7 +904,7 @@ function uqDrawAnswer(i){
   const phoneBtn=touch?"":window.MathlyAnswers.phoneLive(has?null:r?.scan,`data-uq-phone="${i}"`,`data-uq-cancel="${i}"`,has?"צילום מחדש בטלפון":"צילום בטלפון",!!busy);
   box.innerHTML=`${has?`<img class="mx-uq-img" alt="התשובה המצולמת לשאלה ${i+1}" src="${UQ.images[i]||""}">`:""}
     <p class="mx-small" role="status">${busy?esc(busy):UQ.msg[i]?esc(UQ.msg[i]):has?"✓ התשובה נשמרה":phone?"":st==="declined"?"הבקשה נדחתה בטלפון":st==="expired"?"בקשת הצילום פגה":"עוד לא צולמה תשובה"}</p>
-    <span class="mx-chips">${phoneBtn}<button class="mx-btn${has||!touch?"":" solid"}" data-uq-photo="${i}"${busy?" disabled":""}>${has&&touch?"צילום מחדש":touch?"צילום התשובה":"העלאת תמונה מהמחשב"}</button></span>`;
+    <span class="mx-chips">${window.MathlyBoard?`<button class="mx-btn mx-board-only" data-uq-board="${i}"${busy?" disabled":""}>✏️ פתרון בלוח</button>`:""}${phoneBtn}<button class="mx-btn${has||!touch?"":" solid"}" data-uq-photo="${i}"${busy?" disabled":""}>${has&&touch?"צילום מחדש":touch?"צילום התשובה":"העלאת תמונה מהמחשב"}</button></span>`;
   const done=Object.values(UQ.res).filter(x=>x?.attachment).length, n=uqState(UQ.uid).sitting.attempts.length;
   const c=sheet.querySelector("[data-uq-count]"); if(c) c.textContent=`צולמו ${done} מתוך ${n} תשובות`;
 }
@@ -1008,6 +1018,7 @@ async function uqResult(uid,h,check=false){
 function onClick(e){
   const t=e.target.closest("button,[data-act]"); if(!t||!root.contains(t)) return;
   if(t.dataset.choice!=null) return answer(t);
+  if(t.dataset.boardToggle!=null) return window.MathlyBoard?.toggle();
   if(t.dataset.quizUnit) return quizToggle(t.dataset.quizUnit);
   if(t.dataset.quizGo!=null) return quizGo(+t.dataset.quizGo);
   if(t.dataset.uquiz) return uqIntro(t.dataset.uquiz);   // a sitting in progress opens straight on its paper
@@ -1015,6 +1026,7 @@ function onClick(e){
   if(t.dataset.uqPhoto!=null){ UQ.pick=+t.dataset.uqPhoto; return sheet.querySelector("[data-uq-file]").click(); }
   if(t.dataset.uqPhone!=null) return uqPhone(+t.dataset.uqPhone);
   if(t.dataset.uqCancel!=null) return uqCancel(+t.dataset.uqCancel);
+  if(t.dataset.uqBoard!=null) return window.MathlyBoard?.show(+t.dataset.uqBoard);
   if(t.dataset.subject) return selectSubject(t.dataset.subject);
   if(t.dataset.view){ closeSheet(); return setView(t.dataset.view,t.dataset.unit); }
   if(t.dataset.comet) return showComet(t.dataset.comet);
