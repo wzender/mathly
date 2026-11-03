@@ -353,3 +353,22 @@ def test_the_math_renderer_draws_what_the_keyboard_makes(browser, server):
     frac, plain = sizes[1], sizes[0]
     assert frac[0] > plain[0] and frac[1] > plain[1]   # a fraction is wider and taller than a line of text
     assert errors == []
+
+
+def test_the_move_tool_scrolls_when_it_drags_empty_paper(browser, server):
+    page, errors = open_skill(browser, server, 390, 844)
+    page.locator("[data-board-toggle]").click()
+    touch(page, [("pointerdown", 1, 60, 300), *[("pointermove", 1, 60 + k * 20, 300) for k in range(1, 10)], ("pointerup", 1, 240, 300)])
+    page.locator(".mx-board [data-tool=move]").click()
+    # one finger on empty paper: the paper scrolls, the line goes up with it
+    touch(page, [("pointerdown", 2, 150, 600), *[("pointermove", 2, 150, 600 - k * 20) for k in range(1, 11)], ("pointerup", 2, 150, 400)])
+    assert alpha_near(page, 150, 300) == 0 and alpha_near(page, 150, 100) > 0
+    playwright.expect(page.locator(".mx-board-top")).to_be_visible()
+    # one finger on the line: the line moves, the paper stays
+    touch(page, [("pointerdown", 3, 150, 100), *[("pointermove", 3, 150, 100 + k * 20) for k in range(1, 11)], ("pointerup", 3, 150, 300)])
+    assert alpha_near(page, 150, 100) == 0 and alpha_near(page, 150, 300) > 0
+    playwright.expect(page.locator(".mx-board-del")).to_be_visible()   # it is selected, not the paper scrolled
+    # never above the top
+    touch(page, [("pointerdown", 4, 300, 200), *[("pointermove", 4, 300, 200 + k * 60) for k in range(1, 11)], ("pointerup", 4, 300, 800)])
+    playwright.expect(page.locator(".mx-board-top")).to_be_hidden()
+    assert errors == []

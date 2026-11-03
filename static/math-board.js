@@ -11,7 +11,8 @@
    lines that meet that way move together. The eraser removes the lines and circles it touches and cuts pen strokes;
    it leaves the question's copy alone (select it and delete it instead).
    The paper is endless downwards: the mouse wheel over the board scrolls it, and so do two fingers on a touch
-   screen (one finger draws). Once a pen has touched the screen, a single finger is ignored: a hand resting on it.
+   screen (one finger draws), and so does dragging empty paper with the move tool. Once a pen has touched the screen,
+   a single finger is ignored: a hand resting on it.
    A sheet can let the board hand in a question's answer (the unit quiz): the sketch becomes a picture. */
 (()=>{
 const PREF="mathly.board";
@@ -30,7 +31,7 @@ const FONT='500 17px Rubik, system-ui, "Segoe UI", sans-serif', LINE_H=27, CARD_
 const sketches=new Map(), images=new Map();
 let el=null, canvas=null, ctx=null, key="", base="", pages=0, page=0, layer=null, source=null, hand=null, onPage=null;
 let tool="pen", ink=INKS[0][0], eraser=ERASERS[1][0], sendLabel="";
-let draft=null, drag=null, rub=null, selection=[];
+let draft=null, drag=null, rub=null, slide=null, selection=[];   // slide: the move tool dragging empty paper, which scrolls it
 let editing=null;   // the formula being typed: {mark (null for a new one), at, node, field, key}
 let full=null;   // the board open full screen: {saved: the context to go back to, done: called when it closes}
 const touches=new Map(); let pan=null, penSeen=false;
@@ -94,13 +95,13 @@ function build(){
   setTool(tool);
 }
 function pressed(sel,b){ el.querySelectorAll(sel).forEach(x=>x.setAttribute("aria-pressed",x===b)); }
-function reset(){ draft=drag=rub=null; select([]); if(editing) finishMath(false); }
+function reset(){ draft=drag=rub=slide=null; select([]); if(editing) finishMath(false); }
 function setTool(t){
   tool=t; el.querySelectorAll("[data-tool]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.tool===t));
   el.dataset.tool=t; if(t!=="move"&&selection.length){ select([]); paint(); }
   // the eraser's cursor is a ring its own size, so the student sees what it will wipe
   const r=eraser/2, svg=`<svg xmlns='http://www.w3.org/2000/svg' width='${eraser+2}' height='${eraser+2}'><circle cx='${r+1}' cy='${r+1}' r='${r}' fill='rgba(255,255,255,.35)' stroke='%231B2140' stroke-width='1.2'/></svg>`;
-  canvas.style.cursor=t==="eraser"?`url("data:image/svg+xml,${svg.replace(/</g,"%3C").replace(/>/g,"%3E")}") ${r+1} ${r+1}, cell`:t==="move"?"default":"";
+  canvas.style.cursor=t==="eraser"?`url("data:image/svg+xml,${svg.replace(/</g,"%3C").replace(/>/g,"%3E")}") ${r+1} ${r+1}, cell`:t==="move"?"grab":"";
 }
 function select(list){ selection=list; }
 function turn(p){ if(editing) finishMath(true); page=p; key=`${base}:${page}`; reset(); drawPages(); drawSend(); paint(); }
@@ -238,7 +239,7 @@ function stopLive(){
   if(draft){ s.marks.splice(s.marks.indexOf(draft),1); s.past.pop(); draft=null; }
   if(rub){ s.marks=rub.before; rub=null; }
   if(drag){ if(drag.before) s.marks=s.past.pop(); drag=null; select([]); }
-  paint();
+  slide=null; paint();
 }
 function down(e){
   if(e.pointerType==="pen") penSeen=true;
@@ -254,7 +255,7 @@ function down(e){
   capture(e.pointerId); e.preventDefault();
   if(use==="move"){
     const m=hit(p);
-    if(!m){ select([]); return paint(); }
+    if(!m){ select([]); slide={id:e.pointerId,y:e.clientY,s:sketch().y}; canvas.style.cursor="grabbing"; return paint(); }   // empty paper: scroll it
     if(!selection.includes(m)) select(group(m));
     drag={id:e.pointerId,last:p,before:null}; return paint();
   }
@@ -269,7 +270,8 @@ function move(e){
     touches.set(e.pointerId,[e.clientX,e.clientY]);
     if(pan){ if(touches.size>=2){ sketch().y=Math.max(0,pan.s-(fingersY()-pan.y)); paint(); } return; }
   }
-  if(tool==="move"&&!drag&&!e.buttons) canvas.style.cursor=hit(at(e))?"move":"default";
+  if(slide&&e.pointerId===slide.id){ sketch().y=Math.max(0,slide.s-(e.clientY-slide.y)); return paint(); }
+  if(tool==="move"&&!drag&&!e.buttons) canvas.style.cursor=hit(at(e))?"move":"grab";
   if(drag&&e.pointerId===drag.id){
     const p=at(e), dx=p[0]-drag.last[0], dy=p[1]-drag.last[1]; if(!dx&&!dy) return;
     if(!drag.before){ drag.before=true; remember(); }
@@ -291,6 +293,7 @@ function move(e){
 }
 function up(e){
   if(touches.delete(e.pointerId)&&pan){ if(!touches.size) pan=null; return; }
+  if(slide&&e.pointerId===slide.id){ slide=null; canvas.style.cursor="grab"; return; }
   if(drag&&e.pointerId===drag.id){ drag=null; return paint(); }
   if(rub&&e.pointerId===rub.id){ if(rub.changed) remember(rub.before); rub=null; paint(); return pages>1&&drawPages(); }
   if(!draft||e.pointerId!==draft.id) return;
