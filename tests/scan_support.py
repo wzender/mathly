@@ -117,7 +117,9 @@ def answer_store(postgres_server, tmp_path):
     with store.connect() as c:
         c.execute(BOOTSTRAP)
         c.execute(Path('supabase/migrations/20261031133254_math_answer_scans.sql').read_text())
-        for migration in sorted(Path('supabase/migrations').glob('*_math_answer_grading.sql')):
+        for migration in sorted(Path('supabase/migrations').glob('*_math_answer_*.sql')):
+            if migration.name.endswith('_math_answer_scans.sql'):
+                continue
             c.execute(migration.read_text())
         c.execute('insert into auth.users values(%s),(%s)', (OWNER, OTHER))
     yield store

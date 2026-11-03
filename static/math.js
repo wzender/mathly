@@ -7,9 +7,11 @@
    shuffled each time a question is shown, and a wrong answer does not reveal the right one, so a question that comes
    back is solved again, not remembered. Finished skills come back in a mixed review (see "spaced review" below). Progress is kept on this device, per account (mathly.progress.v1:<email>): `done` per
    skill, and `solved` (indexes answered correctly), `at` (the question to show) and `set` (the round's questions, see round())
-   for skills with a list. */
+   for skills with a list. Every tagged wrong answer is also kept in `slips` (see "misconception patterns" and math-sky.js),
+   so the mistakes that keep coming back across skills can be shown with what to practise. */
 (()=>{
 const css=document.createElement("link"); css.rel="stylesheet"; css.href=document.currentScript.src.replace("math.js","math.css");
+const cssReady=new Promise(done=>{ css.onload=css.onerror=done; });   // until then #mathView is not yet the scrolling box
 document.head.append(css);
 
 const CFG=window.MATHLY||{}, AUTH_URL=CFG.supabaseUrl||"";
@@ -28,7 +30,7 @@ const load=()=>{ try{ return JSON.parse(localStorage.getItem(key())||"{}"); }cat
 const save=()=>{ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} };
 
 let G=null, BY={}, POST={}, ORDER=[], P={done:{},tries:{},solved:{},at:{}}, root=null, curQ=0, path=null, sheet=null, cur=null, back=null, ACTIVE_SUBJECT="";
-let nav=null, FIRST=true, COMBO=0, REV=null;   // the tab bar; whether the shown question is still at its first try; first-try answers in a row
+let nav=null, FIRST=true, COMBO=0, REV=null, QZ=null, UQ=null;   // UQ: the unit quiz on the sheet (see unit quiz below)   // QZ: the practice exam in progress (see quiz below)   // the tab bar; whether the shown question is still at its first try; first-try answers in a row
 let picker=null, PH=null, resPicker=null, RES=null;   // RES: the open lesson-resources sheet (see openResources())   // the photo file picker, and the photographed problem on the sheet (see photo())
 let advanceTimer=null;
 let phonePair=null;
@@ -103,7 +105,7 @@ async function show(){
     nav=document.createElement("nav"); nav.className="mx-nav"; nav.setAttribute("aria-label","ניווט"); nav.hidden=true;
     root.append(path,sheet,picker,resPicker,nav); document.body.append(root); window.MathlySky.mount(root);
     root.addEventListener("click",onClick);
-    document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&cur) closeSheet(); });
+    document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&cur) QZ?.items?quizQuit():closeSheet(); });   // an exam asks before it is left
   }
   root.hidden=false;
   if(!G){
@@ -153,7 +155,7 @@ function selectSubject(subject){
 /* The math screens: home (what you gathered and your streak on top, the path below it) and the collection.
    The rules of the stars, the streak and the comets, and their pictures, are in math-sky.js. */
 const Sky=window.MathlySky;
-let VIEW="path", TRAIL=null;   // TRAIL: watches the path's size to redraw its line
+let VIEW="path";
 const SOUND_ON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const SOUND_OFF='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 const TABS=[["path","בית",'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 11h2.7v9.5h5.3v-6h3v6h5.3V11h2.7Z"/></svg>'],
@@ -260,40 +262,47 @@ function examSoon(){
   return exam&&exam.days<=14?`<button class="mx-examsoon" data-view="sky"><b>המבחן ב${esc(exam.subject)} ${inDays(exam.days)}</b><span>ללוח המבחנים ‹</span></button>`:"";
 }
 
-/* The path: one winding trail from the start through every skill, unit after unit (a banner opens each unit).
-   The nodes sway left and right; trail() then draws the line through their centres, lit up to the last skill done. */
-const SWAY=[0,.55,.9,.55,0,-.55,-.9,-.55];
+/* The path: unit after unit, top to bottom. Each unit is a hub in the middle with its skills orbiting it in order:
+   skill 1 sits at the top and the rest follow clockwise, each numbered, with arrows on the ring between them. A stretch
+   of the ring is lit once the skill it leaves from is done, so the lit ring leads to where to go next. The unit quiz follows the orbit. */
+const ORBIT_R=34;   // the ring's radius, in % of the orbit's width
+const isOn=st=>st==="lit"||st==="gold"||st==="fading";
+function orbitRing(sts){
+  const n=sts.length, a=i=>(-90+360*i/n)*Math.PI/180, pt=(t,r=ORBIT_R)=>[50+r*Math.cos(t),50+r*Math.sin(t)], f=v=>v.toFixed(2);
+  const gap=n>1?Math.min(.32,Math.PI/n*.55):0;   // room left around each node (radians)
+  const arcs=sts.slice(0,-1).map((st,k)=>{
+    const t0=a(k)+gap, t1=a(k+1)-gap, [x0,y0]=pt(t0), [x1,y1]=pt(t1), tm=(a(k)+a(k+1))/2, [mx,my]=pt(tm), deg=tm*180/Math.PI+90;
+    return `<path class="${isOn(st)?"on":""}" d="M${f(x0)} ${f(y0)}A${ORBIT_R} ${ORBIT_R} 0 0 1 ${f(x1)} ${f(y1)}"/>
+      <path class="mx-arrow${isOn(st)?" on":""}" d="M-1.6 -1.9 1.6 0 -1.6 1.9" transform="translate(${f(mx)} ${f(my)}) rotate(${f(deg)})"/>`; }).join("");
+  // the closing stretch, from the last skill back to the first, stays faint: the orbit has a start and an end
+  const back=n>2?(()=>{ const [x0,y0]=pt(a(n-1)+gap), [x1,y1]=pt(a(n)-gap); return `<path class="mx-back" d="M${f(x0)} ${f(y0)}A${ORBIT_R} ${ORBIT_R} 0 0 1 ${f(x1)} ${f(y1)}"/>`; })():"";
+  return `<svg class="mx-ring" viewBox="0 0 100 100" aria-hidden="true">${back}${arcs}</svg>`;
+}
 function pathView(){
   const nxt=next(), cls=MY_CLASS?` · כיתת ${esc(MY_CLASS.name)}`:"", teach=can("students.view");
-  let k=0;
+  const fix=new Set(myPatterns().recurring.map(x=>x.practise));   // skills that a recurring mistake sends back to
   const units=mineUnits().map(u=>{
-    const ids=unitIds(u), act=ids.filter(live), lit=act.filter(id=>P.done[id]).length;
-    const steps=ids.map(id=>{ const st=Sky.star(P,id,status(id),id===nxt), tag=st==="next"?"ממשיכים כאן":st==="fading"?"דועך":"";
-      return `<div class="mx-step u-${u.id}" style="--x:${SWAY[k++%SWAY.length]}">
-        <button class="mx-node mx-star st-${st}" data-id="${id}" aria-label="${esc(plain(BY[id].name))}: ${STATE_NAME[st]}">${Sky.spark()}${st==="next"?`<span class="mx-perch">${Sky.owl(34)}</span>`:""}</button>
-        <span class="mx-lbl l-${st}">${fmt(BY[id].short)}${tag?`<em>${tag}</em>`:""}</span></div>`; }).join("");
+    const ids=unitIds(u), act=ids.filter(live), lit=act.filter(id=>P.done[id]).length, n=ids.length, full=unitDone(u);
+    const sts=ids.map(id=>Sky.star(P,id,status(id),id===nxt));
+    const steps=ids.map((id,i)=>{ const st=sts[i], tag=st==="next"?"ממשיכים כאן":fix.has(id)?"לחזק":st==="fading"?"דועך":"";
+      const t=(-90+360*i/n)*Math.PI/180, dx=Math.cos(t), dy=Math.sin(t), up=dy<-.3;
+      return `<div class="mx-step mx-orb u-${u.id}${up?" up":""}" style="--dx:${dx.toFixed(3)};--dy:${dy.toFixed(3)}">
+        <button class="mx-node mx-star st-${st}${fix.has(id)?" fix":""}" data-id="${id}" aria-label="${i+1}. ${esc(plain(BY[id].name))}: ${STATE_NAME[st]}${fix.has(id)?", כדאי לחזק":""}">${Sky.spark()}<span class="mx-num" aria-hidden="true">${i+1}</span>${st==="next"?`<span class="mx-perch">${Sky.owl(34)}</span>`:""}</button>
+        <span class="mx-lbl l-${st}${fix.has(id)?" l-fix":""}">${fmt(BY[id].short)}${tag?`<em>${tag}</em>`:""}</span></div>`; }).join("");
     const res=teach?` data-act="resources" data-unit="${u.id}"`:"";   // a teacher opens the lesson's resources from its title
-    return `<section class="mx-unit u-${u.id}${unitDone(u)?" full":""}" id="mx-unit-${u.id}"><div class="mx-uhead${teach?" is-teach":""}"${res}>
-      <h2>${esc(u.name)}</h2><span class="mx-pill">${lit}/${act.length}</span>${u.when?`<span class="mx-usub">${esc(u.when)}</span>`:""}
-      ${teach?`<button class="mx-res-open"${res} aria-label="משאבי השיעור ${esc(u.name)}">📷 משאבים</button>`:""}</div></section>${steps}`;
+    const pct=act.length?Math.round(100*lit/act.length):0;
+    return `<section class="mx-unit mx-orbit u-${u.id}${full?" full":""}" id="mx-unit-${u.id}">
+      <div class="mx-stage">${orbitRing(sts)}
+        <div class="mx-uhead mx-hub${teach?" is-teach":""}"${res} style="--p:${pct}">
+          <h2>${esc(u.name)}</h2><span class="mx-pill">${lit}/${act.length}</span>${u.when?`<span class="mx-usub">${esc(u.when)}</span>`:""}</div>
+        ${steps}</div>
+      ${teach?`<button class="mx-res-open"${res} aria-label="משאבי השיעור ${esc(u.name)}">📷 משאבים</button>`:""}</section>${quizStep(u)}`;
   }).join("");
-  return `${topBar()}${daily()}${reviewCard()}${examSoon()}<div class="mx-pghead"><h2>המסלול שלי</h2><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
-    <div class="mx-trail"><svg class="mx-line" aria-hidden="true"></svg>
+  return `${topBar()}${daily()}${reviewCard()}${patternsCard()}${examSoon()}${quizCard()}<div class="mx-pghead"><h2>המסלול שלי</h2><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
+    <div class="mx-trail">
       <div class="mx-start"><span class="mx-flag">${Sky.owl(40)}</span><b>התחלה</b></div>${units}
       <div class="mx-finish" aria-hidden="true">${Sky.spark()}<b>סוף המסלול</b></div></div>
-    <p class="mx-note">כל השיעורים פתוחים. כוכב נדלק כשעונים נכון על כל השאלות של המיומנות, והופך לזהב אחרי ${3} תשובות נכונות ברצף (או כל השאלות, כשיש פחות). כוכב שלא תרגלו ${Sky.FADE_DAYS} יום דועך, ותשובה נכונה אחת מחזירה לו את האור. ההתקדמות נשמרת במכשיר הזה.</p>`;
-}
-// the trail's line: a smooth curve from the start through each node to the finish; a stretch is lit once the skill it reaches is done
-function trail(box){
-  if(!box?.isConnected) return;
-  const svg=box.querySelector(".mx-line"), at=box.getBoundingClientRect(), W=box.clientWidth, H=box.scrollHeight;
-  const mid=el=>{ const r=el.getBoundingClientRect(); return [r.left+r.width/2-at.left,r.top+r.height/2-at.top]; };
-  const pts=[box.querySelector(".mx-start .mx-flag"),...box.querySelectorAll(".mx-star"),box.querySelector(".mx-finish svg")].map(el=>({p:mid(el),el}));
-  const f=n=>n.toFixed(1);
-  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
-  svg.innerHTML=pts.slice(1).map(({p:[x1,y1],el},i)=>{ const [x0,y0]=pts[i].p, my=(y0+y1)/2, st=el.classList;
-    const on=st.contains("st-lit")||st.contains("st-gold")||st.contains("st-fading"), u=el.closest(".mx-step")?.className.match(/u-\w+/)?.[0]||"";
-    return `<path class="${u}${on?" on":""}" d="M${f(x0)} ${f(y0)}C${f(x0)} ${f(my)} ${f(x1)} ${f(my)} ${f(x1)} ${f(y1)}"/>`; }).join("");
+    <p class="mx-note">כל השיעורים פתוחים. בכל יחידה המיומנויות מסודרות סביבה לפי הסדר, מ־1 למעלה ועם כיוון השעון. כוכב נדלק כשעונים נכון על כל השאלות של המיומנות, והופך לזהב אחרי ${3} תשובות נכונות ברצף (או כל השאלות, כשיש פחות). כוכב שלא תרגלו ${Sky.FADE_DAYS} יום דועך, ותשובה נכונה אחת מחזירה לו את האור. ההתקדמות נשמרת במכשיר הזה.</p>`;
 }
 
 function collectionView(){
@@ -314,15 +323,15 @@ function collectionView(){
 function draw(){
   Sky.ensure(P);
   path.innerHTML=VIEW==="sky"?collectionView():pathView();
-  TRAIL?.disconnect(); TRAIL=null;
-  if(VIEW==="path"){ const box=path.querySelector(".mx-trail"); TRAIL=new ResizeObserver(()=>trail(box)); TRAIL.observe(box); }
   nav.hidden=false;
   nav.innerHTML=`<div>${TABS.map(([v,label,icon])=>`<button data-view="${v}"${VIEW===v?' aria-current="page"':""}>${icon}<span>${label}</span></button>`).join("")}</div>`;
 }
 function setView(view,unit){
   VIEW=view; draw(); root.scrollTop=0;
   const target=view!=="path"?null:unit?root.querySelector(`#mx-unit-${CSS.escape(unit)}`):root.querySelector(".mx-star.st-next")||root.querySelector(".mx-star.st-open");
-  if(target) target.scrollIntoView({block:unit?"start":"center"});
+  if(!target) return;
+  target.scrollIntoView({block:unit?"start":"center"});
+  cssReady.then(()=>{ if(VIEW===view&&target.isConnected) target.scrollIntoView({block:unit?"start":"center"}); });
 }
 function showComet(cid){
   const c=Sky.COMETS.find(x=>x.id===cid), have=P.comets.includes(cid);
@@ -367,7 +376,7 @@ function open(id){
   curQ=r.includes(P.at[id])?P.at[id]:r[0];
   const q=all[curQ], openEnded=q.type==="open-ended", got=solvedOf(id), gotN=r.filter(i=>got.has(i)).length;
   if(!cur) back=document.activeElement;
-  cur=id; FIRST=true; REV=null;
+  cur=id; FIRST=true; REV=null; stopQuizClock(); QZ=null; stopUnitQuiz();
   sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
     <div class="mx-sheet u-${s.unit}" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
       <div class="mx-shtop"><div><span class="mx-uchip">${esc(unit.name)}</span>${s.core?' <span class="mx-core">ליבה 5 יח״ל</span>':""}
@@ -385,7 +394,7 @@ function open(id){
   sheet.querySelector(".mx-x").focus({preventScroll:true});
   if(openEnded&&st!=="off")window.MathlyAnswers?.mountQuestion(sheet.querySelector(".mx-answer"),id,s.question_version);
 }
-function closeSheet(){ stopPhone(); dropResources(); cancelAdvance(); REV=null; if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
+function closeSheet(){ stopPhone(); dropResources(); cancelAdvance(); REV=null; stopQuizClock(); QZ=null; stopUnitQuiz(); if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
 
 // counts down, then opens `target` (a skill id); stops if the student moved on in the meantime
 function autoAdvance(id,target){
@@ -403,6 +412,7 @@ function autoAdvance(id,target){
 
 function answer(btn){
   if(btn.disabled) return;
+  if(QZ) return quizPick(btn);
   if(REV) return reviewAnswer(btn);
   const id=cur, m=btn.dataset.m, fb=sheet.querySelector(".mx-fb"), n=round(id).length, qi=curQ;
   const buttons=sheet.querySelectorAll("[data-choice]");
@@ -443,7 +453,7 @@ function answer(btn){
     return;
   }
   // a mistake is quiet: no sound, no vibration, and words about the mistake, not about the student
-  Sky.wrong(P,id); FIRST=false; COMBO=0;
+  Sky.wrong(P,id); Sky.slip(P,id,qi,m,"practice"); FIRST=false; COMBO=0;
   const missed=new Set(P.missed[id]||[]); missed.add(qi); P.missed[id]=[...missed];
   save();
   const M=G.mistakes[m], to=M.back&&M.back!==id?M.back:null;
@@ -452,7 +462,8 @@ function answer(btn){
   if(n>1) buttons.forEach(b=>b.disabled=true); else btn.disabled=true;
   fb.innerHTML=`<div class="mx-bad"><small class="mx-small">טעות נפוצה, וטוב שהיא עולה עכשיו</small><b>${fmt(M.name)}</b><span>${fmt(M.tip)}</span>
     ${n>1?`<span class="mx-small">השאלה תחזור אחרי שאר השאלות, ותוכלו לנסות אותה שוב.</span><button class="mx-btn solid" data-id="${id}">לשאלה הבאה</button>`:""}
-    ${to?`<button class="mx-btn" data-id="${to}">לחזק קודם את: ${fmt(BY[to].short)}</button>`:n>1?"":"<span class=\"mx-small\">אפשר לבחור תשובה אחרת.</span>"}</div>`;
+    ${to?`<button class="mx-btn" data-id="${to}">לחזק קודם את: ${fmt(BY[to].short)}</button>`:n>1?"":"<span class=\"mx-small\">אפשר לבחור תשובה אחרת.</span>"}
+    ${patternNote(m,[id,to])}</div>`;
 }
 
 /* ---------- spaced review ----------
@@ -468,6 +479,49 @@ function reviewCard(){
     <span>${n===1?"מיומנות אחת מחכה":`${n} מיומנויות מחכות`} לחזרה. ${Math.min(n,REVIEW_SIZE)} שאלות מנושאים שונים, מעורבבות, כדי שמה שלמדתם יישאר.</span>
     <span class="mx-dgo">להתחיל ‹</span></button>`;
 }
+/* ---------- misconception patterns ----------
+   The mistakes that keep coming back, across skills (Sky.patterns over P.slips): a card on home, and a sheet with what
+   to practise for each. The words are about the mistake, never about the student; a pattern that stopped is a win. */
+function myPatterns(){
+  const known=x=>G.mistakes[x.m]&&BY[x.practise], {recurring,stopped}=Sky.patterns(P,G.mistakes);
+  return {recurring:recurring.filter(known),stopped:stopped.filter(known)};
+}
+// after a mistake: a line when this mistake is now a recurring one, with its skill to strengthen (unless offered already)
+function patternNote(m,offered=[]){
+  const x=myPatterns().recurring.find(x=>x.m===m); if(!x) return "";
+  return `<span class="mx-pattern-note">הטעות הזו חזרה ${timesWord(x.n)} ${inSkills(x.skills.length)} בחודש האחרון. כדאי לחזק את הבסיס שלה, והיא תיעלם גם בשאר הנושאים.</span>
+    ${offered.includes(x.practise)?"":`<button class="mx-btn" data-id="${x.practise}">לחזק: ${fmt(BY[x.practise].short)}</button>`}`;
+}
+const inSkills=k=>k===1?"במיומנות אחת":`ב־${k} מיומנויות`;
+const timesWord=n=>n===1?"פעם אחת":`${n} פעמים`;
+const daysAgo=iso=>{ const d=Math.round((Date.parse(Sky.dayKey())-Date.parse(Sky.dayKey(new Date(iso))))/86400000); return d<=0?"היום":d===1?"אתמול":`לפני ${d} ימים`; };
+function patternsCard(){
+  const {recurring,stopped}=myPatterns(), top=recurring[0];
+  if(!top&&!stopped.length) return "";
+  const say=top?`${fmt(G.mistakes[top.m].name)}: חזר ${timesWord(top.n)} ${inSkills(top.skills.length)} לאחרונה. כדאי לחזק.`
+    :`${fmt(G.mistakes[stopped[0].m].name)}: הדפוס הזה כבר לא חוזר. התיקון עבד!`;
+  return `<button class="mx-patterns" data-act="patterns"><b>דפוסים שחוזרים</b><span>${say}</span>
+    <span class="mx-dgo">${top?"מה לחזק ‹":"לראות ‹"}</span></button>`;
+}
+function showPatterns(){
+  const {recurring,stopped}=myPatterns();
+  const row=x=>{ const M=G.mistakes[x.m];
+    return `<li><b>${fmt(M.name)}</b><span>${fmt(M.tip)}</span>
+      <small class="mx-small">${timesWord(x.n)} ${inSkills(x.skills.length)} · לאחרונה ${daysAgo(x.last)}</small>
+      <button class="mx-btn solid" data-id="${x.practise}">לחזק: ${fmt(BY[x.practise].short)}</button></li>`; };
+  if(!cur) back=document.activeElement;
+  cur="patterns";
+  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div><div class="mx-sheet mx-patterns-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+    <div class="mx-shtop"><div><h3 id="mxTitle">דפוסים שחוזרים</h3><small class="mx-src">טעויות שחזרו בחודש האחרון, גם בנושאים שונים.</small></div>
+      <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+    ${recurring.length?`<ol class="mx-pattern-list">${recurring.map(row).join("")}</ol>
+      <p class="mx-small">טעות שחוזרת היא רמז למה שכדאי לחזק. כשמתרגלים את הבסיס שלה, היא נעלמת גם בשאר הנושאים.</p>`
+      :"<p>כרגע אין טעות שחוזרת. כל הכבוד!</p>"}
+    ${stopped.length?`<h4>דפוסים שנעלמו</h4><ul class="mx-pattern-list gone">${stopped.map(x=>`<li><b>${fmt(G.mistakes[x.m].name)}</b>
+      <small class="mx-small">לא חזר כבר ${daysAgo(x.last).replace("לפני ","")}. התיקון עבד!</small></li>`).join("")}</ul>`:""}</div>`;
+  sheet.hidden=false; sheet.querySelector(".mx-sheet").scrollTop=0;
+  sheet.querySelector(".mx-x").focus({preventScroll:true});
+}
 // the oldest due skills, one per unit first, in a mixed order; a random multiple-choice question of each
 function startReview(){
   const due=dueReviews(), pick=[], units=new Set();
@@ -476,7 +530,7 @@ function startReview(){
   if(!pick.length) return;
   const items=shuffled(pick).map(id=>{ const qs=QS(BY[id]).map((q,i)=>i).filter(i=>QS(BY[id])[i].choices); return {id,qi:qs[Math.floor(Math.random()*qs.length)]}; });
   if(!cur) back=document.activeElement;
-  REV={items,i:0,right:0}; openReview();
+  stopQuizClock(); QZ=null; REV={items,i:0,right:0}; openReview();
 }
 function openReview(){
   cancelAdvance();
@@ -508,11 +562,11 @@ function reviewAnswer(btn){
     rewards(id,{r,lit:false,unitWas:true});
     return;
   }
-  Sky.wrong(P,id); save(); draw();
+  Sky.wrong(P,id); Sky.slip(P,id,it.qi,m,"review"); save(); draw();
   const M=G.mistakes[m];
   fb.innerHTML=`<div class="mx-bad"><small class="mx-small">הנושא: ${fmt(s.name)}</small><b>${fmt(M.name)}</b><span>${fmt(M.tip)}</span>
     <span class="mx-small">שכחה היא חלק מהלמידה. הנושא יחזור מחר.</span>${go}
-    <button class="mx-btn" data-id="${id}">לתרגל את ${fmt(s.short)}</button></div>`;
+    <button class="mx-btn" data-id="${id}">לתרגל את ${fmt(s.short)}</button>${patternNote(m,[id])}</div>`;
 }
 function reviewNext(){
   if(REV.i+1<REV.items.length){ REV.i++; return openReview(); }
@@ -523,9 +577,390 @@ function reviewNext(){
   REV=null;
 }
 
+/* ---------- practice exam ----------
+   Like the real thing: questions from several units, mixed, the skill's name hidden, no feedback until it is handed in.
+   It covers what the schedule taught before the class's next exam (or before this month, without one); the student can
+   change the units. The report counts the answers per unit, names the three mistakes to work on with their skills, and
+   brings the finished skills that went wrong back to today's review. Nothing on the path is locked by it.
+   The results are kept in P.quizzes (newest last). */
+const QUIZ_SIZE=12, QUIZ_MIN_PER_Q=3.5;   // a relaxed pace: minutes per question, shown, never enforced
+const SCHOOL_MONTHS=["ספטמבר","אוקטובר","נובמבר","דצמבר","ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט"];
+const schoolMonth=d=>(d.getMonth()+4)%12;   // September is 0
+const skillMonth=id=>{ const m=String(BY[id].month||"").split("–")[0].trim(); const i=SCHOOL_MONTHS.indexOf(m); return i<0?99:i; };
+// the exam the practice prepares for: the class's next one within a month, if any
+const quizExam=()=>{ const e=typeof nextExam==="function"?nextExam():null; return e&&e.days<=30?e:null; };
+function quizUnits(){
+  const exam=quizExam(), until=exam?schoolMonth(examDate(exam.date)):schoolMonth(new Date());
+  const units=mineUnits().map(u=>({u,ids:unitIds(u).filter(id=>live(id)&&choiceSkill(id))})).filter(x=>x.ids.length);
+  let on=units.filter(x=>x.ids.some(id=>skillMonth(id)<until));
+  if(!on.length) on=units.filter(x=>x.ids.some(id=>skillMonth(id)<=until));   // the first month of the year
+  const offered=units.filter(x=>x.ids.some(id=>skillMonth(id)<=until));   // taught by then; the exam's own month may be added
+  return {exam,offered,on:new Set(on.map(x=>x.u.id))};
+}
+function quizCard(){
+  const {exam,on}=quizUnits(); if(!on.size) return "";
+  const last=(P.quizzes||[]).at(-1);
+  return `<button class="mx-quiz-card" data-act="quiz"><b>מבחן תרגול${exam?` לקראת המבחן ${inDays(exam.days)}`:""}</b>
+    <span>${QUIZ_SIZE} שאלות מ־${on.size} יחידות, מעורבבות, כמו במבחן. המשוב מגיע בסוף, עם תוכנית: מה לחזק עד המבחן.</span>
+    ${last?`<span>בפעם הקודמת: ${last.right} מתוך ${last.n}</span>`:""}<span class="mx-dgo">להתחיל ‹</span></button>`;
+}
+function quizSetup(){
+  const {exam,offered,on}=quizUnits();
+  if(!cur) back=document.activeElement;
+  cur="quiz"; QZ={setup:true,on,offered};
+  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
+    <div class="mx-sheet mx-quiz-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-shtop"><div><span class="mx-uchip">מבחן תרגול</span><h3 id="mxTitle">${exam?`לקראת המבחן ב${esc(exam.subject)} ${inDays(exam.days)}`:"מבחן תרגול"}</h3>
+        <small class="mx-src">${QUIZ_SIZE} שאלות · זמן מומלץ: כ־${Math.round(QUIZ_SIZE*QUIZ_MIN_PER_Q/5)*5} דקות, בלי לחץ: השעון רק מראה.</small></div>
+        <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+      <p>אילו יחידות במבחן? סימנו את מה שנלמד עד ${exam?"המבחן":"עכשיו"}. אפשר לשנות.</p>
+      <div class="mx-quiz-units">${offered.map(({u})=>`<button class="mx-btn" data-quiz-unit="${u.id}" aria-pressed="${on.has(u.id)}">${esc(u.name)}</button>`).join("")}</div>
+      <p class="mx-small">השאלות מעורבבות ושם הנושא לא מופיע: לזהות איזו דרך מתאימה זה חלק מהמבחן. אין משוב באמצע, כמו במבחן אמיתי.</p>
+      <button class="mx-btn solid" data-act="quiz-start"${on.size?"":" disabled"}>להתחיל</button></div>`;
+  sheet.hidden=false; sheet.querySelector(".mx-x").focus({preventScroll:true});
+}
+function quizToggle(uid){
+  if(!QZ?.setup) return;
+  QZ.on.has(uid)?QZ.on.delete(uid):QZ.on.add(uid);
+  sheet.querySelector(`[data-quiz-unit="${CSS.escape(uid)}"]`).setAttribute("aria-pressed",QZ.on.has(uid));
+  sheet.querySelector("[data-act=quiz-start]").disabled=!QZ.on.size;
+}
+// questions from the chosen units in proportion to their skills: the units take turns, each turn a skill not used yet
+function quizStart(){
+  const units=QZ.offered.filter(x=>QZ.on.has(x.u.id)).map(x=>({u:x.u,ids:shuffled(x.ids)}));
+  const total=units.reduce((n,x)=>n+x.ids.length,0), items=[], used=new Set();
+  const share=units.map(x=>({...x,want:Math.max(1,Math.round(QUIZ_SIZE*x.ids.length/total)),k:0}));
+  for(let turn=0;items.length<QUIZ_SIZE&&turn<QUIZ_SIZE*4;turn++){
+    for(const x of share){
+      if(items.length>=QUIZ_SIZE||x.k>=x.want) continue;
+      const id=x.ids[x.k%x.ids.length], qs=QS(BY[id]).map((q,i)=>i).filter(i=>QS(BY[id])[i].choices&&!used.has(`${id}:${i}`));
+      if(!qs.length){ x.k++; continue; }
+      const qi=qs[Math.floor(Math.random()*qs.length)]; used.add(`${id}:${qi}`); items.push({id,qi,pick:null}); x.k++;
+    }
+    if(share.every(x=>x.k>=x.want)) share.forEach(x=>x.want++);   // rounding left room: one more for each, in turn
+  }
+  QZ={items:shuffled(items),i:0,started:Date.now(),units:units.map(x=>x.u.id)};
+  quizShow();
+  QZ.clock=setInterval(quizTick,1000);
+}
+function stopQuizClock(){ if(QZ?.clock) clearInterval(QZ.clock); }
+const mmss=ms=>{ const s=Math.floor(ms/1000); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
+function quizTick(){ const el=sheet.querySelector(".mx-quiz-clock"); if(el&&QZ?.started) el.textContent=mmss(Date.now()-QZ.started); }
+function quizShow(){
+  const {items,i}=QZ, it=items[i], q=QS(BY[it.id])[it.qi], last=i===items.length-1;
+  if(!it.order) it.order=shuffled(q.choices.map((_,k)=>k));   // the same order when coming back to a question
+  sheet.innerHTML=`<div class="mx-scrim"></div>
+    <div class="mx-sheet mx-quiz-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-shtop"><div><span class="mx-uchip">מבחן תרגול</span><h3 id="mxTitle">שאלה ${i+1} מתוך ${items.length}</h3>
+        <small class="mx-src">⏱ <span class="mx-quiz-clock">${mmss(Date.now()-QZ.started)}</span></small></div>
+        <button class="mx-x" data-act="quiz-quit" aria-label="יציאה מהמבחן">✕</button></div>
+      <div class="mx-quiz-dots">${items.map((x,k)=>`<button data-quiz-go="${k}" class="${x.pick!=null?"done":""}${k===i?" now":""}" aria-label="שאלה ${k+1}${x.pick!=null?", נענתה":""}">${k+1}</button>`).join("")}</div>
+      <div class="mx-q"><p>${fmt(q.question)}</p>${figures(q)}
+        <div class="mx-choices">${it.order.map(k=>{ const c=q.choices[k]; return `<button data-choice="${k}" data-m="${c.correct?"":esc(c.mistake)}"${c.correct?" data-right":""} aria-pressed="${it.pick===k}">${fmt(c.text)}</button>`; }).join("")}</div></div>
+      <div class="mx-quiz-nav"><button class="mx-btn" data-act="quiz-prev"${i?"":" disabled"}>הקודמת</button>
+        ${last?`<button class="mx-btn solid" data-act="quiz-submit">הגשה</button>`:`<button class="mx-btn solid" data-act="quiz-next">הבאה</button>`}</div></div>`;
+  sheet.hidden=false; sheet.querySelector(".mx-sheet").scrollTop=0;
+}
+// a choice is only marked; it can be changed until the exam is handed in
+function quizPick(btn){
+  if(!QZ?.items) return;
+  const it=QZ.items[QZ.i]; it.pick=+btn.dataset.choice;
+  sheet.querySelectorAll("[data-choice]").forEach(b=>b.setAttribute("aria-pressed",b===btn));
+  sheet.querySelector(`[data-quiz-go="${QZ.i}"]`).classList.add("done");
+  Sky.sound.tap();
+}
+function quizGo(k){ if(!QZ?.items) return; QZ.i=Math.max(0,Math.min(QZ.items.length-1,k)); quizShow(); }
+function quizSubmit(){
+  const left=QZ.items.filter(x=>x.pick==null).length;
+  if(left&&!QZ.sure){
+    QZ.sure=true;
+    const nav=sheet.querySelector(".mx-quiz-nav");
+    nav.insertAdjacentHTML("beforebegin",`<p class="mx-small mx-quiz-warn">${left===1?"שאלה אחת לא נענתה":`${left} שאלות לא נענו`}. אפשר לחזור אליהן במספרים למעלה, או ללחוץ שוב על הגשה.</p>`);
+    return;
+  }
+  stopQuizClock();
+  const items=QZ.items, ms=Date.now()-QZ.started, now=new Date().toISOString();
+  const res=items.map(x=>{ const q=QS(BY[x.id])[x.qi], c=x.pick==null?null:q.choices[x.pick]; return {...x,q,ok:!!c?.correct,mistake:c&&!c.correct?c.mistake:null}; });
+  const right=res.filter(r=>r.ok).length;
+  // answering counts like practice: right answers go to today's goal, and a finished skill that went wrong is reviewed today
+  for(const r of res){
+    if(r.ok){ Sky.ensure(P); const k=Sky.dayKey(); P.days[k]=(P.days[k]||0)+1; }
+    else if(P.done[r.id]){ Sky.ensure(P); P.review[r.id]={box:0,due:Sky.dayKey()}; }
+    if(r.mistake) Sky.slip(P,r.id,r.qi,r.mistake,"exam",new Date(now));
+  }
+  const mistakes={}; res.filter(r=>r.mistake).forEach(r=>{ (mistakes[r.mistake]??={n:0,ids:new Set()}).n++; mistakes[r.mistake].ids.add(r.id); });
+  const skipped=res.filter(r=>r.pick==null).map(r=>r.id);
+  const top=Object.entries(mistakes).sort((a,b)=>b[1].n-a[1].n).slice(0,3);
+  const weak=[...new Set([...top.flatMap(([,m])=>[...m.ids]),...skipped])];
+  (P.quizzes=P.quizzes||[]).push({at:now,n:items.length,right,ms,units:QZ.units,weak}); P.quizzes=P.quizzes.slice(-20);
+  save(); draw();
+  const perUnit=QZ.units.map(uid=>{ const u=G.units.find(x=>x.id===uid), rs=res.filter(r=>BY[r.id].unit===uid); return {u,n:rs.length,ok:rs.filter(r=>r.ok).length}; }).filter(x=>x.n);
+  const plan=top.length?top.map(([k,m])=>{ const M=G.mistakes[k]; return `<li><b>${fmt(M.name)}</b>${m.n>1?` <small>(${m.n} פעמים)</small>`:""}<span>${fmt(M.tip)}</span>
+      <span class="mx-chips">${[...m.ids].map(id=>`<button class="mx-btn" data-id="${id}">לתרגל: ${fmt(BY[id].short)}</button>`).join("")}</span></li>`; }).join(""):"";
+  QZ={done:true};
+  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
+    <div class="mx-sheet mx-quiz-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-shtop"><div><span class="mx-uchip">מבחן תרגול</span><h3 id="mxTitle">${right} מתוך ${items.length} נכונות</h3>
+        <small class="mx-src">⏱ ${mmss(ms)}${skipped.length?` · ${skipped.length} בלי תשובה`:""}</small></div>
+        <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+      <div class="mx-quiz-units-score">${perUnit.map(x=>`<div><span>${esc(x.u.name)}</span><b>${x.ok}/${x.n}</b><span class="mx-meter" aria-hidden="true"><i style="width:${Math.round(100*x.ok/x.n)}%"></i></span></div>`).join("")}</div>
+      ${plan?`<h4>${top.length===1?"דבר אחד":top.length===2?"שני דברים":"שלושה דברים"} לחזק עד המבחן</h4><ol class="mx-quiz-plan">${plan}</ol>
+        <p class="mx-small">מיומנויות שכבר סיימתם וטעיתם בהן חוזרות היום לחזרה המעורבת.</p>`
+        :right===items.length?"<p>הכול נכון. ממשיכים לתרגל קצת כל יום, וזה יישאר.</p>":""}
+      <details class="mx-quiz-review"><summary>כל השאלות והתשובות</summary><ol>${res.map(r=>{ const c=r.q.choices.find(c=>c.correct), mine=r.pick==null?null:r.q.choices[r.pick];
+        return `<li class="${r.ok?"ok":"bad"}"><span>${fmt(r.q.question)}</span><small>${esc(plain(BY[r.id].short))}</small>
+          ${r.ok?`<span>✓ ${fmt(c.text)}</span>`:`<span>${mine?`ענית: ${fmt(mine.text)}`:"בלי תשובה"} · נכון: ${fmt(c.text)}</span>`}</li>`; }).join("")}</ol></details>
+      <div class="mx-quiz-nav"><button class="mx-btn" data-act="quiz">מבחן תרגול חדש</button><button class="mx-btn solid" data-act="close">חזרה למסלול</button></div></div>`;
+  sheet.querySelector(".mx-x").focus({preventScroll:true});
+  if(right/items.length>=.8) Sky.sound.goal();
+}
+function quizQuit(){
+  if(!QZ?.items) return closeSheet();
+  if(QZ.items.every(x=>x.pick==null)||QZ.quitting) return closeSheet();
+  QZ.quitting=true;
+  sheet.querySelector(".mx-quiz-nav").insertAdjacentHTML("beforebegin",'<p class="mx-small mx-quiz-warn">לצאת? התשובות במבחן הזה לא יישמרו. לחצו שוב על ✕ כדי לצאת.</p>');
+}
+
+/* ---------- unit quiz ----------
+   A unit can end with a summarizing quiz (unit.quiz, app/math_skills.py): open-ended questions with points, and a time
+   limit. It is shown like a paper quiz: all the questions at once, a clock counting down, nothing checked until it is
+   handed in. The student writes on paper and photographs each answer (on this device, or from the phone on the same
+   account); when the time is up there are UQ_PHOTO_MIN more minutes to photograph, then it is handed in by itself.
+   After handing in, each answer is checked (the server does not check quiz answers on upload), and the report shows
+   the points per question with feedback and a solution. The sitting is kept in P.uq[unit]: {sitting:{started,
+   attempts, submitted}, history:[{at, score, graded}]} so a reload continues it with the clock still running.
+   The time limit is kept by this page; the server keeps the answers and their checks. */
+const UQ_PHOTO_MIN=10, UQ_BASE="/api/math/answer-attempts";
+const uqState=uid=>((P.uq||={})[uid]||={history:[]});
+const uqReady=u=>!!(u.quiz&&!u.quiz.locked&&CFG.answerScans&&CFG.userId);
+const uqEnds=(u,sit)=>sit.started+u.quiz.minutes*60000;
+function quizStep(u){
+  if(!u.quiz) return "";
+  const st=uqState(u.id), last=st.history.at(-1), going=st.sitting&&!st.sitting.submitted;
+  const tag=going?"בתהליך":last?.score!=null?`${last.score}/100`:last?"הוגש":"";
+  return `<div class="mx-step mx-uquiz-step u-${u.id}"><button class="mx-node mx-uquiz${last?" done":""}" data-uquiz="${u.id}" aria-label="בוחן מסכם: ${esc(u.name)}${tag?`, ${tag}`:""}">📝</button>
+    <span class="mx-lbl">בוחן מסכם${tag?`<em>${tag}</em>`:""}</span></div>`;
+}
+async function uqJson(url,options={}){
+  const r=await api(url,{cache:"no-store",...options}), d=await r.json().catch(()=>({}));
+  if(!r.ok){ const e=Error(UQ_ERRORS[d.detail]||"החיבור נקטע. נסו שוב."); e.code=d.detail; e.status=r.status; throw e; }
+  return d;
+}
+const uqPost=(url,body={})=>uqJson(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+const UQ_ERRORS={question_changed:"הבוחן עודכן. רעננו את העמוד והתחילו מחדש.",image_too_large:"התמונה גדולה מדי. צלמו שוב.",invalid_image:"לא ניתן לקרוא את התמונה. צלמו שוב.",
+  unsupported_image:"בחרו תמונת JPEG, PNG או WebP.",answer_storage_unavailable:"שמירת תשובות אינה זמינה כרגע.",grading_unavailable:"הבדיקה האוטומטית אינה זמינה כרגע.",
+  grading_failed:"הבדיקה נכשלה. התמונה נשמרה; אפשר לנסות שוב.",grading_limit:"הגעתם למכסת הבדיקות היומית. נסו שוב מחר.",grading_busy:"כבר מתבצעות בדיקות. נסו שוב בעוד רגע.",
+  upload_in_progress:"העלאה כבר מתבצעת. רגע…",open_ended_locked:"בוחנים פתוחים סגורים כרגע באתר.",sign_in_required:"יש להיכנס לחשבון."};
+function stopUnitQuiz(){ if(UQ){ clearInterval(UQ.clock); clearTimeout(UQ.poll); Object.values(UQ.images||{}).forEach(URL.revokeObjectURL); } UQ=null; }
+// the intro: what the quiz is and how it works, the last results, and start / continue
+function uqIntro(uid){
+  const u=G.units.find(x=>x.id===uid), q=u.quiz, st=uqState(uid), sit=st.sitting, going=sit&&!sit.submitted;
+  if(going) return uqOpen(uid);
+  if(!cur) back=document.activeElement;
+  stopUnitQuiz(); cur="uquiz"; UQ={uid};
+  const ready=uqReady(u), n=q.questions.length;
+  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
+    <div class="mx-sheet mx-uq-sheet u-${uid}" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-shtop"><div><span class="mx-uchip">${esc(u.name)}</span><h3 id="mxTitle">בוחן מסכם</h3>
+        <small class="mx-src">${n} שאלות פתוחות · ${q.minutes} דקות · 100 נקודות</small></div>
+        <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+      <ul class="mx-uq-rules">
+        <li>כמו בוחן בכיתה: כל השאלות מופיעות יחד, והשעון סופר לאחור מרגע ההתחלה.</li>
+        <li>כתבו את הפתרונות על דף, כל שאלה בנפרד, עם דרך פתרון מלאה ונימוקים.</li>
+        <li>צלמו את התשובה לכל שאלה. כשהזמן נגמר יש עוד ${UQ_PHOTO_MIN} דקות לצלם ולהגיש.</li>
+        <li>הבדיקה, הציון והפתרונות מגיעים רק אחרי ההגשה.</li>
+        <li>אפשר לסגור ולחזור, אבל השעון ממשיך לרוץ.</li></ul>
+      ${st.history.length?`<div class="mx-uq-history"><h4>הגשות קודמות</h4>${st.history.slice().reverse().map((h,k)=>{ const i=st.history.length-1-k;
+        return `<button class="mx-btn" data-uq-result="${uid}:${i}">${new Date(h.at).toLocaleDateString("he-IL")} · ${h.score==null?"ממתין לבדיקה":`${h.score}/100`}</button>`; }).join("")}</div>`:""}
+      ${ready?`<button class="mx-btn solid" data-act="uq-start">התחלת הבוחן</button>`
+        :`<p class="mx-note">${!CFG.userId?"הבוחן זמין אחרי כניסה לחשבון.":"בוחנים עם תשובה מצולמת ובדיקה אוטומטית אינם זמינים כרגע באתר."}</p>`}</div>`;
+  sheet.hidden=false; sheet.querySelector(".mx-x").focus({preventScroll:true});
+}
+// a new sitting: one fresh answer attempt per question
+async function uqStart(){
+  const uid=UQ.uid, u=G.units.find(x=>x.id===uid), btn=sheet.querySelector("[data-act=uq-start]");
+  btn.disabled=true; btn.textContent="מכינים את הבוחן…";
+  try{
+    const attempts=[];
+    for(const [index,q] of u.quiz.questions.entries())
+      attempts.push((await uqPost("/api/math/quiz-attempts",{unit:uid,index,question_version:q.question_version,new:true})).attempt.id);
+    uqState(uid).sitting={started:Date.now(),attempts,submitted:null}; save(); draw();
+    uqOpen(uid);
+  }catch(e){ btn.disabled=false; btn.textContent="התחלת הבוחן"; btn.insertAdjacentHTML("afterend",`<p class="mx-small mx-quiz-warn">${esc(e.message)}</p>`); }
+}
+// the quiz paper
+function uqOpen(uid){
+  const u=G.units.find(x=>x.id===uid), sit=uqState(uid).sitting;
+  if(!cur) back=document.activeElement;
+  stopUnitQuiz(); cur="uquiz"; UQ={uid,res:{},images:{},busy:{},msg:{}};
+  sheet.innerHTML=`<div class="mx-scrim"></div>
+    <div class="mx-sheet mx-uq-sheet mx-uq-paper u-${uid}" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-uq-head"><div><span class="mx-uchip">${esc(u.name)}</span><h3 id="mxTitle">בוחן מסכם</h3></div>
+        <div class="mx-uq-clock" role="timer" aria-live="off"></div>
+        <button class="mx-x" data-act="close" aria-label="יציאה (השעון ממשיך)">✕</button></div>
+      <p class="mx-uq-banner" aria-live="polite"></p>
+      <ol class="mx-uq-qs">${u.quiz.questions.map((q,i)=>`<li class="mx-uq-q" id="uq-q${i}">
+        <div class="mx-uq-qhead"><b>שאלה ${i+1}</b><span>${q.points} נק׳</span></div>
+        <p class="mx-uq-text">${fmt(q.question).replace(/\n/g,"<br>")}</p>${figures(q)}
+        <div class="mx-uq-answer" data-uq-i="${i}"></div></li>`).join("")}</ol>
+      <div class="mx-quiz-nav"><span class="mx-small" data-uq-count></span><button class="mx-btn solid" data-act="uq-submit">הגשת הבוחן</button></div>
+      <input type="file" accept="image/*" capture="environment" hidden data-uq-file></div>`;
+  sheet.hidden=false; sheet.querySelector(".mx-sheet").scrollTop=0;
+  sheet.querySelector("[data-uq-file]").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; if(f&&UQ?.pick!=null) uqUpload(UQ.pick,f); };
+  uqTick(); UQ.clock=setInterval(uqTick,1000);
+  sit.attempts.forEach((_,i)=>uqRefresh(i));
+}
+function uqTick(){
+  if(!UQ?.uid) return;
+  const u=G.units.find(x=>x.id===UQ.uid), sit=uqState(UQ.uid).sitting; if(!sit||sit.submitted) return;
+  const left=uqEnds(u,sit)-Date.now(), photo=left+UQ_PHOTO_MIN*60000;
+  const clock=sheet.querySelector(".mx-uq-clock"), banner=sheet.querySelector(".mx-uq-banner"); if(!clock) return;
+  if(photo<=0) return uqSubmit(true);
+  clock.textContent=left>0?mmss(left):mmss(photo);
+  clock.classList.toggle("low",left>0&&left<5*60000); clock.classList.toggle("over",left<=0);
+  const say=left>0?(left<5*60000?"נשארו פחות מ־5 דקות. זה זמן טוב לבדוק ולצלם.":""):`הזמן לכתיבה נגמר. נשארו ${mmss(photo)} לצילום ולהגשה, בלי להוסיף לפתרונות.`;
+  if(banner.textContent!==say) banner.textContent=say;
+}
+// one question's answer box: the photo if there is one, and the ways to add or replace it
+async function uqRefresh(i){
+  const sit=uqState(UQ.uid).sitting, aid=sit.attempts[i], uid=UQ.uid;
+  try{
+    const r=await uqJson(`${UQ_BASE}/${aid}`); if(UQ?.uid!==uid) return;
+    UQ.res[i]=r;
+    if(r.attachment&&!UQ.images[i]){ const b=await api(`${UQ_BASE}/${aid}/image`,{cache:"no-store"}); if(b.ok&&UQ?.uid===uid) UQ.images[i]=URL.createObjectURL(await b.blob()); }
+  }catch(e){ if(UQ?.uid===uid) UQ.msg[i]=e.message; }
+  if(UQ?.uid===uid) uqDrawAnswer(i);
+  // waiting for the phone: look again soon
+  if(UQ?.uid===uid&&!UQ.res[i]?.attachment&&["waiting","confirmed","uploading"].includes(UQ.res[i]?.scan?.state)){ clearTimeout(UQ.poll); UQ.poll=setTimeout(()=>sit.attempts.forEach((_,k)=>uqRefresh(k)),4000); }
+}
+function uqDrawAnswer(i){
+  const box=sheet.querySelector(`[data-uq-i="${i}"]`); if(!box) return;
+  const r=UQ.res[i], has=!!r?.attachment, busy=UQ.busy[i], st=r?.scan?.state, phone=["waiting","confirmed"].includes(st)&&!has;
+  const touch=matchMedia("(max-width: 700px)").matches||navigator.maxTouchPoints>0;
+  // on a computer the phone comes first: it is how most answers on paper get here
+  const phoneBtn=touch?"":`<button class="mx-btn${has?"":" solid"} mx-phone-cta" data-uq-phone="${i}"${busy||st==="uploading"?" disabled":""}><span aria-hidden="true">📱</span> ${phone?"הצגת המספר לטלפון":has?"צילום מחדש בטלפון":"צילום בטלפון"}</button>`;
+  box.innerHTML=`${has?`<img class="mx-uq-img" alt="התשובה המצולמת לשאלה ${i+1}" src="${UQ.images[i]||""}">`:""}
+    <p class="mx-small" role="status">${busy?esc(busy):UQ.msg[i]?esc(UQ.msg[i]):has?"✓ התשובה נשמרה":phone?"ממתינים לצילום מהטלפון":st==="declined"?"הבקשה נדחתה בטלפון":"עוד לא צולמה תשובה"}</p>
+    <span class="mx-chips">${phoneBtn}<button class="mx-btn${has||!touch?"":" solid"}" data-uq-photo="${i}"${busy?" disabled":""}>${has&&touch?"צילום מחדש":touch?"צילום התשובה":"העלאת תמונה מהמחשב"}</button></span>`;
+  const done=Object.values(UQ.res).filter(x=>x?.attachment).length, n=uqState(UQ.uid).sitting.attempts.length;
+  const c=sheet.querySelector("[data-uq-count]"); if(c) c.textContent=`צולמו ${done} מתוך ${n} תשובות`;
+}
+// a photo replaces an answer by a fresh attempt for that question (an attempt keeps the one photo it received)
+async function uqFresh(i){
+  const u=G.units.find(x=>x.id===UQ.uid), q=u.quiz.questions[i], sit=uqState(UQ.uid).sitting;
+  if(!UQ.res[i]?.attachment) return sit.attempts[i];
+  const r=await uqPost("/api/math/quiz-attempts",{unit:UQ.uid,index:i,question_version:q.question_version,new:true});
+  sit.attempts[i]=r.attempt.id; save();
+  if(UQ.images[i]){ URL.revokeObjectURL(UQ.images[i]); delete UQ.images[i]; }
+  UQ.res[i]=r; return r.attempt.id;
+}
+// this device: request, confirm, lease and upload in a row (the same steps the phone takes)
+async function uqUpload(i,file){
+  const uid=UQ.uid; UQ.busy[i]="מעלים את התמונה…"; UQ.msg[i]=""; uqDrawAnswer(i);
+  try{
+    const photo=await window.MathlyPhoto.prepare(file);
+    if(photo.size>5000000) throw Error(UQ_ERRORS.image_too_large);
+    const aid=await uqFresh(i);
+    const scan=(await uqPost(`${UQ_BASE}/${aid}/scans`,{renew:true})).scan;
+    await uqPost(`/api/math/answer-scans/${scan.id}/confirm`);
+    const lease=await uqPost(`/api/math/answer-scans/${scan.id}/uploads`,{key:crypto.randomUUID()});
+    if(!lease.attachment){ const form=new FormData(); form.append("photo",photo,"answer.jpg");
+      await uqJson(`/api/math/answer-scans/${scan.id}/uploads/${lease.lease_id}`,{method:"POST",body:form}); }
+  }catch(e){ if(UQ?.uid===uid) UQ.msg[i]=e.message; }
+  if(UQ?.uid!==uid) return;
+  UQ.busy[i]=""; uqRefresh(i);
+}
+// the phone: a request with a 4-digit code, and a window here until the phone sends the photo or declines
+async function uqPhone(i){
+  const uid=UQ.uid, r0=UQ.res[i];
+  let r=r0&&!r0.attachment&&["waiting","confirmed"].includes(r0.scan?.state)?r0:null;   // a request still open: show its code again
+  if(!r){
+    UQ.busy[i]="יוצרים בקשת צילום…"; UQ.msg[i]=""; uqDrawAnswer(i);
+    try{ const aid=await uqFresh(i); r=await uqPost(`${UQ_BASE}/${aid}/scans`,{renew:true}); }
+    catch(e){ if(UQ?.uid===uid) UQ.msg[i]=e.message; }
+    if(UQ?.uid!==uid) return;
+    UQ.busy[i]=""; uqDrawAnswer(i);
+  }
+  if(r) await window.MathlyAnswers.waitForPhone(r);
+  if(UQ?.uid===uid) uqRefresh(i);
+}
+function uqSubmit(timeUp=false){
+  const uid=UQ.uid, sit=uqState(uid).sitting; if(!sit||sit.submitted) return;
+  const missing=sit.attempts.filter((_,i)=>!UQ.res[i]?.attachment).length;
+  if(!timeUp&&missing&&!UQ.sure){
+    UQ.sure=true;
+    sheet.querySelector(".mx-quiz-nav").insertAdjacentHTML("beforebegin",`<p class="mx-small mx-quiz-warn">${missing===1?"לשאלה אחת":`ל־${missing} שאלות`} אין תשובה מצולמת, והן יקבלו 0 נקודות. לחצו שוב על הגשה כדי להגיש בכל זאת.</p>`);
+    return;
+  }
+  sit.submitted=Date.now();
+  const st=uqState(uid); st.history.push({at:new Date().toISOString(),attempts:sit.attempts.slice(),score:null,timeUp}); st.history=st.history.slice(-10);
+  save(); draw();
+  uqResult(uid,st.history.length-1,true);
+}
+// the report: each answer is checked now (once), then points per question, feedback and the solution
+async function uqResult(uid,h,check=false){
+  const u=G.units.find(x=>x.id===uid), st=uqState(uid), entry=st.history[h];
+  if(!cur) back=document.activeElement;
+  stopUnitQuiz(); cur="uquiz"; UQ={uid,res:{},images:{}};
+  const n=entry.attempts.length;
+  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
+    <div class="mx-sheet mx-uq-sheet u-${uid}" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-shtop"><div><span class="mx-uchip">${esc(u.name)}</span><h3 id="mxTitle">בוחן מסכם: בודקים…</h3>
+        <small class="mx-src" aria-live="polite">בודקים את התשובות, זה לוקח כחצי דקה לשאלה</small></div>
+        <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div><div class="mx-uq-report"></div></div>`;
+  sheet.hidden=false; sheet.querySelector(".mx-x").focus({preventScroll:true});
+  const results=[];
+  for(let i=0;i<n;i++){
+    let r=null;
+    try{
+      r=await uqJson(`${UQ_BASE}/${entry.attempts[i]}`);
+      if(r.attachment&&r.grading_available&&(!r.grading||(check&&r.grading.state==="failed"))){
+        if(UQ?.uid!==uid) return;
+        sheet.querySelector(".mx-src").textContent=`בודקים את שאלה ${i+1} מתוך ${n}…`;
+        try{ r=await uqPost(`${UQ_BASE}/${entry.attempts[i]}/grade`,{automatic:!check}); }catch(e){ r.error=e.message; }
+      }
+      if(r.attachment){ const b=await api(`${UQ_BASE}/${entry.attempts[i]}/image`,{cache:"no-store"}); if(b.ok&&UQ?.uid===uid) UQ.images[i]=URL.createObjectURL(await b.blob()); }
+    }catch(e){ r={error:e.message}; }
+    if(UQ?.uid!==uid) return;
+    results.push(r);
+  }
+  // points: a checked answer earns its share; a missing one 0; one not checked yet leaves the total open
+  let earned=0, open=0;
+  const rows=u.quiz.questions.map((q,i)=>{
+    const r=results[i], g=r?.grading, a=g?.state==="completed"?g.result:null;
+    let pts=null, say="";
+    if(!r?.attachment) { pts=0; say="לא צולמה תשובה"; }
+    else if(a&&a.score!=null){ pts=Math.round(q.points*a.score/100); say={correct:"נכון ומלא",partial:"נכון בחלקו",incorrect:"לא נכון"}[a.verdict]||""; }
+    else { open++; say=a?.verdict==="unreadable"?"לא הצלחנו לקרוא את התמונה":a?.verdict==="needs_review"?"נדרשת בדיקה של מורה":r.error||(!r.grading_available?"הבדיקה האוטומטית אינה זמינה כרגע":"עוד לא נבדקה"); }
+    if(pts!=null) earned+=pts;
+    return `<li class="mx-uq-q"><div class="mx-uq-qhead"><b>שאלה ${i+1}</b><span>${pts==null?"–":pts}/${q.points} נק׳</span></div>
+      <p class="mx-uq-text">${fmt(q.question).replace(/\n/g,"<br>")}</p>
+      ${UQ.images[i]?`<img class="mx-uq-img" alt="התשובה שלכם לשאלה ${i+1}" src="${UQ.images[i]}">`:""}
+      <p class="mx-uq-verdict ${a?.verdict||"none"}">${esc(say)}</p>
+      ${a?.feedback?`<p>${fmtLoose(a.feedback)}</p>`:""}${a?.next_step?`<p><b>הצעד הבא: </b>${fmtLoose(a.next_step)}</p>`:""}
+      ${a?.solution?`<details><summary>הפתרון המלא</summary><p class="mx-grade-solution">${fmtLoose(a.solution)}</p></details>`:""}
+      ${r?.attachment&&!a&&r.grading_available?`<button class="mx-btn" data-uq-result="${uid}:${h}:check">בדיקה נוספת</button>`:""}</li>`;
+  });
+  entry.score=open?null:earned; save(); draw();
+  const total=open?`${earned} נקודות עד עכשיו · ${open===1?"שאלה אחת לא נבדקה":`${open} שאלות לא נבדקו`}`:`${earned}/100`;
+  sheet.querySelector("#mxTitle").textContent=`בוחן מסכם: ${total}`;
+  sheet.querySelector(".mx-src").textContent=`הוגש ${new Date(entry.at).toLocaleString("he-IL",{dateStyle:"short",timeStyle:"short"})}${entry.timeUp?" · הוגש כשהזמן נגמר":""}`;
+  const weak=u.quiz.questions.map((q,i)=>i).filter(i=>{ const a=results[i]?.grading?.result; return !results[i]?.attachment||(a&&a.score!=null&&a.score<70); });
+  sheet.querySelector(".mx-uq-report").innerHTML=`<ol class="mx-uq-qs">${rows.join("")}</ol>
+    ${weak.length&&!open?`<p class="mx-note">כדאי לחזור על ${weak.map(i=>`שאלה ${i+1}`).join(", ")} ולתרגל את המיומנויות של היחידה במסלול לפני הבוחן הבא.</p>`:""}
+    <p class="mx-small">הבדיקה אוטומטית באמצעות AI: בדקו שהיא תואמת למה שכתבתם, ואם משהו נראה לא נכון, הראו למורה.</p>
+    <div class="mx-quiz-nav"><button class="mx-btn" data-uquiz="${uid}">לבוחן</button><button class="mx-btn solid" data-act="close">חזרה למסלול</button></div>`;
+}
+
 function onClick(e){
   const t=e.target.closest("button,[data-act]"); if(!t||!root.contains(t)) return;
   if(t.dataset.choice!=null) return answer(t);
+  if(t.dataset.quizUnit) return quizToggle(t.dataset.quizUnit);
+  if(t.dataset.quizGo!=null) return quizGo(+t.dataset.quizGo);
+  if(t.dataset.uquiz) return uqIntro(t.dataset.uquiz);   // a sitting in progress opens straight on its paper
+  if(t.dataset.uqResult){ const [uid,h,check]=t.dataset.uqResult.split(":"); return uqResult(uid,+h,check==="check"); }
+  if(t.dataset.uqPhoto!=null){ UQ.pick=+t.dataset.uqPhoto; return sheet.querySelector("[data-uq-file]").click(); }
+  if(t.dataset.uqPhone!=null) return uqPhone(+t.dataset.uqPhone);
   if(t.dataset.subject) return selectSubject(t.dataset.subject);
   if(t.dataset.view){ closeSheet(); return setView(t.dataset.view,t.dataset.unit); }
   if(t.dataset.comet) return showComet(t.dataset.comet);
@@ -540,6 +975,15 @@ function onClick(e){
     case "subjects": return drawSubjectPicker();
     case "streak": return showStreak();
     case "review": return startReview();
+    case "patterns": return showPatterns();
+    case "quiz": stopQuizClock(); QZ=null; return quizSetup();
+    case "quiz-start": return quizStart();
+    case "quiz-next": return quizGo(QZ.i+1);
+    case "quiz-prev": return quizGo(QZ.i-1);
+    case "quiz-submit": return quizSubmit();
+    case "quiz-quit": return quizQuit();
+    case "uq-start": return uqStart();
+    case "uq-submit": return uqSubmit();
     case "review-next": return REV&&reviewNext();
     case "cal-prev": return showStreak(-1);
     case "cal-next": return showStreak(1);

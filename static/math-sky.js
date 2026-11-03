@@ -5,7 +5,8 @@
    comes back for spaced review (`review`, after 1, 3, 7, 14, 30 and 60 days; a miss starts over). A finished skill not practised for
    FADE_DAYS fades until one correct answer brightens it again. GOAL correct answers make a day; days in a row make the
    streak, and one missed day does not break it. Now and then a comet crosses the screen and can be caught for the
-   collection. All of it lives in the student's progress (P, see math.js): run, gold, seen, days, comets, cometDay.
+   collection. All of it lives in the student's progress (P, see math.js): run, gold, seen, days, comets, cometDay, and the
+   misconceptions met along the way (slips, see "misconception patterns").
    Pure rules first, then the drawings (owl, constellations), then the effects (sound, sparkles, overlays). */
 (function(){
 "use strict";
@@ -19,7 +20,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 /* ---------- rules ---------- */
 const dayKey=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const daysBack=(n,from)=>{const d=new Date(from);d.setDate(d.getDate()-n);return d};
-function ensure(P){ for(const k of ["run","gold","seen","days","review","missed"]) if(!P[k]||typeof P[k]!=="object") P[k]={}; if(!Array.isArray(P.comets)) P.comets=[]; return P; }
+function ensure(P){ for(const k of ["run","gold","seen","days","review","missed"]) if(!P[k]||typeof P[k]!=="object") P[k]={}; for(const k of ["comets","slips"]) if(!Array.isArray(P[k])) P[k]=[]; return P; }
 function fading(P,id,now=new Date()){
   if(!P.done?.[id]) return false;
   const t=Date.parse(P.seen?.[id]||P.done[id]);
@@ -53,6 +54,40 @@ function due(P,id,now=new Date()){
   const r=P.review?.[id]; if(r?.due) return r.due<=dayKey(now);
   const t=Date.parse(P.seen?.[id]||P.done[id]); return !isNaN(t)&&now-t>=DAY;
 }
+/* ---------- misconception patterns ----------
+   Every tagged wrong answer is kept in P.slips ({at, id: skill, q: question index, m: mistake tag, via: practice |
+   review | exam}), newest last, at most SLIP_MAX. patterns() reads it: a tag is recurring when it came up at least
+   twice in RECUR_DAYS and once in the last QUIET_DAYS; it has stopped when it once came up twice within RECUR_DAYS,
+   but not in the last QUIET_DAYS, and less than GONE_DAYS ago. */
+const SLIP_MAX=500, RECUR_DAYS=30, QUIET_DAYS=14, GONE_DAYS=60, PATTERNS_SHOWN=3;
+function slip(P,id,q,m,via,now=new Date()){
+  ensure(P); if(!m) return;
+  P.slips.push({at:now.toISOString(),id,q,m,via});
+  if(P.slips.length>SLIP_MAX) P.slips.splice(0,P.slips.length-SLIP_MAX);
+}
+// `mistakes`: the graph's mistakes by tag (for the skill each one sends back to)
+function patterns(P,mistakes={},now=new Date()){
+  const by={};
+  for(const s of P.slips||[]){ const t=Date.parse(s?.at); if(s?.m&&!isNaN(t)&&t<=now) (by[s.m]||=[]).push({t,id:s.id}); }
+  const recurring=[], stopped=[], age=t=>(now-t)/DAY;
+  for(const [m,all] of Object.entries(by)){
+    all.sort((a,b)=>a.t-b.t);
+    const last=all.at(-1).t;
+    if(age(last)>=GONE_DAYS) continue;
+    const recent=all.filter(x=>age(x.t)<RECUR_DAYS);
+    const item=list=>{
+      const count={}, seen={};
+      for(const x of list){ count[x.id]=(count[x.id]||0)+1; seen[x.id]=x.t; }
+      const skills=Object.keys(count).sort((a,b)=>count[b]-count[a]||seen[b]-seen[a]);
+      return {m,n:list.length,skills,last:new Date(last).toISOString(),practise:mistakes[m]?.back||skills[0]};
+    };
+    if(age(last)<QUIET_DAYS){ if(recent.length>=2) recurring.push(item(recent)); }
+    else if(all.some((x,i)=>i>0&&(x.t-all[i-1].t)/DAY<=RECUR_DAYS)) stopped.push(item(all));
+  }
+  const rank=(a,b)=>b.skills.length-a.skills.length||b.n-a.n||b.last.localeCompare(a.last);
+  return {recurring:recurring.sort(rank).slice(0,PATTERNS_SHOWN),stopped:stopped.sort(rank).slice(0,PATTERNS_SHOWN)};
+}
+
 /* a star's look: gold, lit, fading (finished), next, open, locked, off */
 function star(P,id,status,isNext){
   if(status==="done") return P.gold?.[id]?"gold":fading(P,id)?"fading":"lit";
@@ -315,6 +350,6 @@ function comet(onCatch){
 }
 const cometCard=c=>`<div class="sky-card"><span class="sym">${esc(c.sym)}</span><b>${esc(c.name)}</b></div>`;
 
-window.MathlySky={GOAL,FADE_DAYS,MASTER_RUN,GOLD_RUN,masterNeed,goldNeed,mastered,reviewed,due,COMETS,SPARK,spark,FLAME,owl,praise,dayKey,ensure,correct,wrong,fading,star,today,streak,dayState,month,best,
+window.MathlySky={GOAL,slip,patterns,FADE_DAYS,MASTER_RUN,GOLD_RUN,masterNeed,goldNeed,mastered,reviewed,due,COMETS,SPARK,spark,FLAME,owl,praise,dayKey,ensure,correct,wrong,fading,star,today,streak,dayState,month,best,
   cometDue,catchComet,shape,labels,mount,burst,burstAt,sound,buzz,soundOn,setSound,toast,celebrate,comet,cometCard};
 })();

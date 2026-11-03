@@ -3,11 +3,12 @@
 (()=>{
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=s=>esc(s).replace(/\$([^$]+)\$/g,'<span class="m">$1</span>');
-const states={waiting:"ממתינים לטלפון",confirmed:"ממתינים לטלפון",uploading:"מעלים את התשובה…",received:"התשובה התקבלה",failed:"ההעלאה נכשלה",expired:"בקשת הצילום פגה",superseded:"הבקשה הוחלפה"};
+const states={waiting:"ממתינים לטלפון",confirmed:"ממתינים לטלפון",uploading:"מעלים את התשובה…",received:"התשובה התקבלה",failed:"ההעלאה נכשלה",expired:"בקשת הצילום פגה",superseded:"הבקשה הוחלפה",declined:"הבקשה נדחתה בטלפון"};
 const errors={expired:"בקשת הצילום פגה. צרו בקשה חדשה ונסו שוב.",superseded:"הבקשה הוחלפה. בחרו את הבקשה העדכנית.",upload_in_progress:"העלאה כבר מתבצעת. ממתינים לעדכון…",confirmation_required:"יש לאשר את בקשת הצילום תחילה.",invalid_upload:"ההעלאה הופסקה. נסו שוב.",question_changed:"השאלה השתנתה. רעננו את העמוד ופתחו אותה מחדש.",invalid_image:"לא ניתן לקרוא את התמונה. צלמו שוב.",image_too_large:"התמונה גדולה מדי. צלמו שוב.",unsupported_image:"בחרו תמונת JPEG, PNG או WebP.",answer_storage_unavailable:"שמירת תשובות אינה זמינה כרגע. נסו שוב מאוחר יותר.",sign_in_required:"יש להיכנס לאותו חשבון בשני המכשירים."};
 Object.assign(errors,{grading_unavailable:"בדיקת תשובות אינה זמינה כרגע באתר.",grading_failed:"הבדיקה נכשלה. התמונה נשמרה; אפשר לנסות שוב.",grading_interrupted:"הבדיקה הופסקה. אפשר לנסות שוב.",grading_limit:"הגעתם למכסת 20 הבדיקות היומית. נסו שוב מחר.",grading_busy:"כבר מתבצעות בדיקות בחשבון. נסו שוב בעוד רגע.",answer_required:"יש לצלם ולשלוח תשובה לפני הבדיקה."});
 const verdicts={correct:"נכון! הפתרון מלא",partial:"פתרון נכון בחלקו",incorrect:"יש לתקן את הפתרון",unreadable:"לא ניתן לקרוא את התשובה",needs_review:"נדרשת הבהרה לפני מתן ציון"};
-let api=null,account=null,epoch=0,question=null,inbox=null,inboxTimer=null,inboxPoll=null,capture=null,visibleRoot=null,onGraded=null;
+let api=null,account=null,epoch=0,question=null,inbox=false,inboxTimer=null,inboxPoll=null,capture=null,visibleRoot=null,onGraded=null,waiting=null;
+const handled=new Set();   // requests this phone already answered (photographed or declined): not shown again
 const live=(e)=>e===epoch&&!!account;
 async function json(url,options={}){
   const r=await api(url,{cache:"no-store",...options});
@@ -23,35 +24,35 @@ function closeCapture(){
   if(capture){if(capture.url)URL.revokeObjectURL(capture.url);capture.node.remove();capture.returnFocus?.focus?.();capture=null;}
 }
 function reset(){
-  epoch++;if(question)question.node.replaceChildren();closeQuestion();closeCapture();clearTimeout(inboxTimer);inboxTimer=null;
-  inbox?.remove();inbox=null;account=null;onGraded=null;
+  epoch++;if(question)question.node.replaceChildren();closeQuestion();closeCapture();closeWait();clearTimeout(inboxTimer);inboxTimer=null;
+  inbox=false;account=null;onGraded=null;
 }
 function configure(options){
   reset();api=options.api;account=options.enabled?options.account:null;visibleRoot=options.root;onGraded=options.onGraded;
   if(!account)return;
-  // Foreground discovery is available in the responsive phone app/PWA.
-  if(matchMedia("(max-width: 700px)").matches||navigator.maxTouchPoints){
-    inbox=document.createElement("section");inbox.className="mx-scan-inbox mx-wrap";
-    inbox.setAttribute("aria-label","בקשות לצילום תשובה");visibleRoot.prepend(inbox);pollInbox(epoch);
-  }
+  // The phone (the responsive app/PWA) watches for requests from the computer and pops them up.
+  if(matchMedia("(max-width: 700px)").matches||navigator.maxTouchPoints){inbox=true;pollInbox(epoch);}
 }
+/* The phone looks for requests every few seconds while the app is open. A new request pops up as a window with its
+   4-digit code (the same code the computer shows); the student photographs the answer or declines. */
 async function pollInbox(e){
   clearTimeout(inboxTimer);if(!live(e)||!inbox||inboxPoll===e)return;
   if(document.hidden){inboxTimer=setTimeout(()=>pollInbox(e),5000);return;}
   inboxPoll=e;
-  let delay=5000;
+  let delay=3000;
   try{
     const list=await json("/api/math/answer-scans");if(!live(e)||!inbox)return;
-    const signature=JSON.stringify(list.map(r=>[r.scan.id,r.scan.state]));
-    if(inbox.dataset.signature!==signature){
-      inbox.dataset.signature=signature;
-      inbox.innerHTML=list.length?`<h2>בקשות לצילום תשובה</h2>${list.map((r,i)=>`<button class="mx-btn" data-scan-index="${i}"><b>${fmt(r.attempt.snapshot.question)}</b><small>ניסיון ${esc(r.attempt.id.slice(0,8))} · ${esc(states[r.scan.state])}</small></button>`).join("")}`:"";
-      inbox.querySelectorAll("[data-scan-index]").forEach(button=>button.onclick=()=>openCapture(list[Number(button.dataset.scanIndex)]));
+    if(capture&&!capture.ended){
+      const mine=list.find(r=>r.attempt.id===capture.result.attempt.id);
+      // withdrawn on the computer (or replaced there by a new request): this window has nothing left to answer
+      if(!mine||mine.scan.id!==capture.result.scan.id&&!capture.busy)capture.withdrawn?.(mine);
     }
+    const ask=list.find(r=>["waiting","confirmed","failed"].includes(r.scan.state)&&!handled.has(r.scan.id));
+    if(ask&&!capture)openCapture(ask);
   }catch(error){
     if(!live(e))return;
     if(error.status===401){reset();return;}
-    if(inbox){inbox.textContent="לא ניתן לבדוק בקשות צילום כרגע. מנסים שוב…";delete inbox.dataset.signature;}delay=15000;
+    delay=15000;
   }finally{if(inboxPoll===e)inboxPoll=null;}
   if(live(e))inboxTimer=setTimeout(()=>pollInbox(e),delay);
 }
@@ -86,13 +87,19 @@ async function renderQuestion(q){
     q.signature=signature;
     q.node.innerHTML=`<small>ניסיון ${esc(r.attempt.id.slice(0,8))}</small><p role="status" aria-live="polite">${esc(statusText)}</p>
       ${received?`<img class="mx-answer-image" alt="התשובה המצולמת שלכם" hidden>${gradingPanel(r,checking)}
-        <button class="mx-btn" data-new-attempt ${checking?"disabled":""}>ניסיון חדש וצילום מחדש</button>`:`<button class="mx-btn solid" data-request>${s?["expired","superseded"].includes(state)?"יצירת בקשת צילום חדשה":state==="failed"?"ניסיון נוסף":"פתחו את Mathly בטלפון באותו חשבון":"סריקת התשובה שלי בטלפון"}</button>`}`;
+        <button class="mx-btn" data-new-attempt ${checking?"disabled":""}>ניסיון חדש וצילום מחדש</button>`:`<button class="mx-btn solid mx-phone-cta" data-request><span aria-hidden="true">📱</span> ${s?["expired","superseded","declined"].includes(state)?"בקשת צילום חדשה לטלפון":waitingState(state)?"הצגת המספר לטלפון":"ניסיון נוסף בטלפון":"צילום התשובה בטלפון"}</button>`}`;
     if(!received){
-      const b=q.node.querySelector("[data-request]");b.disabled=["uploading","waiting","confirmed"].includes(state);
+      const b=q.node.querySelector("[data-request]");b.disabled=state==="uploading";
       b.onclick=async()=>{
         b.disabled=true;
-        try{const result=await post(`/api/math/answer-attempts/${r.attempt.id}/scans`,{question_id:q.id,renew:["expired","superseded","failed"].includes(state)});
-          if(!current(q))return;q.result=result;q.signature=null;await renderQuestion(q);schedule(q);}
+        try{
+          const result=waitingState(q.result.scan?.state)?q.result:await post(`/api/math/answer-attempts/${r.attempt.id}/scans`,
+            {question_id:q.id,renew:["expired","superseded","failed","declined"].includes(q.result.scan?.state)});
+          if(!current(q))return;q.result=result;q.signature=null;await renderQuestion(q);
+          const end=await waitForPhone(result,{question_id:q.id});
+          if(end&&current(q)){q.result=end;q.signature=null;await renderQuestion(q);}
+          schedule(q,0);
+        }
         catch(error){if(current(q)){q.node.querySelector("[role=status]").textContent=error.message;b.disabled=false;}}
       };
     }
@@ -151,44 +158,59 @@ async function checkAnswer(q,automatic=false){
     }
   }
 }
+const waitingState=st=>st==="waiting"||st==="confirmed";
+const codeHTML=code=>`<div class="mx-scan-code" dir="ltr" aria-label="מספר מזהה ${esc([...String(code||"")].join(" "))}">${[...String(code||"----")].map(d=>`<span>${esc(d)}</span>`).join("")}</div>`;
+// keeps Tab inside a window
+function trapTab(node,event){
+  if(event.key!=="Tab")return;
+  const buttons=[...node.querySelectorAll("button")].filter(b=>!b.hidden&&!b.disabled&&b.offsetParent);
+  if(event.shiftKey&&document.activeElement===buttons[0]){event.preventDefault();buttons.at(-1)?.focus();}
+  else if(!event.shiftKey&&document.activeElement===buttons.at(-1)){event.preventDefault();buttons[0]?.focus();}
+}
+
+/* ---------- the phone: a window for a request from the computer ---------- */
 function openCapture(result){
   closeCapture();const e=epoch;
   if(!live(e))return;
-  const node=document.createElement("div");node.className="mx-scan-overlay";node.setAttribute("role","dialog");node.setAttribute("aria-modal","true");node.setAttribute("aria-labelledby","scanTitle");
-  node.innerHTML=`<div class="mx-scan-card"><button class="mx-btn" data-close>סגירה</button><h2 id="scanTitle">צילום תשובה</h2>
-    <p>${fmt(result.attempt.snapshot.question)}</p><small>ניסיון ${esc(result.attempt.id.slice(0,8))}</small>
-    <p data-status role="status" aria-live="polite">האם לצלם תשובה לשאלה הזו?</p>
-    <button class="mx-btn solid" data-confirm>כן, אני רוצה לצלם תשובה</button>
-    <button class="mx-btn" data-renew hidden>יצירת בקשת צילום חדשה</button>
-    <input data-camera type="file" accept="image/*" capture="environment" hidden>
-    <button class="mx-btn" data-take hidden>צילום התשובה</button>
+  const node=document.createElement("div");node.className="mx-scan-overlay";node.setAttribute("role","alertdialog");node.setAttribute("aria-modal","true");node.setAttribute("aria-labelledby","scanTitle");
+  node.innerHTML=`<div class="mx-scan-card mx-scan-ask">
+    <h2 id="scanTitle"><span aria-hidden="true">📷</span> בקשת צילום מהמחשב</h2>
+    <p>בדקו שזה אותו מספר שמופיע במחשב:</p>${codeHTML(result.scan.code)}
+    <div class="mx-scan-q"><small>השאלה</small><p>${fmt(result.attempt.snapshot.question)}</p></div>
     <img class="mx-answer-image" data-preview alt="תצוגה מקדימה של התשובה" hidden>
-    <p>כשהבדיקה האוטומטית זמינה, צילום התשובה יישלח לבדיקה באמצעות AI. המשוב והציון יופיעו בשאלה במחשב.</p>
-    <button class="mx-btn solid" data-submit hidden>שליחת התשובה למחשב</button></div>`;
-  const c=capture={node,e,result,photo:null,url:null,key:null,busy:false,returnFocus:document.activeElement};visibleRoot.append(node);
-  const status=node.querySelector("[data-status]"),camera=node.querySelector("[data-camera]"),take=node.querySelector("[data-take]"),send=node.querySelector("[data-submit]"),preview=node.querySelector("[data-preview]"),confirm=node.querySelector("[data-confirm]"),renew=node.querySelector("[data-renew]");
+    <p data-status role="status" aria-live="polite">כתבו את הפתרון על דף וצלמו אותו.</p>
+    <input data-camera type="file" accept="image/*" capture="environment" hidden>
+    <div class="mx-scan-actions">
+      <button class="mx-btn solid" data-take>📷 צילום התשובה</button>
+      <button class="mx-btn solid" data-submit hidden>שליחה למחשב</button>
+      <button class="mx-btn" data-renew hidden>בקשה חדשה</button>
+      <button class="mx-btn mx-btn-quiet" data-decline>סירוב</button>
+      <button class="mx-btn" data-close hidden>סגירה</button>
+    </div>
+    <small>כשהבדיקה האוטומטית זמינה, צילום התשובה יישלח לבדיקה באמצעות AI. המשוב יופיע בשאלה במחשב.</small></div>`;
+  const c=capture={node,e,result,photo:null,url:null,key:null,busy:false,ended:false,confirming:null,returnFocus:document.activeElement};visibleRoot.append(node);
+  const $=sel=>node.querySelector(sel);
+  const status=$("[data-status]"),camera=$("[data-camera]"),take=$("[data-take]"),send=$("[data-submit]"),preview=$("[data-preview]"),renew=$("[data-renew]"),decline=$("[data-decline]"),close=$("[data-close]");
   const valid=()=>capture===c&&live(e),say=message=>{if(valid())status.textContent=message;};
-  const controls=busy=>{c.busy=busy;take.disabled=send.disabled=confirm.disabled=renew.disabled=busy;};
-  const expired=()=>{confirm.hidden=true;take.hidden=true;send.hidden=true;renew.hidden=false;say(errors.expired);};
-  node.querySelector("[data-close]").onclick=closeCapture;
+  const controls=busy=>{c.busy=busy;take.disabled=send.disabled=renew.disabled=decline.disabled=busy;};
+  // the request is over: only closing is left
+  const finish=message=>{c.ended=true;handled.add(c.result.scan.id);take.hidden=send.hidden=renew.hidden=decline.hidden=true;close.hidden=false;say(message);close.focus();};
+  const expired=()=>{take.hidden=send.hidden=true;renew.hidden=false;say(errors.expired);};
+  c.withdrawn=mine=>{ if(c.photo&&mine&&waitingState(mine.scan.state)){c.result=mine;return;} finish("הבקשה בוטלה במחשב."); };
+  close.onclick=()=>{closeCapture();if(valid())pollInbox(e);};
   node.onkeydown=event=>{
-    if(event.key==="Escape"&&!c.busy){event.preventDefault();event.stopPropagation();closeCapture();}
-    if(event.key==="Tab"){
-      const buttons=[...node.querySelectorAll("button")].filter(b=>!b.hidden&&!b.disabled);
-      if(event.shiftKey&&document.activeElement===buttons[0]){event.preventDefault();buttons.at(-1)?.focus();}
-      else if(!event.shiftKey&&document.activeElement===buttons.at(-1)){event.preventDefault();buttons[0]?.focus();}
-    }
+    if(event.key==="Escape"){event.preventDefault();event.stopPropagation();if(c.ended)close.click();}
+    trapTab(node,event);
   };
-  confirm.onclick=async()=>{
-    controls(true);
-    try{const r=await post(`/api/math/answer-scans/${c.result.scan.id}/confirm`);if(!valid())return;c.result=r;
-      if(r.attachment){success();return;}
-      confirm.hidden=true;take.hidden=false;say("בחרו צילום. אם תתבקשו, אפשרו גישה למצלמה.");take.focus();}
-    catch(error){if(valid()){say(error.message);if(error.status===410)expired();}}
-    finally{if(valid())controls(false);}
+  // confirming happens in the background, so the camera opens right from the tap
+  const confirmed=()=>c.confirming||=(async()=>{
+    const r=await post(`/api/math/answer-scans/${c.result.scan.id}/confirm`);if(valid())c.result=r;return r;
+  })().catch(error=>{c.confirming=null;throw error;});
+  take.onclick=()=>{
+    say("צלמו את הפתרון. אם המצלמה חסומה, אפשרו אותה בהגדרות האתר ונסו שוב.");camera.click();
+    confirmed().then(r=>{if(r.attachment&&valid())success();}).catch(error=>{if(valid()){say(error.message);if(error.status===410)expired();}});
   };
-  take.onclick=()=>{say("צלמו את הפתרון. אם המצלמה חסומה, אפשרו אותה בהגדרות האתר ונסו שוב.");camera.click();};
-  camera.addEventListener("cancel",()=>say("הצילום בוטל או שלא ניתנה הרשאה. אפשר לנסות שוב בכפתור הצילום."));
+  camera.addEventListener("cancel",()=>say("הצילום בוטל או שלא ניתנה הרשאה. אפשר לצלם שוב או לסרב."));
   camera.onchange=async()=>{
     const file=camera.files[0];camera.value="";if(!file||!valid())return;
     controls(true);say("מכינים את התמונה…");
@@ -197,15 +219,16 @@ function openCapture(result){
       if(photo.size>5000000)throw Error(errors.image_too_large);
       if(c.url)URL.revokeObjectURL(c.url);
       c.photo=photo;c.key=null;preview.src=c.url=URL.createObjectURL(photo);preview.hidden=false;
-      take.textContent="צילום מחדש";send.hidden=false;say("בדקו שכל הפתרון ברור, ואז שלחו את התשובה.");
+      take.textContent="צילום מחדש";take.classList.remove("solid");send.hidden=false;say("בדקו שכל הפתרון ברור, ואז שלחו למחשב.");send.focus();
     }catch(error){say("לא ניתן להכין את התמונה. נסו לצלם שוב.");}
     finally{if(valid())controls(false);}
   };
-  const success=()=>{say("התשובה הועלתה בהצלחה ומצורפת לשאלה במחשב.");take.hidden=send.hidden=confirm.hidden=renew.hidden=true;c.photo=null;if(valid())pollInbox(e);};
+  const success=()=>{c.photo=null;finish("✓ התשובה נשלחה למחשב.");};
   send.onclick=async()=>{
     if(!c.photo||c.busy)return;
     controls(true);say(states.uploading);
     try{
+      await confirmed();if(!valid())return;
       c.key=c.key||crypto.randomUUID();
       let b=await post(`/api/math/answer-scans/${c.result.scan.id}/uploads`,{key:c.key});if(!valid())return;
       if(b.attachment){success();return;}
@@ -216,17 +239,86 @@ function openCapture(result){
       if(!valid())return;say(error.message+" התמונה נשמרה לתצוגה מקדימה. אפשר לנסות שוב.");
       if(error.status===410||error.code==="superseded")expired();
       // Reuse the key after an uncertain response; the server returns prior success.
-    }finally{if(valid())controls(false);}
+    }finally{if(valid()&&!c.ended)controls(false);}
+  };
+  decline.onclick=async()=>{
+    controls(true);
+    try{await post(`/api/math/answer-scans/${c.result.scan.id}/decline`);if(!valid())return;finish("סירבתם לבקשה. המחשב קיבל הודעה.");}
+    catch(error){if(!valid())return;if(error.code==="superseded"||error.status===404)finish("הבקשה כבר לא פעילה.");else say(error.message);}
+    finally{if(valid()&&!c.ended)controls(false);}
   };
   renew.onclick=async()=>{
     controls(true);
     try{const r=await post(`/api/math/answer-attempts/${c.result.attempt.id}/scans`,{renew:true});if(!valid())return;
-      c.result=r;c.key=null;renew.hidden=true;confirm.hidden=false;say("נוצרה בקשה חדשה. האם לצלם תשובה לשאלה הזו?");}
+      c.result=r;c.key=null;c.confirming=null;renew.hidden=true;take.hidden=false;node.querySelector(".mx-scan-code").outerHTML=codeHTML(r.scan.code);
+      say("נוצרה בקשה חדשה עם מספר חדש. אפשר לצלם.");}
     catch(error){say(error.message);}
     finally{if(valid())controls(false);}
   };
   if(result.scan.state==="expired")expired();
-  node.querySelector("[data-close]").focus();
+  if(navigator.vibrate)try{navigator.vibrate([60,40,60]);}catch{}
+  take.focus();
+}
+
+/* ---------- the computer: waiting for the phone ---------- */
+/* A window with the request's 4-digit code until the phone answers. Resolves with the attempt's last result (photo
+   received, declined, expired or withdrawn here), or null when the account changed. `scanTo`: the body for a new
+   request ({question_id} when it belongs to a question). */
+function closeWait(){ if(waiting){clearTimeout(waiting.timer);waiting.node.remove();waiting.returnFocus?.focus?.({preventScroll:true});const done=waiting.done;waiting=null;done(null);} }
+function waitForPhone(result,scanTo={}){
+  closeWait();const e=epoch;
+  if(!live(e))return Promise.resolve(null);
+  return new Promise(done=>{
+    const node=document.createElement("div");node.className="mx-scan-overlay mx-scan-wait";node.setAttribute("role","dialog");node.setAttribute("aria-modal","true");node.setAttribute("aria-labelledby","waitTitle");
+    node.innerHTML=`<div class="mx-scan-card">
+      <h2 id="waitTitle"><span aria-hidden="true">📱</span> צילום בטלפון</h2>
+      <p data-say>פתחו את Mathly בטלפון, באותו חשבון. יקפוץ שם חלון עם המספר הזה:</p>
+      <div data-code></div>
+      <p class="mx-scan-live" data-status role="status" aria-live="polite"><span class="mx-scan-dot" aria-hidden="true"></span><span data-text>ממתינים לטלפון…</span></p>
+      <div class="mx-scan-actions">
+        <button class="mx-btn solid" data-again hidden>בקשה חדשה</button>
+        <button class="mx-btn" data-cancel>ביטול הבקשה</button>
+        <button class="mx-btn" data-done hidden>סגירה</button>
+      </div></div>`;
+    const w=waiting={node,timer:null,result,returnFocus:document.activeElement,done:r=>done(r)};(visibleRoot||document.body).append(node);
+    const $=sel=>node.querySelector(sel);
+    const valid=()=>waiting===w&&live(e);
+    const end=r=>{ if(waiting!==w)return; clearTimeout(w.timer);node.remove();waiting=null;w.returnFocus?.focus?.({preventScroll:true});done(r); };
+    let shown=null;
+    const paint=()=>{
+      const r=w.result,st=r.scan?.state,got=!!r.attachment;
+      if(got){ end(r); return; }
+      if(shown!==r.scan?.id){ shown=r.scan?.id; $("[data-code]").innerHTML=codeHTML(r.scan?.code); }
+      const over=["declined","expired","superseded"].includes(st);
+      const text={waiting:"ממתינים לטלפון…",confirmed:"הטלפון אישר. ממתינים לצילום…",uploading:"מקבלים את התמונה מהטלפון…",failed:"ההעלאה מהטלפון נכשלה. אפשר לנסות שוב בטלפון.",
+        declined:"הבקשה נדחתה בטלפון.",expired:"הבקשה פגה. אפשר ליצור בקשה חדשה.",superseded:"הבקשה הוחלפה."}[st]||"ממתינים לטלפון…";
+      $("[data-text]").textContent=text;
+      node.classList.toggle("is-over",over);node.classList.toggle("is-declined",st==="declined");
+      $("[data-say]").hidden=over;$("[data-code]").hidden=over;
+      $("[data-again]").hidden=$("[data-done]").hidden=!over;$("[data-cancel]").hidden=over||st==="uploading";
+    };
+    const poll=async()=>{
+      clearTimeout(w.timer);if(!valid())return;
+      try{ const r=await json(`/api/math/answer-attempts/${w.result.attempt.id}`);if(!valid())return;w.result=r;paint(); }
+      catch(error){ if(!valid())return;$("[data-text]").textContent=error.message; }
+      if(valid()&&!["declined","expired","superseded"].includes(w.result.scan?.state))w.timer=setTimeout(poll,document.hidden?5000:2000);
+    };
+    $("[data-cancel]").onclick=async()=>{
+      const b=$("[data-cancel]");b.disabled=true;
+      try{ w.result=await post(`/api/math/answer-scans/${w.result.scan.id}/decline`,{});if(!valid())return; }
+      catch(error){ if(!valid())return; }
+      end(w.result);
+    };
+    $("[data-done]").onclick=()=>end(w.result);
+    $("[data-again]").onclick=async()=>{
+      const b=$("[data-again]");b.disabled=true;
+      try{ w.result=await post(`/api/math/answer-attempts/${w.result.attempt.id}/scans`,{...scanTo,renew:true});if(!valid())return;paint();poll(); }
+      catch(error){ if(valid())$("[data-text]").textContent=error.message; }
+      finally{ b.disabled=false; }
+    };
+    node.onkeydown=event=>{ if(event.key==="Escape"){event.preventDefault();event.stopPropagation();} trapTab(node,event); };
+    paint(); if(waiting===w){ $("[data-cancel]").focus(); w.timer=setTimeout(poll,1500); }
+  });
 }
 document.addEventListener("visibilitychange",()=>{
   if(document.hidden)return;
@@ -234,5 +326,5 @@ document.addEventListener("visibilitychange",()=>{
   if(question?.result)pollQuestion(question);
 });
 window.addEventListener("online",()=>{if(account&&inbox)pollInbox(epoch);if(question?.result)pollQuestion(question);});
-window.MathlyAnswers={configure,mountQuestion,closeQuestion,reset};
+window.MathlyAnswers={configure,mountQuestion,closeQuestion,reset,waitForPhone};
 })();

@@ -136,9 +136,25 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-answer{display:flex;flex-direction:column;gap:12px}
 .mx-answer [hidden]{display:none}
 .mx-answer-image{display:block;max-width:100%;max-height:420px;object-fit:contain;border-radius:12px;background:#fff}
-.mx-scan-inbox:empty{display:none}.mx-scan-inbox{display:flex;flex-direction:column;gap:12px;padding-top:24px}
-.mx-scan-inbox .mx-btn{display:flex;flex-direction:column;align-items:flex-start;text-align:start;white-space:normal;gap:8px}
-.mx-scan-overlay{position:fixed;inset:0;z-index:1000;background:#000c;overflow:auto;padding:20px;display:flex;align-items:flex-start;justify-content:center}
+/* photo by phone (static/answer-scans.js): a window on the phone with the request, and one on the computer while it waits;
+   both show the same 4-digit code */
+.mx-scan-overlay{position:fixed;inset:0;z-index:1000;background:#000c;overflow:auto;padding:20px;display:flex;align-items:center;justify-content:center;animation:mx-scan-in .2s ease-out}
+@keyframes mx-scan-in{from{opacity:0;transform:scale(.97)}}
+.mx-scan-card h2{margin:0;font-size:22px}
+.mx-scan-code{display:flex;justify-content:center;gap:10px;margin:2px 0}
+.mx-scan-code span{display:grid;place-items:center;width:58px;height:72px;border-radius:14px;background:#0b0d0e;border:2px solid var(--mx-accent);
+  color:#fff;font:800 40px/1 var(--f-body,system-ui);font-variant-numeric:tabular-nums;box-shadow:0 0 18px color-mix(in srgb,var(--mx-accent) 30%,transparent)}
+.mx-scan-q{padding:10px 12px;border-radius:12px;background:#0b0d0e;border:1px solid #2c3333}
+.mx-scan-actions{display:flex;flex-direction:column;gap:10px}
+.mx-scan-actions .mx-btn{min-height:50px;font-size:17px}
+.mx-btn-quiet{border-color:#485050;color:#d7dcd8}
+.mx-scan-live{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:700}
+.mx-scan-dot{width:10px;height:10px;border-radius:50%;background:var(--mx-accent);animation:sky-pulse 1.4s ease-out infinite}
+.mx-scan-wait.is-over .mx-scan-dot{display:none}
+.mx-scan-wait.is-declined .mx-scan-live{color:var(--amber,#f0b35a)}
+.mx-scan-wait .mx-scan-card{text-align:center}
+.mx-phone-cta{font-size:15px;padding:12px 18px}
+@media (prefers-reduced-motion:reduce){.mx-scan-overlay,.mx-scan-dot{animation:none}}
 .mx-scan-card{background:#141719;color:#f4f2ec;border:1px solid #485050;border-radius:18px;padding:24px;width:min(520px,100%);display:flex;flex-direction:column;gap:14px;line-height:1.6}
 .mx-scan-card p{margin:0}.mx-scan-card [hidden]{display:none}.mx-scan-card small{color:#adb7b1}
 .mx-management,.mx-class-editor form{display:flex;flex-direction:column;gap:16px}
@@ -353,10 +369,10 @@ line.draw{stroke-dasharray:500;stroke-dashoffset:500;animation:sky-draw 1.1s eas
 /* today's goal, above the path; opens the streak calendar */
 .mx-daily{display:flex;flex-direction:column;gap:8px;width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:18px;background:var(--surface);color:var(--ink);font:inherit;text-align:start;cursor:pointer;transition:border-color .15s}
 .mx-daily:hover{border-color:var(--ember)}
-.mx-review{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:10px;padding:12px 14px;border:1px solid var(--line);border-inline-start:4px solid var(--gold);border-radius:18px;background:var(--surface);color:var(--ink);font:inherit;text-align:start;cursor:pointer;transition:border-color .15s}
-.mx-review:hover{border-color:var(--gold)}
+.mx-review,.mx-quiz-card{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:10px;padding:12px 14px;border:1px solid var(--line);border-inline-start:4px solid var(--gold);border-radius:18px;background:var(--surface);color:var(--ink);font:inherit;text-align:start;cursor:pointer;transition:border-color .15s}
+.mx-review:hover,.mx-quiz-card:hover{border-color:var(--gold)}
 #mathView .mx-review-sheet{--uc:var(--starlight)}   /* neutral: a unit colour would give the topic away */
-.mx-review span{color:var(--muted);font-size:13px}.mx-review .mx-dgo{color:var(--gold)}
+.mx-review span,.mx-quiz-card span{color:var(--muted);font-size:13px}.mx-review .mx-dgo,.mx-quiz-card .mx-dgo{color:var(--gold)}
 .mx-daily small{color:var(--muted);font-size:13px}
 .mx-dline{display:flex;align-items:center;gap:8px;font-size:15px}
 .mx-dline b{flex:1;min-width:0}
@@ -402,19 +418,34 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
 .k-met{background:var(--ember)}.k-saved{background:var(--ice-bg);box-shadow:inset 0 0 0 2px var(--ice)}.k-some{width:6px!important;height:6px!important;background:var(--ember)}
 .mx-examsoon{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;border:1px solid color-mix(in srgb,var(--ember) 50%,var(--line));border-radius:14px;background:var(--ember-bg);color:var(--ink);font-size:15px;text-align:start;cursor:pointer}
 .mx-examsoon span{color:var(--muted);font-size:13px;white-space:nowrap}
-/* one winding trail: start, then each unit's banner and its skills, then the finish; the line is drawn behind */
-.mx-trail{position:relative;display:flex;flex-direction:column;align-items:center;gap:22px;padding-block:6px 10px;--amp:min(90px,22vw)}
-.mx-line{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
-.mx-line path{fill:none;stroke:var(--line);stroke-width:7;stroke-linecap:round;stroke-dasharray:1 13}
-.mx-line path.on{stroke:var(--uc,var(--aurora));stroke-dasharray:none;stroke-opacity:.85}
+/* the path: start, then each unit's orbit (and its quiz), then the finish; a dotted line joins them top to bottom */
+.mx-trail{position:relative;display:flex;flex-direction:column;align-items:center;gap:30px;padding-block:6px 10px;container-type:inline-size}
+.mx-trail>:not(:first-child)::before{content:"";position:absolute;bottom:100%;left:50%;width:6px;height:30px;margin-left:-3px;
+  background:radial-gradient(circle,var(--line) 2.6px,transparent 3px) center top/6px 10px repeat-y;pointer-events:none}
 .mx-start,.mx-finish{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;font:400 15px/1.2 var(--f-display);color:var(--muted)}
 .mx-flag{display:grid;place-items:center;width:64px;height:64px;border-radius:50%;background:var(--surface-2);border:3px solid var(--aurora)}
 .mx-start b{color:var(--aurora)}
 .mx-finish>svg{width:30px;height:30px;fill:var(--dim)}
-.mx-unit{position:relative;width:100%;padding:12px 16px;border-radius:16px;background:var(--surface);border:1px solid color-mix(in srgb,var(--uc) 45%,var(--line));scroll-margin-top:72px}
+/* a unit's orbit: the unit in the middle, its skills around it in order (math.js, pathView) */
+.mx-unit{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;scroll-margin-top:72px}
+.mx-stage{--s:min(400px,100cqw);position:relative;width:var(--s);height:var(--s);margin-block:34px 30px}
+.mx-ring{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.mx-ring path{fill:none;stroke:var(--line);stroke-width:1.6;stroke-linecap:round;stroke-dasharray:.1 3.2}
+.mx-ring path.on{stroke:var(--uc);stroke-dasharray:none;stroke-opacity:.9}
+.mx-ring .mx-arrow{stroke-width:1.1;stroke-dasharray:none;stroke-linejoin:round;stroke:var(--dim)}
+.mx-ring .mx-arrow.on{stroke:var(--uc)}
+.mx-ring .mx-back{stroke-opacity:.35}
 .mx-uhead{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap}
-.mx-uhead h2{font-size:20px;color:var(--uc);flex:1;min-width:0}
-.mx-unit.full .mx-uhead h2::after{content:" ✦";color:var(--gold)}
+.mx-hub{position:absolute;left:50%;top:50%;width:calc(var(--s) * .36);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  flex-direction:column;justify-content:center;flex-wrap:nowrap;gap:4px;padding:12px;box-sizing:border-box;text-align:center;
+  background:radial-gradient(circle,color-mix(in srgb,var(--uc) 22%,var(--surface)) 0 calc(100% - 7px),transparent calc(100% - 6px)),
+    conic-gradient(var(--uc) calc(var(--p) * 1%),var(--surface-2) 0);
+  box-shadow:0 6px 0 var(--night-2),0 0 26px color-mix(in srgb,var(--uc) 30%,transparent)}
+.mx-hub h2{font-size:clamp(14px,4.2cqw,18px);line-height:1.15;color:var(--ink);margin:0;overflow-wrap:anywhere}
+.mx-hub .mx-pill{background:color-mix(in srgb,var(--uc) 35%,var(--bg));color:var(--ink)}
+.mx-hub .mx-usub{width:auto;font-size:11.5px}
+.mx-unit.full .mx-hub{box-shadow:0 6px 0 var(--night-2),0 0 30px color-mix(in srgb,var(--gold) 55%,transparent)}
+.mx-unit.full .mx-hub h2::after{content:" ✦";color:var(--gold)}
 /* lesson resources: a teacher opens them from a unit's title (static/math.js, openResources) */
 .mx-uhead.is-teach{cursor:pointer}
 .mx-res-open{border:1px solid color-mix(in srgb,var(--uc) 55%,var(--line));background:var(--bg);color:var(--ink);border-radius:999px;padding:6px 12px;font:600 13px/1 var(--f-body);cursor:pointer;min-height:32px}
@@ -440,7 +471,21 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
 @media (max-width:380px){.mx-res-kinds{grid-template-columns:1fr}}
 .mx-pill{padding:3px 10px;border-radius:999px;font:700 12px/1.4 var(--f-body);background:color-mix(in srgb,var(--uc) 18%,transparent);color:var(--uc);font-variant-numeric:tabular-nums}
 .mx-usub{width:100%;color:var(--muted);font-size:13px}
-.mx-step{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;width:150px;transform:translateX(calc(var(--x) * var(--amp)))}
+.mx-step{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;width:150px}
+/* a skill on the orbit: its centre sits on the ring; the name goes above it in the top part, below it elsewhere */
+.mx-orb{position:absolute;width:0;height:0;gap:0;left:calc(50% + var(--dx) * var(--s) * .34);top:calc(50% + var(--dy) * var(--s) * .34)}
+.mx-orb>.mx-star{position:absolute;left:0;top:0;width:54px;height:54px;transform:translate(-50%,-50%)}
+.mx-orb>.mx-star:active{transform:translate(-50%,calc(-50% + 3px))}
+.mx-orb>.mx-star.st-next{width:64px;height:64px}
+.mx-orb>.mx-lbl{position:absolute;left:0;top:32px;transform:translateX(-50%);width:max-content;max-width:min(112px,28cqw);padding:2px 7px;font-size:12px}
+.mx-orb .mx-perch{top:20px;left:-30px}
+.mx-orb.up>.mx-lbl{top:auto;bottom:32px}
+.mx-orb>.st-next+.mx-lbl{top:38px}.mx-orb.up>.st-next+.mx-lbl{top:auto;bottom:38px}
+.mx-num{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 4px;box-sizing:border-box;border-radius:999px;display:grid;place-items:center;
+  font:700 11.5px/1 var(--f-body);font-variant-numeric:tabular-nums;background:var(--bg);color:var(--muted);border:2px solid var(--line)}
+.mx-star.st-lit .mx-num,.mx-star.st-fading .mx-num{border-color:var(--uc);color:var(--ink)}
+.mx-star.st-gold .mx-num{border-color:var(--gold);color:var(--gold)}
+.mx-star.st-next .mx-num{border-color:var(--aurora);background:var(--aurora);color:var(--on-aurora)}
 .mx-star{position:relative;width:62px;height:62px;padding:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;
   background:var(--surface-2);border:3px solid var(--line);box-shadow:0 5px 0 var(--night-2);transition:transform .15s}
 .mx-star:active{transform:translateY(3px);box-shadow:0 2px 0 var(--night-2)}
@@ -545,3 +590,63 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
   line.draw{stroke-dashoffset:0}
   .sky-comet{animation:none;left:auto;right:24px;top:30%}
 }
+
+/* the practice exam (math.js, "practice exam"); its card looks like the review's */
+.mx-quiz-card{border-inline-start-color:var(--aurora)}.mx-quiz-card .mx-dgo{color:var(--aurora)}
+.mx-quiz-units{display:flex;flex-wrap:wrap;gap:8px}
+.mx-quiz-units button[aria-pressed="true"]{background:var(--mx-accent);color:var(--mx-on-accent)}
+.mx-quiz-units button[aria-pressed="false"]{opacity:.7}
+.mx-quiz-dots{display:flex;flex-wrap:wrap;gap:6px}
+.mx-quiz-dots button{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--muted);font:600 13px/1 var(--f-body);cursor:pointer}
+.mx-quiz-dots button.done{border-color:var(--mx-accent);color:var(--ink)}
+.mx-quiz-dots button.now{outline:2px solid var(--gold);outline-offset:2px}
+.mx-quiz-sheet .mx-choices button[aria-pressed="true"]{border-color:var(--gold);background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--gold)}
+.mx-quiz-nav{display:flex;justify-content:space-between;gap:8px;margin-top:4px}
+.mx-quiz-warn{color:var(--amber)}
+.mx-quiz-units-score{display:grid;gap:10px}
+.mx-quiz-units-score div{display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center}
+.mx-quiz-units-score .mx-meter{grid-column:1/-1;height:8px;background:var(--surface-2)}
+.mx-quiz-units-score .mx-meter i{background:var(--aurora)}
+.mx-quiz-plan{display:flex;flex-direction:column;gap:10px;padding-inline-start:20px;margin:0}
+.mx-quiz-plan li{display:flex;flex-direction:column;gap:4px;background:var(--amber-bg);border-radius:12px;padding:10px 12px}
+.mx-quiz-plan li b{color:var(--amber)}
+.mx-quiz-review summary{cursor:pointer;color:var(--muted)}
+.mx-quiz-review ol{display:flex;flex-direction:column;gap:8px;padding-inline-start:20px}
+.mx-quiz-review li{display:flex;flex-direction:column;gap:2px}
+.mx-quiz-review li small{color:var(--dim)}
+.mx-quiz-review li.ok>span:last-child{color:var(--ok)}
+.mx-quiz-review li.bad>span:last-child{color:var(--amber)}
+
+/* the unit quiz (math.js, "unit quiz"): a node at the end of the unit, and a sheet that looks like a paper quiz */
+.mx-uquiz{width:60px;height:60px;padding:0;border-radius:18px;font-size:24px;display:grid;place-items:center;border:2px dashed var(--uc,var(--gold));background:var(--surface);cursor:pointer;box-shadow:0 5px 0 var(--night-2)}
+.mx-uquiz.done{border-style:solid}
+.mx-uq-rules{display:flex;flex-direction:column;gap:6px;padding-inline-start:20px;margin:0;color:var(--ink)}
+.mx-uq-history{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.mx-uq-history h4{width:100%;margin:0}
+.mx-uq-head{position:sticky;top:-16px;z-index:2;display:flex;align-items:center;gap:10px;justify-content:space-between;background:var(--surface);padding:16px 0 6px;margin-top:-16px;border-bottom:1px solid var(--line)}   /* covers the sheet's top padding too */
+.mx-uq-head h3{margin:2px 0 0}
+.mx-uq-clock{font:700 22px/1 var(--f-body);font-variant-numeric:tabular-nums;color:var(--ink);padding:6px 12px;border-radius:999px;background:var(--surface-2);margin-inline-start:auto}
+.mx-uq-clock.low{color:var(--amber)}.mx-uq-clock.over{color:var(--amber);background:var(--amber-bg)}
+.mx-uq-banner{margin:0;color:var(--amber);font-size:14px}.mx-uq-banner:empty{display:none}
+.mx-uq-qs{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px}
+.mx-uq-q{background:var(--bg);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.mx-uq-qhead{display:flex;justify-content:space-between;align-items:baseline}.mx-uq-qhead span{color:var(--muted);font-size:14px}
+.mx-uq-text{margin:0;line-height:1.7}
+.mx-uq-answer{display:flex;flex-direction:column;gap:6px;border-top:1px dashed var(--line);padding-top:8px}
+.mx-uq-img{max-width:100%;max-height:320px;object-fit:contain;border-radius:10px;border:1px solid var(--line);align-self:flex-start}
+.mx-uq-verdict{margin:0;font-weight:700}.mx-uq-verdict.correct{color:var(--ok)}.mx-uq-verdict.partial,.mx-uq-verdict.incorrect,.mx-uq-verdict.none,.mx-uq-verdict.unreadable,.mx-uq-verdict.needs_review{color:var(--amber)}
+
+
+/* misconception patterns: a card on home (after the review) and its sheet */
+.mx-patterns{display:flex;flex-direction:column;gap:4px;width:100%;margin-top:10px;padding:12px 14px;border:1px solid var(--line);border-inline-start:4px solid var(--starlight);border-radius:18px;background:var(--surface);color:var(--ink);font:inherit;text-align:start;cursor:pointer;transition:border-color .15s}
+.mx-patterns:hover{border-color:var(--starlight)}
+.mx-patterns span{color:var(--muted);font-size:13px;overflow-wrap:anywhere}.mx-patterns .mx-dgo{color:var(--starlight)}
+#mathView .mx-patterns-sheet{--uc:var(--starlight)}
+.mx-pattern-list{display:flex;flex-direction:column;gap:10px;margin:12px 0;padding:0;list-style:none}
+.mx-pattern-list li{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:12px;border:1px solid var(--line);border-radius:14px;overflow-wrap:anywhere}
+.mx-pattern-list li>span{color:var(--muted);font-size:14px}
+.mx-pattern-list.gone li{opacity:.85;border-style:dashed}
+.mx-patterns-sheet h4{margin:18px 0 0}.mx-pattern-list.gone{margin-top:8px}
+/* a skill that a recurring mistake sends back to: a gold ring on its star and its tag in gold, so it shows on the path */
+.mx-star.fix{box-shadow:0 0 0 3px var(--gold),0 0 14px color-mix(in srgb,var(--gold) 55%,transparent)}
+.mx-lbl.l-fix em{background:var(--gold);color:#2A1B00}
+.mx-pattern-note{display:block;margin-top:6px;padding:8px 10px;border-inline-start:3px solid var(--gold);border-radius:8px;background:color-mix(in srgb,var(--gold) 10%,transparent);color:var(--ink);font-size:13.5px}

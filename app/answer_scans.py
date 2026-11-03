@@ -130,12 +130,21 @@ def public_result(result):
     if result.get("scan"):
         for key in ("idempotency_key", "lease_id", "lease_until"):
             result["scan"].pop(key, None)
+        result["scan"]["code"] = scan_code(result["scan"].get("id"))
     if result.get("attachment"):
         result["attachment"].pop("object_key", None)
     if result.get("grading"):
         result["grading"].pop("lease_id", None)
         result["grading"].pop("lease_until", None)
     return result
+
+
+def scan_code(scan_id):
+    """The 4 digits shown on both the computer and the phone, so the student can match the request."""
+    try:
+        return f"{uuid.UUID(str(scan_id)).int % 10000:04d}"
+    except (ValueError, TypeError, AttributeError):
+        return ""
 
 
 def uuid_text(value):

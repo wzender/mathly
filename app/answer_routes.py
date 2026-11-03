@@ -12,7 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from .answer_scans import AnswerScans, MAX_IMAGE, ScanError, clean_image, public_result, uuid_text
 from .answer_grading import AnswerGrader
 from .math_photo import PhotoUnavailable
-from .math_skills import algebra9, question_version
+from .math_skills import algebra9, question_version, quiz_snapshot
 
 log = logging.getLogger("mathly.answer_routes")
 VERDICTS = {"correct": "נכונה", "partial": "נכונה חלקית", "incorrect": "שגויה",
@@ -88,6 +88,22 @@ def install_answer_routes(app, signed_in):
         return reply(call(user, "resume", question_id=question["id"], question_version=version,
                           snapshot={"name": question["name"], **sample}, new=body.get("new") is True))
 
+    @app.post("/api/math/quiz-attempts")
+    def quiz_attempt(body: dict, user=Depends(student)):
+        """An answer to a question of a unit's summarizing quiz: `new` starts the attempt of a new sitting."""
+        if open_ended_locked():
+            raise ScanError(403, "open_ended_locked")
+        unit = next((u for u in algebra9()["units"] if u["id"] == body.get("unit") and "quiz" in u), None)
+        index = body.get("index")
+        if not unit or type(index) is not int or not 0 <= index < len(unit["quiz"]["questions"]):
+            raise ScanError(404, "not_found")
+        snapshot = quiz_snapshot(unit, index)
+        version = question_version(snapshot)
+        if body.get("question_version") != version:
+            raise ScanError(409, "question_changed")
+        return reply(call(user, "resume", question_id=f"quiz:{unit['id']}:{index}", question_version=version,
+                          snapshot=snapshot, new=body.get("new") is True))
+
     @app.get("/api/math/answer-attempts/{attempt_id}")
     def get_attempt(attempt_id: str, user=Depends(student)):
         return reply(call(user, "get", attempt_id=uuid_text(attempt_id)))
@@ -157,6 +173,11 @@ def install_answer_routes(app, signed_in):
     def confirm(scan_id: str, user=Depends(student)):
         return reply(usable(call(user, "confirm", scan_id=uuid_text(scan_id))))
 
+    @app.post("/api/math/answer-scans/{scan_id}/decline")
+    def decline(scan_id: str, user=Depends(student)):
+        """The phone refuses the request, or the computer withdraws it."""
+        return reply(call(user, "decline", scan_id=uuid_text(scan_id)))
+
     @app.post("/api/math/answer-scans/{scan_id}/uploads")
     def begin(scan_id: str, body: dict, user=Depends(student)):
         result = usable(call(user, "begin", scan_id=uuid_text(scan_id), key=uuid_text(body.get("key"))))
@@ -172,7 +193,9 @@ def install_answer_routes(app, signed_in):
         data = await photo.read(MAX_IMAGE + 1)
         result = await run_in_threadpool(submit, user, sid, lease, data, photo.content_type)
         note(user, "answer_upload", result)
-        if result.get("grading_available") and not result.get("grading"):
+        # a quiz answer is graded only once the quiz is handed in (the page asks for it then)
+        quiz = str(result.get("attempt", {}).get("question_id", "")).startswith("quiz:")
+        if result.get("grading_available") and not result.get("grading") and not quiz:
             background_tasks.add_task(automatic_grade, user, result["attempt"]["id"])
         return reply(result)
 

@@ -9,6 +9,9 @@ the one it came from (`from`) so classes that chose it keep their content. `mont
 The questions are written for the app, and every skill, link and mistake still needs a teacher's review.
 
 `problems` is run by the tests and on loading: a broken graph is refused before a student meets it.
+
+A unit may end with a summarizing quiz (`quiz`): open-ended questions answered on paper and photographed, a time limit
+in minutes, and points per question that add up to 100. Its questions are graded only after the quiz is handed in.
 """
 from __future__ import annotations
 
@@ -107,6 +110,39 @@ def sample_problems(where: str, sid: str, sample: dict, listed: bool, mistakes: 
     return out
 
 
+def quiz_problems(unit: dict) -> list[str]:
+    """A unit's summarizing quiz: a time limit, and open-ended questions whose points add up to 100."""
+    quiz, where = unit["quiz"], f"{unit['id']} quiz"
+    if not isinstance(quiz, dict):
+        return [f"{where}: must be an object"]
+    out = []
+    if type(quiz.get("minutes")) is not int or not 5 <= quiz["minutes"] <= 120:
+        out.append(f"{where}: minutes must be a whole number from 5 to 120")
+    qs = quiz.get("questions")
+    if not isinstance(qs, list) or not qs:
+        return out + [f"{where}: needs questions"]
+    for n, q in enumerate(qs, 1):
+        at = f"{where} question {n}"
+        if not isinstance(q, dict) or not isinstance(q.get("question"), str) or not q["question"].strip():
+            out.append(f"{at}: question text is required")
+            continue
+        if type(q.get("points")) is not int or q["points"] <= 0:
+            out.append(f"{at}: points must be a positive whole number")
+        if "choices" in q:
+            out.append(f"{at}: a quiz question is open-ended")
+        if "figure" in q:
+            out += figure_problems(at, q["figure"])
+    if not out and sum(q["points"] for q in qs) != 100:
+        out.append(f"{where}: points add up to {sum(q['points'] for q in qs)}, not 100")
+    return out
+
+
+def quiz_snapshot(unit: dict, index: int) -> dict:
+    """What an answer to quiz question `index` is graded against, and what its version is computed from."""
+    q = unit["quiz"]["questions"][index]
+    return {"name": f"בוחן מסכם: {unit['name']} · שאלה {index + 1}", **q, "type": "open-ended"}
+
+
 def problems(graph: dict) -> list[str]:
     """What is wrong with a graph: unknown units, skills or mistakes, a cycle, a link implied by another,
     a question without exactly one right answer, or a mistake that sends the student to a skill that is not before it."""
@@ -114,6 +150,7 @@ def problems(graph: dict) -> list[str]:
     skills = {s["id"]: s for s in graph["skills"]}
     mistakes = graph["mistakes"]
     out = [f"{u['id']}: subject is required" for u in graph["units"] if not str(u.get("subject") or "").strip()]
+    out += [p for u in graph["units"] if "quiz" in u for p in quiz_problems(u)]
     out += [f"{s['id']}: unknown unit {s['unit']}" for s in skills.values() if s["unit"] not in units]
     out += [f"{s['id']}: unknown prerequisite {p}" for s in skills.values() for p in s["prereqs"] if p not in skills]
     if out:
@@ -156,6 +193,10 @@ def algebra9() -> dict:
     return graph
 
 
+def algebra9_unit(unit_id: str) -> dict:
+    return next(u for u in algebra9()["units"] if u["id"] == unit_id)
+
+
 def practice_graph(answer_scans_enabled: bool, open_ended_locked: bool = False) -> dict:
     """Keep practice usable during a scan rollout or rollback.
 
@@ -165,6 +206,11 @@ def practice_graph(answer_scans_enabled: bool, open_ended_locked: bool = False) 
     """
     graph = copy.deepcopy(algebra9())
     subject = {unit["id"]: unit["subject"] for unit in graph["units"]}
+    for unit in graph["units"]:
+        if "quiz" in unit:   # photographed and graded: only with answer storage and open-ended grading on
+            unit["quiz"]["locked"] = not answer_scans_enabled or open_ended_locked
+            for i, q in enumerate(unit["quiz"]["questions"]):
+                q["question_version"] = question_version(quiz_snapshot(algebra9_unit(unit["id"]), i))
     for skill in graph["skills"]:
         skill["subject"] = subject[skill["unit"]]   # a subunit belongs to its unit's subject
         fallback = skill.pop("fallback_sample", None)
