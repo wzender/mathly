@@ -72,9 +72,12 @@ def test_two_device_capture_retake_failure_retry_and_original_attempt(scan_serve
                 open_question(computer)
             assert len(resume.value.post_data_json['question_version'])==64
             computer.locator('[data-request]').click()
-            playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('ממתינים לטלפון')
-            wait = computer.locator('.mx-scan-wait')
-            playwright.expect(wait.locator('.mx-scan-code span')).to_have_count(4)   # the computer waits with a 4-digit code
+            # no window over the question: the button itself shows the 4-digit code and the progress
+            wait = computer.locator('.mx-answer .mx-phone-live')
+            playwright.expect(wait).to_contain_text('ממתינים לטלפון')
+            playwright.expect(wait.locator('.mx-scan-code span')).to_have_count(4)
+            assert computer.locator('.mx-scan-overlay').count() == 0
+            playwright.expect(computer.locator('.mx-answer')).to_be_visible()   # the question stays in view
             code = wait.locator('.mx-scan-code').inner_text().replace('\n', '')
             assert len(code) == 4 and code.isdigit()
             with store.connect() as c:
@@ -108,7 +111,7 @@ def test_two_device_capture_retake_failure_retry_and_original_attempt(scan_serve
             store.fail_put = True
             phone.locator('[data-submit]').click()
             playwright.expect(phone.locator('[data-status]')).to_contain_text('אפשר לנסות שוב')
-            playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('ההעלאה נכשלה', timeout=10000)
+            playwright.expect(wait).to_contain_text('ההעלאה נכשלה', timeout=10000)
             assert phone.locator('[data-preview]').is_visible()
             store.fail_put = False
             started, release = threading.Event(), threading.Event()
@@ -121,7 +124,7 @@ def test_two_device_capture_retake_failure_retry_and_original_attempt(scan_serve
             assert started.is_set()
             release.set()
             playwright.expect(phone.locator('[data-status]')).to_contain_text('נשלחה למחשב', timeout=10000)
-            playwright.expect(wait).to_have_count(0, timeout=10000)   # the computer's window closes with the photo
+            playwright.expect(wait).to_have_count(0, timeout=10000)   # the code box gives way to the photo
             playwright.expect(computer.locator('.mx-answer-image')).to_be_visible()
             assert computer.locator('.mx-answer-image').evaluate('img=>img.complete&&img.naturalWidth>0')
             computer.screenshot(path='/tmp/mathly-answer-computer.png', full_page=True, animations='disabled')
@@ -144,17 +147,18 @@ def test_expiry_renewal_reconnect_and_account_change(scan_server):
         try:
             computer = session(browser).new_page();computer.goto(url);open_question(computer)
             computer.locator('[data-request]').click()
-            playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('ממתינים לטלפון')
+            playwright.expect(computer.locator('.mx-phone-live')).to_contain_text('ממתינים לטלפון')
             with store.connect() as c:
                 old = str(c.execute('select id from math_answer_scans').fetchone()[0])
                 c.execute("update math_answer_scans set expires_at=now()-interval '1 second'")
             computer.route('**/api/math/answer-attempts/*', lambda r:r.abort(), times=1)
             playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('בקשת הצילום פגה', timeout=15000)
-            playwright.expect(computer.locator('.mx-scan-wait')).to_contain_text('הבקשה פגה')
+            playwright.expect(computer.locator('.mx-phone-live')).to_have_count(0)
+            playwright.expect(computer.locator('[data-request]')).to_contain_text('בקשת צילום חדשה')
             phone = session(browser, mobile=True).new_page();phone.goto(url)
             phone.wait_for_timeout(1500)
             playwright.expect(phone.locator('.mx-scan-overlay')).to_have_count(0)   # an expired request does not pop up
-            computer.locator('[data-again]').click()
+            computer.locator('[data-request]').click()
             playwright.expect(phone.locator('.mx-scan-overlay')).to_be_visible(timeout=10000)
             assert store.action(OWNER, 'pending')[0]['scan']['generation'] == 2
             phone.locator('[data-camera]').set_input_files({'name':'answer.png','mimeType':'image/png','buffer':png()})
@@ -179,7 +183,7 @@ def test_success_response_loss_is_safe_to_retry(scan_server):
         try:
             computer=session(browser).new_page();computer.goto(url);open_question(computer)
             computer.locator('[data-request]').click()
-            playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('ממתינים לטלפון')
+            playwright.expect(computer.locator('.mx-phone-live')).to_contain_text('ממתינים לטלפון')
             phone=session(browser,mobile=True).new_page();phone.goto(url)
             playwright.expect(phone.locator('.mx-scan-overlay')).to_be_visible()
             phone.locator('[data-camera]').set_input_files({'name':'answer.png','mimeType':'image/png','buffer':png()})
@@ -284,7 +288,7 @@ def test_upload_is_acknowledged_before_automatic_grading_finishes(scan_server, m
         try:
             computer=session(browser).new_page();computer.goto(url);open_question(computer)
             computer.locator('[data-request]').click()
-            playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('ממתינים לטלפון')
+            playwright.expect(computer.locator('.mx-phone-live')).to_contain_text('ממתינים לטלפון')
             phone=session(browser,mobile=True).new_page();phone.goto(url)
             playwright.expect(phone.locator('.mx-scan-overlay')).to_be_visible()
             phone.locator('[data-camera]').set_input_files({'name':'answer.png','mimeType':'image/png','buffer':png()})
@@ -310,22 +314,20 @@ def test_phone_declines_and_computer_withdraws(scan_server):
             computer.on('pageerror', lambda error: errors.append(str(error)))
             computer.goto(url); open_question(computer)
             computer.locator('[data-request]').click()
-            wait = computer.locator('.mx-scan-wait')
+            wait = computer.locator('.mx-phone-live')
             playwright.expect(wait.locator('.mx-scan-code span')).to_have_count(4)
             phone = session(browser, mobile=True).new_page()
             phone.on('pageerror', lambda error: errors.append(str(error)))
             phone.goto(url)
             # the phone declines: the computer reports it
             phone.locator('[data-decline]').click()
-            playwright.expect(wait).to_contain_text('הבקשה נדחתה בטלפון', timeout=10000)
-            computer.locator('[data-done]').click()
+            playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('הבקשה נדחתה בטלפון', timeout=10000)
             playwright.expect(wait).to_have_count(0)
-            playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('הבקשה נדחתה בטלפון')
             phone.locator('[data-close]').click()
             # a new request pops up again; the computer withdraws it and the phone's window says so
             computer.locator('[data-request]').click()
             playwright.expect(phone.locator('.mx-scan-overlay [data-take]')).to_be_visible(timeout=10000)
-            computer.locator('[data-cancel]').click()
+            computer.locator('[data-cancel-scan]').click()
             playwright.expect(wait).to_have_count(0)
             playwright.expect(phone.locator('[data-status]')).to_contain_text('בוטלה במחשב', timeout=10000)
             assert store.action(OWNER, 'pending') == []

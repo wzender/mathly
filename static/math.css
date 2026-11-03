@@ -131,6 +131,7 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-geometry small{font-size:12px;color:var(--muted)}
 /* Handwritten answer scanning */
 .mx-answer{display:flex;flex-direction:column;gap:12px}
+.mx-answer > p[role=status]:empty{display:none}
 .mx-answer [hidden]{display:none}
 .mx-answer-image{display:block;max-width:100%;max-height:420px;object-fit:contain;border-radius:12px;background:#fff}
 /* photo by phone (static/answer-scans.js): a window on the phone with the request, and one on the computer while it waits;
@@ -149,10 +150,17 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-push-offer[hidden]{display:none}
 .mx-scan-live{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:700}
 .mx-scan-dot{width:10px;height:10px;border-radius:50%;background:var(--mx-accent);animation:sky-pulse 1.4s ease-out infinite}
-.mx-scan-wait.is-over .mx-scan-dot{display:none}
-.mx-scan-wait.is-declined .mx-scan-live{color:var(--amber,#f0b35a)}
-.mx-scan-wait .mx-scan-card{text-align:center}
 .mx-phone-cta{font-size:15px;padding:12px 18px}
+/* the photo button while the phone has the request: its code and progress, in place (no window over the question) */
+.mx-phone-live{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 16px;border-radius:18px;
+  border:2px solid var(--mx-accent);background:color-mix(in srgb,var(--mx-accent) 8%,transparent);text-align:center}
+.mx-phone-live-head{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px}
+.mx-phone-live-code{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+.mx-phone-live-code small{color:var(--muted,#adb7b1)}
+.mx-phone-live .mx-scan-code{gap:6px}
+.mx-phone-live .mx-scan-code span{width:34px;height:42px;border-radius:9px;font-size:24px}
+.mx-phone-live.is-failed{border-color:var(--amber,#f0b35a)}.mx-phone-live.is-failed .mx-phone-live-head{color:var(--amber,#f0b35a)}
+.mx-phone-live.is-uploading .mx-phone-live-code{opacity:.6}
 @media (prefers-reduced-motion:reduce){.mx-scan-overlay,.mx-scan-dot{animation:none}}
 .mx-scan-card{background:#141719;color:#f4f2ec;border:1px solid #485050;border-radius:18px;padding:24px;width:min(520px,100%);display:flex;flex-direction:column;gap:14px;line-height:1.6}
 .mx-scan-card p{margin:0}.mx-scan-card [hidden]{display:none}.mx-scan-card small{color:#adb7b1}

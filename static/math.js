@@ -829,16 +829,17 @@ async function uqRefresh(i){
   }catch(e){ if(UQ?.uid===uid) UQ.msg[i]=e.message; }
   if(UQ?.uid===uid) uqDrawAnswer(i);
   // waiting for the phone: look again soon
-  if(UQ?.uid===uid&&!UQ.res[i]?.attachment&&["waiting","confirmed","uploading"].includes(UQ.res[i]?.scan?.state)){ clearTimeout(UQ.poll); UQ.poll=setTimeout(()=>sit.attempts.forEach((_,k)=>uqRefresh(k)),4000); }
+  if(UQ?.uid===uid&&!UQ.res[i]?.attachment&&["waiting","confirmed","uploading","failed"].includes(UQ.res[i]?.scan?.state)){ clearTimeout(UQ.poll); UQ.poll=setTimeout(()=>sit.attempts.forEach((_,k)=>uqRefresh(k)),2000); }
 }
 function uqDrawAnswer(i){
   const box=sheet.querySelector(`[data-uq-i="${i}"]`); if(!box) return;
-  const r=UQ.res[i], has=!!r?.attachment, busy=UQ.busy[i], st=r?.scan?.state, phone=["waiting","confirmed"].includes(st)&&!has;
+  const r=UQ.res[i], has=!!r?.attachment, busy=UQ.busy[i], st=r?.scan?.state, phone=["waiting","confirmed","uploading","failed"].includes(st)&&!has;
   const touch=matchMedia("(max-width: 700px)").matches||navigator.maxTouchPoints>0;
-  // on a computer the phone comes first: it is how most answers on paper get here
-  const phoneBtn=touch?"":`<button class="mx-btn${has?"":" solid"} mx-phone-cta" data-uq-phone="${i}"${busy||st==="uploading"?" disabled":""}><span aria-hidden="true">📱</span> ${phone?"הצגת המספר לטלפון":has?"צילום מחדש בטלפון":"צילום בטלפון"}</button>`;
+  // on a computer the phone comes first: it is how most answers on paper get here. While the phone has the request,
+  // the button is the request's box (its code and progress), not a window over the quiz.
+  const phoneBtn=touch?"":window.MathlyAnswers.phoneLive(has?null:r?.scan,`data-uq-phone="${i}"`,`data-uq-cancel="${i}"`,has?"צילום מחדש בטלפון":"צילום בטלפון",!!busy);
   box.innerHTML=`${has?`<img class="mx-uq-img" alt="התשובה המצולמת לשאלה ${i+1}" src="${UQ.images[i]||""}">`:""}
-    <p class="mx-small" role="status">${busy?esc(busy):UQ.msg[i]?esc(UQ.msg[i]):has?"✓ התשובה נשמרה":phone?"ממתינים לצילום מהטלפון":st==="declined"?"הבקשה נדחתה בטלפון":"עוד לא צולמה תשובה"}</p>
+    <p class="mx-small" role="status">${busy?esc(busy):UQ.msg[i]?esc(UQ.msg[i]):has?"✓ התשובה נשמרה":phone?"":st==="declined"?"הבקשה נדחתה בטלפון":st==="expired"?"בקשת הצילום פגה":"עוד לא צולמה תשובה"}</p>
     <span class="mx-chips">${phoneBtn}<button class="mx-btn${has||!touch?"":" solid"}" data-uq-photo="${i}"${busy?" disabled":""}>${has&&touch?"צילום מחדש":touch?"צילום התשובה":"העלאת תמונה מהמחשב"}</button></span>`;
   const done=Object.values(UQ.res).filter(x=>x?.attachment).length, n=uqState(UQ.uid).sitting.attempts.length;
   const c=sheet.querySelector("[data-uq-count]"); if(c) c.textContent=`צולמו ${done} מתוך ${n} תשובות`;
@@ -868,18 +869,18 @@ async function uqUpload(i,file){
   if(UQ?.uid!==uid) return;
   UQ.busy[i]=""; uqRefresh(i);
 }
-// the phone: a request with a 4-digit code, and a window here until the phone sends the photo or declines
+// the phone: a request with a 4-digit code, shown in the answer's own box until the phone sends the photo or declines
 async function uqPhone(i){
-  const uid=UQ.uid, r0=UQ.res[i];
-  let r=r0&&!r0.attachment&&["waiting","confirmed"].includes(r0.scan?.state)?r0:null;   // a request still open: show its code again
-  if(!r){
-    UQ.busy[i]="יוצרים בקשת צילום…"; UQ.msg[i]=""; uqDrawAnswer(i);
-    try{ const aid=await uqFresh(i); r=await uqPost(`${UQ_BASE}/${aid}/scans`,{renew:true}); }
-    catch(e){ if(UQ?.uid===uid) UQ.msg[i]=e.message; }
-    if(UQ?.uid!==uid) return;
-    UQ.busy[i]=""; uqDrawAnswer(i);
-  }
-  if(r) await window.MathlyAnswers.waitForPhone(r);
+  const uid=UQ.uid;
+  UQ.busy[i]="יוצרים בקשת צילום…"; UQ.msg[i]=""; uqDrawAnswer(i);
+  try{ const aid=await uqFresh(i); UQ.res[i]=await uqPost(`${UQ_BASE}/${aid}/scans`,{renew:true}); }
+  catch(e){ if(UQ?.uid===uid) UQ.msg[i]=e.message; }
+  if(UQ?.uid!==uid) return;
+  UQ.busy[i]=""; uqRefresh(i);
+}
+async function uqCancel(i){   // the computer withdraws the request
+  const uid=UQ.uid, sid=UQ.res[i]?.scan?.id; if(!sid) return;
+  try{ UQ.res[i]=await uqPost(`/api/math/answer-scans/${sid}/decline`); }catch(e){ if(UQ?.uid===uid) UQ.msg[i]=e.message; }
   if(UQ?.uid===uid) uqRefresh(i);
 }
 function uqSubmit(timeUp=false){
@@ -959,6 +960,7 @@ function onClick(e){
   if(t.dataset.uqResult){ const [uid,h,check]=t.dataset.uqResult.split(":"); return uqResult(uid,+h,check==="check"); }
   if(t.dataset.uqPhoto!=null){ UQ.pick=+t.dataset.uqPhoto; return sheet.querySelector("[data-uq-file]").click(); }
   if(t.dataset.uqPhone!=null) return uqPhone(+t.dataset.uqPhone);
+  if(t.dataset.uqCancel!=null) return uqCancel(+t.dataset.uqCancel);
   if(t.dataset.subject) return selectSubject(t.dataset.subject);
   if(t.dataset.view){ closeSheet(); return setView(t.dataset.view,t.dataset.unit); }
   if(t.dataset.comet) return showComet(t.dataset.comet);

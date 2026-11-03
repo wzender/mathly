@@ -210,6 +210,7 @@ def install_push_routes(app, signed_in):
         except ValueError as e:
             raise HTTPException(400, str(e)) from e
         except AuthUnavailable as e:
+            log.error("push subscription not kept: %s", e)
             raise HTTPException(503, str(e)) from e
         return {"ok": True}
 
