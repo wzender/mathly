@@ -407,3 +407,47 @@ def test_phone_asks_once_for_notifications_and_the_bell_toggles(answer_store, mo
                 assert computer.locator('.mx-push-btn:visible').count() == 0
             finally:
                 browser.close(); server.should_exit = True; thread.join(timeout=5)
+
+
+def test_the_phone_answers_a_photo_request_by_drawing_on_the_board(scan_server):
+    url, store = scan_server
+    with playwright.sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            computer = session(browser).new_page(); errors = []
+            computer.on('pageerror', lambda error: errors.append(str(error)))
+            computer.goto(url)
+            open_question(computer)
+            computer.locator('[data-request]').click()
+            wait = computer.locator('.mx-answer .mx-phone-live')
+            playwright.expect(wait).to_contain_text('ממתינים לטלפון')
+            phone = session(browser, mobile=True).new_page()
+            phone.on('pageerror', lambda error: errors.append(str(error)))
+            phone.goto(url)
+            ask = phone.locator('.mx-scan-overlay')
+            playwright.expect(ask).to_contain_text('משולש ישר', timeout=10000)
+            phone.locator('[data-draw]').click()   # the board instead of a photo
+            board = phone.locator('.mx-board.full')
+            playwright.expect(board).to_be_visible()
+            box = board.locator('canvas').bounding_box()
+            assert box['width'] > 300 and box['height'] > 500   # the whole phone screen
+            phone.locator('.mx-board-send').click()   # nothing drawn yet: nothing is sent
+            playwright.expect(phone.locator('.mx-board-send')).to_contain_text('הלוח ריק')
+            phone.locator('.mx-board [data-do=question]').click()   # the question, copied to the top
+            phone.locator('.mx-board [data-tool=pen]').click()
+            x, y = box['x'] + 60, box['y'] + 300
+            phone.mouse.move(x, y); phone.mouse.down()
+            for k in range(1, 12):
+                phone.mouse.move(x + k * 20, y + (k % 3) * 15)
+            phone.mouse.up()
+            phone.wait_for_timeout(2600)
+            phone.locator('.mx-board-send').click()
+            playwright.expect(phone.locator('[data-status]')).to_contain_text('נשלחה למחשב', timeout=10000)
+            playwright.expect(board).to_have_count(0, timeout=5000)   # back to the request's window
+            playwright.expect(computer.locator('.mx-answer-image')).to_be_visible(timeout=10000)
+            with store.connect() as c:
+                attempt_id = str(c.execute('select id from math_question_attempts').fetchone()[0])
+            assert store.action(OWNER, 'get', attempt_id=attempt_id)['attachment']
+            assert not errors
+        finally:
+            browser.close()

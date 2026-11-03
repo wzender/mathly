@@ -660,11 +660,10 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
 
 /* the sketch board beside a skill's exercise (static/math-board.js): a desktop screen with a mouse or a pen only */
 .mx-shacts{display:flex;align-items:center;gap:6px}
-.mx-board-btn,.mx-board,.mx-board-only{display:none}
+.mx-board{display:none}   /* the buttons that open it show everywhere: beside the exercise on a desktop, full screen on a phone */
 .mx-board-btn{border:1px solid var(--line);background:none;color:var(--muted);font:700 14px/1 var(--f-body);padding:7px 12px;border-radius:999px;cursor:pointer}
 .mx-board-btn[aria-pressed="true"]{border-color:var(--mx-accent);background:var(--mx-accent-soft);color:var(--ink)}
 @media (min-width:1000px) and (any-pointer:fine){
-  .mx-board-btn,.mx-board-only{display:inline-block}
   .mx-sheet.with-board{inset:16px 16px 16px auto;width:min(600px,42vw);max-height:none;border-radius:20px}
   .mx-board{display:flex;flex-direction:column;position:fixed;z-index:62;top:16px;bottom:16px;left:16px;right:calc(min(600px,42vw) + 32px);
     background:var(--surface);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 6px 30px rgb(0 0 0/.25)}
@@ -707,3 +706,14 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
   font:700 13px/1 var(--f-body);padding:7px 12px;border-radius:999px;cursor:pointer;box-shadow:0 2px 8px rgb(27 33 64/.15)}
 .mx-board-top[hidden]{display:none}
 .mx-uq-q{scroll-margin-top:90px}   /* a question scrolled to from the board's tabs shows below the quiz's sticky head */
+
+/* the board full screen (a phone or a tablet, and the phone's answer to a photo request) */
+.mx-board-head{display:none}
+.mx-board.full{display:flex;flex-direction:column;position:fixed;inset:0;z-index:1100;border:0;border-radius:0;box-shadow:none;background:var(--surface);
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+.mx-board.full .mx-board-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);color:var(--ink)}
+.mx-board-back{border:1px solid var(--mx-accent);background:var(--mx-accent-soft);color:var(--ink);font:700 14px/1 var(--f-body);padding:9px 14px;border-radius:999px;cursor:pointer}
+.mx-board.full .mx-board-bar{flex-wrap:wrap;row-gap:4px}   /* every tool in sight: two rows on a phone rather than hidden off the edge */
+.mx-board.full .mx-board-gap{flex:0}
+.mx-board.full .mx-board-bar [data-do="hide"]{display:none}   /* the head's "back" does it */
+.mx-board.full .mx-board-bar button{min-height:40px;min-width:40px;justify-content:center}

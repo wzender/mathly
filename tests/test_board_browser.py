@@ -70,10 +70,46 @@ def draw_line(page):
     page.mouse.up()
 
 
-def test_board_off_by_default_and_hidden_on_a_phone(browser, server):
+def touch(page, events):
+    """Sends pointer events of a finger or a pen to the board: [(type, id, x, y, kind)], x and y from its corner."""
+    page.evaluate("""(events)=>{ const c=document.querySelector('.mx-board canvas'), r=c.getBoundingClientRect();
+      for(const [type,id,x,y,kind] of events) c.dispatchEvent(new PointerEvent(type,{pointerId:id,pointerType:kind||'touch',
+        clientX:r.left+x,clientY:r.top+y,button:type==='pointermove'?-1:0,buttons:type==='pointerup'?0:1,pressure:.5,bubbles:true,isPrimary:id===1})); }""", events)
+
+
+def test_on_a_phone_the_board_opens_full_screen_over_the_exercise(browser, server):
     page, errors = open_skill(browser, server, 390, 844)
-    playwright.expect(page.locator("[data-board-toggle]")).to_be_hidden()
-    assert page.locator(".mx-board").count() == 0
+    assert page.locator(".mx-board").count() == 0   # nothing until asked
+    page.locator("[data-board-toggle]").click()
+    board = page.locator(".mx-board.full")
+    playwright.expect(board).to_be_visible()
+    box = board.bounding_box()
+    assert box["width"] == 390 and box["height"] == 844
+    touch(page, [("pointerdown", 1, 60, 200), *[("pointermove", 1, 60 + k * 20, 200) for k in range(1, 10)], ("pointerup", 1, 240, 200)])
+    assert alpha_near(page, 150, 200) > 0   # one finger draws
+
+    # two fingers scroll the paper and draw nothing
+    touch(page, [("pointerdown", 2, 100, 500), ("pointerdown", 3, 200, 500),
+                 *[e for k in range(1, 11) for e in (("pointermove", 2, 100, 500 - k * 30), ("pointermove", 3, 200, 500 - k * 30))],
+                 ("pointerup", 2, 100, 200), ("pointerup", 3, 200, 200)])
+    assert alpha_near(page, 150, 200) == 0 and alpha_near(page, 150, 0) == 0   # the line went up out of sight
+    playwright.expect(page.locator(".mx-board-top")).to_be_visible()
+    page.locator(".mx-board-top").click()
+    assert alpha_near(page, 150, 200) > 0 and alpha_near(page, 150, 500) == 0
+
+    # once a pen has written, a resting hand does not draw
+    touch(page, [("pointerdown", 5, 60, 600, "pen"), ("pointermove", 5, 200, 600, "pen"), ("pointerup", 5, 200, 600, "pen")])
+    touch(page, [("pointerdown", 6, 60, 700), ("pointermove", 6, 200, 700), ("pointerup", 6, 200, 700)])
+    assert alpha_near(page, 130, 600) > 0 and alpha_near(page, 130, 700) == 0
+
+    page.locator(".mx-board-back").click()   # back to the question; the sketch waits
+    playwright.expect(page.locator(".mx-board")).to_have_count(0)
+    playwright.expect(page.locator(".mx-sheet")).to_be_visible()
+    page.locator("[data-board-toggle]").click()
+    assert alpha_near(page, 150, 200) > 0
+    page.keyboard.press("Escape")   # closes the board, not the exercise
+    playwright.expect(page.locator(".mx-board")).to_have_count(0)
+    playwright.expect(page.locator(".mx-sheet")).to_be_visible()
     assert errors == []
 
 
@@ -107,7 +143,7 @@ def test_board_turns_on_draws_undoes_and_is_remembered(browser, server):
     playwright.expect(page.locator(".mx-board")).to_be_visible()
     assert ink_pixels(page) > 50
 
-    page.locator(".mx-board [data-do=hide]").click()
+    page.locator(".mx-board-bar [data-do=hide]").click()
     playwright.expect(page.locator(".mx-board")).to_have_count(0)
     playwright.expect(page.locator("[data-board-toggle]")).to_have_attribute("aria-pressed", "false")
     assert page.evaluate("localStorage.getItem('mathly.board')") == "off"

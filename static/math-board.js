@@ -1,14 +1,16 @@
-/* Mathly's sketch board: a whiteboard beside an exercise, on a desktop screen only (see math.css).
-   Used by a skill's exercise, the practice exam and the unit quiz. The student turns it on from the sheet's header;
-   this browser remembers the choice. Each question keeps its own sketch for as long as the page is open.
-   Nothing is sent anywhere.
+/* Mathly's sketch board. On a desktop screen it sits beside the exercise (the student turns it on from the sheet's
+   header; this browser remembers the choice). On a phone or a tablet it opens full screen over the exercise, from
+   the same button, and closes back to the question. Used by a skill's exercise, the practice exam, the unit quiz,
+   and the phone's answer to a photo request from the computer (openFull). Each question keeps its own sketch for
+   as long as the page is open. Nothing is sent anywhere unless the student hands it in.
 
    Everything on the board is an element that can be moved or erased: a pen stroke (with a pen's pressure),
    a straight line, a circle (dragged from the center), and a copy of the question (its text and figures).
    Line ends and circle centers snap to the ends and centers already drawn, so a triangle closes neatly;
    lines that meet that way move together. The eraser removes the lines and circles it touches and cuts pen strokes;
    it leaves the question's copy alone (select it and delete it instead).
-   The paper is endless downwards: the mouse wheel over the board scrolls it.
+   The paper is endless downwards: the mouse wheel over the board scrolls it, and so do two fingers on a touch
+   screen (one finger draws). Once a pen has touched the screen, a single finger is ignored: a hand resting on it.
    A sheet can let the board hand in a question's answer (the unit quiz): the sketch becomes a picture. */
 (()=>{
 const PREF="mathly.board";
@@ -25,8 +27,13 @@ const FONT='500 17px Rubik, system-ui, "Segoe UI", sans-serif', LINE_H=27, CARD_
 /* sketch key -> {marks, past}: marks are drawn in order; past holds copies of marks for undo */
 const sketches=new Map(), images=new Map();
 let el=null, canvas=null, ctx=null, key="", base="", pages=0, page=0, layer=null, source=null, hand=null, onPage=null;
-let tool="pen", ink=INKS[0][0], eraser=ERASERS[1][0];
+let tool="pen", ink=INKS[0][0], eraser=ERASERS[1][0], sendLabel="";
 let draft=null, drag=null, rub=null, selection=[];
+let full=null;   // the board open full screen: {saved: the context to go back to, done: called when it closes}
+const touches=new Map(); let pan=null, penSeen=false;
+const desk=()=>matchMedia("(min-width:1000px) and (any-pointer:fine)").matches;   // the same test as math.css
+const context=()=>({layer,base,pages,page,source,hand,onPage,sendLabel,key});
+function restore(c){ ({layer,base,pages,page,source,hand,onPage,sendLabel,key}=c); }
 
 const sketch=()=>{ if(!sketches.has(key)) sketches.set(key,{marks:[],past:[],y:0}); return sketches.get(key); };   // y: how far down the paper is scrolled
 const marks=()=>sketch().marks;
@@ -38,7 +45,8 @@ const same=(a,b)=>dist(a,b)<.5;
 
 function build(){
   el=document.createElement("aside"); el.className="mx-board"; el.setAttribute("aria-label","לוח טיוטה");
-  el.innerHTML=`<div class="mx-board-bar" role="toolbar" aria-label="כלי הלוח">
+  el.innerHTML=`<div class="mx-board-head"><b data-title>לוח טיוטה</b><button type="button" data-do="hide" class="mx-board-back">↩ חזרה לשאלה</button></div>
+    <div class="mx-board-bar" role="toolbar" aria-label="כלי הלוח">
       <span class="mx-board-group">${TOOLS.map(([t,icon,name])=>`<button type="button" data-tool="${t}" aria-pressed="${t===tool}" title="${name}"><i aria-hidden="true">${icon}</i><span>${name}</span></button>`).join("")}</span>
       <span class="mx-board-group mx-board-inks">${INKS.map(([c,name])=>`<button type="button" data-ink="${c}" aria-pressed="${c===ink}" aria-label="${name}" title="${name}" style="--dot:${c}"></button>`).join("")}</span>
       <span class="mx-board-group mx-board-sizes">${ERASERS.map(([w,name])=>`<button type="button" data-eraser="${w}" aria-pressed="${w===eraser}" aria-label="מחק ${name}" title="מחק ${name}" style="--d:${Math.round(6+w/6)}px"></button>`).join("")}</span>
@@ -66,18 +74,18 @@ function build(){
     if(act==="question") copyQuestion();
     if(act==="send") send();
     if(act==="top"){ sketch().y=0; paint(); }
-    if(act==="hide") toggle();
+    if(act==="hide") full?closeFull():toggle();
   });
   canvas.addEventListener("pointerdown",down);
   canvas.addEventListener("pointermove",move);
   canvas.addEventListener("pointerup",up);
   canvas.addEventListener("pointercancel",up);
-  canvas.addEventListener("contextmenu",e=>e.preventDefault());
+  canvas.addEventListener("contextmenu",e=>e.preventDefault());   // the pen's side button: no browser menu over the board
   canvas.addEventListener("wheel",e=>{   // endless paper: scrolls down as far as needed, never above the top
     if(e.ctrlKey) return;   // the browser's zoom
     e.preventDefault(); const s=sketch(), dy=e.deltaMode===1?e.deltaY*24:e.deltaMode===2?e.deltaY*canvas.clientHeight:e.deltaY;
     s.y=Math.max(0,s.y+dy); paint();
-  },{passive:false});   // the pen's side button: no browser menu over the board
+  },{passive:false});
   new ResizeObserver(fit).observe(canvas);
   setTool(tool);
 }
@@ -94,7 +102,7 @@ function select(list){ selection=list; }
 function turn(p){ page=p; key=`${base}:${page}`; reset(); drawPages(); drawSend(); paint(); }
 function drawSend(){
   const b=el.querySelector(".mx-board-send"); b.hidden=!hand; el.querySelector(".mx-board-row").hidden=pages<2&&!hand; if(!hand) return;
-  b.disabled=false; b.innerHTML=`<i aria-hidden="true">📤</i><span>הגשה לשאלה ${page+1}</span>`; b.title=`הגשת הלוח כתשובה לשאלה ${page+1}`;
+  b.disabled=false; b.innerHTML=`<i aria-hidden="true">📤</i><span>${sendLabel||`הגשה לשאלה ${page+1}`}</span>`; b.title=sendLabel||`הגשת הלוח כתשובה לשאלה ${page+1}`;
 }
 function drawPages(){
   const box=el.querySelector(".mx-board-pages"); el.querySelector(".mx-board-row").hidden=pages<2&&!hand;
@@ -214,10 +222,26 @@ function along(a,b,step){ const n=Math.max(1,Math.ceil(dist(a,b)/step)), out=[];
 
 /* ---------- the pointer ---------- */
 const at=e=>{ const r=canvas.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top+sketch().y,e.pointerType==="pen"?e.pressure:.5]; };   // a point on the paper, not on the screen
+const capture=id=>{ try{ canvas.setPointerCapture(id); }catch{} };   // a pointer the browser no longer knows: draw anyway
+const fingersY=()=>{ let t=0; touches.forEach(p=>t+=p[1]); return t/touches.size; };
+// a second finger came down: what the first one started is taken back, and the two scroll the paper
+function stopLive(){
+  const s=sketch();
+  if(draft){ s.marks.splice(s.marks.indexOf(draft),1); s.past.pop(); draft=null; }
+  if(rub){ s.marks=rub.before; rub=null; }
+  if(drag){ if(drag.before) s.marks=s.past.pop(); drag=null; select([]); }
+  paint();
+}
 function down(e){
+  if(e.pointerType==="pen") penSeen=true;
+  if(e.pointerType==="touch"){
+    touches.set(e.pointerId,[e.clientX,e.clientY]); capture(e.pointerId); e.preventDefault();
+    if(touches.size===2){ stopLive(); pan={y:fingersY(),s:sketch().y}; return; }
+    if(touches.size>2||pan||penSeen) return;   // a hand resting on the screen while a pen writes
+  }
   if(e.button!==0&&e.button!==5) return;   // 5: the pen's eraser end
   const p=at(e), use=e.button===5||(e.buttons&32)>0?"eraser":tool;
-  canvas.setPointerCapture(e.pointerId); e.preventDefault();
+  capture(e.pointerId); e.preventDefault();
   if(use==="move"){
     const m=hit(p);
     if(!m){ select([]); return paint(); }
@@ -231,6 +255,10 @@ function down(e){
   draft.id=e.pointerId; marks().push(draft); paint();
 }
 function move(e){
+  if(touches.has(e.pointerId)){
+    touches.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pan){ if(touches.size>=2){ sketch().y=Math.max(0,pan.s-(fingersY()-pan.y)); paint(); } return; }
+  }
   if(tool==="move"&&!drag&&!e.buttons) canvas.style.cursor=hit(at(e))?"move":"default";
   if(drag&&e.pointerId===drag.id){
     const p=at(e), dx=p[0]-drag.last[0], dy=p[1]-drag.last[1]; if(!dx&&!dy) return;
@@ -243,7 +271,8 @@ function move(e){
   }
   if(!draft||e.pointerId!==draft.id) return;
   if(draft.kind==="free"){
-    for(const c of e.getCoalescedEvents?.()||[e]){ const p=at(c); draft.pts.push(...along(draft.pts.at(-1),p,STEP)); }
+    const all=e.getCoalescedEvents?.();
+    for(const c of all?.length?all:[e]){ const p=at(c); draft.pts.push(...along(draft.pts.at(-1),p,STEP)); }
     ctx.save(); ctx.strokeStyle=draft.color; ctx.lineCap=ctx.lineJoin="round";
     for(let i=Math.max(1,draft.drawn||1);i<draft.pts.length;i++) segment(draft,i);
     draft.drawn=draft.pts.length; ctx.restore(); return;
@@ -251,6 +280,7 @@ function move(e){
   const p=at(e); draft.b=draft.kind==="line"?snap(p,draft):[p[0],p[1]]; paint();
 }
 function up(e){
+  if(touches.delete(e.pointerId)&&pan){ if(!touches.size) pan=null; return; }
   if(drag&&e.pointerId===drag.id){ drag=null; return paint(); }
   if(rub&&e.pointerId===rub.id){ if(rub.changed) remember(rub.before); rub=null; paint(); return pages>1&&drawPages(); }
   if(!draft||e.pointerId!==draft.id) return;
@@ -343,24 +373,31 @@ async function send(){
   if(!blob){ say(`<span>הלוח ריק: אין מה להגיש</span>`); return setTimeout(()=>page===p&&drawSend(),2500); }
   b.disabled=true; say(`<span>מגישים…</span>`);
   let r; try{ r=await hand(p,blob); }catch(e){ r={error:e.message}; }
-  b.disabled=false; say(r?.error?`<span>⚠ ${r.error}</span>`:`<i aria-hidden="true">✓</i><span>הוגשה לשאלה ${p+1}</span>`);
+  b.disabled=false; say(r?.error?`<span>⚠ ${r.error}</span>`:`<i aria-hidden="true">✓</i><span>${sendLabel?"נשלחה":`הוגשה לשאלה ${p+1}`}</span>`);
+  if(r?.close&&full) return setTimeout(closeFull,900);   // done: back to the window that asked
   setTimeout(()=>page===p&&!b.disabled&&drawSend(),3000);
 }
 
 document.addEventListener("keydown",e=>{
+  if(full&&e.key==="Escape"){ e.preventDefault(); e.stopImmediatePropagation(); return closeFull(); }   // back to the question, not out of it
   if(!shown()||e.target.closest?.("input,textarea,[contenteditable]")) return;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&!e.shiftKey){ e.preventDefault(); undo(); }
   else if((e.key==="Delete"||e.key==="Backspace")&&selection.length){ e.preventDefault(); removeSelection(); }
 });
 
-/* Shows the board in the sheet's layer when the student has it on, and takes it away when not.
+/* Shows the board in the sheet's layer when the student has it on (a desktop screen), and takes it away when not.
    sketchKey names the sketch; with pages>1 (a sheet with several questions at once) the board has a tab per question.
-   question(page) gives the element the question is shown in, for the board's copy of it. */
+   question(page) gives the element the question is shown in, for the board's copy of it; submit(page, picture)
+   hands a page in and resolves to {error} or {}; turned(page) is told when the student picks another tab.
+   On a phone nothing shows until the header's button opens the board full screen. */
 function mount(sheetLayer,sketchKey,{pages:n=1,question=null,submit=null,turned=null}={}){
-  layer=sheetLayer; source=question; hand=submit; onPage=turned;
-  if(sketchKey!==base||n!==pages){ base=sketchKey; pages=n; page=0; }
-  key=pages>1?`${base}:${page}`:base;
-  const sheet=layer.querySelector(".mx-sheet"), on=isOn();
+  const was=full?full.saved:context(), same=sketchKey===was.base&&n===was.pages;
+  const next={layer:sheetLayer,source:question,hand:submit,onPage:turned,sendLabel:"",
+    base:sketchKey,pages:n,page:same?was.page:0};
+  next.key=next.pages>1?`${next.base}:${next.page}`:next.base;
+  if(full){ full.saved=next; return; }   // the sheet changed under the full-screen board: it is where the board goes back to
+  restore(next);
+  const sheet=layer.querySelector(".mx-sheet"), on=isOn()&&desk();
   layer.querySelector("[data-board-toggle]")?.setAttribute("aria-pressed",on);
   sheet?.classList.toggle("with-board",on);
   if(on) sheet?.removeAttribute("aria-modal"); else sheet?.setAttribute("aria-modal","true");   // the board is outside the dialog: still reachable
@@ -369,11 +406,36 @@ function mount(sheetLayer,sketchKey,{pages:n=1,question=null,submit=null,turned=
   reset(); drawPages(); drawSend(); layer.append(el); fit();
 }
 const again=()=>mount(layer,base,{pages,question:source,submit:hand,turned:onPage});
-function toggle(){ setOn(!isOn()); if(layer) again(); }
+const here=p=>({host:layer,key:base,pages,page:p,question:source,submit:hand,turned:onPage});
+function toggle(){
+  if(!desk()) return layer&&openFull(here(page));   // a phone: the board over the exercise
+  setOn(!isOn()); if(layer) again();
+}
 // opens the board on one question's page (the unit quiz's own button under each question)
-function show(p){ setOn(true); if(!layer) return; again(); if(pages>1&&p!==page) turn(p); }
-// the header's switch: shown on a desktop screen only (math.css)
-const button=()=>`<button class="mx-board-btn" data-board-toggle aria-pressed="${isOn()}" title="לוח טיוטה ליד התרגיל">✏️ לוח</button>`;
+function show(p){
+  if(!desk()) return layer&&openFull(here(p));
+  setOn(true); if(!layer) return; again(); if(pages>1&&p!==page) turn(p);
+}
+/* The board full screen over everything in host, until the student goes back. Options as mount's, and:
+   title (the head's words), sendLabel (the hand-in button's words), done (called when it closes).
+   A submit answer with close:true closes it after the hand-in. */
+function openFull({host,key:k,pages:n=1,page:p=0,question=null,submit=null,turned=null,title="לוח טיוטה",sendLabel:label="",done=null}){
+  if(!el) build();
+  if(full) full.done=done; else full={saved:context(),done};
+  restore({layer:host,base:k,pages:n,page:p,source:question,hand:submit,onPage:turned,sendLabel:label,key:n>1?`${k}:${p}`:k});
+  el.querySelector("[data-title]").textContent=title;
+  el.classList.add("full"); el.setAttribute("role","dialog"); el.setAttribute("aria-modal","true");
+  reset(); drawPages(); drawSend(); host.append(el); fit();
+  el.querySelector(".mx-board-back").focus({preventScroll:true});
+}
+function closeFull(){
+  if(!full) return; const f=full; full=null;
+  el.classList.remove("full"); el.removeAttribute("role"); el.removeAttribute("aria-modal"); el.remove();
+  restore(f.saved); f.done?.();
+  if(layer?.isConnected&&desk()) again();
+}
+// the header's switch: beside the exercise on a desktop screen, full screen on a phone
+const button=()=>`<button class="mx-board-btn" data-board-toggle aria-pressed="${isOn()&&desk()}" title="לוח טיוטה">✏️ לוח</button>`;
 
-window.MathlyBoard={button,mount,toggle,show,isOn};
+window.MathlyBoard={button,mount,toggle,show,openFull,closeFull,isOn};
 })();

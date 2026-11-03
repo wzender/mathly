@@ -269,3 +269,29 @@ def test_a_unit_quiz_answer_is_handed_in_from_the_board(quiz_server):
             assert errors == []
         finally:
             browser.close()
+
+
+def test_on_a_phone_a_unit_quiz_answer_is_handed_in_from_the_full_screen_board(quiz_server):
+    url, _ = quiz_server
+    with playwright.sync_playwright() as p:
+        browser, page, errors = signed_in(p, url, mobile=True)
+        try:
+            page.locator('.mx-uquiz[data-uquiz="t"]').click()
+            page.locator("[data-act=uq-start]").click()
+            page.locator('[data-uq-board="1"]').click()   # the student picks the board over a photo
+            board = page.locator(".mx-board.full")
+            playwright.expect(board).to_be_visible()
+            playwright.expect(page.locator('.mx-board-pages [data-page="1"]')).to_have_attribute("aria-selected", "true")
+            box = board.locator("canvas").bounding_box()
+            x, y = box["x"] + 60, box["y"] + 200
+            page.mouse.move(x, y); page.mouse.down()
+            for k in range(1, 10):
+                page.mouse.move(x + k * 25, y + (k % 2) * 20)
+            page.mouse.up()
+            page.locator(".mx-board-send").click()
+            playwright.expect(page.locator(".mx-board-send")).to_contain_text("הוגשה לשאלה 2", timeout=10000)
+            page.locator(".mx-board-back").click()
+            playwright.expect(page.locator('[data-uq-i="1"] [role=status]')).to_have_text("✓ התשובה נשמרה", timeout=10000)
+            assert errors == []
+        finally:
+            browser.close()

@@ -327,10 +327,11 @@ function openCapture(result){
     <p>בדקו שזה אותו מספר שמופיע במחשב:</p>${codeHTML(result.scan.code)}
     <div class="mx-scan-q"><small>השאלה</small><p>${fmt(result.attempt.snapshot.question)}</p></div>
     <img class="mx-answer-image" data-preview alt="תצוגה מקדימה של התשובה" hidden>
-    <p data-status role="status" aria-live="polite">כתבו את הפתרון על דף וצלמו אותו.</p>
+    <p data-status role="status" aria-live="polite">${window.MathlyBoard?"כתבו את הפתרון על דף וצלמו אותו, או כתבו אותו כאן בלוח.":"כתבו את הפתרון על דף וצלמו אותו."}</p>
     <input data-camera type="file" accept="image/*" capture="environment" hidden>
     <div class="mx-scan-actions">
       <button class="mx-btn solid" data-take>📷 צילום התשובה</button>
+      ${window.MathlyBoard?'<button class="mx-btn solid" data-draw>✏️ כתיבה בלוח</button>':""}
       <button class="mx-btn solid" data-submit hidden>שליחה למחשב</button>
       <button class="mx-btn" data-renew hidden>בקשה חדשה</button>
       <button class="mx-btn mx-btn-quiet" data-decline>סירוב</button>
@@ -339,12 +340,12 @@ function openCapture(result){
     <small>כשהבדיקה האוטומטית זמינה, צילום התשובה יישלח לבדיקה באמצעות AI. המשוב יופיע בשאלה במחשב.</small></div>`;
   const c=capture={node,e,result,photo:null,url:null,key:null,busy:false,ended:false,confirming:null,returnFocus:document.activeElement};visibleRoot.append(node);
   const $=sel=>node.querySelector(sel);
-  const status=$("[data-status]"),camera=$("[data-camera]"),take=$("[data-take]"),send=$("[data-submit]"),preview=$("[data-preview]"),renew=$("[data-renew]"),decline=$("[data-decline]"),close=$("[data-close]");
+  const status=$("[data-status]"),camera=$("[data-camera]"),take=$("[data-take]"),draw=$("[data-draw]"),send=$("[data-submit]"),preview=$("[data-preview]"),renew=$("[data-renew]"),decline=$("[data-decline]"),close=$("[data-close]");
   const valid=()=>capture===c&&live(e),say=message=>{if(valid())status.textContent=message;};
-  const controls=busy=>{c.busy=busy;take.disabled=send.disabled=renew.disabled=decline.disabled=busy;};
+  const controls=busy=>{c.busy=busy;take.disabled=send.disabled=renew.disabled=decline.disabled=busy;if(draw)draw.disabled=busy;};
   // the request is over: only closing is left
-  const finish=(message,offer=false)=>{c.ended=true;handled.add(c.result.scan.id);take.hidden=send.hidden=renew.hidden=decline.hidden=true;close.hidden=false;say(message);if(offer)pushOffer($(".mx-scan-actions"),e);close.focus();};
-  const expired=()=>{take.hidden=send.hidden=true;renew.hidden=false;say(errors.expired);};
+  const finish=(message,offer=false)=>{c.ended=true;handled.add(c.result.scan.id);take.hidden=send.hidden=renew.hidden=decline.hidden=true;if(draw)draw.hidden=true;close.hidden=false;say(message);if(offer)pushOffer($(".mx-scan-actions"),e);close.focus();};
+  const expired=()=>{take.hidden=send.hidden=true;if(draw)draw.hidden=true;renew.hidden=false;say(errors.expired);};
   c.withdrawn=mine=>{ if(c.photo&&mine&&waitingState(mine.scan.state)){c.result=mine;return;} finish("הבקשה בוטלה במחשב."); };
   close.onclick=()=>{closeCapture();if(valid())pollInbox(e);};
   node.onkeydown=event=>{
@@ -355,9 +356,22 @@ function openCapture(result){
   const confirmed=()=>c.confirming||=(async()=>{
     const r=await post(`/api/math/answer-scans/${c.result.scan.id}/confirm`);if(valid())c.result=r;return r;
   })().catch(error=>{c.confirming=null;throw error;});
+  const confirmNow=()=>confirmed().then(r=>{if(r.attachment&&valid())success();}).catch(error=>{if(valid()){say(error.message);if(error.status===410)expired();}});
   take.onclick=()=>{
     say("צלמו את הפתרון. אם המצלמה חסומה, אפשרו אותה בהגדרות האתר ונסו שוב.");camera.click();
-    confirmed().then(r=>{if(r.attachment&&valid())success();}).catch(error=>{if(valid()){say(error.message);if(error.status===410)expired();}});
+    confirmNow();
+  };
+  // the board instead of paper: full screen; its hand-in becomes this answer's picture and is sent like a photo
+  if(draw)draw.onclick=()=>{
+    confirmNow();
+    window.MathlyBoard.openFull({host:visibleRoot,key:`scan:${c.result.attempt.id}`,title:"התשובה למחשב",sendLabel:"שליחה למחשב",
+      question:()=>node.querySelector(".mx-scan-q"),done:()=>{if(valid())(c.ended?close:draw).focus();},
+      submit:async(_,picture)=>{
+        if(!valid()||c.ended)return {error:"הבקשה כבר לא פעילה"};
+        try{setPhoto(await window.MathlyPhoto.prepare(picture));}catch{return {error:"לא ניתן להכין את התמונה"};}
+        await upload();
+        return c.ended?{close:true}:{error:status.textContent};
+      }});
   };
   camera.addEventListener("cancel",()=>say("הצילום בוטל או שלא ניתנה הרשאה. אפשר לצלם שוב או לסרב."));
   camera.onchange=async()=>{
@@ -365,15 +379,19 @@ function openCapture(result){
     controls(true);say("מכינים את התמונה…");
     try{
       const photo=await window.MathlyPhoto.prepare(file);if(!valid())return;
-      if(photo.size>5000000)throw Error(errors.image_too_large);
-      if(c.url)URL.revokeObjectURL(c.url);
-      c.photo=photo;c.key=null;preview.src=c.url=URL.createObjectURL(photo);preview.hidden=false;
-      take.textContent="צילום מחדש";take.classList.remove("solid");send.hidden=false;say("בדקו שכל הפתרון ברור, ואז שלחו למחשב.");send.focus();
+      setPhoto(photo);say("בדקו שכל הפתרון ברור, ואז שלחו למחשב.");send.focus();
     }catch(error){say("לא ניתן להכין את התמונה. נסו לצלם שוב.");}
     finally{if(valid())controls(false);}
   };
+  // a picture to send: the camera's, or the board's
+  function setPhoto(photo){
+    if(photo.size>5000000)throw Error(errors.image_too_large);
+    if(c.url)URL.revokeObjectURL(c.url);
+    c.photo=photo;c.key=null;preview.src=c.url=URL.createObjectURL(photo);preview.hidden=false;
+    take.textContent="צילום מחדש";take.classList.remove("solid");send.hidden=false;
+  }
   const success=()=>{c.photo=null;finish("✓ התשובה נשלחה למחשב.",true);};
-  send.onclick=async()=>{
+  const upload=async()=>{
     if(!c.photo||c.busy)return;
     controls(true);say(states.uploading);
     try{
@@ -390,6 +408,7 @@ function openCapture(result){
       // Reuse the key after an uncertain response; the server returns prior success.
     }finally{if(valid()&&!c.ended)controls(false);}
   };
+  send.onclick=upload;
   decline.onclick=async()=>{
     controls(true);
     try{await post(`/api/math/answer-scans/${c.result.scan.id}/decline`);if(!valid())return;finish("סירבתם לבקשה. המחשב קיבל הודעה.");}
