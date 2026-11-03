@@ -28,6 +28,6 @@ None. This repository has no main capability specifications yet.
 
 - Question validation in `app/math_skills.py`, sample content, and question rendering in `static/math.js`.
 - Authenticated attempt and scan APIs in `app/main.py` with a dedicated persistence module.
-- Existing account integration in `app/auth.py`, mobile/PWA entry in `static/index.html`, and reusable photo preparation from `static/phone.js`.
+- Existing account integration in `app/auth.py`, mobile/PWA entry in `static/index.html`, and reusable photo preparation from `static/photo-image.js`.
 - Additive Supabase tables and private image storage; use a separate migration rather than rerunning the destructive `docs/mathly-supabase.sql` script.
 - API, ownership, concurrency, and desktop/mobile browser coverage alongside current phone-solver tests.

@@ -31,8 +31,87 @@ function configure(options){
   reset();api=options.api;account=options.enabled?options.account:null;visibleRoot=options.root;onGraded=options.onGraded;
   if(!account)return;
   // The phone (the responsive app/PWA) watches for requests from the computer and pops them up.
-  if(matchMedia("(max-width: 700px)").matches||navigator.maxTouchPoints){inbox=true;pollInbox(epoch);}
+  if(matchMedia("(max-width: 700px)").matches||navigator.maxTouchPoints){inbox=true;pollInbox(epoch);pushSync(epoch);}
 }
+/* ---------- the phone: a notification when the computer asks for a photo (app/push.py) ----------
+   Only the phone subscribes, so the computer that made the request is not notified. The notification just brings the
+   student here; the look for requests above shows the request itself. On an iPhone only the app added to the home
+   screen may get notifications. A tap while the app is open comes as a message from the service worker. */
+const PUSH_IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const PUSH_STANDALONE=matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+const PUSH_CAN="serviceWorker" in navigator&&"PushManager" in window&&"Notification" in window;
+const PUSH_OFF="mathly.pushOff";   // turned off here: not turned on again by itself
+const pushOptOut=v=>{try{if(v===undefined)return localStorage.getItem(PUSH_OFF)==="1";v?localStorage.setItem(PUSH_OFF,"1"):localStorage.removeItem(PUSH_OFF);}catch{return false;}};
+let pushKey=null,pushReg=null;
+function pushWorker(){
+  if(!("serviceWorker" in navigator))return Promise.resolve(null);
+  return pushReg||=navigator.serviceWorker.register("/service-worker.js").then(()=>navigator.serviceWorker.ready).catch(()=>null);
+}
+async function pushState(){   // {key, sub}: key is empty when the server sends no notifications
+  if(!PUSH_CAN||!account)return {key:"",sub:null};
+  if(pushKey===null)pushKey=await json("/api/push").then(d=>d.key||"").catch(()=>"");
+  const reg=await pushWorker();
+  const sub=reg?await reg.pushManager.getSubscription().catch(()=>null):null;
+  return {key:pushKey,sub};
+}
+const subscribeBody=sub=>({method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sub.toJSON())});
+async function pushOn(key){   // asks the permission (call it from a tap) and subscribes; the subscription, or null
+  if(await Notification.requestPermission()!=="granted")return null;
+  const reg=await pushWorker();if(!reg)throw Error("no worker");
+  const raw=atob(key.replace(/-/g,"+").replace(/_/g,"/")+"=".repeat((4-key.length%4)%4));
+  const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:Uint8Array.from(raw,c=>c.charCodeAt(0))});
+  const r=await api("/api/push/subscribe",subscribeBody(sub));
+  if(!r.ok){await sub.unsubscribe().catch(()=>{});throw Error("not kept");}
+  pushOptOut(false);return sub;
+}
+async function pushOff(sub){
+  await api("/api/push/unsubscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>{});
+  await sub.unsubscribe().catch(()=>{});
+}
+/* A phone's subscription belongs to the account signed in on it: on sign-in it moves to that account (or, notifications
+   being allowed already, is made again after a sign-out), unless it was turned off here. */
+async function pushSync(e){
+  try{
+    const st=await pushState();if(!live(e)||!st.key)return;
+    if(st.sub)await api("/api/push/subscribe",subscribeBody(st.sub));
+    else if(Notification.permission==="granted"&&!pushOptOut())await pushOn(st.key);
+  }catch{}
+}
+async function forgetPush(){   // signing out: the next account on this phone does not get this one's requests
+  try{const st=await pushState();if(st.sub)await pushOff(st.sub);}catch{}
+}
+async function clearScanNotices(){   // the app is open and shows requests itself: the tray's ones are old news
+  try{const reg=await navigator.serviceWorker?.getRegistration();for(const n of await reg?.getNotifications()||[])if(String(n.tag).startsWith("scan-"))n.close();}catch{}
+}
+/* The offer, at the end of a request on the phone: "next time, tell me". Nothing is shown when notifications cannot
+   work here or are blocked; an iPhone's browser gets the home-screen hint instead. */
+function pushOffer(node,e){
+  const box=document.createElement("div");box.className="mx-push-offer";box.hidden=true;node.append(box);
+  const draw=(text,button,act)=>{
+    box.replaceChildren();const p=document.createElement("small");p.textContent=text;box.append(p);
+    if(button){const b=document.createElement("button");b.className="mx-btn";b.type="button";b.textContent=button;b.onclick=async()=>{
+      b.disabled=true;try{await act();}catch{p.textContent="לא הצלחנו להפעיל התראות. נסו שוב מאוחר יותר.";}finally{b.disabled=false;}};box.append(b);}
+    box.hidden=false;
+  };
+  if(!PUSH_CAN){
+    if(PUSH_IOS&&!PUSH_STANDALONE)draw("📱 רוצים שהטלפון יצלצל כשהמחשב מבקש צילום? באייפון זה עובד רק מהאפליקציה שעל מסך הבית: שיתוף ← „הוספה למסך הבית”.");
+    return;
+  }
+  pushState().then(st=>{
+    if(!live(e)||!st.key||Notification.permission==="denied")return;
+    const show=sub=>sub
+      ?draw("🔔 התראה תגיע לטלפון כשהמחשב מבקש צילום.","כיבוי ההתראות",async()=>{await pushOff(sub);pushOptOut(true);show(null);})
+      :draw("רוצים שהטלפון יודיע לכם בפעם הבאה שהמחשב מבקש צילום, גם כשהאפליקציה סגורה?","🔔 כן, להודיע לי",async()=>{const s=await pushOn(st.key);if(live(e))show(s);});
+    show(st.sub);
+  });
+}
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.addEventListener("message",ev=>{
+    if(ev.data?.type!=="notified"||!account||!inbox)return;
+    clearScanNotices();pollInbox(epoch);
+  });
+}
+if(new URLSearchParams(location.search).get("from")==="push-scan")history.replaceState(null,"",location.pathname);
 /* The phone looks for requests every few seconds while the app is open. A new request pops up as a window with its
    4-digit code (the same code the computer shows); the student photographs the answer or declines. */
 async function pollInbox(e){
@@ -48,7 +127,7 @@ async function pollInbox(e){
       if(!mine||mine.scan.id!==capture.result.scan.id&&!capture.busy)capture.withdrawn?.(mine);
     }
     const ask=list.find(r=>["waiting","confirmed","failed"].includes(r.scan.state)&&!handled.has(r.scan.id));
-    if(ask&&!capture)openCapture(ask);
+    if(ask&&!capture){openCapture(ask);clearScanNotices();}
   }catch(error){
     if(!live(e))return;
     if(error.status===401){reset();return;}
@@ -194,7 +273,7 @@ function openCapture(result){
   const valid=()=>capture===c&&live(e),say=message=>{if(valid())status.textContent=message;};
   const controls=busy=>{c.busy=busy;take.disabled=send.disabled=renew.disabled=decline.disabled=busy;};
   // the request is over: only closing is left
-  const finish=message=>{c.ended=true;handled.add(c.result.scan.id);take.hidden=send.hidden=renew.hidden=decline.hidden=true;close.hidden=false;say(message);close.focus();};
+  const finish=(message,offer=false)=>{c.ended=true;handled.add(c.result.scan.id);take.hidden=send.hidden=renew.hidden=decline.hidden=true;close.hidden=false;say(message);if(offer)pushOffer($(".mx-scan-actions"),e);close.focus();};
   const expired=()=>{take.hidden=send.hidden=true;renew.hidden=false;say(errors.expired);};
   c.withdrawn=mine=>{ if(c.photo&&mine&&waitingState(mine.scan.state)){c.result=mine;return;} finish("הבקשה בוטלה במחשב."); };
   close.onclick=()=>{closeCapture();if(valid())pollInbox(e);};
@@ -223,7 +302,7 @@ function openCapture(result){
     }catch(error){say("לא ניתן להכין את התמונה. נסו לצלם שוב.");}
     finally{if(valid())controls(false);}
   };
-  const success=()=>{c.photo=null;finish("✓ התשובה נשלחה למחשב.");};
+  const success=()=>{c.photo=null;finish("✓ התשובה נשלחה למחשב.",true);};
   send.onclick=async()=>{
     if(!c.photo||c.busy)return;
     controls(true);say(states.uploading);
@@ -322,9 +401,9 @@ function waitForPhone(result,scanTo={}){
 }
 document.addEventListener("visibilitychange",()=>{
   if(document.hidden)return;
-  if(account&&inbox)pollInbox(epoch);
+  if(account&&inbox){clearScanNotices();pollInbox(epoch);}
   if(question?.result)pollQuestion(question);
 });
 window.addEventListener("online",()=>{if(account&&inbox)pollInbox(epoch);if(question?.result)pollQuestion(question);});
-window.MathlyAnswers={configure,mountQuestion,closeQuestion,reset,waitForPhone};
+window.MathlyAnswers={configure,mountQuestion,closeQuestion,reset,waitForPhone,forgetPush};
 })();

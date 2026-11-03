@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import logging
 import os
-import io
-import secrets
 import time
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +20,7 @@ from .auth import AuthUnavailable, ClassConflict, SupabaseAuth, load_auth
 from .math_photo import (DAILY_PHOTOS, MAX_PHOTO, MEDIA_TYPES as PHOTO_TYPES,
                          PhotoSolver, PhotoUnavailable, math_model, photo_client)
 from .math_skills import algebra9, practice_graph
+from .push import install_push_routes
 from .monitoring import ActionLog, RETURN_GAP, install_monitoring_routes
 from .unit_resources import install_resource_routes
 
@@ -101,25 +100,12 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
     async def index():
         return page()
 
-    @app.get("/phone", response_class=HTMLResponse, include_in_schema=False)
-    async def phone():
-        return HTMLResponse((STATIC / "phone.html").read_text(encoding="utf-8"),
-                            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
-
     @app.get("/service-worker.js", include_in_schema=False)
-    async def retired_service_worker():
-        # An older version installed a service worker that served /static/ from its own cache forever.
-        # Browsers that still have it fetch this file to update it: the new one clears that cache,
-        # removes itself and reloads the open pages, so they get the current app.
-        script = """
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", event => event.waitUntil((async () => {
-  await Promise.all((await caches.keys()).map(key => caches.delete(key)));
-  await self.registration.unregister();
-  for (const client of await self.clients.matchAll({type: "window"})) client.navigate(client.url);
-})()));
-"""
-        return Response(script, media_type="text/javascript", headers={"Cache-Control": "no-store"})
+    async def service_worker():
+        # Push notifications only (see app/push.py). It serves nothing from a cache: an older version kept /static/
+        # in its own cache forever, so on activation this one also deletes every cache that version left.
+        return Response((STATIC / "service-worker.js").read_text(encoding="utf-8"), media_type="text/javascript",
+                        headers={"Cache-Control": "no-store"})
 
     @app.get("/manifest.webmanifest", include_in_schema=False)
     async def manifest():
@@ -202,47 +188,6 @@ self.addEventListener("activate", event => event.waitUntil((async () => {
         return {"ok": True}
 
     photo_counts: dict[tuple[str, str], int] = app.state.photo_counts
-    photo_sessions: dict[str, dict] = {}
-
-    def session_for(token: str) -> dict:
-        session = photo_sessions.get(token)
-        if not session or session["expires"] <= time.monotonic():
-            photo_sessions.pop(token, None)
-            raise HTTPException(410, "הקישור פג. פתחו קישור חדש במחשב.")
-        return session
-
-    @app.post("/api/math/photo-sessions")
-    async def pair_phone(user: dict | None = Depends(signed_in)):
-        solver()  # Report missing configuration before asking the student to scan.
-        for token in list(photo_sessions):
-            if photo_sessions[token]["expires"] <= time.monotonic():
-                del photo_sessions[token]
-        if len(photo_sessions) >= 1000:
-            raise HTTPException(429, "נסו שוב מאוחר יותר.")
-        token = secrets.token_urlsafe(32)
-        photo_sessions[token] = {"expires": time.monotonic() + 900, "user": user,
-                                 "state": "waiting", "result": None, "error": ""}
-        return {"token": token, "expires_in": 900}
-
-    @app.get("/api/math/photo-sessions/{token}")
-    async def paired_result(token: str, user: dict | None = Depends(signed_in)):
-        session = session_for(token)
-        if (session["user"] or {}).get("email") != (user or {}).get("email"):
-            raise HTTPException(404, "session not found")
-        return JSONResponse({key: session[key] for key in ("state", "result", "error")},
-                            headers={"Cache-Control": "no-store"})
-
-    @app.post("/api/math/photo-qr")
-    async def photo_qr(request: Request, _user: dict | None = Depends(signed_in)):
-        import qrcode
-        import qrcode.image.svg
-        body = await request.json()
-        url = body.get("url", "")
-        if not isinstance(url, str) or len(url) > 2048 or not url.startswith(("https://", "http://")):
-            raise HTTPException(400, "invalid phone URL")
-        output = io.BytesIO()
-        qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, border=4).save(output)
-        return Response(output.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
 
     def solver() -> PhotoSolver:
         key = os.environ.get("ANTHROPIC_API_KEY", "").strip() or os.environ.get("CLAUDE_API_KEY", "").strip()
@@ -289,23 +234,7 @@ self.addEventListener("activate", event => event.waitUntil((async () => {
         app.state.actions.record(user, "photo", skill if result.get("readable") else "התמונה לא נקראה")
         return {**result, "left": DAILY_PHOTOS - photo_counts.get(counter, 0) if counter else None}
 
-    @app.post("/api/math/phone-photo")
-    async def phone_photo(request: Request, photo: UploadFile = File(...)):
-        session = session_for(request.headers.get("x-photo-token", ""))
-        if session["state"] in ("solving", "done"):
-            raise HTTPException(409, "התמונה כבר נשלחה. פתחו קישור חדש במחשב לתרגיל נוסף.")
-        session.update(state="solving", error="")
-        try:
-            result = await solve_upload(photo, session["user"])
-        except HTTPException as exc:
-            session.update(state="error", error=str(exc.detail))
-            raise
-        except Exception:
-            session.update(state="error", error="לא הצלחנו לפתור. נסו שוב.")
-            raise
-        session.update(state="done", result=result)
-        return {"ok": True, "readable": result.get("readable", False)}
-
+    install_push_routes(app, signed_in)
     install_answer_routes(app, signed_in)
     install_resource_routes(app, signed_in)
     install_monitoring_routes(app, manager)

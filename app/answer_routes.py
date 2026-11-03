@@ -155,11 +155,16 @@ def install_answer_routes(app, signed_in):
             log.info("automatic answer grading stopped: %s", exc.code)
 
     @app.post("/api/math/answer-attempts/{attempt_id}/scans")
-    def create_scan(attempt_id: str, body: dict, user=Depends(student)):
+    def create_scan(attempt_id: str, body: dict, background_tasks: BackgroundTasks, user=Depends(student)):
         fields = {"attempt_id": uuid_text(attempt_id), "renew": body.get("renew") is True}
         if "question_id" in body:
             fields["question_id"] = str(body["question_id"])
-        return reply(call(user, "create_scan", **fields))
+        result = call(user, "create_scan", **fields)
+        push = getattr(app.state, "push", None)
+        if push is not None and push.on:
+            # the phone may be in a pocket with the app closed: a notification brings the student to the request
+            background_tasks.add_task(push.scan_requested, user, result)
+        return reply(result)
 
     @app.get("/api/math/answer-scans")
     def pending(user=Depends(student)):

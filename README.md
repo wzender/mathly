@@ -12,9 +12,11 @@ pinned: false
 
 Mathly is a Hebrew ninth-grade algebra and geometry practice path. It contains 140 skills across 14 units that follow the Ministry of Education's 9th-grade teaching schedule (see `docs/prisa_9A.md`), ten per unit, immediate feedback for known mistakes, and optional photographed-problem help.
 
-Choose **צילום בטלפון, פתרון במחשב** on the computer, scan the QR code with your phone, take a photo, and confirm sending it. The answer and worked solution appear automatically on the computer. Links last 15 minutes and accept one exercise; the phone does not need a separate login. Geometry practice includes diagrams for rectangle area, triangle area, and Pythagoras.
+Geometry practice includes diagrams for rectangle area, triangle area, and Pythagoras.
 
-Both devices must be able to reach the same app URL. For local use, open the computer's LAN address (for example `http://192.168.1.10:7860`) on both devices instead of `localhost`. Phone links and results are temporary in server memory: use a single server worker; restarting it clears active links. Images are sent to the configured AI provider for solving and are not stored by Mathly.
+Photographed problems are sent to the configured AI provider for solving and are not stored by Mathly.
+
+When the computer asks for a photo of a handwritten answer, the student's phone can get a notification, even with the app closed. The phone offers it after its first photo is sent. It needs `VAPID_PRIVATE_KEY` (make one with `python -m app.push`) and the migration `supabase/migrations/20261103180000_math_push_subs.sql`. On an iPhone it works only from the app added to the home screen.
 
 ## Run locally
 

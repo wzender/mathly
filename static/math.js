@@ -33,10 +33,8 @@ let G=null, BY={}, POST={}, ORDER=[], P={done:{},tries:{},solved:{},at:{}}, root
 let nav=null, FIRST=true, COMBO=0, REV=null, QZ=null, UQ=null;   // UQ: the unit quiz on the sheet (see unit quiz below)   // QZ: the practice exam in progress (see quiz below)   // the tab bar; whether the shown question is still at its first try; first-try answers in a row
 let picker=null, PH=null, resPicker=null, RES=null;   // RES: the open lesson-resources sheet (see openResources())   // the photo file picker, and the photographed problem on the sheet (see photo())
 let advanceTimer=null;
-let phonePair=null;
 function stopPhone(){
   window.MathlyAnswers?.closeQuestion();
-  if(phonePair){clearTimeout(phonePair.timer);if(phonePair.qr)URL.revokeObjectURL(phonePair.qr);phonePair=null;}
 }
 function cancelAdvance(){ clearTimeout(advanceTimer); advanceTimer=null; }
 
@@ -988,18 +986,16 @@ function onClick(e){
     case "cal-prev": return showStreak(-1);
     case "cal-next": return showStreak(1);
     case "sound": Sky.setSound(!Sky.soundOn()); Sky.sound.tap(); return draw();
-    case "phone": return pairPhone();
     case "resources": return openResources(t.dataset.unit);
     case "res-take": case "res-retake": return resPicker.click();
     case "res-cancel": RES.photo=null; RES.msg=""; return drawResources();
     case "res-delete": return deleteResource(t.dataset.res);
-    case "copy-phone": return copyPhone(t);
     case "photo": case "retake": return picker.click();
     case "hint": PH.shown++; return drawPhoto();
     case "work": PH.works.add(+t.dataset.i); return drawPhoto();
     case "all": PH.all=true; return drawPhoto();
     case "close": return closeSheet();
-    case "out": window.MathlyAnswers?.reset();closeSheet();hide();return client?.auth.signOut().then(()=>location.reload());
+    case "out": return Promise.resolve(window.MathlyAnswers?.forgetPush?.()).finally(()=>{window.MathlyAnswers?.reset();closeSheet();hide();return client?.auth.signOut().then(()=>location.reload());});
   }
 }
 
@@ -1364,74 +1360,6 @@ function drawPhoto(){
       <div class="mx-pbody" aria-live="polite">${body}</div></div>`;
   sheet.hidden=false;
   if(PH.fresh){ PH.fresh=false; sheet.querySelector(".mx-x").focus({preventScroll:true}); }
-}
-
-async function copyPhone(button){
-  try{
-    await navigator.clipboard.writeText(phonePair?.url||"");
-    button.textContent="הקישור הועתק";
-  }catch{
-    const input=sheet.querySelector(".mx-phone-url");
-    input?.focus();input?.select();
-    button.textContent="בחרו והעתיקו את הקישור";
-  }
-}
-
-async function pairPhone(){
-  cancelAdvance();stopPhone();
-  if(!cur)back=document.activeElement;
-  cur="phone";
-  const pair=phonePair={timer:null,qr:null,url:""};
-  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div><div class="mx-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
-    <div class="mx-shtop"><h3 id="mxTitle">צילום בטלפון, פתרון במחשב</h3><button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
-    <div class="mx-pair-content"></div><p class="mx-pair-status" role="status" aria-live="polite">מכינים קישור לטלפון…</p></div>`;
-  sheet.hidden=false;sheet.querySelector(".mx-x").focus({preventScroll:true});
-  const content=sheet.querySelector(".mx-pair-content"),message=sheet.querySelector(".mx-pair-status");
-  try{
-    const response=await api("/api/math/photo-sessions",{method:"POST"}),data=await response.json();
-    if(!response.ok)throw Error(data.detail||"לא הצלחנו ליצור קישור.");
-    if(phonePair!==pair)return;
-    pair.url=`${location.origin}/phone#${data.token}`;
-    content.innerHTML=`<p>סרקו בטלפון וצלמו את התרגיל. התשובה והפתרון יופיעו כאן. הקישור תקף ל־15 דקות ולתרגיל אחד.</p>
-      <div class="mx-qr-slot"></div><label>אפשר גם לפתוח בטלפון את הקישור:<input class="mx-phone-url" readonly dir="ltr" value="${esc(pair.url)}" aria-label="קישור לצילום בטלפון"></label>
-      <button class="mx-btn" data-act="copy-phone">העתקת קישור</button>
-      ${["localhost","127.0.0.1","[::1]"].includes(location.hostname)?'<p class="mx-bad">כדי שהטלפון יתחבר, פתחו במחשב את האתר בכתובת רשת שנגישה גם מהטלפון, ואז צרו קישור חדש.</p>':""}`;
-    message.textContent="ממתינים לתמונה מהטלפון…";
-    // Start polling independently so a QR failure still leaves a working link.
-    const poll=async()=>{
-      if(phonePair!==pair)return;
-      try{
-        const res=await api(`/api/math/photo-sessions/${data.token}`,{cache:"no-store"}),result=await res.json();
-        if(phonePair!==pair)return;
-        if(!res.ok){
-          if(res.status>=400&&res.status<500){
-            message.textContent=result.detail||"החיבור הופסק. פתחו קישור חדש.";
-            stopPhone();return;
-          }
-          throw Error(result.detail||"החיבור נקטע לרגע. מנסים שוב…");
-        }
-        if(result.state==="done"){
-          stopPhone();cur="photo";
-          if(PH?.url)URL.revokeObjectURL(PH.url);
-          PH={url:null,data:result.result,error:"",busy:false,shown:1,works:new Set(),all:true,fresh:true};
-          drawPhoto();return;
-        }
-        message.textContent=result.state==="solving"?"התמונה התקבלה! קוראים ופותרים…":result.state==="error"?result.error+" אפשר לנסות שוב בטלפון.":"ממתינים לתמונה מהטלפון…";
-      }catch(error){
-        if(phonePair!==pair)return;
-        message.textContent="החיבור נקטע לרגע. מנסים שוב…";
-      }
-      pair.timer=setTimeout(poll,2000);
-    };
-    poll();
-    try{
-      const qr=await api("/api/math/photo-qr",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:pair.url})});
-      if(!qr.ok)throw Error("qr");
-      const blob=await qr.blob();if(phonePair!==pair)return;
-      pair.qr=URL.createObjectURL(blob);
-      content.querySelector(".mx-qr-slot").innerHTML=`<img class="mx-phone-qr" src="${pair.qr}" alt="סרקו בטלפון כדי לצלם תרגיל">`;
-    }catch{if(phonePair===pair)content.querySelector(".mx-qr-slot").textContent="הקוד לא נטען. אפשר להעתיק את הקישור לטלפון.";}
-  }catch(error){if(phonePair===pair)message.textContent=error.message;}
 }
 
 /* Lesson resources (app/unit_resources.py). A teacher taps a unit's title on the path, photographs an exercise or an
