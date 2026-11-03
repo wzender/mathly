@@ -5,7 +5,8 @@
    as long as the page is open. Nothing is sent anywhere unless the student hands it in.
 
    Everything on the board is an element that can be moved or erased: a pen stroke (with a pen's pressure),
-   a straight line, a circle (dragged from the center), and a copy of the question (its text and figures).
+   a straight line, a circle (dragged from the center), typed math (the math keyboard, static/board-math.js), and a
+   copy of the question (its text and figures).
    Line ends and circle centers snap to the ends and centers already drawn, so a triangle closes neatly;
    lines that meet that way move together. The eraser removes the lines and circles it touches and cuts pen strokes;
    it leaves the question's copy alone (select it and delete it instead).
@@ -19,7 +20,8 @@ const setOn=on=>{ try{ localStorage.setItem(PREF,on?"on":"off"); }catch{} };
 
 const INKS=[["#1B2140","שחור"],["#2563D9","כחול"],["#D3455B","אדום"]];
 const ERASERS=[[16,"קטן"],[40,"בינוני"],[90,"גדול"]];
-const TOOLS=[["move","✋","הזזה"],["pen","✏️","עט"],["line","╱","קו ישר"],["circle","◯","עיגול"],["eraser","🧽","מחק"]];
+const TOOLS=[["move","✋","הזזה"],["pen","✏️","עט"],["line","╱","קו ישר"],["circle","◯","עיגול"],["math","∑","נוסחה"],["eraser","🧽","מחק"]];
+const MATH_SIZE=26;
 const PEN=2.6, SHAPE=2.4, SNAP=12, GRAB=9, STEP=2, HISTORY=100;
 const PAPER_INK="#1B2140", PAPER_FAINT="#C5CBDF", SELECT="#2563D9";
 const FONT='500 17px Rubik, system-ui, "Segoe UI", sans-serif', LINE_H=27, CARD_PAD=14;
@@ -29,6 +31,7 @@ const sketches=new Map(), images=new Map();
 let el=null, canvas=null, ctx=null, key="", base="", pages=0, page=0, layer=null, source=null, hand=null, onPage=null;
 let tool="pen", ink=INKS[0][0], eraser=ERASERS[1][0], sendLabel="";
 let draft=null, drag=null, rub=null, selection=[];
+let editing=null;   // the formula being typed: {mark (null for a new one), at, node, field, key}
 let full=null;   // the board open full screen: {saved: the context to go back to, done: called when it closes}
 const touches=new Map(); let pan=null, penSeen=false;
 const desk=()=>matchMedia("(min-width:1000px) and (any-pointer:fine)").matches;   // the same test as math.css
@@ -80,7 +83,8 @@ function build(){
   canvas.addEventListener("pointermove",move);
   canvas.addEventListener("pointerup",up);
   canvas.addEventListener("pointercancel",up);
-  canvas.addEventListener("contextmenu",e=>e.preventDefault());   // the pen's side button: no browser menu over the board
+  canvas.addEventListener("contextmenu",e=>e.preventDefault());
+  canvas.addEventListener("dblclick",e=>{ const m=hit(at(e)); if(m?.kind==="math") editMath(m,at(e)); });   // typed math is edited where it is   // the pen's side button: no browser menu over the board
   canvas.addEventListener("wheel",e=>{   // endless paper: scrolls down as far as needed, never above the top
     if(e.ctrlKey) return;   // the browser's zoom
     e.preventDefault(); const s=sketch(), dy=e.deltaMode===1?e.deltaY*24:e.deltaMode===2?e.deltaY*canvas.clientHeight:e.deltaY;
@@ -90,7 +94,7 @@ function build(){
   setTool(tool);
 }
 function pressed(sel,b){ el.querySelectorAll(sel).forEach(x=>x.setAttribute("aria-pressed",x===b)); }
-function reset(){ draft=drag=rub=null; select([]); }
+function reset(){ draft=drag=rub=null; select([]); if(editing) finishMath(false); }
 function setTool(t){
   tool=t; el.querySelectorAll("[data-tool]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.tool===t));
   el.dataset.tool=t; if(t!=="move"&&selection.length){ select([]); paint(); }
@@ -99,7 +103,7 @@ function setTool(t){
   canvas.style.cursor=t==="eraser"?`url("data:image/svg+xml,${svg.replace(/</g,"%3C").replace(/>/g,"%3E")}") ${r+1} ${r+1}, cell`:t==="move"?"default":"";
 }
 function select(list){ selection=list; }
-function turn(p){ page=p; key=`${base}:${page}`; reset(); drawPages(); drawSend(); paint(); }
+function turn(p){ if(editing) finishMath(true); page=p; key=`${base}:${page}`; reset(); drawPages(); drawSend(); paint(); }
 function drawSend(){
   const b=el.querySelector(".mx-board-send"); b.hidden=!hand; el.querySelector(".mx-board-row").hidden=pages<2&&!hand; if(!hand) return;
   b.disabled=false; b.innerHTML=`<i aria-hidden="true">📤</i><span>${sendLabel||`הגשה לשאלה ${page+1}`}</span>`; b.title=sendLabel||`הגשת הלוח כתשובה לשאלה ${page+1}`;
@@ -134,6 +138,7 @@ function draw(m){
   if(m.kind==="line"){ ctx.lineWidth=SHAPE; ctx.beginPath(); ctx.moveTo(...m.a); ctx.lineTo(...m.b); ctx.stroke(); }
   else if(m.kind==="circle"){ ctx.lineWidth=SHAPE; ctx.beginPath(); ctx.arc(m.a[0],m.a[1],dist(m.a,m.b),0,Math.PI*2); ctx.stroke(); }
   else if(m.kind==="card") card(m);
+  else if(m.kind==="math"){ const L=mathBox(m); if(L){ ctx.fillStyle=m.color; ctx.direction="ltr"; ctx.textAlign="left"; ctx.textBaseline="alphabetic"; L.paint(ctx,m.x,m.y+L.a); } }
   else{ for(let i=1;i<m.pts.length;i++) segment(m,i); if(m.pts.length===1) segment(m,0); }
   ctx.restore();
 }
@@ -160,8 +165,10 @@ function picture(src){
   if(!images.has(src)){ const img=new Image(); img.onload=()=>paint(); img.src=src; images.set(src,img); }
   return images.get(src);
 }
+const mathBox=m=>window.MathlyBoardMath?.layout(m.latex,m.size||MATH_SIZE);
 function box(m){
   if(m.kind==="card") return [m.x,m.y,m.x+m.w,m.y+m.h];
+  if(m.kind==="math"){ const L=mathBox(m)||{w:0,a:0,d:0}; return [m.x,m.y,m.x+L.w,m.y+L.a+L.d]; }
   if(m.kind==="circle"){ const r=dist(m.a,m.b); return [m.a[0]-r,m.a[1]-r,m.a[0]+r,m.a[1]+r]; }
   const pts=m.kind==="line"?[m.a,m.b]:m.pts, xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
   return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];
@@ -182,7 +189,8 @@ function toSegment(p,a,b){
 function reach(m,p){
   if(m.kind==="line") return toSegment(p,m.a,m.b);
   if(m.kind==="circle") return Math.min(Math.abs(dist(p,m.a)-dist(m.a,m.b)),dist(p,m.a));
-  if(m.kind==="card"){ const [x0,y0,x1,y1]=box(m); return p[0]>=x0&&p[0]<=x1&&p[1]>=y0&&p[1]<=y1?0:Infinity; }
+  if(m.kind==="card"||m.kind==="math"){ const [x0,y0,x1,y1]=box(m), dx=Math.max(x0-p[0],0,p[0]-x1), dy=Math.max(y0-p[1],0,p[1]-y1);
+    return m.kind==="card"?(dx||dy?Infinity:0):Math.hypot(dx,dy); }
   if(m.pts.length===1) return dist(p,m.pts[0]);
   let d=Infinity; for(let i=1;i<m.pts.length;i++) d=Math.min(d,toSegment(p,m.pts[i-1],m.pts[i])); return d;
 }
@@ -203,13 +211,13 @@ function snap(p,skip){
 }
 function shift(m,dx,dy){
   const by=p=>{ p[0]+=dx; p[1]+=dy; };
-  if(m.kind==="card"){ m.x+=dx; m.y+=dy; } else if(m.kind==="free") m.pts.forEach(by); else { by(m.a); by(m.b); }
+  if(m.kind==="card"||m.kind==="math"){ m.x+=dx; m.y+=dy; } else if(m.kind==="free") m.pts.forEach(by); else { by(m.a); by(m.b); }
 }
-// the eraser at p: lines and circles it touches go; pen strokes are cut; the question's copy stays
+// the eraser at p: lines, circles and typed math it touches go; pen strokes are cut; the question's copy stays
 function rubOut(p){
   const r=eraser/2, all=marks(); let changed=false;
   for(let i=all.length-1;i>=0;i--){ const m=all[i];
-    if(m.kind==="line"||m.kind==="circle"){ if(reach(m,p)<=r+SHAPE/2){ all.splice(i,1); changed=true; } continue; }
+    if(m.kind==="line"||m.kind==="circle"||m.kind==="math"){ if(reach(m,p)<=r+SHAPE/2){ all.splice(i,1); changed=true; } continue; }
     if(m.kind!=="free") continue;
     const gone=m.pts.map(q=>dist(p,q)<=r+PEN); if(!gone.some(Boolean)) continue;
     const runs=[]; let run=[]; m.pts.forEach((q,k)=>{ if(gone[k]){ if(run.length) runs.push(run); run=[]; } else run.push(q); }); if(run.length) runs.push(run);
@@ -241,6 +249,8 @@ function down(e){
   }
   if(e.button!==0&&e.button!==5) return;   // 5: the pen's eraser end
   const p=at(e), use=e.button===5||(e.buttons&32)>0?"eraser":tool;
+  if(editing){ e.preventDefault(); return finishMath(true); }   // a tap beside the formula being typed: it is done
+  if(use==="math"){ e.preventDefault(); const m=hit(p); return editMath(m?.kind==="math"?m:null,p); }
   capture(e.pointerId); e.preventDefault();
   if(use==="move"){
     const m=hit(p);
@@ -356,6 +366,47 @@ function copyQuestion(){
   marks().push(m); setTool("move"); select([m]); paint(); if(pages>1) drawPages();
 }
 
+/* ---------- typed math ---------- */
+// a bar over the board's top with the math field; the math keyboard opens with it
+async function editMath(mark,p){
+  const M=window.MathlyBoardMath; if(!M||editing) return;
+  const node=document.createElement("div"); node.className="mx-board-mathedit"; node.dir="ltr";
+  node.innerHTML='<span class="mx-board-mathwait" dir="rtl">טוענים את מקלדת המתמטיקה…</span>';
+  el.querySelector(".mx-board-stage").append(node);
+  const e=editing={mark,at:p,node,field:null,key};
+  try{ await M.load(); }
+  catch{ node.querySelector("span").textContent="לא הצלחנו לטעון את מקלדת המתמטיקה. נסו שוב."; return setTimeout(()=>editing===e&&finishMath(false),2500); }
+  if(editing!==e) return;
+  node.innerHTML=`<math-field aria-label="נוסחה"></math-field>
+    <button type="button" data-math="ok" title="הוספה ללוח">✓</button><button type="button" data-math="cancel" title="ביטול">✕</button>`;
+  const f=e.field=node.querySelector("math-field");
+  f.mathVirtualKeyboardPolicy="manual";
+  f.value=mark?.latex||"";
+  f.addEventListener("change",()=>editing===e&&finishMath(true));   // the keyboard's return key, Enter, or leaving the field
+  f.addEventListener("focusin",()=>window.mathVirtualKeyboard?.show());
+  // the buttons keep the field's focus, so leaving it does not count as done before the tap is read
+  node.querySelectorAll("button").forEach(b=>b.addEventListener("pointerdown",ev=>{ ev.preventDefault(); finishMath(b.dataset.math==="ok"); }));
+  f.focus(); window.mathVirtualKeyboard?.show();
+}
+function finishMath(keep){
+  const e=editing; if(!e) return; editing=null;
+  const latex=keep&&e.field?String(e.field.getValue?.("latex")??e.field.value??"").trim():null;
+  try{ window.mathVirtualKeyboard?.hide(); }catch{}
+  e.node.remove();
+  if(latex===null||e.key!==key) return;   // cancelled, or another page by now
+  const all=marks();
+  if(e.mark){
+    if(!all.includes(e.mark)||latex===e.mark.latex) return;
+    remember(); if(latex) e.mark.latex=latex; else all.splice(all.indexOf(e.mark),1);   // emptied: gone
+  }else if(latex){
+    const L=window.MathlyBoardMath.layout(latex,MATH_SIZE), W=canvas.clientWidth;
+    remember();
+    all.push({kind:"math",latex,color:ink,size:MATH_SIZE,x:Math.max(8,Math.min(e.at[0],W-8-L.w)),y:Math.max(0,e.at[1]-(L.a+L.d)/2)});
+  }else return;
+  paint(); if(pages>1) drawPages();
+}
+if(window.MathlyBoardMath) window.MathlyBoardMath.onFonts=()=>el&&paint();
+
 /* ---------- handing in ---------- */
 // the whole sketch as a picture on white paper: as wide as the board, as tall as what is drawn
 function snapshot(){
@@ -379,8 +430,9 @@ async function send(){
 }
 
 document.addEventListener("keydown",e=>{
+  if(editing&&e.key==="Escape"){ e.preventDefault(); e.stopImmediatePropagation(); return finishMath(false); }
   if(full&&e.key==="Escape"){ e.preventDefault(); e.stopImmediatePropagation(); return closeFull(); }   // back to the question, not out of it
-  if(!shown()||e.target.closest?.("input,textarea,[contenteditable]")) return;
+  if(!shown()||editing||e.target.closest?.("input,textarea,[contenteditable],math-field")) return;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&!e.shiftKey){ e.preventDefault(); undo(); }
   else if((e.key==="Delete"||e.key==="Backspace")&&selection.length){ e.preventDefault(); removeSelection(); }
 });
@@ -429,7 +481,7 @@ function openFull({host,key:k,pages:n=1,page:p=0,question=null,submit=null,turne
   el.querySelector(".mx-board-back").focus({preventScroll:true});
 }
 function closeFull(){
-  if(!full) return; const f=full; full=null;
+  if(!full) return; if(editing) finishMath(true); const f=full; full=null;
   el.classList.remove("full"); el.removeAttribute("role"); el.removeAttribute("aria-modal"); el.remove();
   restore(f.saved); f.done?.();
   if(layer?.isConnected&&desk()) again();

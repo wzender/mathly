@@ -296,3 +296,60 @@ def test_the_wheel_scrolls_an_endless_paper(browser, server):
     assert alpha_near(page, 200, 300) > 0
     playwright.expect(page.locator(".mx-board-send")).to_be_hidden()   # handing in is the unit quiz's
     assert errors == []
+
+
+def type_math(page, at, latex):
+    """Taps the board with the math tool at `at`, types `latex` into the math field and adds it."""
+    box = page.locator(".mx-board canvas").bounding_box()
+    page.mouse.click(box["x"] + at[0], box["y"] + at[1])
+    field = page.locator(".mx-board-mathedit math-field")
+    playwright.expect(field).to_be_visible(timeout=10000)
+    page.evaluate("v=>{document.querySelector('.mx-board-mathedit math-field').value=v}", latex)
+    page.locator(".mx-board-mathedit [data-math=ok]").dispatch_event("pointerdown")
+    playwright.expect(page.locator(".mx-board-mathedit")).to_have_count(0)
+
+
+def test_typed_math_is_an_element_like_any_other(browser, server):
+    page, errors = open_skill(browser, server, 1440, 900)
+    board_on(page)
+    page.locator(".mx-board [data-tool=math]").click()
+    box = page.locator(".mx-board canvas").bounding_box()
+    page.mouse.click(box["x"] + 100, box["y"] + 200)
+    playwright.expect(page.locator(".mx-board-mathedit math-field")).to_be_visible(timeout=10000)
+    assert page.evaluate("window.mathVirtualKeyboard.visible")   # the math keyboard opens with it
+    page.keyboard.press("Escape")   # cancels the formula, not the board
+    playwright.expect(page.locator(".mx-board-mathedit")).to_have_count(0)
+    playwright.expect(page.locator(".mx-board")).to_be_visible()
+    assert ink_pixels(page) == 0
+
+    type_math(page, (100, 200), r"\frac{x^2-9}{x+3}=x-3")
+    assert ink_pixels(page) > 100
+    assert alpha_near(page, 112, 200) > 0 or alpha_near(page, 130, 200) > 0
+
+    type_math(page, (100, 200), r"x^2")   # tapping it with the math tool edits it, in place
+    assert ink_pixels(page) > 0
+    page.locator(".mx-board [data-do=undo]").click()   # back to the fraction
+
+    page.locator(".mx-board [data-tool=move]").click()
+    drag(page, (120, 200), (120, 450))
+    assert alpha_near(page, 112, 200) + alpha_near(page, 130, 200) == 0
+    assert alpha_near(page, 112, 450) + alpha_near(page, 130, 450) > 0   # it went with the drag, whole
+
+    page.locator(".mx-board [data-tool=eraser]").click()
+    drag(page, (100, 440), (260, 460))
+    assert ink_pixels(page) == 0   # the eraser takes the whole formula
+    assert errors == []
+
+
+def test_the_math_renderer_draws_what_the_keyboard_makes(browser, server):
+    page, errors = open_skill(browser, server, 1440, 900)
+    sizes = page.evaluate("""()=>[
+      'x^2-5x+6=0', 'x_{1,2}=\\\\frac{-b\\\\pm\\\\sqrt{b^2-4ac}}{2a}', '\\\\sqrt[3]{8}', '\\\\left(\\\\frac{a}{b}\\\\right)^{3}',
+      '\\\\left|x-2\\\\right|\\\\le 5', '\\\\angle ABC=30^{\\\\circ}', '\\\\triangle ABC\\\\cong\\\\triangle DEF', 'a\\\\perp b\\\\parallel c',
+      '\\\\text{שטח}=\\\\pi r^2', '\\\\placeholder{}+1', '\\\\unknowncommand{x}', ''
+    ].map(l=>{ const L=window.MathlyBoardMath.layout(l,26); return [L.w,L.a,L.d]; })""")
+    assert all(w >= 0 and a >= 0 and d >= 0 for w, a, d in sizes)
+    assert all(w > 10 for w, _, _ in sizes[:-1])
+    frac, plain = sizes[1], sizes[0]
+    assert frac[0] > plain[0] and frac[1] > plain[1]   # a fraction is wider and taller than a line of text
+    assert errors == []
