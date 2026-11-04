@@ -38,6 +38,8 @@ log = logging.getLogger("mathly.answers")
 class ScanError(Exception):
     status: int
     code: str
+    reason: str = ""   # why an AI check failed (math_photo.failure_reason), for the teacher's error details
+    detail: str = ""   # the technical line behind it
 
 
 def clean_image(data: bytes, content_type: str) -> bytes:

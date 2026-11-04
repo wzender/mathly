@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 
 from . import ai_usage
+from .ai_queue import AiQueue, for_student, may_send
 from .answer_scans import AnswerScans, MAX_IMAGE, ScanError, clean_image, public_result, uuid_text
 from .answer_grading import AnswerGrader
 from .math_photo import PhotoUnavailable
@@ -35,10 +36,15 @@ def grading_key():
 def install_answer_routes(app, signed_in):
     if not hasattr(app.state, "answers"):
         app.state.answers = AnswerScans(app.state.auth)
+    if not hasattr(app.state, "ai_queue"):
+        app.state.ai_queue = AiQueue(app.state.auth)
 
     @app.exception_handler(ScanError)
     async def scan_error(_request, exc):
-        return JSONResponse({"detail": exc.code}, status_code=exc.status,
+        body = {"detail": exc.code}
+        if exc.reason:
+            body.update(reason=exc.reason, error_detail=exc.detail)
+        return JSONResponse(body, status_code=exc.status,
                             headers={"Cache-Control": "no-store"})
 
     def student(user=Depends(signed_in)):
@@ -58,6 +64,12 @@ def install_answer_routes(app, signed_in):
                 # A staged deployment must not block saved images or upload receipt.
                 result["grading"] = None
                 result["grading_available"] = False
+            result["ai_request"] = None   # the teacher's queue (ai_queue.py): this answer's latest request
+            if app.state.ai_queue.configured and (result.get("grading") or {}).get("state") != "completed":
+                try:
+                    result["ai_request"] = for_student(app.state.ai_queue.for_attempt(user, result["attempt"]["id"]))
+                except ScanError:
+                    pass
         return result
 
     def note(user, kind, result, extra=""):
@@ -110,10 +122,13 @@ def install_answer_routes(app, signed_in):
         return reply(call(user, "get", attempt_id=uuid_text(attempt_id)))
 
     @app.post("/api/math/answer-attempts/{attempt_id}/grade")
-    def grade_answer(attempt_id: str, body: dict | None = None, user=Depends(student)):
-        return evaluate_answer(user, uuid_text(attempt_id), automatic=bool(body and body.get("automatic") is True))
+    def grade_answer(attempt_id: str, body: dict | None = None, user=Depends(student), account=Depends(signed_in)):
+        return evaluate_answer(user, uuid_text(attempt_id), automatic=bool(body and body.get("automatic") is True),
+                               account=account)
 
-    def evaluate_answer(user, aid, *, automatic=False):
+    def evaluate_answer(user, aid, *, automatic=False, account=None):
+        """Checks the answer with the AI. `account`: the signed-in student asking; one who may not call the AI
+        (ai_queue.may_send) puts the answer in their teacher's queue instead. None: the teacher's queue sending it."""
         if open_ended_locked():
             raise ScanError(403, "open_ended_locked")   # before any storage read or provider call
         result = app.state.answers.action(user, "get", attempt_id=aid)
@@ -124,7 +139,9 @@ def install_answer_routes(app, signed_in):
             return reply(call(user, "get", attempt_id=aid))
         key = grading_key()
         if not key:
-            raise ScanError(503, "grading_unavailable")
+            raise ScanError(503, "grading_unavailable", "missing_key", "ANTHROPIC_API_KEY is not set")
+        if account is not None and not may_send(account):
+            return ask_teacher(user, account, aid, result, automatic)
         lease = str(uuid.uuid4())
         grading = app.state.answers.grade(user, "start", attempt_id=aid, lease_id=lease)
         if grading["state"] != "grading" or grading["lease_id"] != lease:
@@ -144,14 +161,43 @@ def install_answer_routes(app, signed_in):
                 pass  # an uncertain commit may already have stored the successful check
             if isinstance(exc, ScanError):
                 raise
-            if not isinstance(exc, PhotoUnavailable):
+            if isinstance(exc, PhotoUnavailable):
+                reason, detail = exc.reason or "provider_error", exc.detail
+            else:
                 log.error("answer grader failed: %s", type(exc).__name__)
-            raise ScanError(503, "grading_failed") from exc
+                reason, detail = "server_error", f"{type(exc).__name__}: {' '.join(str(exc).split())[:200]}"
+            raise ScanError(503, "grading_failed", reason, detail) from exc
         return reply(call(user, "get", attempt_id=aid))
 
-    def automatic_grade(user, attempt_id):
+    def ask_teacher(user, account, aid, result, automatic):
+        queue = app.state.ai_queue
+        if not queue.configured:
+            raise ScanError(503, "grading_unavailable")
+        latest = queue.for_attempt(user, aid)
+        if latest and latest["state"] in ("pending", "sending"):
+            pass   # already waiting
+        elif latest and automatic:
+            pass   # declined, failed or done before: only the student's own click asks again
+        elif latest and latest["state"] in ("failed", "declined"):
+            queue.reopen(latest["id"])
+            note(user, "ai_request", result)
+        else:
+            snapshot = result["attempt"].get("snapshot") or {}
+            queue.add({"user_id": user, "email": str(account.get("email", "")).lower(), "kind": "grading",
+                       "attempt_id": aid, "label": str(snapshot.get("name", ""))[:300],
+                       "question": str(snapshot.get("question", ""))[:4000]})
+            note(user, "ai_request", result)
+        return reply(call(user, "get", attempt_id=aid))
+
+    # the teacher's queue sends a student's answer: the same check, with no queue in front of it
+    def grade_for_queue(user_id, aid):
+        evaluate_answer(user_id, aid)
+        return call(user_id, "get", attempt_id=aid)
+    app.state.grade_attempt = grade_for_queue
+
+    def automatic_grade(user, attempt_id, account=None):
         try:
-            evaluate_answer(user, attempt_id, automatic=True)
+            evaluate_answer(user, attempt_id, automatic=True, account=account)
         except ScanError as exc:
             # Upload is already committed. Keep failures separate and retryable.
             log.info("automatic answer grading stopped: %s", exc.code)
@@ -205,7 +251,7 @@ def install_answer_routes(app, signed_in):
 
     @app.post("/api/math/answer-scans/{scan_id}/uploads/{lease_id}")
     async def upload(scan_id: str, lease_id: str, background_tasks: BackgroundTasks,
-                     photo: UploadFile = File(...), user=Depends(student)):
+                     photo: UploadFile = File(...), user=Depends(student), account=Depends(signed_in)):
         sid, lease = uuid_text(scan_id), uuid_text(lease_id)
         data = await photo.read(MAX_IMAGE + 1)
         result = await run_in_threadpool(submit, user, sid, lease, data, photo.content_type)
@@ -213,7 +259,7 @@ def install_answer_routes(app, signed_in):
         # a quiz answer is graded only once the quiz is handed in (the page asks for it then)
         quiz = str(result.get("attempt", {}).get("question_id", "")).startswith("quiz:")
         if result.get("grading_available") and not result.get("grading") and not quiz:
-            background_tasks.add_task(automatic_grade, user, result["attempt"]["id"])
+            background_tasks.add_task(automatic_grade, user, result["attempt"]["id"], account)
         return reply(result)
 
     def submit(user, sid, lease, data, content_type):

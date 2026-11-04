@@ -32,8 +32,13 @@ class ScanAuth:
     url = 'https://test.invalid'
     key = 'public-test'
     secret = 'server-test'
-    teachers = frozenset()
+    # OWNER is a teacher, so these tests check answers straight with the AI; the students' queue is in test_ai_queue
+    teachers = frozenset({OWNER + '@test.invalid'})
     developers = frozenset()
+
+    def _admin(self, path, *args, **kwargs):
+        from app.auth import AuthUnavailable
+        raise AuthUnavailable('supabase answered 404: no tables here but the answer RPCs')
 
     def user(self, token):
         if token not in (OWNER, OTHER):

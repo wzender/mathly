@@ -160,6 +160,22 @@ class SupabaseAuth:
             grades = []
         return {"attempts": attempts, "grades": grades}
 
+    def user_ids(self, emails: list[str]) -> dict[str, str]:
+        """The account id of each email that has signed in at least once (Supabase's admin user list), by email."""
+        wanted, found = {email.lower() for email in emails}, {}
+        page = 1
+        while wanted - found.keys():
+            data = self._admin(f"/auth/v1/admin/users?page={page}&per_page=1000") or {}
+            users = data.get("users") if isinstance(data, dict) else data
+            for user in users or []:
+                email = str(user.get("email") or "").lower()
+                if email in wanted and user.get("id"):
+                    found[email] = user["id"]
+            if len(users or []) < 1000 or page >= 50:
+                break
+            page += 1
+        return found
+
     def access_for(self, user_id: str, fresh: bool = False) -> dict | None:
         if not self.secret:
             return None

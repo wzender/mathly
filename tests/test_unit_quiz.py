@@ -256,7 +256,7 @@ def test_a_unit_quiz_answer_is_handed_in_from_the_board(quiz_server):
             playwright.expect(page.locator(".mx-board")).to_be_visible()
             playwright.expect(page.locator('.mx-board-pages [data-page="2"]')).to_have_attribute("aria-selected", "true")
             send = page.locator(".mx-board-send")
-            playwright.expect(send).to_have_text("📤הגשה לשאלה 3")
+            playwright.expect(send).to_have_text("הגשה לשאלה 3")
             send.click()   # an empty page is not handed in
             playwright.expect(send).to_contain_text("הלוח ריק")
             draw_line(page)

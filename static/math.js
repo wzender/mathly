@@ -164,7 +164,8 @@ async function show(){
   if(remote){ try{ localStorage.setItem(key(),JSON.stringify(P)); }catch{} queuePush(); }   // this device's own work goes up too
   if(!P.set||typeof P.set!=="object") P.set={}; SHOWN=new Set(shownUnits().map(u=>u.id));
   hasExams()?drawSubjectPicker():selectSubject("מתמטיקה");   // no exams yet: straight to math, science is a tap away
-  window.MathlyAnswers?.configure({api,account:CFG.userId,enabled:CFG.answerScans,root,onGraded:({questionId,grading})=>{
+  if(CFG.aiReview) aqCount();
+  window.MathlyAnswers?.configure({api,account:CFG.userId,enabled:CFG.answerScans,root,queued:CFG.aiDirect===false,onGraded:({questionId,grading})=>{
     if(grading.result.verdict!=="correct"||P.done[questionId])return;
     const unitWas=unitDone(unitOf(questionId));
     P.done[questionId]=grading.finished_at||new Date().toISOString(); Sky.mastered(P,questionId);
@@ -185,16 +186,32 @@ function subjectOptions(){
     const item=bySubject.get(exam.subject)||{name:exam.subject,dates:[],classes:new Set()};
     item.dates.push(exam.date);item.classes.add(row.name);bySubject.set(exam.subject,item);
   }));
-  return [...bySubject.values()].map(item=>({...item,dates:item.dates.sort()})).sort((a,b)=>!a.dates.length-!b.dates.length||String(a.dates[0]||"").localeCompare(String(b.dates[0]||"")));
+  const today=new Date();today.setHours(0,0,0,0);
+  // first the subjects with an exam ahead (nearest first), then those with no exams yet, then those whose exams are over
+  return [...bySubject.values()].map(item=>{
+    const dates=item.dates.sort(), left=dates.filter(date=>examDate(date)>=today);
+    return {...item,dates,left,rank:left.length?0:dates.length?2:1};
+  }).sort((a,b)=>a.rank-b.rank||String(a.left[0]||"").localeCompare(String(b.left[0]||"")));
+}
+// the stars lit in a subject's units out of all its skills; null when the subject has no practice path here
+function subjectSkills(name){
+  const ids=mineUnits().filter(u=>u.subject===name).flatMap(u=>unitIds(u).filter(live));
+  return ids.length?{lit:ids.filter(id=>P.done[id]).length,total:ids.length}:null;
+}
+function subjectCard(item,today){
+  const [icon,tone]=examLooks[item.name]||["●","other"], count=item.dates.length, left=item.left.length, over=count>0&&!left;
+  const days=left?Math.round((examDate(item.left[0])-today)/86400000):null, skills=subjectSkills(item.name);
+  const dots=count&&count<=12?`<span class="mx-subject-dots" aria-hidden="true">${item.dates.map(date=>`<span${examDate(date)<today?' class="past"':""}></span>`).join("")}</span>`:"";
+  const exams=count?(over?"כל המבחנים הסתיימו":`נשארו ${left} מתוך ${count} מבחנים`):item.name==="מדעים"?"חידות בהצבעה כיתתית":"מסלול תרגול";
+  const bar=skills?`<span class="mx-subject-bar" role="progressbar" aria-label="מיומנויות שהושלמו" aria-valuemin="0" aria-valuemax="${skills.total}" aria-valuenow="${skills.lit}"><span style="width:${Math.round(100*skills.lit/skills.total)}%"></span></span><small>${skills.lit} מתוך ${skills.total} מיומנויות</small>`:"";
+  const when=days===null?"":`<span class="mx-subject-count${days<3?" urgent":days<7?" soon":""}" title="${esc(examFullDate(item.left[0]))}">${days===0?"<b>היום</b>":days===1?"<b>מחר</b>":`<small>בעוד</small><b>${days}</b><small>ימים</small>`}</span>`;
+  return `<button class="mx-subject-card exam-${tone}${over?" is-over":""}" data-subject="${esc(item.name)}"><span class="mx-subject-icon" aria-hidden="true">${icon}</span><span><b>${esc(item.name)}</b><small class="mx-subject-left">${dots}${exams}</small>${bar}</span>${when}<i aria-hidden="true">‹</i></button>`;
 }
 function drawSubjectPicker(){
   ACTIVE_SUBJECT=""; nav.hidden=true;
   const manage=can("management.access"), subjects=subjectOptions(), today=new Date();today.setHours(0,0,0,0);
-  path.innerHTML=`<header class="mx-top"><div><h1>המקצועות שלי</h1><p class="mx-sub">בחרו מקצוע כדי לפתוח את המסלול שלו</p></div><div class="mx-acts">${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${window.MathlyAnswers?.pushButton?.()||""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
-    <section class="mx-subject-grid" aria-label="מקצועות הכיתה">${subjects.map(item=>{
-      const [icon,tone]=examLooks[item.name]||["●","other"],future=item.dates.find(date=>examDate(date)>=today),count=item.dates.length;
-      return `<button class="mx-subject-card exam-${tone}" data-subject="${esc(item.name)}"><span class="mx-subject-icon" aria-hidden="true">${icon}</span><span><b>${esc(item.name)}</b><small>${count?`${count} מבחנים${future?` · הבא ${examDay(future)}`:" · הסתיימו"}`:item.name==="מדעים"?"חידות בהצבעה כיתתית":"מסלול תרגול"}</small></span><i aria-hidden="true">‹</i></button>`;
-    }).join("")}</section>`;
+  path.innerHTML=`<header class="mx-top"><div><h1>המקצועות שלי</h1><p class="mx-sub">בחרו מקצוע כדי לפתוח את המסלול שלו</p></div><div class="mx-acts">${window.MathlyGuide?.button()||""}${teachButton()}${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${window.MathlyAnswers?.pushButton?.()||""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
+    <section class="mx-subject-grid" aria-label="מקצועות הכיתה">${subjects.map(item=>subjectCard(item,today)).join("")}</section>`;
 }
 function selectSubject(subject){
   ACTIVE_SUBJECT=subject;
@@ -244,7 +261,7 @@ function nextExam(){
 function topBar(){
   const st=skyStats(), hot=Sky.today(P)>=Sky.GOAL, manage=can("management.access"), on=Sky.soundOn(), streak=Sky.streak(P);
   return `<header class="mx-top"><div class="mx-brand">${Sky.spark()}<span>מתמטיקה</span></div>
-    <div class="mx-acts"><button class="mx-btn" data-act="subjects">מקצועות</button>${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${window.MathlyAnswers?.pushButton?.()||""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
+    <div class="mx-acts"><button class="mx-btn" data-act="subjects">מקצועות</button>${window.MathlyGuide?.button()||""}${teachButton()}${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${window.MathlyAnswers?.pushButton?.()||""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
     <div class="mx-hud"><div class="mx-stats">
       <button class="sky-chip flame${hot?"":" cold"}" data-act="streak" title="${streak} ימים ברצף">${Sky.FLAME}<b>${streak}</b><span class="mx-sr">ימים ברצף</span></button>
       <span class="sky-chip stars" title="${st.lit} כוכבים">${Sky.spark()}<b>${st.lit}</b><span class="mx-sr">כוכבים</span></span>
@@ -448,7 +465,7 @@ function open(id){
   sheet.querySelector(".mx-x").focus({preventScroll:true});
   if(openEnded&&st!=="off")window.MathlyAnswers?.mountQuestion(sheet.querySelector(".mx-answer"),id,s.question_version);
 }
-function closeSheet(){ stopPhone(); dropResources(); cancelAdvance(); REV=null; stopQuizClock(); QZ=null; stopUnitQuiz(); if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
+function closeSheet(){ stopPhone(); dropResources(); dropQueue(); cancelAdvance(); REV=null; stopQuizClock(); QZ=null; stopUnitQuiz(); if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
 
 // counts down, then opens `target` (a skill id); stops if the student moved on in the meantime
 function autoAdvance(id,target){
@@ -969,7 +986,7 @@ async function uqResult(uid,h,check=false){
   sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
     <div class="mx-sheet mx-uq-sheet u-${uid}" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
       <div class="mx-shtop"><div><span class="mx-uchip">${esc(u.name)}</span><h3 id="mxTitle">בוחן מסכם: בודקים…</h3>
-        <small class="mx-src" aria-live="polite">בודקים את התשובות, זה לוקח כחצי דקה לשאלה</small></div>
+        <small class="mx-src" aria-live="polite">${CFG.aiDirect===false?"שולחים את התשובות לבדיקת המורה":"בודקים את התשובות, זה לוקח כחצי דקה לשאלה"}</small></div>
         <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div><div class="mx-uq-report"></div></div>`;
   sheet.hidden=false; sheet.querySelector(".mx-x").focus({preventScroll:true});
   const results=[];
@@ -979,7 +996,7 @@ async function uqResult(uid,h,check=false){
       r=await uqJson(`${UQ_BASE}/${entry.attempts[i]}`);
       if(r.attachment&&r.grading_available&&(!r.grading||(check&&r.grading.state==="failed"))){
         if(UQ?.uid!==uid) return;
-        sheet.querySelector(".mx-src").textContent=`בודקים את שאלה ${i+1} מתוך ${n}…`;
+        sheet.querySelector(".mx-src").textContent=CFG.aiDirect===false?`שולחים את שאלה ${i+1} מתוך ${n} למורה…`:`בודקים את שאלה ${i+1} מתוך ${n}…`;
         try{ r=await uqPost(`${UQ_BASE}/${entry.attempts[i]}/grade`,{automatic:!check}); }catch(e){ r.error=e.message; }
       }
       if(r.attachment){ const b=await api(`${UQ_BASE}/${entry.attempts[i]}/image`,{cache:"no-store"}); if(b.ok&&UQ?.uid===uid) UQ.images[i]=URL.createObjectURL(await b.blob()); }
@@ -994,7 +1011,8 @@ async function uqResult(uid,h,check=false){
     let pts=null, say="";
     if(!r?.attachment) { pts=0; say="לא צולמה תשובה"; }
     else if(a&&a.score!=null){ pts=Math.round(q.points*a.score/100); say={correct:"נכון ומלא",partial:"נכון בחלקו",incorrect:"לא נכון"}[a.verdict]||""; }
-    else { open++; say=a?.verdict==="unreadable"?"לא הצלחנו לקרוא את התמונה":a?.verdict==="needs_review"?"נדרשת בדיקה של מורה":r.error||(!r.grading_available?"הבדיקה האוטומטית אינה זמינה כרגע":"עוד לא נבדקה"); }
+    else { open++; const req=a?null:r.ai_request;
+      say=req&&["pending","sending","failed"].includes(req.state)?"מחכה למורה שיאשר את הבדיקה":req?.state==="declined"?`המורה לא אישר את הבדיקה${req.note?`: ${req.note}`:""}`:a?.verdict==="unreadable"?"לא הצלחנו לקרוא את התמונה":a?.verdict==="needs_review"?"נדרשת בדיקה של מורה":r.error||(!r.grading_available?"הבדיקה האוטומטית אינה זמינה כרגע":"עוד לא נבדקה"); }
     if(pts!=null) earned+=pts;
     return `<li class="mx-uq-q"><div class="mx-uq-qhead"><b>שאלה ${i+1}</b><span>${pts==null?"–":pts}/${q.points} נק׳</span></div>
       <p class="mx-uq-text">${fmt(q.question).replace(/\n/g,"<br>")}</p>
@@ -1002,7 +1020,7 @@ async function uqResult(uid,h,check=false){
       <p class="mx-uq-verdict ${a?.verdict||"none"}">${esc(say)}</p>
       ${a?.feedback?`<p>${fmtLoose(a.feedback)}</p>`:""}${a?.next_step?`<p><b>הצעד הבא: </b>${fmtLoose(a.next_step)}</p>`:""}
       ${a?.solution?`<details><summary>הפתרון המלא</summary><p class="mx-grade-solution">${fmtLoose(a.solution)}</p></details>`:""}
-      ${r?.attachment&&!a&&r.grading_available?`<button class="mx-btn" data-uq-result="${uid}:${h}:check">בדיקה נוספת</button>`:""}</li>`;
+      ${r?.attachment&&!a&&r.grading_available&&!["pending","sending","failed"].includes(r.ai_request?.state)?`<button class="mx-btn" data-uq-result="${uid}:${h}:check">${CFG.aiDirect===false?"שליחה מחדש למורה":"בדיקה נוספת"}</button>`:""}</li>`;
   });
   entry.score=open?null:earned; save(); draw();
   const total=open?`${earned} נקודות עד עכשיו · ${open===1?"שאלה אחת לא נבדקה":`${open} שאלות לא נבדקו`}`:`${earned}/100`;
@@ -1033,8 +1051,15 @@ function onClick(e){
   if(t.dataset.id) return open(t.dataset.id);
   if(t.dataset.manageMode) return showManageMode(t.dataset.manageMode);
   if(t.dataset.classAction) return manageClassAction(t.dataset.classAction,t.dataset.classId);
+  if(t.dataset.reportClass!=null) return classReport(t.dataset.reportClass);
+  if(t.dataset.aqSend) return aqSend(t.dataset.aqSend);
+  if(t.dataset.aqDecline) return aqDecline(t.dataset.aqDecline);
   switch(t.dataset.act){
     case "manage": return manageClasses();
+    case "class-report": return classReport();
+    case "ai-queue": return aiQueue();
+    case "aq-all": return aqAll();
+    case "photo-cancel": return photoCancel();
     case "manage-refresh": return loadManagedClasses(true);
     case "manage-lab": return showManageMode("lab");
     case "manage-practice": return closeSheet();
@@ -1166,7 +1191,8 @@ function showManageMode(mode){
 /* Monitoring (ניטור): a snapshot of the system, open-answer activity, and the server's latest warnings.
    Each source loads and fails on its own, so a slow Supabase does not hold up the rest. */
 const MON_RANGES={day:["יום","24 השעות האחרונות","15 דקות"],week:["שבוע","7 הימים האחרונים","שעה"],month:["חודש","30 הימים האחרונים","יום"]};
-const MON_ACTIONS={visit:["👋","נכנס/ה לאפליקציה"],photo:["📷","צילם/ה תרגיל לעזרה"],answer_upload:["📝","שלח/ה תשובה פתוחה"],answer_graded:["✔️","תשובה נבדקה"],class_saved:["🏫","שמר/ה כיתה"],class_deleted:["🗑️","מחק/ה כיתה"],resource_added:["🖼️","הוסיף/ה תמונה למשאבי שיעור"]};
+const MON_ACTIONS={visit:["👋","נכנס/ה לאפליקציה"],photo:["📷","צילם/ה תרגיל לעזרה"],answer_upload:["📝","שלח/ה תשובה פתוחה"],answer_graded:["✔️","תשובה נבדקה"],class_saved:["🏫","שמר/ה כיתה"],class_deleted:["🗑️","מחק/ה כיתה"],resource_added:["🖼️","הוסיף/ה תמונה למשאבי שיעור"],
+  ai_request:["🙋","ביקש/ה בדיקת AI מהמורה"],ai_sent:["🤖","שלח/ה בקשה של תלמיד ל-AI"],ai_failed:["⚠️","שליחה ל-AI נכשלה"],ai_declined:["✋","דחה/תה בקשת AI"]};
 const VERDICTS={correct:"נכונות",partial:"נכונות חלקית",incorrect:"שגויות",unreadable:"לא קריאות",needs_review:"דורשות בדיקה",grading:"בבדיקה",failed:"הבדיקה נכשלה"};
 let MON={}, MON_RANGE=(()=>{try{return localStorage.getItem("mathly.monRange")}catch{return null}})();
 if(!MON_RANGES[MON_RANGE]) MON_RANGE="week";
@@ -1306,8 +1332,8 @@ function drawManagedClasses(box){
       const subjects=classSubjects(row);
       const unitLine=units.length===G.units.length?`כל היחידות (${G.units.length})`:units.map(unit=>unit.name).join(" · ")||"לא נבחרו";
       const students=row.emails||[], teachers=row.teachers||[];
-      return `<article class="mx-class-card"><div class="mx-class-card-head"><h5>${esc(row.name)}</h5><div class="mx-class-actions"><button class="mx-btn" data-class-action="edit" data-class-id="${esc(row.id)}">עריכה</button><button class="mx-btn danger" data-class-action="delete" data-class-id="${esc(row.id)}">מחיקה</button></div></div>
-        <dl><dt>יחידות</dt><dd>${esc(unitLine)}</dd><dt>מקצועות היחידות</dt><dd>${esc(subjects.join(" · ")||"לא הוגדרו")}</dd><dt>תלמידים</dt><dd>${students.length?`${students.length}: ${esc(students.join(" · "))}`:"עוד אין"}</dd><dt>מורים</dt><dd>${teachers.length?esc(teachers.join(" · ")):"עוד לא נבחרו"}</dd></dl>${examBoard(row)}</article>`;
+      return `<article class="mx-class-card"><div class="mx-class-card-head"><h5>${esc(row.name)}</h5><div class="mx-class-actions"><button class="mx-btn" data-class-action="report" data-class-id="${esc(row.id)}">מעקב</button><button class="mx-btn" data-class-action="edit" data-class-id="${esc(row.id)}">עריכה</button><button class="mx-btn danger" data-class-action="delete" data-class-id="${esc(row.id)}">מחיקה</button></div></div>
+        <dl><dt>יחידות</dt><dd>${esc(unitLine)}</dd><dt>מקצועות היחידות</dt><dd>${esc(subjects.join(" · ")||"לא הוגדרו")}</dd><dt>תלמידים</dt><dd>${students.length?`${students.length}: ${esc(students.join(" · "))}`:"עוד אין"}</dd><dt>מורה הכיתה</dt><dd dir="auto">${teachers.length?esc(teachers.join(" · ")):"עוד לא נבחר"}</dd></dl>${examBoard(row)}</article>`;
     }).join("")}</div>`:'<div class="mx-empty-class"><h5>עוד אין כיתות</h5><p>פתחו כיתה ראשונה, בחרו את יחידות הלימוד והוסיפו את כתובות התלמידים.</p></div>'}`;
 }
 
@@ -1318,6 +1344,7 @@ function manageClassAction(action,id){
   if(!row) return;
   if(action==="edit") return openClassEditor(row);
   if(action==="delete") return deleteManagedClass(row);
+  if(action==="report") return classReport(row.id);
 }
 
 function openClassEditor(row){
@@ -1333,7 +1360,7 @@ function openClassEditor(row){
         <p class="mx-note mx-no-subject">בחרו מקצוע כדי לראות את יחידות הלימוד שלו.</p>
         ${subjects.map(subject=>`<section class="mx-subject-units" data-subject-units="${esc(subject)}"><h6 class="mx-pick-subject">${esc(subject)}</h6><div class="mx-unit-picks">${subjectUnits(subject).map(unit=>{const skills=unitSkills(unit.id);return `<label class="u-${unit.id}"><input type="checkbox" name="unit" value="${esc(unit.id)}" data-subject="${esc(subject)}"${selected.has(unit.id)?" checked":""}><span>${esc(unit.name)}<small>${skills.length} תת־נושאים · ${questionCount(skills)} שאלות</small></span></label>`}).join("")}</div></section>`).join("")}</fieldset>
       <label>התלמידים<small>כתובת דוא״ל אחת בכל שורה. תלמיד יכול להשתייך ליותר מכיתה אחת.</small><textarea name="emails" dir="ltr" spellcheck="false" placeholder="student@example.com">${esc((row?.emails||[]).join("\n"))}</textarea></label>
-      <label>מורי הכיתה<small>כתובת דוא״ל אחת בכל שורה. למורים תהיה גישה לכיתה הזו.</small><textarea name="teachers" dir="ltr" spellcheck="false" placeholder="teacher@example.com">${esc((row?.teachers||[]).join("\n"))}</textarea></label>
+      <label>מורה הכיתה<small>אחד מתלמידי הכיתה. המורה רואה את ההתקדמות, הקשיים והציונים של כל התלמידים בכיתה.</small><select name="teacher" dir="ltr"></select></label>
       <div class="mx-class-form-actions"><button class="mx-btn solid" type="submit">${creating?"פתיחת הכיתה":"שמירת השינויים"}</button><button class="mx-btn" type="button" data-class-action="cancel">ביטול</button><span role="status" aria-live="polite"></span></div></form>`;
   const form=box.querySelector("form"), message=form.querySelector('[role="status"]');
   const unitBoxes=subject=>[...form.querySelectorAll('input[name="unit"]')].filter(input=>input.dataset.subject===subject);
@@ -1356,19 +1383,26 @@ function openClassEditor(row){
     if(input.name==="subject"||input.name==="unit") syncSubjects();
   });
   syncSubjects();
+  // the teacher is picked from the students: the list follows the students box as it is edited
+  const lines=name=>form.elements[name].value.split(/[\n,;]+/).map(value=>value.trim().toLowerCase()).filter(Boolean);
+  const pickTeacher=form.elements.teacher;
+  const syncTeacher=()=>{
+    const chosen=pickTeacher.options.length?pickTeacher.value:(row?.teachers||[])[0]||"", students=[...new Set(lines("emails"))];
+    pickTeacher.innerHTML=`<option value="">ללא מורה</option>${students.map(email=>`<option value="${esc(email)}"${email===chosen?" selected":""}>${esc(email)}</option>`).join("")}`;
+  };
+  form.elements.emails.addEventListener("input",syncTeacher); syncTeacher();
   form.querySelector('input[name="name"]').focus();
   form.onsubmit=async event=>{
     event.preventDefault();
     const lessons=[...form.querySelectorAll('input[name="unit"]:checked')].map(input=>input.value);
     if(!lessons.length){message.textContent="בחרו לפחות מקצוע אחד.";return;}
-    const lines=name=>form.elements[name].value.split(/[\n,;]+/).map(value=>value.trim().toLowerCase()).filter(Boolean);
-    const body={name:form.elements.name.value.trim(),emails:lines("emails"),teachers:lines("teachers"),lessons};
+    const body={name:form.elements.name.value.trim(),emails:lines("emails"),teachers:pickTeacher.value?[pickTeacher.value]:[],lessons};
     const buttons=form.querySelectorAll("button"); buttons.forEach(button=>button.disabled=true); message.textContent=creating?"פותחים את הכיתה…":"שומרים…";
     try{
       const response=await api(creating?"/api/classes":`/api/classes/${encodeURIComponent(row.id)}`,{method:creating?"POST":"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
       if(!response.ok){const detail=(await response.json().catch(()=>({}))).detail;throw new Error(detail||"לא הצלחנו לשמור את הכיתה. נסו שוב.");}
       if(!creating){
-        Object.assign(row,body); MY_CLASSES.forEach(item=>{if(String(item.id)===String(row.id))Object.assign(item,body);});
+        Object.assign(row,body); MY_CLASSES.forEach(item=>{if(String(item.id)===String(row.id))Object.assign(item,body,{teacher:body.teachers.includes(ME_EMAIL.toLowerCase())});});
         if(String(MY_CLASS?.id)===String(row.id))Object.assign(MY_CLASS,body);
         SHOWN=new Set(shownUnits().map(unit=>unit.id)); draw();
       }
@@ -1390,6 +1424,190 @@ async function deleteManagedClass(row){
   }catch(error){state.textContent=error.message;}
 }
 
+/* ---------- the class teacher's report ----------
+   A class's teacher is one of its students, chosen in the class editor. That account (and a manager, from the class's
+   card) opens the class's report (/api/classes/{id}/report, app/class_report.py): each student's saved progress, read
+   the same way the student's own page reads it. It shows, per student, the skills finished in the class's units,
+   the mistakes that keep coming back (Sky.patterns), the summarizing quizzes' grades and the practice exams' results,
+   and above them the mistakes most common in the class. */
+const teachClasses=()=>MY_CLASSES.filter(row=>row.teacher);
+const teachButton=()=>(teachClasses().length?'<button class="mx-btn" data-act="class-report">הכיתה שלי</button>':"")
+  +(CFG.aiReview?`<button class="mx-btn" data-act="ai-queue">${aqLabel()}</button>`:"");
+let REPORT=null;
+const shortDate=at=>{ const d=new Date(at); return isNaN(d)?"":d.toLocaleDateString("he-IL",{day:"numeric",month:"numeric"}); };
+const pct=(a,b)=>b?Math.round(100*a/b):0;
+// one student's numbers, from their saved progress (null: nothing saved yet)
+function reportOf(student,units){
+  const p=student.progress; if(!p) return null;
+  const perUnit=units.map(u=>{ const ids=unitIds(u).filter(live); return {u,n:ids.length,done:ids.filter(id=>p.done?.[id]).length,
+    gold:ids.filter(id=>p.gold?.[id]).length,stuck:ids.filter(id=>!p.done?.[id]&&(p.missed?.[id]||[]).length).map(id=>BY[id])}; });
+  const n=perUnit.reduce((s,x)=>s+x.n,0), done=perUnit.reduce((s,x)=>s+x.done,0);
+  const {recurring}=Sky.patterns(p,G.mistakes);
+  const quizzes=units.filter(u=>u.quiz).map(u=>({u,st:p.uq?.[u.id]||{history:[]}}));
+  const scores=quizzes.map(x=>x.st.history.filter(h=>h.score!=null).at(-1)?.score).filter(s=>s!=null);
+  const exams=(p.quizzes||[]).slice().reverse();
+  const days=Object.keys(p.days||{}).sort(), last=[p.updated?new Date(+p.updated):null,days.length?new Date(days.at(-1)):null].filter(d=>d&&!isNaN(d)).sort((a,b)=>b-a)[0];
+  return {perUnit,n,done,recurring:recurring.filter(x=>G.mistakes[x.m]),quizzes,quizAvg:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null,exams,last};
+}
+async function classReport(id){
+  const mine=teachClasses(), classId=id??REPORT?.id??mine[0]?.id; if(classId==null) return;
+  if(!cur) back=document.activeElement;
+  closeSheetQuietly(); cur="report"; REPORT={id:classId,data:null};
+  const tabs=mine.length>1?`<div class="mx-report-tabs">${mine.map(row=>`<button class="mx-btn" data-report-class="${esc(row.id)}" aria-pressed="${String(row.id)===String(classId)}">${esc(row.name)}</button>`).join("")}</div>`:"";
+  sheet.innerHTML=`<div class="mx-scrim"></div>
+    <div class="mx-sheet mx-manage-sheet mx-report-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-manage-head"><h3 id="mxTitle">הכיתה שלי</h3><span class="mx-manage-spacer"></span>
+        <button class="mx-btn" data-report-class="${esc(classId)}">רענון</button><button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+      ${tabs}<p class="mx-manage-state" aria-live="polite">טוענים את נתוני הכיתה…</p><div class="mx-report"></div></div>`;
+  sheet.hidden=false; sheet.querySelector(".mx-x").focus({preventScroll:true});
+  try{
+    const r=await api(`/api/classes/${encodeURIComponent(classId)}/report`,{cache:"no-store"});
+    if(!r.ok) throw Error(r.status===403?"רק מורה הכיתה יכול לראות את הנתונים שלה.":"לא הצלחנו לטעון את נתוני הכיתה. נסו שוב.");
+    const data=await r.json(); if(cur!=="report"||REPORT?.id!==classId) return;
+    REPORT.data=data; drawReport();
+  }catch(e){ if(cur==="report") sheet.querySelector(".mx-manage-state").textContent=e.message; }
+}
+function closeSheetQuietly(){ const b=back; closeSheet(); back=b; }
+function drawReport(){
+  const {class:row,students}=REPORT.data, ids=new Set(row.lessons||[]);
+  const units=G.units.filter(u=>ids.has(u.id)&&unitIds(u).some(live));
+  const all=students.map(s=>({s,r:reportOf(s,units)}));
+  sheet.querySelector("#mxTitle").textContent=`הכיתה שלי: ${row.name}`;
+  sheet.querySelector(".mx-manage-state").textContent=`${students.length} תלמידים · ${all.filter(x=>x.r).length} התחילו לתרגל`;
+  // the mistakes that keep coming back for the most students
+  const common={}; all.forEach(({s,r})=>r?.recurring.forEach(x=>(common[x.m]||=[]).push(s.email)));
+  const top=Object.entries(common).sort((a,b)=>b[1].length-a[1].length).slice(0,5);
+  const name=email=>email.split("@")[0];
+  const quizUnits=units.filter(u=>u.quiz);
+  const grade=score=>score==null?"–":`${score}`;
+  const tone=score=>score==null?"":score>=80?" good":score>=55?" mid":" low";
+  const card=({s,r})=>{
+    if(!r) return `<details class="mx-report-student"><summary><b dir="ltr">${esc(name(s.email))}</b><span class="mx-small">${s.signed_in?"עוד לא התחיל לתרגל":"עוד לא נכנס לחשבון"}</span></summary><p class="mx-small" dir="ltr">${esc(s.email)}</p></details>`;
+    const exam=r.exams[0];
+    return `<details class="mx-report-student"><summary><b dir="ltr">${esc(name(s.email))}</b>
+        <span class="mx-report-prog"><span class="mx-meter" aria-hidden="true"><i style="width:${pct(r.done,r.n)}%"></i></span><small>${r.done}/${r.n} מיומנויות</small></span>
+        <span class="mx-report-chip${tone(r.quizAvg)}" title="ממוצע בחנים מסכמים">בוחן ${grade(r.quizAvg)}</span>
+        <span class="mx-report-chip${tone(exam?pct(exam.right,exam.n):null)}" title="מבחן התרגול האחרון">תרגול ${exam?`${exam.right}/${exam.n}`:"–"}</span>
+        ${r.recurring.length?`<span class="mx-report-chip low">${r.recurring.length} קשיים</span>`:""}</summary>
+      <div class="mx-report-body">
+        <p class="mx-small"><span dir="ltr">${esc(s.email)}</span>${r.last?` · פעילות אחרונה ${r.last.toLocaleDateString("he-IL")}`:""}</p>
+        <section><h5>התקדמות ביחידות</h5><div class="mx-quiz-units-score">${r.perUnit.map(x=>`<div><span>${esc(x.u.name)}${x.gold?` <small>· ${x.gold} זהב</small>`:""}</span><b>${x.done}/${x.n}</b><span class="mx-meter" aria-hidden="true"><i style="width:${pct(x.done,x.n)}%"></i></span></div>`).join("")}</div></section>
+        <section><h5>קשיים</h5>${r.recurring.length?`<ul class="mx-report-list">${r.recurring.map(x=>`<li><b>${fmt(G.mistakes[x.m].name)}</b> <small>${x.n} פעמים ב־${x.skills.length} מיומנויות, לאחרונה ${shortDate(x.last)}</small>${BY[x.practise]?`<small>לחזק: ${fmt(BY[x.practise].name)}</small>`:""}</li>`).join("")}</ul>`:'<p class="mx-small">אין טעויות שחוזרות לאחרונה.</p>'}
+          ${r.perUnit.some(x=>x.stuck.length)?`<p class="mx-small">מיומנויות עם שאלות שעוד לא נפתרו: ${r.perUnit.flatMap(x=>x.stuck).slice(0,8).map(sk=>fmt(sk.name)).join(" · ")}</p>`:""}</section>
+        <section><h5>בוחן מסכם</h5>${quizUnits.length?`<table class="mx-report-table"><thead><tr><th>יחידה</th><th>ציון אחרון</th><th>הגשות</th><th>תאריך</th></tr></thead><tbody>${r.quizzes.map(({u,st})=>{ const h=st.history.at(-1);
+            return `<tr><td>${esc(u.name)}</td><td class="mx-report-grade${tone(h?.score)}">${st.going?"בתהליך":h?(h.score==null?"ממתין לבדיקה":`${h.score}/100`):"–"}</td><td>${st.history.length||"–"}</td><td>${h?shortDate(h.at):"–"}</td></tr>`; }).join("")}</tbody></table>`:'<p class="mx-small">ליחידות של הכיתה אין בוחן מסכם.</p>'}</section>
+        <section><h5>מבחני תרגול</h5>${r.exams.length?`<table class="mx-report-table"><thead><tr><th>תאריך</th><th>ציון</th><th>תשובות נכונות</th><th>זמן</th></tr></thead><tbody>${r.exams.slice(0,10).map(q=>`<tr><td>${shortDate(q.at)}</td><td class="mx-report-grade${tone(pct(q.right,q.n))}">${pct(q.right,q.n)}</td><td>${q.right}/${q.n}</td><td>${q.ms?`${Math.round(q.ms/60000)} דק׳`:"–"}</td></tr>`).join("")}</tbody></table>`:'<p class="mx-small">עוד לא נעשו מבחני תרגול.</p>'}</section>
+      </div></details>`;
+  };
+  sheet.querySelector(".mx-report").innerHTML=`
+    ${top.length?`<section class="mx-report-common"><h4>קשיים נפוצים בכיתה</h4><ul class="mx-report-list">${top.map(([m,who])=>`<li><b>${fmt(G.mistakes[m].name)}</b> <small>${who.length} תלמידים: ${who.map(e=>esc(name(e))).join(", ")}</small></li>`).join("")}</ul></section>`:""}
+    <h4>תלמידים</h4>${students.length?all.map(card).join(""):'<p class="mx-note">אין עדיין תלמידים בכיתה.</p>'}`;
+}
+
+/* ---------- the teacher's AI queue (app/ai_queue.py) ----------
+   A student does not call the AI. Their answer to check (or a photographed problem) waits here for their class's
+   teacher, who looks at the photo and sends it to the AI or declines it with a note. The student's page shows the
+   result. A manager sees every class's requests. */
+let AQ=null, AQ_OPEN=null;   // AQ: the queue on the sheet; AQ_OPEN: how many requests wait (for the header button)
+const AQ_KIND={photo:"📷 תרגיל לעזרה",grading:"📝 בדיקת תשובה"};
+const AQ_STATE={pending:"ממתינה",sending:"נשלחת…",done:"נשלחה ל-AI",failed:"השליחה נכשלה",declined:"נדחתה",cancelled:"בוטלה"};
+const AQ_ERR={grading_failed:"הבדיקה נכשלה. אפשר לנסות שוב.",grading_unavailable:"בדיקה אוטומטית אינה זמינה כרגע באתר.",open_ended_locked:"שאלות פתוחות נעולות כרגע.",
+  grading_limit:"התלמיד הגיע למכסת הבדיקות היומית.",grading_busy:"כבר מתבצעות בדיקות לתלמיד הזה. נסו שוב בעוד רגע.",grading_interrupted:"הבדיקה הופסקה. אפשר לנסות שוב.",
+  request_taken:"הבקשה כבר טופלה (אולי ממכשיר אחר). רעננו את התור.",queue_unavailable:"התור אינו זמין כרגע.",
+  answer_storage_unavailable:"לא הצלחנו לקרוא את התמונה השמורה.",photo_failed:"פתרון התמונה נכשל. אפשר לנסות שוב."};
+// a failed send's error is "code|reason|technical detail" (app/ai_queue.py)
+function aqError(error){
+  const [code,reason="",...rest]=String(error||"").split("|"), detail=rest.join("|");
+  return `<p class="mx-aq-error">${esc(AQ_ERR[code]||code||"השליחה נכשלה.")}</p>${window.MathlyAnswers?.errorDetails?.(reason,detail)||""}`;
+}
+const AQ_VERDICT={correct:"נכונה",partial:"נכונה חלקית",incorrect:"שגויה",unreadable:"לא קריאה",needs_review:"דורשת בדיקה שלכם"};
+const aqWaiting=r=>["pending","sending","failed"].includes(r.state);
+const aqLabel=()=>`תור AI${AQ_OPEN?` <span class="mx-aq-badge">${AQ_OPEN}</span>`:""}`;
+function aqBadge(rows){
+  AQ_OPEN=rows.filter(r=>r.state==="pending").length;
+  document.querySelectorAll('[data-act="ai-queue"]').forEach(b=>{ if(!b.closest(".mx-sheet")) b.innerHTML=aqLabel(); });
+}
+async function aqCount(){
+  try{ const r=await api("/api/ai-queue",{cache:"no-store"}); if(r.ok) aqBadge((await r.json()).requests||[]); }catch{}
+}
+function dropQueue(){ if(AQ) Object.values(AQ.urls).forEach(u=>u&&URL.revokeObjectURL(u)); AQ=null; }
+async function aiQueue(){
+  if(cur!=="aiqueue"){ if(!cur) back=document.activeElement; closeSheetQuietly(); cur="aiqueue"; AQ={rows:null,urls:{},busy:new Set()}; }
+  const mine=AQ;
+  sheet.innerHTML=`<div class="mx-scrim"></div>
+    <div class="mx-sheet mx-manage-sheet mx-aq-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-manage-head"><h3 id="mxTitle">תור AI</h3><span class="mx-manage-spacer"></span>
+        <button class="mx-btn" data-act="aq-all" hidden>שליחת כל הממתינות</button><button class="mx-btn" data-act="ai-queue">רענון</button><button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>
+      <p class="mx-small">בקשות התלמידים מחכות כאן. הסתכלו בתמונה, ואז שלחו אותה ל-AI או דחו אותה. התלמיד רואה את התוצאה בעמוד שלו.</p>
+      <p class="mx-manage-state" aria-live="polite">טוענים את הבקשות…</p><div class="mx-aq"></div></div>`;
+  sheet.hidden=false; sheet.querySelector(".mx-x").focus({preventScroll:true});
+  try{
+    const r=await api("/api/ai-queue",{cache:"no-store"});
+    if(!r.ok) throw Error(r.status===403?"רק מורה של כיתה יכול לראות את התור.":"לא הצלחנו לטעון את התור. נסו שוב.");
+    const d=await r.json(); if(AQ!==mine) return;
+    mine.rows=d.requests||[]; drawQueue();
+  }catch(e){ if(AQ===mine) sheet.querySelector(".mx-manage-state").textContent=e.message; }
+}
+function aqResult(r){
+  const x=r.result||{};
+  if(r.kind==="photo") return x.readable===false?"ה-AI לא הצליח לקרוא את התרגיל.":`התשובה שה-AI מצא: ${fmtLoose(x.answer||"")}`;
+  return `תוצאה: ${esc(AQ_VERDICT[x.verdict]||"")}${x.score==null?"":` · ${esc(x.score)}/100`}`;
+}
+function drawQueue(){
+  const box=sheet.querySelector(".mx-aq"); if(!box||!AQ?.rows) return;
+  const open=AQ.rows.filter(aqWaiting), rest=AQ.rows.filter(r=>!aqWaiting(r));
+  aqBadge(AQ.rows);
+  sheet.querySelector(".mx-manage-state").textContent=open.length?(open.length===1?"בקשה אחת ממתינה":`${open.length} בקשות ממתינות`):"אין בקשות ממתינות.";
+  sheet.querySelector('[data-act="aq-all"]').hidden=open.filter(r=>r.state==="pending").length<2;
+  const when=at=>new Date(at).toLocaleString("he-IL",{dateStyle:"short",timeStyle:"short"});
+  const card=r=>{
+    const busy=AQ.busy.has(r.id), act=r.state==="pending"||r.state==="failed";
+    return `<article class="mx-aq-card ${esc(r.state)}"><div class="mx-aq-head"><b dir="ltr">${esc(String(r.email).split("@")[0])}</b><span>${AQ_KIND[r.kind]||""}</span>
+        <small>${when(r.created_at)}</small><span class="mx-aq-state">${busy?"שולחים ל-AI…":AQ_STATE[r.state]||esc(r.state)}</span></div>
+      ${r.label?`<p class="mx-aq-label">${fmt(r.label)}</p>`:""}${r.question?`<p class="mx-aq-q">${fmtLoose(r.question).replace(/\n/g,"<br>")}</p>`:""}
+      ${aqWaiting(r)?`<img class="mx-aq-img" alt="התמונה ששלח התלמיד" data-aq-img="${esc(r.id)}" hidden>`:""}
+      ${r.state==="failed"&&r.error?aqError(r.error):""}
+      ${r.state==="declined"&&r.note?`<p class="mx-small">ההערה שלכם: ${esc(r.note)}</p>`:""}
+      ${r.state==="done"?`<p class="mx-small">${aqResult(r)}</p>`:""}
+      ${act?`<div class="mx-row"><button class="mx-btn solid" data-aq-send="${esc(r.id)}"${busy?" disabled":""}>${r.state==="failed"?"שליחה חוזרת ל-AI":"שליחה ל-AI"}</button>
+        <button class="mx-btn" data-aq-decline="${esc(r.id)}"${busy?" disabled":""}>דחייה</button></div>`:""}</article>`;
+  };
+  box.innerHTML=`${open.map(card).join("")}${rest.length?`<h4 class="mx-aq-done">טופלו ביממה האחרונה</h4>${rest.map(card).join("")}`:""}`;
+  open.forEach(r=>aqImage(r.id));
+}
+async function aqImage(id){
+  const mine=AQ, show=url=>{ const img=sheet.querySelector(`[data-aq-img="${CSS.escape(id)}"]`); if(img){ img.src=url; img.hidden=false; } };
+  if(mine.urls[id]) return show(mine.urls[id]);
+  if(id in mine.urls) return;   // loading
+  mine.urls[id]=null;
+  try{
+    const r=await api(`/api/ai-queue/${encodeURIComponent(id)}/image`,{cache:"no-store"}); if(!r.ok) throw Error();
+    const url=URL.createObjectURL(await r.blob());
+    if(AQ!==mine) return URL.revokeObjectURL(url);
+    mine.urls[id]=url; show(url);
+  }catch{ if(AQ===mine) delete mine.urls[id]; }
+}
+async function aqPost(id,what,body){
+  const mine=AQ; if(!mine||mine.busy.has(id)) return;
+  mine.busy.add(id); drawQueue();
+  let row=null, err="";
+  try{
+    const r=await api(`/api/ai-queue/${encodeURIComponent(id)}/${what}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw Error(AQ_ERR[d.detail]||"הפעולה נכשלה. נסו שוב.");
+    row=d;
+  }catch(e){ err=e.message; }
+  mine.busy.delete(id); if(AQ!==mine) return;
+  if(row){ const i=mine.rows.findIndex(x=>x.id===id); if(i>=0) mine.rows[i]=row; }
+  drawQueue(); if(err) sheet.querySelector(".mx-manage-state").textContent=err;
+}
+const aqSend=id=>aqPost(id,"send");
+function aqDecline(id){
+  const note=prompt("הערה לתלמיד (לא חובה), למשל: צלמו שוב, התמונה לא ברורה");
+  if(note!==null) return aqPost(id,"decline",{note});
+}
+async function aqAll(){ for(const r of (AQ?.rows||[]).filter(x=>x.state==="pending")){ if(!AQ) return; await aqSend(r.id); } }
+
 /* A photographed problem (/api/math/photo, app/math_photo.py): hints first. The sheet shows the problem as it was
    read (a wrong reading is the student's cue to photograph again), then one hint; each further hint, each step and
    the whole solution with its answer come only when the student asks for them. */
@@ -1406,16 +1624,38 @@ async function photo(file){
     const form=new FormData(); form.append("photo",blob,"problem.jpg");
     const res=await api("/api/math/photo",{method:"POST",body:form}), data=await res.json().catch(()=>({}));
     if(!res.ok) throw new Error(typeof data.detail==="string"?data.detail:`השרת ענה ${res.status}`);
-    mine.data=data;
+    if(data.queued){ mine.req=data.request; mine.left=data.left; } else mine.data=data;
   }catch(e){ mine.error=e.message; }
   mine.busy=false;
   if(PH===mine&&cur==="photo") drawPhoto();   // a newer photo, or a closed sheet, keeps its own
+  if(mine.req) photoWait(mine);
+}
+// a student's photo waits for their teacher (app/ai_queue.py): the sheet looks for the answer while it is open
+const photoWaiting=req=>!!req&&["pending","sending","failed"].includes(req.state);
+async function photoWait(mine){
+  while(PH===mine&&cur==="photo"&&photoWaiting(mine.req)){
+    await new Promise(done=>setTimeout(done,8000));
+    if(PH!==mine||cur!=="photo") return;
+    try{
+      const r=await api("/api/math/ai-requests",{cache:"no-store"}); if(!r.ok) continue;
+      const row=((await r.json()).requests||[]).find(x=>x.id===mine.req.id); if(!row) continue;
+      mine.req=row; if(row.state==="done"&&row.result) mine.data={...row.result,left:mine.left};
+    }catch{ continue; }
+    if(!photoWaiting(mine.req)&&PH===mine&&cur==="photo") drawPhoto();
+  }
+}
+async function photoCancel(){
+  const mine=PH; if(!mine?.req) return;
+  try{ const r=await api(`/api/math/ai-requests/${encodeURIComponent(mine.req.id)}/cancel`,{method:"POST"}); if(r.ok) mine.req=await r.json(); }catch{}
+  if(PH===mine&&cur==="photo") drawPhoto();
 }
 function drawPhoto(){
   const d=PH.data;
   let body;
   if(PH.busy) body='<div class="mx-wait"><span class="mx-spin" aria-hidden="true"></span><b>קוראים את התרגיל ופותרים…</b><small>זה לוקח כמה שניות.</small></div>';
   else if(PH.error) body=`<div class="mx-bad"><b>לא הצלחנו</b><span>${esc(PH.error)}</span><button class="mx-btn" data-act="retake">צילום מחדש</button></div>`;
+  else if(!d&&photoWaiting(PH.req)) body=`<div class="mx-wait"><b>התמונה נשלחה למורה</b><small>אחרי שהמורה יאשר, הרמזים והפתרון יופיעו כאן.</small><button class="mx-btn" data-act="photo-cancel">ביטול הבקשה</button></div>`;
+  else if(!d) body=`<div class="mx-bad"><b>${PH.req?.state==="cancelled"?"הבקשה בוטלה":"המורה לא אישר את הבקשה"}</b>${PH.req?.note?`<span>הערת המורה: ${esc(PH.req.note)}</span>`:""}<button class="mx-btn" data-act="retake">צילום חדש</button></div>`;
   else if(!d.readable) body=`<div class="mx-bad"><b>לא הצלחנו לקרוא את התרגיל</b><span>${fmtLoose(d.note||"צלמו שוב, קרוב יותר ובאור טוב.")}</span><button class="mx-btn" data-act="retake">צילום מחדש</button></div>`;
   else{
     const n=d.steps.length, shown=PH.all?n:Math.min(PH.shown,n);
@@ -1698,7 +1938,7 @@ async function boot(){
     const response=await api("/api/me");
     if(!response.ok){ state.className="error"; state.textContent=response.status===403?"החשבון אינו משויך לכיתת מתמטיקה.":"לא ניתן להשלים את הכניסה."; return; }
     const me=await response.json();CFG.userId=me.user_id;CFG.answerScans=me.answer_scans; ME_EMAIL=me.email||""; MY_CLASSES=me.classes||[]; MY_CLASS=MY_CLASSES.length===1?MY_CLASSES[0]:null;
-    CFG.permissions=me.permissions||[]; CFG.roles=me.roles||[];
+    CFG.permissions=me.permissions||[]; CFG.roles=me.roles||[]; CFG.aiDirect=me.ai_direct!==false; CFG.aiReview=!!me.ai_review;
   }
   document.getElementById("boot").hidden=true;
   show();

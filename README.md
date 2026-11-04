@@ -18,6 +18,10 @@ Photographed problems are sent to the configured AI provider for solving and are
 
 When the computer asks for a photo of a handwritten answer, the student's phone can get a notification, even with the app closed. The phone offers it after its first photo is sent. It needs `VAPID_PRIVATE_KEY` (make one with `python -m app.push`) and the migration `supabase/migrations/20261103180000_math_push_subs.sql`. On an iPhone it works only from the app added to the home screen.
 
+## User guide
+
+The **?** button on the sign-in screen and in the app's header opens a short guide in Hebrew, with a tab for students and one for teachers. Its text is in `static/guide.js`; update it there when a feature changes.
+
 ## Science riddles (class vote)
 
 The **מדעים** subject has a unit **חידות** with the skill **טיל**: the class guesses how much fuel a rocket needs. The teacher opens a vote and shows its 4-digit code; students join with the code on their own devices and vote. Votes stay hidden until the teacher presses check; the answer most students chose is launched, and the rocket flies, falls back (too little fuel) or stays on the pad (too heavy). A tie is not launched: students can change their vote and the teacher checks again. Riddles are in `app/science.json`. Votes live in the server's memory (the app runs as one process), so a restart ends the votes in progress. No sign-in or migration is needed.
@@ -71,6 +75,18 @@ After a photograph is received, grading starts automatically on the server, even
 Checks and feedback are stored privately against the original attempt and photo, surviving refresh and server restarts. Repeated clicks or a lost response reuse a running/completed check. A failed check can be retried explicitly with **ניסיון בדיקה נוסף**, keeping the image. Automatic discovery and duplicate uploads never retry a failed check or consume its allowance repeatedly. Interrupted checks become retryable after **5 minutes**. Each account can start **20 checks per Jerusalem calendar day**, including failed checks, with at most two running simultaneously. Completed checks remain readable without another AI call or daily charge. Select **ניסיון חדש וצילום מחדש** to create a fresh attempt and send a corrected or clearer photograph; the previous attempt, photo, and feedback remain stored.
 
 For rollback, turn `MATHLY_ANSWER_SCANS_ENABLED` off and restart; preserve the new tables and private bucket. The skills API serves the original multiple-choice geometry sample while scanning is disabled, including for guest practice and older frontends. Enabling scanning again restores open-ended presentation and access to saved answers. Keep stored answer records for recovery. No destructive down migration is needed.
+
+### Class teacher
+
+Each class has one teacher, chosen from its students in the class editor (**ניהול → כיתות → עריכה → מורה הכיתה**). That account gets a **הכיתה שלי** button that opens the class report: for every other student, the skills finished in the class's units, the mistakes that keep coming back, the **בוחן מסכם** grade per unit, and the **מבחני תרגול** results, plus the mistakes most common across the class. Managers open the same report from a class's card (**מעקב**). The report reads the students' saved progress (`math_progress`) and Supabase's user list with the server's secret key; it needs no new migration. A student's numbers show up once they have signed in and practised on the current version of the app.
+
+### The teacher's AI queue
+
+Students never call the AI themselves. When a student saves an open answer (or hands in a **בוחן מסכם**, or sends a photographed problem), the request goes to their class teacher's **תור AI** instead of to Claude. The teacher sees each waiting request with the student's photo and the question, then presses **שליחה ל-AI** or **דחייה** (with an optional note for the student). The student's page shows the answer as waiting for the teacher, then the grade and feedback once it is sent, or the teacher's note if it was declined (the student can ask again). A failed send stays in the queue for the teacher to retry. Managers see every class's requests.
+
+Accounts with the teacher, admin or developer role, and every class teacher, still send to the AI directly. A student can have at most 5 requests waiting; the daily limits on checks and photos still apply. A photographed problem is kept (as a clean JPEG) only until the teacher sends or declines it.
+
+Apply [the additive queue migration](supabase/migrations/20261104090000_math_ai_requests.sql) before deploying this code: it adds the service-only `math_ai_requests` table. Without it, students cannot have answers checked (they see that checking is unavailable); teachers are not affected.
 
 ### Lesson resources (teachers)
 

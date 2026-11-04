@@ -27,7 +27,8 @@ LOCAL_TZ = ZoneInfo("Asia/Jerusalem")
 PERIODS = {"day": (15, 96), "week": (60, 168), "month": (24 * 60, 30)}
 SEEN_KEEP = 24 * 3600
 RETURN_GAP = 30 * 60  # a sign-in after this long away counts as a new visit
-ACTION_KINDS = frozenset({"visit", "photo", "answer_upload", "answer_graded", "class_saved", "class_deleted"})
+ACTION_KINDS = frozenset({"visit", "photo", "answer_upload", "answer_graded", "class_saved", "class_deleted",
+                          "ai_request", "ai_sent", "ai_failed", "ai_declined"})
 
 
 class ActionLog:

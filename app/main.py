@@ -1,6 +1,7 @@
 """Math-only HTTP service for the Mathly algebra path."""
 from __future__ import annotations
 
+import base64
 import logging
 import os
 import time
@@ -15,12 +16,15 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from . import ai_usage
+from .ai_queue import MAX_OPEN, for_student, install_ai_queue_routes, may_send
 from .access import has_permission, resolve_access
 from .answer_routes import install_answer_routes, open_ended_locked
+from .answer_scans import ScanError, clean_image
 from .auth import AuthUnavailable, ClassConflict, SupabaseAuth, load_auth
 from .math_photo import (DAILY_PHOTOS, MAX_PHOTO, MEDIA_TYPES as PHOTO_TYPES,
                          PhotoSolver, PhotoUnavailable, math_model, photo_client)
 from .math_skills import algebra9, practice_graph
+from .class_report import install_class_report_routes
 from .progress import install_progress_routes
 from .push import install_push_routes
 from .monitoring import ActionLog, RETURN_GAP, install_monitoring_routes
@@ -128,6 +132,12 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
                 "roles": (user or {}).get("roles", []),
                 "permissions": (user or {}).get("permissions", []),
                 "teacher": bool((user or {}).get("teacher")),
+                # the AI: this account sends to it itself (ai_direct), or asks its teacher (app/ai_queue.py);
+                # ai_review: it reviews students' requests
+                "ai_direct": may_send(user),
+                "ai_review": bool(user) and may_send(user) and (
+                    has_permission(user, "management.access")
+                    or any(email.lower() in (row.get("teachers") or []) for row in mine)),
                 "classes": [{"id": row["id"], "name": row["name"], "lessons": units_of(row),
                              "exams": row.get("exams") or [], "exam_note": row.get("exam_note") or "",
                              "exam_title": row.get("exam_title") or "",
@@ -157,9 +167,12 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
         raw = body.get("emails", "")
         parts = raw.replace(",", " ").split() if isinstance(raw, str) else raw
         emails = sorted({str(part).strip().lower() for part in parts if str(part).strip()})
+        # the class's teacher is one of its students (or none yet)
+        teachers = sorted({str(t).strip().lower() for t in body.get("teachers") or [] if str(t).strip()})
+        if len(teachers) > 1 or not set(teachers) <= set(emails):
+            raise HTTPException(400, "choose one of the class's students as its teacher")
         try:
-            app.state.auth.save_class(class_id, name, emails, {}, selected,
-                                      teachers=body.get("teachers") or [])
+            app.state.auth.save_class(class_id, name, emails, {}, selected, teachers=teachers)
         except ClassConflict as exc:
             raise HTTPException(409, "a class with that name already exists") from exc
         except AuthUnavailable as exc:
@@ -201,9 +214,50 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
             app.state.photo_key = key
         return app.state.photo
 
+    # the teacher's AI queue sends a student's photo with this (app/ai_queue.py)
+    def solve_for_queue(image: bytes, media_type: str) -> dict:
+        try:
+            service = solver()
+        except HTTPException as exc:
+            raise PhotoUnavailable("פתרון מתמונה לא זמין כרגע.", "missing_key", "ANTHROPIC_API_KEY is not set") from exc
+        return service.solve(image, media_type)
+    app.state.solve_photo = solve_for_queue
+
     @app.post("/api/math/photo")
     async def solve_photo(photo: UploadFile = File(...), user: dict | None = Depends(signed_in)):
+        if not may_send(user):
+            return await ask_teacher(photo, user)
         return await solve_upload(photo, user)
+
+    async def ask_teacher(photo: UploadFile, user: dict):
+        """A student's photo waits in their teacher's AI queue; the teacher sends it to the AI."""
+        queue = app.state.ai_queue
+        if not queue.configured:
+            raise HTTPException(503, "עזרה בצילום אינה זמינה כרגע.")
+        counter = (user["email"].lower(), datetime.now(LOCAL_TZ).date().isoformat())
+        if photo.content_type not in PHOTO_TYPES:
+            raise HTTPException(415, "send a JPEG, PNG, or WebP image")
+        raw = await photo.read(MAX_PHOTO + 1)
+        if not raw:
+            raise HTTPException(400, "the image is empty")
+        if len(raw) > MAX_PHOTO:
+            raise HTTPException(413, "the image is too large")
+        if photo_counts.get(counter, 0) >= DAILY_PHOTOS:
+            raise HTTPException(429, "daily photo limit reached")
+        try:
+            if await run_in_threadpool(queue.open_count, user["id"]) >= MAX_OPEN:
+                raise HTTPException(429, "כבר יש לכם כמה בקשות שמחכות למורה. חכו שהמורה יענה עליהן.")
+            image = await run_in_threadpool(clean_image, raw, photo.content_type)   # also drops the photo's metadata
+            row = await run_in_threadpool(queue.add, {
+                "user_id": user["id"], "email": user["email"].lower(), "kind": "photo",
+                "image": base64.standard_b64encode(image).decode("ascii")})
+        except ScanError as exc:
+            if exc.code.endswith("image"):
+                raise HTTPException(415, "לא הצלחנו לקרוא את התמונה. צלמו שוב.") from exc
+            raise HTTPException(503, "עזרה בצילום אינה זמינה כרגע.") from exc
+        photo_counts[counter] = photo_counts.get(counter, 0) + 1
+        app.state.actions.record(user, "ai_request", "תרגיל מצולם")
+        return {"queued": True, "request": for_student(row), "left": DAILY_PHOTOS - photo_counts[counter]}
 
     async def solve_upload(photo: UploadFile, user: dict | None):
         service = solver()
@@ -239,8 +293,10 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
         return {**result, "left": DAILY_PHOTOS - photo_counts.get(counter, 0) if counter else None}
 
     install_progress_routes(app, signed_in)
+    install_class_report_routes(app, signed_in, units_of)
     install_push_routes(app, signed_in)
     install_answer_routes(app, signed_in)
+    install_ai_queue_routes(app, signed_in)
     install_resource_routes(app, signed_in)
     install_science_routes(app)
     install_monitoring_routes(app, manager)

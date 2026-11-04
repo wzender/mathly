@@ -26,7 +26,43 @@ MEDIA_TYPES = ("image/jpeg", "image/png", "image/webp")
 
 
 class PhotoUnavailable(Exception):
-    """The photo could not be solved; the message is for the student (Hebrew)."""
+    """The photo could not be solved; the message is for the student (Hebrew). `reason` names the cause for the
+    teacher's error details (see failure_reason), and `detail` is the technical line behind it."""
+
+    def __init__(self, message: str = "", reason: str = "", detail: str = ""):
+        super().__init__(message)
+        self.reason, self.detail = reason, detail
+
+
+def failure_reason(exc) -> tuple[str, str]:
+    """Why an Anthropic API call failed, as (reason, technical detail). The detail is the error's type, HTTP status
+    and the API's own short message, never the request (which holds a student's work)."""
+    import anthropic
+    status = getattr(exc, "status_code", None)
+    body = getattr(exc, "body", None)
+    said = body.get("error", {}).get("message") if isinstance(body, dict) and isinstance(body.get("error"), dict) else ""
+    message = " ".join(str(said or getattr(exc, "message", "") or exc).split())
+    low = message.lower()
+    if isinstance(exc, anthropic.AuthenticationError):
+        reason = "api_key_invalid"
+    elif isinstance(exc, anthropic.PermissionDeniedError):
+        reason = "permission"
+    elif isinstance(exc, anthropic.NotFoundError):
+        reason = "model_not_found"
+    elif isinstance(exc, anthropic.RateLimitError):
+        reason = "rate_limited"
+    elif isinstance(exc, anthropic.APIConnectionError):
+        reason = "no_connection"
+    elif "credit balance" in low or "billing" in low:
+        reason = "no_credit"
+    elif status == 529 or "overloaded" in low:
+        reason = "overloaded"
+    elif isinstance(exc, anthropic.BadRequestError):
+        reason = "bad_request"
+    else:
+        reason = "provider_error"
+    detail = type(exc).__name__ + (f" {status}" if status else "") + (f": {message[:200]}" if message else "")
+    return reason, detail
 
 
 def photo_schema(skill_ids: list[str]) -> dict:
@@ -84,27 +120,28 @@ class PhotoSolver:
             )
         except anthropic.RateLimitError as e:
             log.warning("math photo rate limited: %s", e)
-            raise PhotoUnavailable("עמוס כרגע. נסו שוב בעוד דקה.") from e
+            raise PhotoUnavailable("עמוס כרגע. נסו שוב בעוד דקה.", *failure_reason(e)) from e
         except anthropic.AuthenticationError as e:
             log.error("math photo: the API key was refused: %s", e)
-            raise PhotoUnavailable("פתרון מתמונה לא זמין כרגע (מפתח ה-API לא תקין).") from e
+            raise PhotoUnavailable("פתרון מתמונה לא זמין כרגע (מפתח ה-API לא תקין).", *failure_reason(e)) from e
         except anthropic.APIStatusError as e:
             log.warning("math photo: the API answered %s: %s", e.status_code, e.message)
-            raise PhotoUnavailable("פתרון מתמונה לא זמין כרגע. נסו שוב.") from e
+            raise PhotoUnavailable("פתרון מתמונה לא זמין כרגע. נסו שוב.", *failure_reason(e)) from e
         except anthropic.APIConnectionError as e:
             log.warning("math photo: no connection: %s", e)
-            raise PhotoUnavailable("אין חיבור כרגע. נסו שוב.") from e
+            raise PhotoUnavailable("אין חיבור כרגע. נסו שוב.", *failure_reason(e)) from e
         if res.stop_reason == "refusal":
             log.warning("math photo: the model declined (%s)", res.stop_details)
-            raise PhotoUnavailable("לא הצלחנו לפתור את התמונה הזו. נסו לצלם תרגיל אחר.")
+            raise PhotoUnavailable("לא הצלחנו לפתור את התמונה הזו. נסו לצלם תרגיל אחר.", "refused",
+                                   f"stop_reason=refusal ({res.model})")
         if res.stop_reason == "max_tokens":
-            raise PhotoUnavailable("הפתרון נקטע. נסו שוב.")
+            raise PhotoUnavailable("הפתרון נקטע. נסו שוב.", "incomplete", f"stop_reason=max_tokens ({res.model})")
         text = next((b.text for b in res.content if b.type == "text"), "")
         try:
             out = json.loads(text)
         except ValueError as e:
             log.warning("math photo: an answer that is not JSON: %r", text[:300])
-            raise PhotoUnavailable("לא הצלחנו לפתור את התרגיל. נסו שוב.") from e
+            raise PhotoUnavailable("לא הצלחנו לפתור את התרגיל. נסו שוב.", "bad_output", "the answer was not JSON") from e
         log.info("math photo: %s, %d+%d tokens", res.model, res.usage.input_tokens, res.usage.output_tokens)
         return {**out, "usage": usage_of(res)}   # the route pops "usage" and records it (ai_usage.py)
 

@@ -21,7 +21,27 @@ const setOn=on=>{ try{ localStorage.setItem(PREF,on?"on":"off"); }catch{} };
 
 const INKS=[["#1B2140","שחור"],["#2563D9","כחול"],["#D3455B","אדום"]];
 const ERASERS=[[16,"קטן"],[40,"בינוני"],[90,"גדול"]];
-const TOOLS=[["move","✋","הזזה"],["pen","✏️","עט"],["line","╱","קו ישר"],["circle","◯","עיגול"],["math","∑","נוסחה"],["eraser","🧽","מחק"]];
+const TOOLS=[["move","הזזה"],["pen","עט"],["line","קו ישר"],["circle","עיגול"],["math","נוסחה"],["eraser","מחק"]];
+/* one line-drawn icon set (24×24, the button's text colour), so every button looks alike on every device and
+   follows the button's hover and pressed colours; "flip" icons point the other way in a right-to-left page */
+const DOT='fill="currentColor" stroke="none"';
+const ICONS={
+  move:'<path d="M18 11V6.5a1.5 1.5 0 0 0-3 0V11M15 10V4.5a1.5 1.5 0 0 0-3 0V10M12 10V5.5a1.5 1.5 0 0 0-3 0V13M18 9.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-1.5c-2.2 0-3.7-.8-5-2.1l-3.3-3.3a1.5 1.5 0 0 1 2.1-2.1L9 15.2"/>',
+  pen:'<path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8z"/><path d="M14.5 6.5l3 3"/>',
+  line:`<path d="M6 18L18 6"/><circle cx="6" cy="18" r="2" ${DOT}/><circle cx="18" cy="6" r="2" ${DOT}/>`,
+  circle:`<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.6" ${DOT}/>`,
+  math:'<path d="M17.5 5.5V4H6.5l6 8-6 8h11v-1.5"/>',
+  eraser:'<path d="M20 20H9.5M4.6 15.4l9.8-9.8a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L11 19H8.2l-3.6-3.6"/><path d="M9.5 10.5l5 5"/>',
+  question:'<rect x="5.5" y="5" width="13" height="16" rx="2"/><path d="M9 5V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M9 11h6M9 15h4"/>',
+  undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  clear:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12.2A2 2 0 0 0 9 21h6a2 2 0 0 0 2-1.8L18 7M9 7V4.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V7"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18"/>',
+  send:'<path d="M12 15V4M7 9l5-5 5 5M5 15v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4"/>',
+  done:'<path d="M5 12.5l4.5 4.5L19 7"/>',
+  back:'<path d="M19 12H5M11 6l-6 6 6 6"/>',
+  top:'<path d="M12 19V5M6 11l6-6 6 6"/>'};
+const FLIP=new Set(["undo","back"]);
+const ic=n=>`<svg class="mx-ic${FLIP.has(n)?" mx-ic-flip":""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
 const MATH_SIZE=26;
 const PEN=2.6, SHAPE=2.4, SNAP=12, GRAB=9, STEP=2, HISTORY=100;
 const PAPER_INK="#1B2140", PAPER_FAINT="#C5CBDF", SELECT="#2563D9";
@@ -49,21 +69,21 @@ const same=(a,b)=>dist(a,b)<.5;
 
 function build(){
   el=document.createElement("aside"); el.className="mx-board"; el.setAttribute("aria-label","לוח טיוטה");
-  el.innerHTML=`<div class="mx-board-head"><b data-title>לוח טיוטה</b><button type="button" data-do="hide" class="mx-board-back">↩ חזרה לשאלה</button></div>
+  el.innerHTML=`<div class="mx-board-head"><b data-title>לוח טיוטה</b><button type="button" data-do="hide" class="mx-board-back">${ic("back")}<span>חזרה לשאלה</span></button></div>
     <div class="mx-board-bar" role="toolbar" aria-label="כלי הלוח">
-      <span class="mx-board-group">${TOOLS.map(([t,icon,name])=>`<button type="button" data-tool="${t}" aria-pressed="${t===tool}" title="${name}"><i aria-hidden="true">${icon}</i><span>${name}</span></button>`).join("")}</span>
+      <span class="mx-board-group">${TOOLS.map(([t,name])=>`<button type="button" data-tool="${t}" aria-pressed="${t===tool}" title="${name}">${ic(t)}<span>${name}</span></button>`).join("")}</span>
       <span class="mx-board-group mx-board-inks">${INKS.map(([c,name])=>`<button type="button" data-ink="${c}" aria-pressed="${c===ink}" aria-label="${name}" title="${name}" style="--dot:${c}"></button>`).join("")}</span>
       <span class="mx-board-group mx-board-sizes">${ERASERS.map(([w,name])=>`<button type="button" data-eraser="${w}" aria-pressed="${w===eraser}" aria-label="מחק ${name}" title="מחק ${name}" style="--d:${Math.round(6+w/6)}px"></button>`).join("")}</span>
-      <span class="mx-board-gap"></span>
-      <button type="button" data-do="question" title="העתקת השאלה לראש הלוח"><i aria-hidden="true">📋</i><span>השאלה</span></button>
-      <button type="button" data-do="undo" title="ביטול (Ctrl+Z)"><i aria-hidden="true">↶</i></button>
-      <button type="button" data-do="clear" title="ניקוי הלוח"><i aria-hidden="true">🗑</i></button>
-      <button type="button" data-do="hide" aria-label="סגירת הלוח" title="סגירת הלוח">✕</button>
+      <span class="mx-board-group mx-board-acts">
+        <button type="button" data-do="question" title="העתקת השאלה לראש הלוח">${ic("question")}<span>השאלה</span></button>
+        <button type="button" data-do="undo" title="ביטול (Ctrl+Z)">${ic("undo")}<span>ביטול</span></button>
+        <button type="button" data-do="clear" title="ניקוי הלוח">${ic("clear")}<span>ניקוי</span></button></span>
+      <button type="button" data-do="hide" class="mx-board-close" aria-label="סגירת הלוח" title="סגירת הלוח">${ic("close")}</button>
     </div><div class="mx-board-row"><div class="mx-board-pages" role="tablist" aria-label="הדף של כל שאלה"></div>
       <button type="button" data-do="send" class="mx-board-send" hidden></button></div>
     <div class="mx-board-stage"><canvas></canvas>
-      <button type="button" data-do="delete" class="mx-board-del" title="מחיקת מה שנבחר (Delete)" hidden>✕ מחיקה</button>
-      <button type="button" data-do="top" class="mx-board-top" hidden>⇡ לראש הדף</button></div>`;
+      <button type="button" data-do="delete" class="mx-board-del" title="מחיקת מה שנבחר (Delete)" hidden>${ic("clear")}מחיקה</button>
+      <button type="button" data-do="top" class="mx-board-top" hidden>${ic("top")}לראש הדף</button></div>`;
   canvas=el.querySelector("canvas"); ctx=canvas.getContext("2d");
   el.addEventListener("click",e=>{
     const b=e.target.closest("button"); if(!b) return;
@@ -107,7 +127,7 @@ function select(list){ selection=list; }
 function turn(p){ if(editing) finishMath(true); page=p; key=`${base}:${page}`; reset(); drawPages(); drawSend(); paint(); }
 function drawSend(){
   const b=el.querySelector(".mx-board-send"); b.hidden=!hand; el.querySelector(".mx-board-row").hidden=pages<2&&!hand; if(!hand) return;
-  b.disabled=false; b.innerHTML=`<i aria-hidden="true">📤</i><span>${sendLabel||`הגשה לשאלה ${page+1}`}</span>`; b.title=sendLabel||`הגשת הלוח כתשובה לשאלה ${page+1}`;
+  b.disabled=false; b.innerHTML=`${ic("send")}<span>${sendLabel||`הגשה לשאלה ${page+1}`}</span>`; b.title=sendLabel||`הגשת הלוח כתשובה לשאלה ${page+1}`;
 }
 function drawPages(){
   const box=el.querySelector(".mx-board-pages"); el.querySelector(".mx-board-row").hidden=pages<2&&!hand;
@@ -427,7 +447,7 @@ async function send(){
   if(!blob){ say(`<span>הלוח ריק: אין מה להגיש</span>`); return setTimeout(()=>page===p&&drawSend(),2500); }
   b.disabled=true; say(`<span>מגישים…</span>`);
   let r; try{ r=await hand(p,blob); }catch(e){ r={error:e.message}; }
-  b.disabled=false; say(r?.error?`<span>⚠ ${r.error}</span>`:`<i aria-hidden="true">✓</i><span>${sendLabel?"נשלחה":`הוגשה לשאלה ${p+1}`}</span>`);
+  b.disabled=false; say(r?.error?`<span>⚠ ${r.error}</span>`:`${ic("done")}<span>${sendLabel?"נשלחה":`הוגשה לשאלה ${p+1}`}</span>`);
   if(r?.close&&full) return setTimeout(closeFull,900);   // done: back to the window that asked
   setTimeout(()=>page===p&&!b.disabled&&drawSend(),3000);
 }
@@ -481,7 +501,7 @@ function openFull({host,key:k,pages:n=1,page:p=0,question=null,submit=null,turne
   el.querySelector("[data-title]").textContent=title;
   el.classList.add("full"); el.setAttribute("role","dialog"); el.setAttribute("aria-modal","true");
   reset(); drawPages(); drawSend(); host.append(el); fit();
-  el.querySelector(".mx-board-back").focus({preventScroll:true});
+  el.querySelector(".mx-board-back").focus({preventScroll:true,focusVisible:false});   // reachable by keyboard, without a ring on a tap
 }
 function closeFull(){
   if(!full) return; if(editing) finishMath(true); const f=full; full=null;
@@ -490,7 +510,7 @@ function closeFull(){
   if(layer?.isConnected&&desk()) again();
 }
 // the header's switch: beside the exercise on a desktop screen, full screen on a phone
-const button=()=>`<button class="mx-board-btn" data-board-toggle aria-pressed="${isOn()&&desk()}" title="לוח טיוטה">✏️ לוח</button>`;
+const button=()=>`<button class="mx-board-btn" data-board-toggle aria-pressed="${isOn()&&desk()}" title="לוח טיוטה">${ic("pen")}<span>לוח</span></button>`;
 
 window.MathlyBoard={button,mount,toggle,show,openFull,closeFull,isOn};
 })();

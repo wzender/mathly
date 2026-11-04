@@ -6,7 +6,7 @@ import json
 import logging
 
 from .ai_usage import usage_of
-from .math_photo import PhotoUnavailable, math_model, photo_client
+from .math_photo import PhotoUnavailable, failure_reason, math_model, photo_client
 
 log = logging.getLogger("mathly.answer_grading")
 BOOLEAN_FIELDS = ("readable", "confident", "answer_correct", "reasoning_correct",
@@ -89,13 +89,19 @@ class AnswerGrader:
             )
         except anthropic.APIError as exc:
             # Do not log student work or provider response bodies.
-            log.warning("answer grading provider failed: %s", type(exc).__name__)
-            raise PhotoUnavailable("הבדיקה אינה זמינה כרגע. נסו שוב בעוד דקה.") from exc
+            reason, detail = failure_reason(exc)
+            log.warning("answer grading provider failed: %s (%s)", reason, detail)
+            raise PhotoUnavailable("הבדיקה אינה זמינה כרגע. נסו שוב בעוד דקה.", reason, detail) from exc
         if response.stop_reason != "end_turn":
-            raise PhotoUnavailable("הבדיקה לא הושלמה. נסו שוב.")
+            raise PhotoUnavailable("הבדיקה לא הושלמה. נסו שוב.", "refused" if response.stop_reason == "refusal"
+                                   else "incomplete", f"stop_reason={response.stop_reason} ({response.model})")
         try:
             value = json.loads(next(b.text for b in response.content if b.type == "text"))
         except (ValueError, StopIteration) as exc:
-            raise PhotoUnavailable("הבדיקה לא הושלמה. נסו שוב.") from exc
+            raise PhotoUnavailable("הבדיקה לא הושלמה. נסו שוב.", "bad_output", "the answer was not JSON") from exc
+        try:
+            checked = validate_assessment(value)
+        except PhotoUnavailable as exc:
+            raise PhotoUnavailable(str(exc), "bad_output", "the answer did not pass the rubric's checks") from exc
         # The route pops "usage" before storing the result and records it (ai_usage.py).
-        return {**validate_assessment(value), "model": response.model, "usage": usage_of(response)}
+        return {**checked, "model": response.model, "usage": usage_of(response)}

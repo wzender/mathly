@@ -5,15 +5,41 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const fmt=s=>esc(s).replace(/\$([^$]+)\$/g,'<span class="m">$1</span>');
 const states={waiting:"ממתינים לטלפון",confirmed:"ממתינים לטלפון",uploading:"מעלים את התשובה…",received:"התשובה התקבלה",failed:"ההעלאה נכשלה",expired:"בקשת הצילום פגה",superseded:"הבקשה הוחלפה",declined:"הבקשה נדחתה בטלפון"};
 const errors={expired:"בקשת הצילום פגה. צרו בקשה חדשה ונסו שוב.",superseded:"הבקשה הוחלפה. בחרו את הבקשה העדכנית.",upload_in_progress:"העלאה כבר מתבצעת. ממתינים לעדכון…",confirmation_required:"יש לאשר את בקשת הצילום תחילה.",invalid_upload:"ההעלאה הופסקה. נסו שוב.",question_changed:"השאלה השתנתה. רעננו את העמוד ופתחו אותה מחדש.",invalid_image:"לא ניתן לקרוא את התמונה. צלמו שוב.",image_too_large:"התמונה גדולה מדי. צלמו שוב.",unsupported_image:"בחרו תמונת JPEG, PNG או WebP.",answer_storage_unavailable:"שמירת תשובות אינה זמינה כרגע. נסו שוב מאוחר יותר.",sign_in_required:"יש להיכנס לאותו חשבון בשני המכשירים."};
-Object.assign(errors,{grading_unavailable:"בדיקת תשובות אינה זמינה כרגע באתר.",grading_failed:"הבדיקה נכשלה. התמונה נשמרה; אפשר לנסות שוב.",grading_interrupted:"הבדיקה הופסקה. אפשר לנסות שוב.",grading_limit:"הגעתם למכסת 20 הבדיקות היומית. נסו שוב מחר.",grading_busy:"כבר מתבצעות בדיקות בחשבון. נסו שוב בעוד רגע.",answer_required:"יש לצלם ולשלוח תשובה לפני הבדיקה."});
+Object.assign(errors,{grading_unavailable:"בדיקת תשובות אינה זמינה כרגע באתר.",grading_failed:"הבדיקה נכשלה. התמונה נשמרה; אפשר לנסות שוב.",grading_interrupted:"הבדיקה הופסקה. אפשר לנסות שוב.",grading_limit:"הגעתם למכסת 20 הבדיקות היומית. נסו שוב מחר.",grading_busy:"כבר מתבצעות בדיקות בחשבון. נסו שוב בעוד רגע.",answer_required:"יש לצלם ולשלוח תשובה לפני הבדיקה.",queue_unavailable:"שליחת תשובות לבדיקת המורה אינה זמינה כרגע.",request_taken:"המורה כבר טיפל בבקשה. רעננו את העמוד."});
+/* Why an AI check failed (the server's `reason`, app/math_photo.py: failure_reason), for the people who can fix it:
+   a teacher sending from the AI queue, or checking their own answer. Each is what happened and what to do. */
+const reasons={
+  missing_key:["חסר מפתח API בשרת","משתנה הסביבה ANTHROPIC_API_KEY לא מוגדר בשרת. הוסיפו אותו להגדרות השרת (Secrets או קובץ .env) והפעילו את השרת מחדש."],
+  api_key_invalid:["מפתח ה-API לא תקין","Anthropic דחתה את המפתח (401). בדקו שהערך של ANTHROPIC_API_KEY הועתק במלואו, ושהמפתח לא בוטל ב-Anthropic Console."],
+  permission:["אין הרשאה","למפתח ה-API אין הרשאה למודל או לפעולה הזו (403). בדקו את הרשאות המפתח וה-Workspace ב-Anthropic Console."],
+  model_not_found:["המודל לא נמצא","המודל שמוגדר בשרת (MATH_MODEL) לא קיים או לא זמין למפתח הזה (404). בדקו את שם המודל, או מחקו את MATH_MODEL כדי לחזור לברירת המחדל."],
+  no_credit:["נגמר הקרדיט","אין מספיק קרדיט בחשבון Anthropic. הוסיפו קרדיט ב-Anthropic Console, בעמוד Billing."],
+  rate_limited:["יותר מדי בקשות","הגעתם למגבלת הקצב של ה-API (429). חכו דקה ונסו שוב."],
+  overloaded:["שירות ה-AI עמוס","השרתים של Anthropic עמוסים כרגע. נסו שוב בעוד כמה דקות."],
+  no_connection:["אין חיבור ל-AI","השרת לא הצליח להתחבר ל-API של Anthropic (רשת או זמן המתנה ארוך מדי). בדקו את החיבור של השרת ונסו שוב."],
+  bad_request:["ה-API דחה את הבקשה","Anthropic החזירה שגיאה 400. הפרטים הטכניים למטה מסבירים למה."],
+  refused:["ה-AI סירב לבדוק","המודל סירב לענות על הבקשה הזו. אפשר לנסות שוב או לבקש מהתלמיד לצלם מחדש."],
+  incomplete:["הבדיקה נקטעה","ה-AI הפסיק לפני שסיים את הבדיקה. נסו שוב."],
+  bad_output:["תשובה לא תקינה מה-AI","ה-AI החזיר תשובה שלא עברה את בדיקות השרת, ולכן לא ניתן ציון. נסו שוב."],
+  provider_error:["שגיאה בשירות ה-AI","Anthropic החזירה שגיאה לא צפויה. נסו שוב, ואם זה חוזר, ראו את הפרטים הטכניים."],
+  server_error:["שגיאה בשרת שלנו","משהו נכשל בשרת של Mathly. הפרטים הטכניים למטה, וגם ביומן השגיאות בלשונית ניטור."],
+  answer_storage_unavailable:["האחסון לא זמין","לא הצלחנו לקרוא את התמונה השמורה. בדקו את Supabase או את MATHLY_ANSWER_BUCKET ו-HF_TOKEN."],
+  open_ended_locked:["שאלות פתוחות נעולות","בשרת מוגדר MATHLY_OPEN_ENDED_LOCKED=1. שנו ל-0 והפעילו מחדש כדי לאפשר בדיקה."]};
+// a "פירוט השגיאה" button that opens what happened, what to do, and the technical line; "" without a reason
+function errorDetails(reason,detail){
+  if(!reason&&!detail)return "";
+  const [title,say]=reasons[reason]||["שגיאה לא מוכרת","לא זיהינו את סוג השגיאה. הפרטים הטכניים למטה."];
+  return `<details class="mx-error-details"><summary>פירוט השגיאה</summary><p><b>${esc(title)}</b></p><p>${esc(say)}</p>${detail?`<code dir="ltr">${esc(detail)}</code>`:""}</details>`;
+}
 const verdicts={correct:"נכון! הפתרון מלא",partial:"פתרון נכון בחלקו",incorrect:"יש לתקן את הפתרון",unreadable:"לא ניתן לקרוא את התשובה",needs_review:"נדרשת הבהרה לפני מתן ציון"};
+let queued=false;   // a student: an answer is checked only after their teacher sends it to the AI (app/ai_queue.py)
 let api=null,account=null,epoch=0,question=null,inbox=false,inboxTimer=null,inboxPoll=null,capture=null,visibleRoot=null,onGraded=null;
 const handled=new Set();   // requests this phone already answered (photographed or declined): not shown again
 const live=(e)=>e===epoch&&!!account;
 async function json(url,options={}){
   const r=await api(url,{cache:"no-store",...options});
   const d=await r.json().catch(()=>({}));
-  if(!r.ok){if(r.status===401)reset();const error=Error(errors[d.detail]||"החיבור נקטע. נסו שוב.");error.status=r.status;error.code=d.detail;throw error;}
+  if(!r.ok){if(r.status===401)reset();const error=Error(errors[d.detail]||"החיבור נקטע. נסו שוב.");error.status=r.status;error.code=d.detail;error.reason=d.reason||"";error.detail=d.error_detail||"";throw error;}
   return d;
 }
 const post=(url,body={})=>json(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
@@ -28,7 +54,7 @@ function reset(){
   inbox=false;account=null;onGraded=null;PUSH_MODE="hidden";paintPush();document.querySelector(".mx-push-ask")?.remove();
 }
 function configure(options){
-  reset();api=options.api;account=options.enabled?options.account:null;visibleRoot=options.root;onGraded=options.onGraded;
+  reset();api=options.api;account=options.enabled?options.account:null;visibleRoot=options.root;onGraded=options.onGraded;queued=!!options.queued;
   if(!account)return;
   // The phone (the responsive app/PWA) watches for requests from the computer and pops them up.
   if(matchMedia("(max-width: 700px)").matches||navigator.maxTouchPoints){inbox=true;pollInbox(epoch);pushSync(epoch);}
@@ -223,11 +249,12 @@ async function pollQuestion(q){
 async function renderQuestion(q){
   if(!current(q))return;
   const r=q.result,s=r.scan,state=s?.state,received=!!r.attachment,g=r.grading;
-  const checking=q.grading||g?.state==="grading";
+  const checking=q.grading||g?.state==="grading", req=r.ai_request;
+  const waiting=!checking&&g?.state!=="completed"&&waitingTeacher(req);
   // while the phone has the request, its code and progress are in the phone box itself (phoneLive)
-  const statusText=checking?"בודקים את התשובה…":g?.state==="completed"?verdicts[g.result.verdict]:g?.state==="failed"?errors[g.error]||errors.grading_failed:!received&&phonePending(state)?"":states[state]||"כתבו את הפתרון על דף וצלמו אותו בטלפון.";
+  const statusText=checking?(q.grading&&queued?"שולחים למורה…":"בודקים את התשובה…"):waiting?"התשובה מחכה למורה":g?.state==="completed"?verdicts[g.result.verdict]:g?.state==="failed"?errors[g.error]||errors.grading_failed:!received&&phonePending(state)?"":states[state]||"כתבו את הפתרון על דף וצלמו אותו בטלפון.";
   // Rebuilding controls on every poll would steal focus and race a button click.
-  const signature=[state,s?.id,r.attachment?.id,g?.id,g?.state,r.grading_available].join(":");
+  const signature=[state,s?.id,r.attachment?.id,g?.id,g?.state,r.grading_available,req?.id,req?.state].join(":");
   if(q.signature!==signature){
     q.signature=signature;
     q.node.innerHTML=`<small>ניסיון ${esc(r.attempt.id.slice(0,8))}</small><p role="status" aria-live="polite">${esc(statusText)}</p>
@@ -289,20 +316,33 @@ function gradingPanel(r,checking){
       <small>בדיקה אוטומטית באמצעות AI. בדקו שהתמלול תואם למה שכתבתם.</small></section>`;
   }
   if(!r.grading_available&&!checking)return '<p>התמונה נשמרה כתשובה. בדיקה אוטומטית אינה זמינה כרגע באתר.</p>';
+  if(queued&&!checking){
+    const req=r.ai_request;
+    if(waitingTeacher(req))return '<p>התשובה נשלחה למורה. אחרי שהמורה יאשר את הבדיקה, התוצאה תופיע כאן.</p>';
+    if(req?.state==="declined")return `<p>המורה לא אישר את הבדיקה.${req.note?` <b>הערת המורה:</b> ${esc(req.note)}`:""}</p>
+      <button class="mx-btn" data-grade>שליחה מחדש למורה</button>`;
+    return `<p>${g?.state==="failed"||req?.state==="failed"?"הבדיקה נכשלה. אפשר לשלוח שוב למורה.":"שלחו את התשובה למורה, והמורה יעביר אותה לבדיקה."}</p>
+      <button class="mx-btn solid" data-grade>שליחה לבדיקת המורה</button>`;
+  }
   return `<p>התשובה נשלחת לבדיקה אוטומטית באמצעות AI.</p>
     <button class="mx-btn solid" data-grade ${checking?"disabled":""}>${checking?"בודקים את התשובה…":g?.state==="failed"?"ניסיון בדיקה נוסף":"בדיקת התשובה"}</button>`;
 }
+// the answer's request is in the teacher's queue (a failed send stays there for the teacher to try again)
+const waitingTeacher=req=>!!req&&["pending","sending","failed"].includes(req.state);
 async function checkAnswer(q,automatic=false){
   if(!current(q)||q.grading)return;
   q.grading=true;q.signature=null;await renderQuestion(q);schedule(q);
   try{
     const r=await post(`/api/math/answer-attempts/${q.result.attempt.id}/grade`,{automatic});
     if(!current(q))return;q.result=r;
-  }catch(error){if(current(q))q.gradeError=error.message;}
+  }catch(error){if(current(q))q.gradeError=error;}
   finally{
     if(current(q)){
       q.grading=false;q.signature=null;await renderQuestion(q);
-      if(q.gradeError){q.node.querySelector("[role=status]").textContent=q.gradeError;q.gradeError=null;}
+      if(q.gradeError){
+        const status=q.node.querySelector("[role=status]");status.textContent=q.gradeError.message;
+        status.insertAdjacentHTML("afterend",errorDetails(q.gradeError.reason,q.gradeError.detail));q.gradeError=null;
+      }
       schedule(q);
     }
   }
@@ -450,5 +490,5 @@ document.addEventListener("visibilitychange",()=>{
   if(question?.result)pollQuestion(question);
 });
 window.addEventListener("online",()=>{if(account&&inbox)pollInbox(epoch);if(question?.result)pollQuestion(question);});
-window.MathlyAnswers={configure,mountQuestion,closeQuestion,reset,phoneLive,forgetPush,pushButton,paintPush,togglePush};
+window.MathlyAnswers={errorDetails,configure,mountQuestion,closeQuestion,reset,phoneLive,forgetPush,pushButton,paintPush,togglePush};
 })();

@@ -50,6 +50,14 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-subject-icon{flex:none;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--exam) 22%,var(--bg));color:var(--exam);font:700 24px/1 var(--f-body)}
 .mx-subject-card>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}.mx-subject-card b{font-size:18px}.mx-subject-card small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mx-subject-card i{color:var(--exam);font-size:26px;font-style:normal}
 .mx-subject-empty{--exam:var(--mx-accent);display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;border:1px solid color-mix(in srgb,var(--exam) 45%,var(--line));border-radius:18px;background:var(--surface);padding:32px 20px}.mx-subject-empty>span{font-size:42px}.mx-subject-empty h2{color:var(--exam)}.mx-subject-empty p{max-width:480px;margin:0;color:var(--muted);line-height:1.5}
+.mx-subject-left{display:flex;align-items:center;gap:6px}
+.mx-subject-dots{display:inline-flex;gap:3px;flex:none}.mx-subject-dots>span{width:8px;height:8px;border-radius:50%;background:var(--exam)}.mx-subject-dots>span.past{background:transparent;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--exam) 55%,var(--line))}
+.mx-subject-bar{display:block;height:6px;border-radius:99px;background:color-mix(in srgb,var(--exam) 28%,var(--line));overflow:hidden;margin-top:2px}.mx-subject-bar>span{display:block;height:100%;border-radius:inherit;background:var(--exam)}
+.mx-subject-count{flex:none;display:flex;flex-direction:column;align-items:center;min-width:48px;padding:6px 8px;border-radius:12px;background:color-mix(in srgb,var(--exam) 14%,var(--bg));line-height:1.1}
+.mx-subject-card .mx-subject-count b{font:700 22px/1.1 var(--f-display)}.mx-subject-card .mx-subject-count small{font-size:11px}
+.mx-subject-count.soon{background:var(--amber-bg);color:var(--amber)}.mx-subject-count.urgent{background:var(--sumac-bg);color:var(--sumac)}
+.mx-subject-count.soon small,.mx-subject-count.urgent small{color:inherit}
+.mx-subject-card.is-over{opacity:.55;filter:saturate(.4)}.mx-subject-card.is-over:hover{opacity:.8}
 @media (max-width:520px){.mx-subject-grid{grid-template-columns:1fr}}
 
 /* a skill's sheet */
@@ -211,6 +219,7 @@ html.math-on, html.math-on body{overflow:hidden}
 .mx-class-form label>small,.mx-class-form legend small{display:block;color:var(--muted);font-size:12px;font-weight:500;margin-top:3px}
 .mx-class-form input[type="text"],.mx-class-form input[name="name"],.mx-class-form textarea{box-sizing:border-box;width:100%;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);padding:11px 12px;font:inherit}
 .mx-class-form textarea{min-height:110px;resize:vertical;text-align:left}
+.mx-class-form select{box-sizing:border-box;width:100%;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);padding:11px 12px;font:inherit;text-align:left}
 .mx-class-form fieldset{margin:0}
 .mx-subject-picks{--exam:var(--mx-accent);display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
 .mx-subject-picks label{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:13px;padding:9px 10px;cursor:pointer}
@@ -661,7 +670,11 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
 /* the sketch board beside a skill's exercise (static/math-board.js): a desktop screen with a mouse or a pen only */
 .mx-shacts{display:flex;align-items:center;gap:6px}
 .mx-board{display:none}   /* the buttons that open it show everywhere: beside the exercise on a desktop, full screen on a phone */
-.mx-board-btn{border:1px solid var(--line);background:none;color:var(--muted);font:700 14px/1 var(--f-body);padding:7px 12px;border-radius:999px;cursor:pointer}
+.mx-board-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:none;color:var(--muted);font:700 14px/1 var(--f-body);padding:7px 12px;border-radius:999px;cursor:pointer}
+.mx-board-btn .mx-ic{width:16px;height:16px}
+/* the board's icons: one line-drawn set in the button's own colour */
+.mx-ic{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+[dir="rtl"] .mx-ic-flip{transform:scaleX(-1)}   /* back and undo point to the start of a right-to-left line */
 .mx-board-btn[aria-pressed="true"]{border-color:var(--mx-accent);background:var(--mx-accent-soft);color:var(--ink)}
 @media (min-width:1000px) and (any-pointer:fine){
   .mx-sheet.with-board{inset:16px 16px 16px auto;width:min(600px,42vw);max-height:none;border-radius:20px}
@@ -669,20 +682,29 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
     background:var(--surface);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 6px 30px rgb(0 0 0/.25)}
 }
 .mx-board-bar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-.mx-board-bar button{display:inline-flex;align-items:center;gap:5px;border:1px solid transparent;background:none;color:var(--muted);
-  font:500 14px/1 var(--f-body);padding:7px 10px;border-radius:10px;cursor:pointer;min-height:34px}
-.mx-board-bar button i{font-style:normal;font-size:16px;line-height:1}
+.mx-board-bar button{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid transparent;background:none;color:var(--muted);
+  font:500 14px/1 var(--f-body);padding:0 7px;border-radius:10px;cursor:pointer;height:36px;min-width:36px}
 .mx-board-bar button:hover{color:var(--ink);background:var(--surface-2)}
 .mx-board-bar button[hidden]{display:none}
 .mx-board-bar button[aria-pressed="true"]{color:var(--ink);border-color:var(--mx-accent);background:var(--mx-accent-soft)}
 @media (max-width:1600px){.mx-board-bar button span{display:none}}   /* a narrower board: icons only, names stay as tooltips */
 .mx-board-group{display:inline-flex;align-items:center;gap:3px}
-.mx-board-inks,.mx-board-sizes{padding-inline:6px;border-inline-start:1px solid var(--line)}
-.mx-board-inks button,.mx-board-sizes button{width:34px;padding:0;justify-content:center}
-.mx-board-inks button::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--dot);box-shadow:0 0 0 2px #fff}
-.mx-board-sizes button::before{content:"";width:var(--d);height:var(--d);border-radius:50%;border:1.5px solid currentColor}
-.mx-board:not([data-tool="eraser"]) .mx-board-sizes{display:none}   /* the sizes show with the eraser */
-.mx-board-gap{flex:1}
+/* the inks and the eraser's sizes sit on a strip of the paper's colour, so each ink shows as it will be drawn
+   (the black one too); the chosen one has a ring, not the tools' outline. The sizes take the inks' place with
+   the eraser, so the bar keeps its shape. */
+.mx-board-inks,.mx-board-sizes{background:#F8F7F2;border-radius:12px;padding:2px;gap:2px}
+.mx-board-bar .mx-board-inks button,.mx-board-bar .mx-board-sizes button{width:34px;min-width:0;height:32px;padding:0;border:0;border-radius:9px;background:none}
+.mx-board-bar .mx-board-inks button:hover,.mx-board-bar .mx-board-sizes button:hover{background:rgb(27 33 64/.08)}
+.mx-board-inks button::before,.mx-board-sizes button::before{content:"";border-radius:50%}
+.mx-board-inks button::before{width:18px;height:18px;background:var(--dot)}
+.mx-board-sizes button::before{width:var(--d);height:var(--d);background:#8A93B8}
+.mx-board-bar .mx-board-inks button[aria-pressed="true"],.mx-board-bar .mx-board-sizes button[aria-pressed="true"]{background:none}
+.mx-board-inks button[aria-pressed="true"]::before{box-shadow:0 0 0 2px #F8F7F2,0 0 0 4px #1B2140}
+.mx-board-sizes button[aria-pressed="true"]::before{background:#1B2140;box-shadow:0 0 0 2px #F8F7F2,0 0 0 4px #1B2140}
+.mx-board:not([data-tool="eraser"]) .mx-board-sizes,.mx-board[data-tool="eraser"] .mx-board-inks{display:none}
+.mx-board-acts{margin-inline-start:auto}   /* the page's actions at the far end, apart from the tools */
+.mx-board-bar .mx-board-close{position:relative;margin-inline-start:9px}   /* close, kept apart from clear by a line */
+.mx-board-close::before{content:"";position:absolute;inset-inline-start:-8px;top:8px;bottom:8px;width:1px;background:var(--line)}
 .mx-board-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line)}
 .mx-board-row[hidden]{display:none}
 .mx-board-pages{display:flex;align-items:center;gap:4px;flex:1;color:var(--muted);font-size:13px}
@@ -694,10 +716,13 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
 .mx-board canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair;
   background-color:#F8F7F2;background-image:linear-gradient(rgb(27 33 64/.07) 1px,transparent 1px),linear-gradient(90deg,rgb(27 33 64/.07) 1px,transparent 1px);
   background-size:28px 28px}
+.mx-board-del,.mx-board-top{display:inline-flex;align-items:center;gap:5px}
+.mx-board-del .mx-ic,.mx-board-top .mx-ic{width:16px;height:16px}
 .mx-board-del{position:absolute;z-index:1;border:1px solid #E7B3BB;background:#FFF1F3;color:#B4233A;font:700 13px/1 var(--f-body);
   padding:7px 11px;border-radius:999px;cursor:pointer;box-shadow:0 2px 8px rgb(27 33 64/.15)}
 .mx-board-del[hidden]{display:none}
 
+.mx-board-send .mx-ic{width:18px;height:18px}
 .mx-board-send{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--mx-accent);background:var(--mx-accent);color:var(--mx-on-accent);
   font:700 14px/1 var(--f-body);padding:8px 14px;border-radius:999px;cursor:pointer}
 .mx-board-send[hidden]{display:none}
@@ -712,11 +737,11 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
 .mx-board.full{display:flex;flex-direction:column;position:fixed;inset:0;z-index:1100;border:0;border-radius:0;box-shadow:none;background:var(--surface);
   padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
 .mx-board.full .mx-board-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);color:var(--ink)}
-.mx-board-back{border:1px solid var(--mx-accent);background:var(--mx-accent-soft);color:var(--ink);font:700 14px/1 var(--f-body);padding:9px 14px;border-radius:999px;cursor:pointer}
+.mx-board-back{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--mx-accent);background:var(--mx-accent-soft);color:var(--ink);font:700 14px/1 var(--f-body);padding:9px 14px;border-radius:999px;cursor:pointer}
 .mx-board.full .mx-board-bar{flex-wrap:wrap;row-gap:4px}   /* every tool in sight: two rows on a phone rather than hidden off the edge */
-.mx-board.full .mx-board-gap{flex:0}
 .mx-board.full .mx-board-bar [data-do="hide"]{display:none}   /* the head's "back" does it */
-.mx-board.full .mx-board-bar button{min-height:40px;min-width:40px;justify-content:center}
+.mx-board.full .mx-board-bar button{height:40px;min-width:40px}
+.mx-board.full .mx-board-bar .mx-board-inks button,.mx-board.full .mx-board-bar .mx-board-sizes button{height:36px;width:40px}
 
 /* typing math on the board: a bar over the board's top; MathLive's keyboard sits above everything, the board too */
 body{--keyboard-zindex:3000}
@@ -727,3 +752,60 @@ body{--keyboard-zindex:3000}
 .mx-board-mathedit button{flex:none;width:40px;height:40px;border-radius:10px;border:1px solid #C5CBDF;background:#F4F6FC;color:#1B2140;font:700 18px/1 var(--f-body);cursor:pointer}
 .mx-board-mathedit button[data-math="ok"]{background:var(--mx-accent);border-color:var(--mx-accent);color:var(--mx-on-accent)}
 .mx-board-mathwait{flex:1;color:#5B6694;font:500 14px/1.3 var(--f-body);padding:8px}
+
+/* the class teacher's report (math.js: classReport) */
+.mx-report-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.mx-report-tabs [aria-pressed="true"]{border-color:var(--mx-accent);color:var(--mx-accent)}
+.mx-report{display:flex;flex-direction:column;gap:10px}
+.mx-report h4{margin:10px 0 0;font-size:18px}
+.mx-report-common{border:1px solid var(--amber);border-radius:14px;background:var(--amber-bg);padding:14px 16px}
+.mx-report-common h4{margin:0 0 6px;color:var(--amber)}
+.mx-report-list{margin:0;padding-inline-start:18px;display:flex;flex-direction:column;gap:6px}
+.mx-report-list li small{display:block;color:var(--muted)}
+.mx-report-student{border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.mx-report-student>summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:12px 14px;cursor:pointer;list-style:none}
+.mx-report-student>summary::-webkit-details-marker{display:none}
+.mx-report-student>summary b{min-width:8ch}
+.mx-report-student[open]>summary{border-bottom:1px solid var(--line)}
+.mx-report-prog{display:flex;align-items:center;gap:8px;flex:1;min-width:150px}
+.mx-report-prog .mx-meter{flex:1;height:8px;background:var(--surface-2)}
+.mx-report-prog .mx-meter i{background:var(--aurora)}
+.mx-report-prog small{color:var(--muted);white-space:nowrap}
+.mx-report-chip{font:700 12px/1 var(--f-body);padding:5px 9px;border-radius:999px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.mx-report-chip.good,.mx-report-grade.good{color:var(--ok)}.mx-report-chip.good{background:var(--ok-bg)}
+.mx-report-chip.mid,.mx-report-grade.mid{color:var(--amber)}.mx-report-chip.mid{background:var(--amber-bg)}
+.mx-report-chip.low,.mx-report-grade.low{color:var(--sumac)}.mx-report-chip.low{background:var(--sumac-bg)}
+.mx-report-body{display:flex;flex-direction:column;gap:16px;padding:14px}
+.mx-report-body h5{margin:0 0 8px;font-size:15px;color:var(--mx-accent)}
+.mx-report-body p{margin:0}
+.mx-report-table{width:100%;border-collapse:collapse;font-size:14px}
+.mx-report-table th{color:var(--muted);font-weight:400;text-align:start;padding:4px 6px;border-bottom:1px solid var(--line)}
+.mx-report-table td{padding:6px;border-bottom:1px solid var(--line)}
+.mx-report-grade{font-weight:700}
+@media (max-width:600px){.mx-report-prog{flex-basis:100%}.mx-report-table{font-size:13px}}
+
+/* the teacher's AI queue (math.js: aiQueue) */
+.mx-aq-badge{display:inline-block;min-width:1.6em;margin-inline-start:4px;padding:2px 6px;border-radius:999px;background:var(--sumac);color:#fff;font:700 12px/1.2 var(--f-body);text-align:center}
+.mx-aq{display:flex;flex-direction:column;gap:10px}
+.mx-aq-done{margin:10px 0 0;font-size:16px;color:var(--muted)}
+.mx-aq-card{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:12px 14px}
+.mx-aq-card p{margin:0}
+.mx-aq-card.done,.mx-aq-card.declined,.mx-aq-card.cancelled{opacity:.8}
+.mx-aq-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.mx-aq-head small{color:var(--muted)}
+.mx-aq-state{margin-inline-start:auto;font:700 12px/1 var(--f-body);padding:5px 9px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.mx-aq-card.pending .mx-aq-state{background:var(--amber-bg);color:var(--amber)}
+.mx-aq-card.done .mx-aq-state{background:var(--ok-bg);color:var(--ok)}
+.mx-aq-card.failed .mx-aq-state,.mx-aq-card.declined .mx-aq-state{background:var(--sumac-bg);color:var(--sumac)}
+.mx-aq-label{font-weight:700}
+.mx-aq-q{color:var(--muted);font-size:14px}
+.mx-aq-error{color:var(--sumac)}
+.mx-aq-img{max-width:100%;max-height:360px;object-fit:contain;border-radius:10px;border:1px solid var(--line);align-self:flex-start}
+/* "פירוט השגיאה": why an AI check failed (answer-scans.js: errorDetails) */
+.mx-error-details{align-self:flex-start;max-width:100%}
+.mx-error-details>summary{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;cursor:pointer;font:500 13px/1.2 var(--f-body);color:var(--sumac);list-style:none}
+.mx-error-details>summary::-webkit-details-marker{display:none}
+.mx-error-details>summary::before{content:"ⓘ"}
+.mx-error-details[open]>summary{border-color:var(--sumac)}
+.mx-error-details p{margin:8px 0 0}
+.mx-error-details code{display:block;margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--surface-2);color:var(--muted);font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;text-align:left}
