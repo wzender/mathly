@@ -15,6 +15,7 @@ from .answer_scans import AnswerScans, MAX_IMAGE, ScanError, clean_image, public
 from .answer_grading import AnswerGrader
 from .math_photo import PhotoUnavailable
 from .quiz_grades import sitting_view
+from .teacher_review import MAX_MESSAGE, effective_score, for_student as review_for_student, request_for_student
 from .math_skills import algebra9, question_version, quiz_snapshot
 
 log = logging.getLogger("mathly.answer_routes")
@@ -55,7 +56,8 @@ def install_answer_routes(app, signed_in):
             raise ScanError(503, "answer_storage_unavailable")
         return user["id"]
 
-    def call(user, action, **data):
+    def call(user, action, *, student_view=False, **data):
+        """`student_view`: the student is opening the answer, so a teacher's review of it counts as seen."""
         result = app.state.answers.action(user, action, **data)
         if isinstance(result, dict) and result.get("attachment"):
             result["grading_available"] = bool(grading_key())
@@ -65,6 +67,17 @@ def install_answer_routes(app, signed_in):
                 # A staged deployment must not block saved images or upload receipt.
                 result["grading"] = None
                 result["grading_available"] = False
+            marks = {"review": None, "request": None}   # the teacher's review of the answer, and the student's request
+            try:
+                marks = app.state.answers.review(user, "get", attempt_id=result["attempt"]["id"])
+                if student_view and marks["review"] and not marks["review"].get("seen_at"):
+                    app.state.answers.review(user, "seen", attempt_id=result["attempt"]["id"])
+            except ScanError:
+                pass   # the reviews are not set up yet: the answer still shows
+            result["teacher_review"] = review_for_student(marks["review"])
+            result["review_request"] = request_for_student(marks["request"])
+            check = (result.get("grading") or {}).get("result") if (result.get("grading") or {}).get("state") == "completed" else None
+            result["effective_score"] = effective_score((check or {}).get("score"), (marks["review"] or {}).get("score"))
             result["ai_request"] = None   # the teacher's queue (ai_queue.py): this answer's latest request
             if app.state.ai_queue.configured and (result.get("grading") or {}).get("state") != "completed":
                 try:
@@ -99,7 +112,7 @@ def install_answer_routes(app, signed_in):
         version = question_version(sample)
         if body.get("question_version") != version:
             raise ScanError(409, "question_changed")
-        return reply(call(user, "resume", question_id=question["id"], question_version=version,
+        return reply(call(user, "resume", student_view=True, question_id=question["id"], question_version=version,
                           snapshot={"name": question["name"], **sample}, new=body.get("new") is True))
 
     @app.post("/api/math/quiz-attempts")
@@ -115,13 +128,14 @@ def install_answer_routes(app, signed_in):
         version = question_version(snapshot)
         if body.get("question_version") != version:
             raise ScanError(409, "question_changed")
-        return reply(call(user, "resume", question_id=f"quiz:{unit['id']}:{index}", question_version=version,
-                          snapshot=snapshot, new=body.get("new") is True))
+        return reply(call(user, "resume", student_view=True, question_id=f"quiz:{unit['id']}:{index}",
+                          question_version=version, snapshot=snapshot, new=body.get("new") is True))
 
     @app.post("/api/math/quiz-sittings")
-    def submit_sitting(body: dict, user=Depends(student)):
+    def submit_sitting(body: dict, user=Depends(student), account=Depends(signed_in)):
         """Hands a unit quiz in: the sitting is kept on the server and its grade is worked out there from the checks
-        (app/quiz_grades.py). Sending the same `client_key` again returns the same sitting."""
+        (app/quiz_grades.py). Sending the same `client_key` again returns the same sitting. A student's answers all go
+        to their teacher's queue right here, so none depends on the page staying open to ask for each one."""
         if open_ended_locked():
             raise ScanError(403, "open_ended_locked")
         unit = next((u for u in algebra9()["units"] if u["id"] == body.get("unit_id") and "quiz" in u), None)
@@ -130,6 +144,14 @@ def install_answer_routes(app, signed_in):
             raise ScanError(404, "not_found")
         sitting = app.state.answers.quiz(user, "submit", unit_id=unit["id"], attempt_ids=[uuid_text(a) for a in attempts],
                                          time_up=body.get("time_up") is True, client_key=uuid_text(body.get("client_key")))
+        if account is not None and not may_send(account) and grading_key():
+            for aid in [a["attempt_id"] for a in sitting.get("attempts") or []]:
+                try:
+                    found = app.state.answers.action(user, "get", attempt_id=aid)
+                    if found.get("attachment") and not app.state.answers.grade(user, "get", attempt_id=aid):
+                        ask_teacher(user, account, aid, found, True)   # automatic: an answer the teacher declined stays declined
+                except ScanError as exc:   # one answer that cannot be queued now must not lose the hand-in
+                    log.warning("quiz answer not queued for the teacher: %s", exc.code)
         return JSONResponse(sitting_view(sitting), headers={"Cache-Control": "no-store"})
 
     @app.get("/api/math/quiz-sittings")
@@ -141,7 +163,28 @@ def install_answer_routes(app, signed_in):
 
     @app.get("/api/math/answer-attempts/{attempt_id}")
     def get_attempt(attempt_id: str, user=Depends(student)):
-        return reply(call(user, "get", attempt_id=uuid_text(attempt_id)))
+        return reply(call(user, "get", student_view=True, attempt_id=uuid_text(attempt_id)))
+
+    @app.post("/api/math/answer-attempts/{attempt_id}/review-request")
+    def ask_review(attempt_id: str, body: dict | None = None, user=Depends(student)):
+        """The student asks their teacher to look again at a checked answer (at most one open request per answer)."""
+        message = (body or {}).get("message")
+        if message is not None and not isinstance(message, str):
+            raise ScanError(400, "invalid_message")
+        message = (message or "").strip()
+        if len(message) > MAX_MESSAGE:
+            raise ScanError(400, "message_too_long")
+        marks = app.state.answers.review(user, "request", attempt_id=uuid_text(attempt_id), message=message)
+        return JSONResponse({"review_request": request_for_student(marks["request"])}, headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/math/teacher-comments")
+    def teacher_comments(user=Depends(student)):
+        """Answers the teacher reviewed that the student has not opened since."""
+        try:
+            rows = app.state.answers.review(user, "unseen")
+        except ScanError:
+            rows = []   # not set up yet: nothing to tell
+        return JSONResponse({"comments": rows}, headers={"Cache-Control": "no-store"})
 
     @app.post("/api/math/answer-attempts/{attempt_id}/grade")
     def grade_answer(attempt_id: str, body: dict | None = None, user=Depends(student), account=Depends(signed_in)):

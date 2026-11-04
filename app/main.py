@@ -25,6 +25,8 @@ from .math_photo import (DAILY_PHOTOS, MAX_PHOTO, MEDIA_TYPES as PHOTO_TYPES,
                          PhotoSolver, PhotoUnavailable, math_model, photo_client)
 from .math_skills import algebra9, practice_graph
 from .class_report import install_class_report_routes
+from .teacher_review import install_teacher_review_routes
+from .assignments import install_assignment_routes
 from .progress import install_progress_routes
 from .push import install_push_routes
 from .monitoring import ActionLog, RETURN_GAP, install_monitoring_routes
@@ -297,7 +299,9 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
     install_push_routes(app, signed_in)
     install_answer_routes(app, signed_in)
     install_ai_queue_routes(app, signed_in)
-    install_resource_routes(app, signed_in)
+    install_teacher_review_routes(app, signed_in)
+    install_assignment_routes(app, signed_in, units_of)
+    install_resource_routes(app, signed_in, units_of)
     install_science_routes(app)
     install_monitoring_routes(app, manager)
     return app

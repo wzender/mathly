@@ -107,3 +107,12 @@ def test_merge_keeps_the_work_of_both_devices():
         assert out["quizzes"] == [{"at": "2026-11-01T08:00", "n": 5}] and out["updated"] == 200
     alone = merge({}, phone)   # a device with nothing yet takes the server's copy as it is
     assert alone == merge(phone, {}) and {k: alone[k] for k in phone} == phone
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="needs node")
+def test_merge_keeps_the_most_worked_example_openings_and_the_latest_time():
+    phone = {"updated": 200, "examples": {"a": {"n": 2, "last": "2026-11-02T10:00:00Z"}}}
+    laptop = {"updated": 100, "examples": {"a": {"n": 3, "last": "2026-11-01T10:00:00Z"}, "b": {"n": 1, "last": "2026-11-01T11:00:00Z"}}}
+    for out in (merge(phone, laptop), merge(laptop, phone)):
+        assert out["examples"] == {"a": {"n": 3, "last": "2026-11-02T10:00:00Z"}, "b": {"n": 1, "last": "2026-11-01T11:00:00Z"}}
+    assert merge({}, phone)["examples"] == phone["examples"]

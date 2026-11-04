@@ -160,8 +160,9 @@ class SupabaseAuth:
             grades = []
         return {"attempts": attempts, "grades": grades}
 
-    def user_ids(self, emails: list[str]) -> dict[str, str]:
-        """The account id of each email that has signed in at least once (Supabase's admin user list), by email."""
+    def user_accounts(self, emails: list[str]) -> dict[str, dict]:
+        """The id and Google name of each email that has signed in at least once (Supabase's admin user list), by email.
+        The name is "" when the account has none."""
         wanted, found = {email.lower() for email in emails}, {}
         page = 1
         while wanted - found.keys():
@@ -170,11 +171,22 @@ class SupabaseAuth:
             for user in users or []:
                 email = str(user.get("email") or "").lower()
                 if email in wanted and user.get("id"):
-                    found[email] = user["id"]
+                    meta = user.get("user_metadata") if isinstance(user.get("user_metadata"), dict) else {}
+                    name = " ".join(str(meta.get("full_name") or meta.get("name") or "").split())
+                    found[email] = {"id": user["id"], "name": name}
             if len(users or []) < 1000 or page >= 50:
                 break
             page += 1
         return found
+
+    def user_email(self, user_id: str) -> str:
+        """The email of one account (Supabase's admin API), "" when it has none."""
+        data = self._admin(f"/auth/v1/admin/users/{user_id}") or {}
+        return str(data.get("email") or "").lower() if isinstance(data, dict) else ""
+
+    def user_ids(self, emails: list[str]) -> dict[str, str]:
+        """The account id of each email that has signed in at least once, by email."""
+        return {email: account["id"] for email, account in self.user_accounts(emails).items()}
 
     def access_for(self, user_id: str, fresh: bool = False) -> dict | None:
         if not self.secret:

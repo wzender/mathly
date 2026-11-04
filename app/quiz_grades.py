@@ -9,17 +9,21 @@ change it. Both the student's result screen and the class report use `sitting_vi
 from __future__ import annotations
 
 from .math_skills import algebra9
+from .teacher_review import effective_score
 
 
 def question_result(points: int, attempt: dict | None) -> dict:
-    """One question of a sitting: its points, what it earned (None while its check is open) and why."""
+    """One question of a sitting: its points, what it earned (None while its check is open) and why. The teacher's
+    score, when they gave one, counts instead of the automatic check's (see app/teacher_review.py)."""
     if not attempt or not attempt.get("has_photo"):
         return {"points": points, "earned": 0, "state": "missing"}
-    score = attempt.get("score")
-    if attempt.get("grade_state") == "completed" and type(score) is int and 0 <= score <= 100:
-        return {"points": points, "earned": int(points * score / 100 + 0.5), "state": "checked",
-                "verdict": attempt.get("verdict")}
-    if attempt.get("grade_state") == "completed":   # a check without a score: unreadable, or needs a teacher's look
+    done = attempt.get("grade_state") == "completed"
+    teacher = attempt.get("teacher_score")
+    score = effective_score(attempt.get("score") if done else None, teacher)
+    if score is not None and 0 <= score <= 100:
+        return {"points": points, "earned": int(points * score / 100 + 0.5),
+                "state": "teacher" if type(teacher) is int else "checked", "verdict": attempt.get("verdict")}
+    if done:   # a check without a score: unreadable, or needs a teacher's look
         return {"points": points, "earned": None, "state": attempt.get("verdict") or "waiting"}
     return {"points": points, "earned": None, "state": "waiting"}
 

@@ -20,7 +20,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 /* ---------- rules ---------- */
 const dayKey=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const daysBack=(n,from)=>{const d=new Date(from);d.setDate(d.getDate()-n);return d};
-function ensure(P){ for(const k of ["run","gold","seen","days","review","missed"]) if(!P[k]||typeof P[k]!=="object") P[k]={}; for(const k of ["comets","slips"]) if(!Array.isArray(P[k])) P[k]=[]; return P; }
+function ensure(P){ for(const k of ["run","gold","seen","days","review","missed","examples"]) if(!P[k]||typeof P[k]!=="object") P[k]={}; for(const k of ["comets","slips"]) if(!Array.isArray(P[k])) P[k]=[]; return P; }
 function fading(P,id,now=new Date()){
   if(!P.done?.[id]) return false;
   const t=Date.parse(P.seen?.[id]||P.done[id]);
@@ -86,6 +86,82 @@ function patterns(P,mistakes={},now=new Date()){
   }
   const rank=(a,b)=>b.skills.length-a.skills.length||b.n-a.n||b.last.localeCompare(a.last);
   return {recurring:recurring.sort(rank).slice(0,PATTERNS_SHOWN),stopped:stopped.sort(rank).slice(0,PATTERNS_SHOWN)};
+}
+
+/* ---------- the class teacher's signals ----------
+   Who needs the teacher's attention, worked out from what the report loads for a student: the saved progress, and the
+   server's quiz sittings (see class_report.py). The progress is what the student's device reports, so these are prompts
+   to look, not grades. A week runs from Sunday. */
+const INACTIVE_DAYS=7, STUCK_SLIPS=3, STUCK_WINDOW_DAYS=14, DROP_RATIO=.5, DROP_MIN_LAST_WEEK=10, LOW_GRADE=55;
+const midnight=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate());
+const keyDate=k=>{ const m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(k); return m?new Date(+m[1],m[2]-1,+m[3]):null; };
+const daysBetween=(a,b)=>Math.round((midnight(b)-midnight(a))/DAY);
+// the latest day the student answered right: from the per-day counts and from when each skill was last practised
+function lastPractice(P){
+  const times=[];
+  for(const [k,n] of Object.entries(P.days||{})){ const d=keyDate(k); if(d&&n>0) times.push(d.getTime()); }
+  for(const v of Object.values(P.seen||{})){ const t=Date.parse(v); if(!isNaN(t)) times.push(t); }
+  return times.length?new Date(Math.max(...times)):null;
+}
+// right answers this week (from Sunday) and in the week before
+function weekly(P,now=new Date()){
+  const start=midnight(now); start.setDate(start.getDate()-start.getDay());
+  const prev=new Date(start); prev.setDate(prev.getDate()-7);
+  let thisWeek=0, lastWeek=0;
+  for(const [k,n] of Object.entries(P.days||{})){
+    const d=keyDate(k); if(!d||!(n>0)) continue;
+    if(d>=start) thisWeek+=n; else if(d>=prev) lastWeek+=n;
+  }
+  return {thisWeek,lastWeek};
+}
+/* The reasons a student needs attention (empty: none). `student`: {signed_in, progress, quiz_sittings}.
+   `ctx`: {skills: name by skill id (the class's skills), units: [{id, name}] (the class units with a quiz)}. */
+function attention(student,{skills={},units=[],assignments=[]}={},now=new Date()){
+  const P=student.progress, out=[];
+  if(!P) return student.signed_in?[{kind:"new",text:"עוד לא התחיל לתרגל"}]:[];
+  const last=lastPractice(P);
+  if(last){ const n=daysBetween(last,now); if(n>=INACTIVE_DAYS) out.push({kind:"inactive",text:`לא תרגל ${n} ימים`}); }
+  const cut=now-STUCK_WINDOW_DAYS*DAY, count={};
+  for(const x of P.slips||[]){ const t=Date.parse(x?.at); if(x?.id&&!isNaN(t)&&t>=cut&&t<=now) count[x.id]=(count[x.id]||0)+1; }
+  const stuck=Object.keys(count).filter(id=>count[id]>=STUCK_SLIPS&&!P.done?.[id]&&skills[id]).sort((a,b)=>count[b]-count[a]);
+  if(stuck.length) out.push({kind:"stuck",skills:stuck,text:`${stuck.length===1?"תקוע במיומנות":"תקוע במיומנויות"}: ${stuck.map(id=>skills[id]).join(", ")}`});
+  const w=weekly(P,now);
+  if(w.lastWeek>=DROP_MIN_LAST_WEEK&&w.thisWeek<w.lastWeek*DROP_RATIO)
+    out.push({kind:"drop",text:`התרגול ירד: ${w.thisWeek} תשובות נכונות השבוע, ${w.lastWeek} בשבוע שעבר`});
+  for(const u of units){   // the server's grades only; without them (null) the signal is left out
+    const g=(student.quiz_sittings||[]).filter(x=>x.unit_id===u.id&&x.grade!=null).sort((a,b)=>String(a.submitted_at).localeCompare(String(b.submitted_at))).at(-1);
+    if(g&&g.grade<LOW_GRADE) out.push({kind:"grade",unit:u.id,text:`ציון נמוך בבוחן ${u.name}: ${g.grade}`});
+  }
+  for(const a of assignments){   // an assignment past its due date and not finished (left out when a unit quiz cannot be told)
+    const st=assignmentState(a,P,student.quiz_sittings,now);
+    if(st.overdue&&st.items.every(x=>x.known)) out.push({kind:"assignment",assignment:a.id,text:`משימה באיחור: ${a.title}`});
+  }
+  return out;
+}
+
+/* ---------- assignments (app/assignments.py) ----------
+   Whether an assignment's items are done is worked out from what already exists, the same way on the student's home
+   screen and in the teacher's report. A skill is done when it is finished, whenever that was. A unit quiz is done when
+   the server has a sitting of it handed in after the assignment was made (`sittings`: [{unit_id, submitted_at}], null
+   when the server's record could not be read), and a practice exam when one covering all the item's units was taken
+   after that (P.quizzes). Dates are Jerusalem days: an item done on the due date is on time. */
+const jerusalemDay=t=>new Date(t).toLocaleDateString("en-CA",{timeZone:"Asia/Jerusalem"});   // YYYY-MM-DD
+function assignmentState(a,P,sittings,now=new Date()){
+  const created=Date.parse(a.created_at)||0, due=String(a.due_on);
+  const earliest=list=>list.filter(Boolean).sort()[0]||null;
+  const items=(a.items||[]).map(item=>{
+    let at=null, known=true;
+    if(item.kind==="skill") at=P?.done?.[item.id]||null;
+    else if(item.kind==="unit_quiz"){
+      known=Array.isArray(sittings);
+      at=earliest((sittings||[]).filter(x=>x.unit_id===item.unit&&Date.parse(x.submitted_at)>created).map(x=>x.submitted_at));
+    }else if(item.kind==="exam")
+      at=earliest((P?.quizzes||[]).filter(x=>Date.parse(x.at)>created&&(item.units||[]).every(u=>(x.units||[]).includes(u))).map(x=>x.at));
+    return {item,done:!!at,at,known,late:!!at&&jerusalemDay(at)>due};
+  });
+  const doneCount=items.filter(x=>x.done).length, finished=items.length>0&&doneCount===items.length;
+  return {items,doneCount,total:items.length,finished,overdue:!finished&&jerusalemDay(now)>due,
+    late:finished&&items.some(x=>x.late),next:items.findIndex(x=>!x.done)};
 }
 
 /* a star's look: gold, lit, fading (finished), next, open, locked, off */
@@ -350,6 +426,6 @@ function comet(onCatch){
 }
 const cometCard=c=>`<div class="sky-card"><span class="sym">${esc(c.sym)}</span><b>${esc(c.name)}</b></div>`;
 
-window.MathlySky={GOAL,slip,patterns,FADE_DAYS,MASTER_RUN,GOLD_RUN,masterNeed,goldNeed,mastered,reviewed,due,COMETS,SPARK,spark,FLAME,owl,praise,dayKey,ensure,correct,wrong,fading,star,today,streak,dayState,month,best,
+window.MathlySky={GOAL,slip,patterns,assignmentState,jerusalemDay,attention,weekly,lastPractice,FADE_DAYS,MASTER_RUN,GOLD_RUN,masterNeed,goldNeed,mastered,reviewed,due,COMETS,SPARK,spark,FLAME,owl,praise,dayKey,ensure,correct,wrong,fading,star,today,streak,dayState,month,best,
   cometDue,catchComet,shape,labels,mount,burst,burstAt,sound,buzz,soundOn,setSound,toast,celebrate,comet,cometCard};
 })();

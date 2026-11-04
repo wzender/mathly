@@ -2,6 +2,10 @@
 
 Rows live in `math_unit_resources`, images in the private `mathly-resources` bucket. Only the backend, with the
 service key, reads or writes either; teachers reach them through `/api/math/units/.../resources`.
+
+A resource is hidden from students until its teacher marks it visible (`visible`; a theory explanation starts visible,
+an exercise or a note starts hidden). Students see the visible resources of the units open to their class, through
+`/api/math/units/.../student-resources`, and never the teacher's email.
 """
 from __future__ import annotations
 
@@ -27,7 +31,8 @@ MAX_NOTE = 200
 
 
 class ResourceUnavailable(RuntimeError):
-    pass
+    """The storage did not answer. `no_visible_column`: the answer was that the visible column is not there yet."""
+    no_visible_column = False
 
 
 class UnitResources:
@@ -51,6 +56,14 @@ class UnitResources:
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
                 return response.read()
+        except urllib.error.HTTPError as exc:
+            log.warning("resource storage failed: %s", exc.code)
+            failure = ResourceUnavailable("resource storage unavailable")
+            try:
+                failure.no_visible_column = exc.code == 400 and b"visible" in exc.read()   # the migration is not applied
+            except OSError:
+                pass
+            raise failure from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             # Never pass SQL, keys or storage paths on to the browser.
             log.warning("resource storage failed: %s", getattr(exc, "code", type(exc).__name__))
@@ -70,7 +83,17 @@ class UnitResources:
         return rows[0] if rows else None
 
     def add(self, row: dict) -> dict:
-        return self._rows("/rest/v1/math_unit_resources", "POST", row)[0]
+        try:
+            return self._rows("/rest/v1/math_unit_resources", "POST", row)[0]
+        except ResourceUnavailable as exc:
+            if not exc.no_visible_column:
+                raise
+            log.warning("the visible column is missing; apply supabase/migrations/20261104180000_math_resources_visible.sql")
+            return self._rows("/rest/v1/math_unit_resources", "POST", {k: v for k, v in row.items() if k != "visible"})[0]
+
+    def set_visible(self, resource_id: str, visible: bool) -> dict | None:
+        rows = self._rows(f"/rest/v1/math_unit_resources?id=eq.{resource_id}", "PATCH", {"visible": visible})
+        return rows[0] if rows else None
 
     def remove(self, resource_id: str) -> None:
         self._rows(f"/rest/v1/math_unit_resources?id=eq.{resource_id}", "DELETE")
@@ -88,9 +111,21 @@ class UnitResources:
 
 
 def public(row: dict) -> dict:
-    """A resource as the browser sees it: no storage path."""
-    return {key: row.get(key) for key in ("id", "unit_id", "kind", "note", "skill_id", "created_email", "created_at",
-                                          "created_by")}
+    """A resource as a teacher's browser sees it: no storage path."""
+    return {**{key: row.get(key) for key in ("id", "unit_id", "kind", "note", "skill_id", "created_email", "created_at",
+                                             "created_by")}, "visible": bool(row.get("visible"))}
+
+
+def for_student(row: dict) -> dict:
+    """A resource as a student's browser sees it: no storage path and no teacher."""
+    return {key: row.get(key) for key in ("id", "unit_id", "kind", "note", "skill_id", "created_at")}
+
+
+def wants_visible(value: str | None, kind: str) -> bool:
+    """The upload form's visibility: what it says, else a theory explanation shows and anything else stays hidden."""
+    if value is None or not value.strip():
+        return kind == "theory"
+    return value.strip().lower() in ("1", "true", "on", "yes")
 
 
 def resource_id(value: str) -> str:
@@ -100,7 +135,7 @@ def resource_id(value: str) -> str:
         raise HTTPException(404, "resource not found") from exc
 
 
-def install_resource_routes(app, signed_in):
+def install_resource_routes(app, signed_in, units_of=None):
     if not hasattr(app.state, "resources"):
         app.state.resources = UnitResources(app.state.auth)
 
@@ -133,7 +168,8 @@ def install_resource_routes(app, signed_in):
 
     @app.post("/api/math/units/{unit_id}/resources")
     async def add_resource(unit_id: str, photo: UploadFile = File(...), kind: str = Form(...),
-                           note: str = Form(""), skill: str = Form(""), user: dict = Depends(teacher)):
+                           note: str = Form(""), skill: str = Form(""), visible: str | None = Form(None),
+                           user: dict = Depends(teacher)):
         unit = unit_of(unit_id)
         if kind not in KINDS:
             raise HTTPException(400, "choose what the photo shows")
@@ -155,7 +191,8 @@ def install_resource_routes(app, signed_in):
         try:
             row = await storage(app.state.resources.add, {
                 "unit_id": unit_id, "kind": kind, "note": note, "skill_id": skill or None, "object_key": key,
-                "byte_size": len(image), "created_by": user["id"], "created_email": user.get("email", "")})
+                "byte_size": len(image), "created_by": user["id"], "created_email": user.get("email", ""),
+                "visible": wants_visible(visible, kind)})
         except HTTPException:
             try:
                 await run_in_threadpool(app.state.resources.delete, key)
@@ -173,6 +210,49 @@ def install_resource_routes(app, signed_in):
             raise HTTPException(404, "resource not found")
         return Response(await storage(app.state.resources.read, row["object_key"]), media_type="image/jpeg",
                         headers={"Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"})
+
+    @app.patch("/api/math/resources/{rid}")
+    async def change_resource(rid: str, body: dict, user: dict = Depends(teacher)):
+        """Shows a resource to students or hides it again: its teacher, or a manager."""
+        if type(body.get("visible")) is not bool:
+            raise HTTPException(400, "send {\"visible\": true or false}")
+        row = await storage(app.state.resources.get, resource_id(rid))
+        if not row:
+            raise HTTPException(404, "resource not found")
+        if row.get("created_by") != user["id"] and not has_permission(user, "management.access"):
+            raise HTTPException(403, "only the teacher who added it can change it")
+        changed = await storage(app.state.resources.set_visible, row["id"], body["visible"])
+        return JSONResponse(public(changed or {**row, "visible": body["visible"]}), headers={"Cache-Control": "no-store"})
+
+    # ---- the students: the visible resources of the units open to their class
+    def student(user=Depends(signed_in)) -> dict:
+        if not user or not user.get("id"):
+            raise HTTPException(401, "sign in required")
+        if not app.state.resources.configured:
+            raise HTTPException(503, "resource storage is not configured")
+        return user
+
+    def open_to(user: dict, unit_id: str) -> bool:
+        """Whether the unit is one of the account's class units; with no class (none configured), every unit."""
+        classes = user.get("classes") or []
+        return not classes or not units_of or unit_id in {u for row in classes for u in units_of(row)}
+
+    @app.get("/api/math/units/{unit_id}/student-resources")
+    async def student_resources(unit_id: str, user: dict = Depends(student)):
+        unit_of(unit_id)
+        if not open_to(user, unit_id):
+            raise HTTPException(404, "unit not found")
+        rows = await storage(app.state.resources.list, unit_id)
+        return JSONResponse({"resources": [for_student(r) for r in rows if r.get("visible")]},
+                            headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/math/student-resources/{rid}/image")
+    async def student_resource_image(rid: str, user: dict = Depends(student)):
+        row = await storage(app.state.resources.get, resource_id(rid))
+        if not row or not row.get("visible") or not open_to(user, row["unit_id"]):
+            raise HTTPException(404, "resource not found")   # hidden, or of another class: as if it did not exist
+        return Response(await storage(app.state.resources.read, row["object_key"]), media_type="image/jpeg",
+                        headers={"Cache-Control": "private, max-age=300", "X-Content-Type-Options": "nosniff"})
 
     @app.delete("/api/math/resources/{rid}")
     async def delete_resource(rid: str, user: dict = Depends(teacher)):

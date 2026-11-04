@@ -451,3 +451,55 @@ def test_the_phone_answers_a_photo_request_by_drawing_on_the_board(scan_server):
             assert not errors
         finally:
             browser.close()
+
+
+@pytest.mark.parametrize('teacher_score,completes', [(100, True), (85, False)])
+def test_the_teachers_review_shows_above_the_ai_check_and_a_100_completes_the_skill(scan_server, teacher_score, completes):
+    import uuid
+    url, store = scan_server
+    from test_answer_scans import begin, finish
+    from app.math_skills import algebra9, question_version
+    skill = next(s for s in algebra9()['skills'] if s['id'] == 'a_30_side')
+    made = store.action(OWNER, 'resume', question_id=skill['id'],
+                        question_version=question_version(skill['sample']), snapshot=skill['sample'])
+    aid = finish(store, begin(store, store.action(OWNER, 'create_scan', attempt_id=made['attempt']['id'])))['attempt']['id']
+    lease = str(uuid.uuid4())   # the AI called it partial: 60
+    store.grade(OWNER, 'start', attempt_id=aid, lease_id=lease)
+    store.grade(OWNER, 'complete', attempt_id=aid, lease_id=lease, result=validate_assessment(
+        assessment(complete=False, score=60, feedback='חסר פירוט בשלב האחרון')))
+    store.review(OWNER, 'review', attempt_id=aid, reviewer='teacher@test.invalid', score=teacher_score,
+                 comment='הדרך נכונה <b>מאוד</b>')
+    key = 'mathly.progress.v1:' + OWNER + '@test.invalid'
+    with playwright.sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = session(browser).new_page(); errors = []
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.goto(url); open_question(page)
+            note = page.locator('.mx-teacher-note')
+            playwright.expect(note).to_contain_text('הערת המורה')
+            playwright.expect(note).to_contain_text(f'{teacher_score}/100')
+            playwright.expect(note).to_contain_text('הדרך נכונה <b>מאוד</b>')       # shown as text, never as markup
+            assert note.locator('b').count() == 0
+            grade = page.locator('.mx-grade')
+            playwright.expect(grade.locator('h4')).to_contain_text('בדיקה אוטומטית: ')
+            playwright.expect(grade.locator('h4')).to_contain_text('60/100')       # the AI's own score stays visible
+            assert page.locator('.mx-teacher-note, .mx-grade').first.get_attribute('class').startswith('mx-teacher-note')   # above it
+            page.wait_for_timeout(500)
+            assert page.evaluate("key=>!!JSON.parse(localStorage.getItem(key)||'{}').done?.a_30_side", key) == completes
+            for _ in range(6):   # a finished skill is celebrated: dismiss it
+                if not page.locator('.sky-cele [data-sky=go]').count():
+                    break
+                page.locator('.sky-cele [data-sky=go]').first.click(); page.wait_for_timeout(200)
+            # the student asks the teacher to look again
+            page.locator('.mx-ask summary').click()
+            page.locator('[data-ask-msg]').fill('כתבתי את כל השלבים')
+            page.locator('[data-ask-review]').click()
+            playwright.expect(page.locator('.mx-ask-wait')).to_contain_text('הבקשה ממתינה')
+            asked = store.review(OWNER, 'get', attempt_id=aid)['request']
+            assert asked['state'] == 'open' and asked['message'] == 'כתבתי את כל השלבים'
+            page.reload(); open_question(page)
+            playwright.expect(page.locator('.mx-ask-wait')).to_contain_text('הבקשה ממתינה')   # and it is remembered
+            assert page.locator('[data-ask-review]').count() == 0 and not errors
+        finally:
+            browser.close()

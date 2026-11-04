@@ -10,6 +10,9 @@ The questions are written for the app, and every skill, link and mistake still n
 
 `problems` is run by the tests and on loading: a broken graph is refused before a student meets it.
 
+A skill may have a worked example (`example`: a question of its own, `steps` of {do, why}, and the `answer`) that the
+student can open when stuck. The examples are written in advance and reviewed by a teacher: students never call the AI.
+
 A unit may end with a summarizing quiz (`quiz`): open-ended questions answered on paper and photographed, a time limit
 in minutes, and points per question that add up to 100. Its questions are graded only after the quiz is handed in.
 """
@@ -110,6 +113,39 @@ def sample_problems(where: str, sid: str, sample: dict, listed: bool, mistakes: 
     return out
 
 
+def example_problems(skill: dict) -> list[str]:
+    """A skill's worked example, if it has one: a question of its own solved in steps (what to do, and why), and the
+    answer. It must not be one of the skill's practice questions, or it would hand the student that question's answer."""
+    example = skill.get("example")
+    if example is None:
+        return []
+    where = f"{skill['id']} example"
+    if not isinstance(example, dict):
+        return [f"{where}: must be an object"]
+    text = lambda value: isinstance(value, str) and bool(value.strip())
+    out = []
+    if not text(example.get("question")):
+        out.append(f"{where}: question text is required")
+    if not text(example.get("answer")):
+        out.append(f"{where}: an answer is required")
+    steps = example.get("steps")
+    if not isinstance(steps, list) or not steps:
+        out.append(f"{where}: needs at least one step")
+    else:
+        out += [f"{where} step {n}: needs what to do (do) and why (why)" for n, step in enumerate(steps, 1)
+                if not isinstance(step, dict) or not text(step.get("do")) or not text(step.get("why"))]
+    squash = lambda value: " ".join(str(value).split())
+    if text(example.get("question")) and squash(example["question"]) in {squash(q.get("question", "")) for q in questions(skill)}:
+        out.append(f"{where}: repeats one of the skill's practice questions")
+    return out
+
+
+def skills_without_example(graph: dict) -> list[str]:
+    """The skills with multiple-choice questions that have no worked example yet (the coverage still to write)."""
+    return [s["id"] for s in graph["skills"]
+            if "example" not in s and all(q.get("type", "multiple-choice") == "multiple-choice" for q in questions(s))]
+
+
 def quiz_problems(unit: dict) -> list[str]:
     """A unit's summarizing quiz: a time limit, and open-ended questions whose points add up to 100."""
     quiz, where = unit["quiz"], f"{unit['id']} quiz"
@@ -181,6 +217,7 @@ def problems(graph: dict) -> list[str]:
         for n, sample in enumerate(questions(s), 1):
             out += sample_problems(f"{s['id']} question {n}" if listed else s["id"], s["id"], sample, listed,
                                    mistakes, below)
+        out += example_problems(s)
     out += [f"mistake {k}: unknown skill {m['back']}" for k, m in mistakes.items() if m["back"] and m["back"] not in skills]
     return out
 

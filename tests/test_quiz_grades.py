@@ -46,3 +46,29 @@ def test_points_are_rounded_per_question():
 
 def test_a_sitting_of_a_unit_without_a_quiz_has_no_view():
     assert sitting_view(sitting(attempt(100), unit="nope")) is None
+
+
+def test_the_teachers_score_counts_instead_of_the_automatic_one():
+    ai_40_teacher_80 = {**attempt(40, verdict="partial"), "teacher_score": 80}
+    view = sitting_view(sitting(attempt(100), ai_40_teacher_80, attempt(100), attempt(100)))
+    assert view["questions"][1]["earned"] == 20 and view["questions"][1]["state"] == "teacher"
+    assert view["grade"] == 25 + 20 + 25 + 25
+
+
+def test_a_teacher_score_grades_what_the_check_could_not_or_has_not_yet():
+    for unreadable in ({**attempt(None, verdict="unreadable"), "teacher_score": 70},
+                       {**attempt(None, state="grading", verdict=None), "teacher_score": 70},
+                       {**attempt(None, state=None, verdict=None), "teacher_score": 70}):
+        view = sitting_view(sitting(attempt(100), unreadable, attempt(100), attempt(100)))
+        assert view["open"] == 0 and view["questions"][1]["earned"] == 18 and view["grade"] == 25 + 18 + 25 + 25
+
+
+def test_a_teacher_score_of_zero_is_a_score_and_a_comment_alone_changes_nothing():
+    zero = {**attempt(100), "teacher_score": 0}
+    assert question_result(25, zero)["earned"] == 0
+    assert question_result(25, {**attempt(100), "teacher_score": None})["earned"] == 25   # the latest review had no score
+
+
+def test_a_missing_photo_stays_zero_whatever_the_teacher_says():
+    assert question_result(25, {**attempt(photo=False, state=None, verdict=None), "teacher_score": 100}) == \
+        {"points": 25, "earned": 0, "state": "missing"}

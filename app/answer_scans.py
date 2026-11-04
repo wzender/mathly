@@ -159,6 +159,20 @@ class AnswerScans:
             raise
         return json.loads(raw)
 
+    def review(self, user_id: str | None, action: str, **data):
+        """The teacher's reviews of answers and the students' requests to look again (app/teacher_review.py). The
+        student's id is `user_id` (a teacher's route finds it first with the `owner` action)."""
+        if not self.configured:
+            raise ScanError(503, "answer_storage_unavailable")
+        body = {"p_user": user_id, "p_action": action, "p_data": data}
+        try:
+            raw = self._request("/rest/v1/rpc/math_review_action", "POST", json.dumps(body).encode(), "application/json")
+        except ScanError as exc:
+            if exc.code == "answer_storage_unavailable":
+                raise ScanError(503, "review_unavailable") from exc
+            raise
+        return json.loads(raw)
+
     def _request(self, path, method="GET", data=None, content_type=None):
         headers = {"Authorization": "Bearer " + self.auth.secret, "apikey": self.auth.secret,
                    "User-Agent": "mathly/1.0"}
@@ -177,7 +191,7 @@ class AnswerScans:
             code, message = error.get("code"), error.get("message", "")
             if code == "P0002":
                 raise ScanError(404, "not_found") from exc
-            if code == "P0001" and message == "grading_limit":
+            if code == "P0001" and message in {"grading_limit", "review_limit"}:
                 raise ScanError(429, message) from exc
             if code == "P0001" and message in {"superseded", "invalid_upload", "upload_in_progress", "confirmation_required",
                                                "answer_required", "grading_busy", "grading_interrupted", "invalid_sitting"}:

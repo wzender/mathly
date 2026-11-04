@@ -36,3 +36,16 @@ def resolve_access(store: SupabaseAuth, token: str, *, fresh_permissions: bool =
 def has_permission(user: dict | None, permission: str) -> bool:
     permissions = set((user or {}).get("permissions", ()))
     return "*" in permissions or permission in permissions
+
+
+def students_of(user: dict, classes) -> set[str] | None:
+    """The students (emails) this account reviews: those of the classes it is the teacher of, and None, meaning every
+    student, for a manager. Shared by the AI queue and the teacher's review of answers."""
+    if has_permission(user, "management.access"):
+        return None
+    email = str(user.get("email", "")).lower()
+    out: set[str] = set()
+    for row in classes:
+        if email in row.get("teachers", ()):
+            out |= set(row.get("emails", ())) - set(row.get("teachers", ()))
+    return out

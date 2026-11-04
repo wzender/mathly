@@ -4,7 +4,7 @@
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=s=>esc(s).replace(/\$([^$]+)\$/g,'<span class="m">$1</span>');
 const states={waiting:"ממתינים לטלפון",confirmed:"ממתינים לטלפון",uploading:"מעלים את התשובה…",received:"התשובה התקבלה",failed:"ההעלאה נכשלה",expired:"בקשת הצילום פגה",superseded:"הבקשה הוחלפה",declined:"הבקשה נדחתה בטלפון"};
-const errors={expired:"בקשת הצילום פגה. צרו בקשה חדשה ונסו שוב.",superseded:"הבקשה הוחלפה. בחרו את הבקשה העדכנית.",upload_in_progress:"העלאה כבר מתבצעת. ממתינים לעדכון…",confirmation_required:"יש לאשר את בקשת הצילום תחילה.",invalid_upload:"ההעלאה הופסקה. נסו שוב.",question_changed:"השאלה השתנתה. רעננו את העמוד ופתחו אותה מחדש.",invalid_image:"לא ניתן לקרוא את התמונה. צלמו שוב.",image_too_large:"התמונה גדולה מדי. צלמו שוב.",unsupported_image:"בחרו תמונת JPEG, PNG או WebP.",answer_storage_unavailable:"שמירת תשובות אינה זמינה כרגע. נסו שוב מאוחר יותר.",sign_in_required:"יש להיכנס לאותו חשבון בשני המכשירים."};
+const errors={expired:"בקשת הצילום פגה. צרו בקשה חדשה ונסו שוב.",superseded:"הבקשה הוחלפה. בחרו את הבקשה העדכנית.",upload_in_progress:"העלאה כבר מתבצעת. ממתינים לעדכון…",confirmation_required:"יש לאשר את בקשת הצילום תחילה.",invalid_upload:"ההעלאה הופסקה. נסו שוב.",question_changed:"השאלה השתנתה. רעננו את העמוד ופתחו אותה מחדש.",invalid_image:"לא ניתן לקרוא את התמונה. צלמו שוב.",image_too_large:"התמונה גדולה מדי. צלמו שוב.",unsupported_image:"בחרו תמונת JPEG, PNG או WebP.",answer_storage_unavailable:"שמירת תשובות אינה זמינה כרגע. נסו שוב מאוחר יותר.",sign_in_required:"יש להיכנס לאותו חשבון בשני המכשירים.",review_limit:"יש כבר 5 בקשות פתוחות למורה. אפשר לבקש שוב אחרי שהמורה יענה.",message_too_long:"ההודעה ארוכה מדי (עד 300 תווים).",invalid_message:"ההודעה אינה תקינה.",answer_required:"צריך לצלם את התשובה קודם.",review_unavailable:"הבקשה למורה אינה זמינה כרגע. נסו שוב מאוחר יותר."};
 Object.assign(errors,{grading_unavailable:"בדיקת תשובות אינה זמינה כרגע באתר.",grading_failed:"הבדיקה נכשלה. התמונה נשמרה; אפשר לנסות שוב.",grading_interrupted:"הבדיקה הופסקה. אפשר לנסות שוב.",grading_limit:"הגעתם למכסת 20 הבדיקות היומית. נסו שוב מחר.",grading_busy:"כבר מתבצעות בדיקות בחשבון. נסו שוב בעוד רגע.",answer_required:"יש לצלם ולשלוח תשובה לפני הבדיקה.",queue_unavailable:"שליחת תשובות לבדיקת המורה אינה זמינה כרגע.",request_taken:"המורה כבר טיפל בבקשה. רעננו את העמוד."});
 /* Why an AI check failed (the server's `reason`, app/math_photo.py: failure_reason), for the people who can fix it:
    a teacher sending from the AI queue, or checking their own answer. Each is what happened and what to do. */
@@ -254,11 +254,11 @@ async function renderQuestion(q){
   // while the phone has the request, its code and progress are in the phone box itself (phoneLive)
   const statusText=checking?(q.grading&&queued?"שולחים למורה…":"בודקים את התשובה…"):waiting?"התשובה מחכה למורה":g?.state==="completed"?verdicts[g.result.verdict]:g?.state==="failed"?errors[g.error]||errors.grading_failed:!received&&phonePending(state)?"":states[state]||"כתבו את הפתרון על דף וצלמו אותו בטלפון.";
   // Rebuilding controls on every poll would steal focus and race a button click.
-  const signature=[state,s?.id,r.attachment?.id,g?.id,g?.state,r.grading_available,req?.id,req?.state].join(":");
+  const signature=[state,s?.id,r.attachment?.id,g?.id,g?.state,r.grading_available,req?.id,req?.state,r.teacher_review?.created_at,r.review_request?.id,r.review_request?.state].join(":");
   if(q.signature!==signature){
     q.signature=signature;
     q.node.innerHTML=`<small>ניסיון ${esc(r.attempt.id.slice(0,8))}</small><p role="status" aria-live="polite">${esc(statusText)}</p>
-      ${received?`<img class="mx-answer-image" alt="התשובה המצולמת שלכם" hidden>${gradingPanel(r,checking)}
+      ${received?`<img class="mx-answer-image" alt="התשובה המצולמת שלכם" hidden>${teacherNote(r)}${gradingPanel(r,checking)}${reviewBox(r.attempt.id,r)}
         <button class="mx-btn" data-new-attempt ${checking?"disabled":""}>ניסיון חדש וצילום מחדש</button>`:phoneLive(s,`data-request`,`data-cancel-scan`,!s?"צילום התשובה בטלפון":"בקשת צילום חדשה לטלפון")}`;
     if(!received){
       const say=t=>{const el=q.node.querySelector("[role=status]");if(el)el.textContent=t;};
@@ -283,9 +283,13 @@ async function renderQuestion(q){
       const gradeButton=q.node.querySelector("[data-grade]");
       if(gradeButton)gradeButton.onclick=()=>checkAnswer(q);
       q.node.querySelector("[data-new-attempt]").onclick=()=>mountQuestion(q.node,q.id,q.version,true);
+      const ask=q.node.querySelector("[data-ask-review]");
+      if(ask)ask.onclick=async()=>{const sent=await askReview(ask);if(sent&&current(q)){q.result={...q.result,review_request:sent};q.signature=[q.signature,"asked"].join(":");}};
     }
   }else q.node.querySelector("[role=status]").textContent=statusText;
   if(g?.state==="completed"&&q.notified!==g.id){q.notified=g.id;onGraded?.({questionId:q.id,grading:g});}
+  const t=r.teacher_review;   // the teacher's 100 counts like a correct check
+  if(t?.score===100&&q.notifiedTeacher!==t.created_at){q.notifiedTeacher=t.created_at;onGraded?.({questionId:q.id,grading:{id:"teacher:"+t.created_at,finished_at:t.created_at,result:{verdict:"correct",score:100}}});}
   if(received&&!q.image&&!q.loadingImage){
     q.loadingImage=true;
     try{
@@ -304,12 +308,38 @@ async function renderQuestion(q){
     q.autoStarted=true;checkAnswer(q,true);
   }
 }
+/* The teacher's review of the answer (its own score and comment), shown above the automatic check, and the student's
+   request to look again. Used by the answer panel here and by the unit quiz's result in math.js. */
+function teacherNote(r){
+  const t=r.teacher_review; if(!t)return "";
+  return `<section class="mx-teacher-note" aria-label="הערת המורה"><h4>הערת המורה${t.score==null?"":` · <span class="m">${esc(t.score)}/100</span>`}</h4>${t.comment?`<p>${esc(t.comment).replace(/\n/g,"<br>")}</p>`:""}</section>`;
+}
+function reviewBox(attemptId,r){
+  if(r.review_request?.state==="open")return '<p class="mx-small mx-ask-wait">ביקשתם מהמורה לבדוק שוב. הבקשה ממתינה.</p>';
+  if(r.grading?.state!=="completed")return "";   // only a checked answer can be questioned
+  return `<details class="mx-ask"><summary>לבקש מהמורה לבדוק שוב</summary>
+    <textarea maxlength="300" rows="2" data-ask-msg aria-label="הודעה למורה (לא חובה)" placeholder="מה לא נראה לכם בבדיקה? (לא חובה)"></textarea>
+    <button type="button" class="mx-btn" data-ask-review="${esc(attemptId)}">שליחה למורה</button></details>`;
+}
+// sends the request in the box the button is in; the box then says it waits
+async function askReview(button){
+  const box=button.closest(".mx-ask"),message=box.querySelector("[data-ask-msg]").value;
+  button.disabled=true;box.querySelector(".mx-ask-error")?.remove();
+  try{
+    const sent=await post(`/api/math/answer-attempts/${button.dataset.askReview}/review-request`,{message});
+    box.outerHTML='<p class="mx-small mx-ask-wait" role="status">ביקשתם מהמורה לבדוק שוב. הבקשה ממתינה.</p>';
+    return sent.review_request;
+  }catch(error){
+    button.disabled=false;box.insertAdjacentHTML("beforeend",`<p class="mx-small mx-ask-error" role="alert">${esc(error.message)}</p>`);
+    return null;
+  }
+}
 function gradingPanel(r,checking){
   const g=r.grading;
   if(g?.state==="completed"){
     const a=g.result;
     return `<section class="mx-grade ${a.verdict==="correct"?"mx-grade-correct":""}" aria-label="תוצאות בדיקת התשובה">
-      <h4>${esc(verdicts[a.verdict])}${a.score==null?"":` · <span class="m">${esc(a.score)}/100</span>`}</h4>
+      <h4>${r.teacher_review?"בדיקה אוטומטית: ":""}${esc(verdicts[a.verdict])}${a.score==null?"":` · <span class="m">${esc(a.score)}/100</span>`}</h4>
       <p>${fmt(a.feedback)}</p>${a.next_step?`<p><b>הצעד הבא: </b>${fmt(a.next_step)}</p>`:""}
       ${a.transcription?`<details><summary>מה קראנו בתמונה</summary><p>${fmt(a.transcription)}</p></details>`:""}
       ${a.solution?`<details><summary>הפתרון המלא</summary><p class="mx-grade-solution">${fmt(a.solution)}</p></details>`:""}
@@ -490,5 +520,5 @@ document.addEventListener("visibilitychange",()=>{
   if(question?.result)pollQuestion(question);
 });
 window.addEventListener("online",()=>{if(account&&inbox)pollInbox(epoch);if(question?.result)pollQuestion(question);});
-window.MathlyAnswers={errorDetails,configure,mountQuestion,closeQuestion,reset,phoneLive,forgetPush,pushButton,paintPush,togglePush};
+window.MathlyAnswers={errorDetails,teacherNote,reviewBox,askReview,configure,mountQuestion,closeQuestion,reset,phoneLive,forgetPush,pushButton,paintPush,togglePush};
 })();

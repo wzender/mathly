@@ -48,6 +48,9 @@ class ScanAuth:
     def classes(self):
         return []
 
+    def user_email(self, user_id):
+        return user_id + '@test.invalid'
+
     def access_for(self, _id, **kwargs):
         return None
 
@@ -71,6 +74,9 @@ class DatabaseAnswers(AnswerScans):
     def quiz(self, user_id, action, **data):
         return self.rpc('math_quiz_action', user_id, action, data)
 
+    def review(self, user_id, action, **data):
+        return self.rpc('math_review_action', user_id, action, data)
+
     def rpc(self, name, user_id, action, data):
         import psycopg
         if self.fail_finalize and action == 'finalize':
@@ -84,7 +90,7 @@ class DatabaseAnswers(AnswerScans):
                 raise ScanError(404, 'not_found') from exc
             except psycopg.errors.RaiseException as exc:
                 message = str(exc).splitlines()[0]
-                raise ScanError(429 if message == 'grading_limit' else 409, message) from exc
+                raise ScanError(429 if message in ('grading_limit', 'review_limit') else 409, message) from exc
 
     def put(self, key, data):
         if self.fail_put:
@@ -129,8 +135,9 @@ def answer_store(postgres_server, tmp_path):
             if migration.name.endswith('_math_answer_scans.sql'):
                 continue
             c.execute(migration.read_text())
-        for migration in sorted(Path('supabase/migrations').glob('*_math_quiz_sittings.sql')):
-            c.execute(migration.read_text())
+        for name in ('quiz_sittings', 'teacher_reviews'):   # in this order: the second rewrites a function of the first
+            for migration in sorted(Path('supabase/migrations').glob(f'*_math_{name}.sql')):
+                c.execute(migration.read_text())
         c.execute('insert into auth.users values(%s),(%s)', (OWNER, OTHER))
     yield store
     with psycopg.connect(postgres_server.get_uri(), autocommit=True) as c:

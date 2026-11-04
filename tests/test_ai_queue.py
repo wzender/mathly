@@ -353,8 +353,11 @@ def test_api_errors_are_named(status, message, reason):
 
 class ReportAuth(ClassAuth):
     """ClassAuth that can also answer the class report's two lookups: user ids and (empty) saved progress."""
-    def user_ids(self, emails):
-        return {mail(uid): uid for uid in (OWNER, OTHER) if mail(uid) in emails}
+    def user_accounts(self, emails):
+        return {mail(uid): {'id': uid, 'name': ''} for uid in (OWNER, OTHER) if mail(uid) in emails}
+
+    def user_email(self, user_id):
+        return mail(user_id)
 
     def _admin(self, path, *args, **kwargs):
         if path.startswith('/rest/v1/math_progress'):
@@ -362,10 +365,35 @@ class ReportAuth(ClassAuth):
         return super()._admin(path, *args, **kwargs)
 
 
+async def hand_in_quiz(student, unit):
+    """The student photographs the four answers of a unit quiz, hands it in and asks each answer to be checked (as the
+    page does). Returns the attempt ids, the queue request ids and the sitting."""
+    from app.math_skills import question_version, quiz_snapshot
+    attempts, requests = [], []
+    for index in range(4):
+        version = question_version(quiz_snapshot(unit, index))
+        made = (await student.post('/api/math/quiz-attempts',
+                                   json={'unit': unit['id'], 'index': index, 'question_version': version, 'new': True})).json()
+        aid = made['attempt']['id']
+        scan = (await student.post(f'/api/math/answer-attempts/{aid}/scans', json={'renew': True})).json()['scan']
+        await student.post(f"/api/math/answer-scans/{scan['id']}/confirm")
+        lease = (await student.post(f"/api/math/answer-scans/{scan['id']}/uploads", json={'key': str(uuid.uuid4())})).json()
+        up = await student.post(f"/api/math/answer-scans/{scan['id']}/uploads/{lease['lease_id']}",
+                                files={'photo': ('a.png', png(), 'image/png')})
+        assert up.status_code == 200
+        attempts.append(aid)
+    handed = (await student.post('/api/math/quiz-sittings', json={'unit_id': unit['id'], 'attempts': attempts,
+                                                                'client_key': str(uuid.uuid4())})).json()
+    for aid in attempts:
+        asked = (await student.post(f'/api/math/answer-attempts/{aid}/grade', json={})).json()
+        requests.append(asked['ai_request']['id'])
+    return attempts, requests, handed
+
+
 def test_a_quiz_checked_through_the_teachers_queue_has_one_grade_for_student_and_teacher(answer_store):
     """The student hands in a unit quiz; each answer waits in the teacher's queue. The sitting has no grade until the
     teacher has sent them all, and then the student's screen and the teacher's class report show the same grade."""
-    from app.math_skills import algebra9, question_version, quiz_snapshot
+    from app.math_skills import algebra9
 
     store = answer_store
     app = create_app(auth=ReportAuth())
@@ -380,24 +408,7 @@ def test_a_quiz_checked_through_the_teachers_queue_has_one_grade_for_student_and
 
     async def check():
         async with as_user(app, OWNER) as student, as_user(app, OTHER) as teacher:
-            attempts, requests = [], []
-            for index in range(4):
-                version = question_version(quiz_snapshot(unit, index))
-                made = (await student.post('/api/math/quiz-attempts',
-                                           json={'unit': 't', 'index': index, 'question_version': version, 'new': True})).json()
-                aid = made['attempt']['id']
-                scan = (await student.post(f'/api/math/answer-attempts/{aid}/scans', json={'renew': True})).json()['scan']
-                await student.post(f"/api/math/answer-scans/{scan['id']}/confirm")
-                lease = (await student.post(f"/api/math/answer-scans/{scan['id']}/uploads", json={'key': str(uuid.uuid4())})).json()
-                up = await student.post(f"/api/math/answer-scans/{scan['id']}/uploads/{lease['lease_id']}",
-                                        files={'photo': ('a.png', png(), 'image/png')})
-                assert up.status_code == 200
-                attempts.append(aid)
-            handed = (await student.post('/api/math/quiz-sittings', json={'unit_id': 't', 'attempts': attempts,
-                                                                        'client_key': str(uuid.uuid4())})).json()
-            for aid in attempts:   # as the page does after handing in: each answer asks the teacher to check it
-                asked = (await student.post(f'/api/math/answer-attempts/{aid}/grade', json={})).json()
-                requests.append(asked['ai_request']['id'])
+            attempts, requests, handed = await hand_in_quiz(student, unit)
             assert handed['grade'] is None and handed['open'] == 4          # every answer waits for the teacher
 
             def seen_by_teacher():
@@ -413,3 +424,104 @@ def test_a_quiz_checked_through_the_teachers_queue_has_one_grade_for_student_and
             report = (await seen_by_teacher()).json()['students'][0]['quiz_sittings'][0]
             assert mine['grade'] == report['grade'] == 25 + 15 + 25 + 10 and mine['id'] == report['id'] == handed['id']
     asyncio.run(check())
+
+
+def test_a_student_disputes_a_check_and_the_teachers_correction_reaches_both_screens(answer_store):
+    """The whole path: the student hands in a quiz, the teacher sends every answer to the AI, the student asks the
+    teacher to look again at one, the teacher corrects it with a comment, and the new grade, the comment and the closed
+    request show on the student's screen and in the teacher's class report."""
+    from app.math_skills import algebra9
+
+    app = create_app(auth=ReportAuth())
+    app.state.answers, app.state.ai_queue = answer_store, MemoryQueue()
+    scores = {0: 100, 1: 60, 2: 100, 3: 40}
+
+    class ByQuestion:
+        def grade(self, image, snapshot):
+            return validate_assessment(assessment(score=scores[int(snapshot['name'][-1]) - 1]))
+    app.state.answer_grader = ByQuestion()
+    unit = next(u for u in algebra9()['units'] if u['id'] == 't')
+
+    async def run():
+        async with as_user(app, OWNER) as student, as_user(app, OTHER) as teacher:
+            attempts, requests, handed = await hand_in_quiz(student, unit)
+            for rid in requests:
+                assert (await teacher.post(f'/api/ai-queue/{rid}/send')).status_code == 200
+            sittings = lambda: student.get('/api/math/quiz-sittings', params={'unit_id': 't'})
+            card = lambda: teacher.get('/api/classes/1/report')
+            assert (await sittings()).json()['sittings'][0]['grade'] == 25 + 15 + 25 + 10      # the AI's: 75
+            # the student disagrees with the second check
+            asked = await student.post(f'/api/math/answer-attempts/{attempts[1]}/review-request', json={'message': 'כתבתי x=4'})
+            assert asked.status_code == 200
+            waiting = (await teacher.get('/api/teacher/review-requests')).json()['requests']
+            assert [(x['attempt_id'], x['student'], x['message']) for x in waiting] == [(attempts[1], mail(OWNER), 'כתבתי x=4')]
+            assert (await card()).json()['students'][0]['review_requests'][0]['attempt_id'] == attempts[1]
+            opened = (await teacher.get(f'/api/teacher/answers/{attempts[1]}')).json()
+            assert opened['grading']['result']['score'] == 60 and opened['request']['state'] == 'open'
+            assert (await teacher.get(f'/api/teacher/answers/{attempts[1]}/image')).status_code == 200
+            # the teacher agrees with the student
+            saved = await teacher.put(f'/api/teacher/answers/{attempts[1]}/review', json={'score': 100, 'comment': 'צדקתם, הפתרון נכון'})
+            assert saved.status_code == 200 and saved.json()['request']['state'] == 'closed'
+            # the student's screen: the new grade, the teacher's words, the AI's check unchanged, the request closed
+            mine = (await sittings()).json()['sittings'][0]
+            assert mine['grade'] == 25 + 25 + 25 + 10 and mine['questions'][1]['state'] == 'teacher'
+            assert [c['comment'] for c in (await student.get('/api/math/teacher-comments')).json()['comments']] == ['צדקתם, הפתרון נכון']
+            answer = (await student.get(f'/api/math/answer-attempts/{attempts[1]}')).json()
+            assert answer['teacher_review']['score'] == 100 and answer['grading']['result']['score'] == 60
+            assert answer['review_request']['state'] == 'closed' and answer['effective_score'] == 100
+            assert (await student.get('/api/math/teacher-comments')).json() == {'comments': []}
+            # the teacher's report: the same grade, and nobody waiting
+            report = (await card()).json()['students'][0]
+            assert report['quiz_sittings'][0]['grade'] == mine['grade'] == 85 and report['quiz_sittings'][0]['id'] == handed['id']
+            assert report['review_requests'] == []
+            assert (await teacher.get('/api/teacher/review-requests')).json() == {'requests': []}
+    asyncio.run(run())
+
+
+def test_handing_a_quiz_in_queues_every_photographed_answer_for_the_teacher_without_the_page_asking(answer_store):
+    """A student's answers all reach their teacher at hand-in, even if the page never asks for the checks one by one."""
+    from app.math_skills import algebra9, question_version, quiz_snapshot
+    from test_unit_quiz import quiz_answer
+
+    app = make_app(answer_store)
+    app.state.auth = ReportAuth()
+    unit = next(u for u in algebra9()['units'] if u['id'] == 't')
+    ids = [quiz_answer(answer_store, i, photo=i != 2) for i in range(4)]   # the third question has no photo
+    key = str(uuid.uuid4())
+
+    async def run():
+        async with as_user(app, OWNER) as student, as_user(app, OTHER) as teacher:
+            r = await student.post('/api/math/quiz-sittings', json={'unit_id': 't', 'attempts': ids, 'client_key': key})
+            assert r.status_code == 200
+            rows = (await teacher.get('/api/ai-queue')).json()['requests']
+            assert sorted(x['label'][-1] for x in rows) == ['1', '2', '4'] and {x['state'] for x in rows} == {'pending'}
+            assert {x['attempt_id'] for x in rows} == {ids[0], ids[1], ids[3]} and all(x['kind'] == 'grading' for x in rows)
+            # handing the same quiz in again changes nothing, and the page's own checks find the requests waiting
+            assert (await student.post('/api/math/quiz-sittings', json={'unit_id': 't', 'attempts': ids, 'client_key': key})).status_code == 200
+            assert len((await teacher.get('/api/ai-queue')).json()['requests']) == 3
+            asked = (await student.post(f'/api/math/answer-attempts/{ids[0]}/grade', json={})).json()
+            assert asked['ai_request']['state'] == 'pending' and len((await teacher.get('/api/ai-queue')).json()['requests']) == 3
+            # an answer the teacher declined stays declined when the hand-in is repeated
+            declined = rows[0]['id']
+            await teacher.post(f'/api/ai-queue/{declined}/decline', json={'note': 'צלמו שוב'})
+            await student.post('/api/math/quiz-sittings', json={'unit_id': 't', 'attempts': ids, 'client_key': key})
+            states = {x['id']: x['state'] for x in (await teacher.get('/api/ai-queue')).json()['requests']}
+            assert states[declined] == 'declined' and len(states) == 3
+    asyncio.run(run())
+    assert len(app.state.ai_queue.rows) == 3
+
+
+def test_a_teachers_own_hand_in_does_not_go_through_the_queue(answer_store):
+    """Accounts that send straight to the AI keep doing so: the hand-in queues nothing for them."""
+    from test_unit_quiz import quiz_answer
+
+    app = make_app(answer_store)
+    app.state.auth = ReportAuth()
+    app.state.auth.teachers = frozenset({mail(OWNER)})   # OWNER has the teacher role now
+    ids = [quiz_answer(answer_store, i) for i in range(4)]
+
+    async def run():
+        async with as_user(app, OWNER) as me:
+            assert (await me.post('/api/math/quiz-sittings', json={'unit_id': 't', 'attempts': ids, 'client_key': str(uuid.uuid4())})).status_code == 200
+    asyncio.run(run())
+    assert app.state.ai_queue.rows == []

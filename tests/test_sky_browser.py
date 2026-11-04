@@ -496,3 +496,251 @@ def test_a_first_mistake_has_no_pattern_note(browser, server):
     playwright.expect(page.locator(".mx-bad")).to_be_visible()
     playwright.expect(page.locator(".mx-pattern-note")).to_have_count(0)
     assert not errors
+
+
+# ---- the class teacher's signals (MathlySky.attention): who needs attention, on Wednesday 4 November 2026
+CLASS = {"skills": {"t_ext": "פילוג מורחב", "g_pyth": "פיתגורס"}, "units": [{"id": "t", "name": "טכניקה אלגברית 1"}]}
+
+
+def attention(page, student, ctx=CLASS):
+    return page.evaluate("([s, c]) => MathlySky.attention(s, c, new Date(2026, 10, 4, 12))", [student, ctx])
+
+
+def kinds(found):
+    return [x["kind"] for x in found]
+
+
+def student(**progress):
+    return {"signed_in": True, "progress": {"done": {}, "days": {}, "slips": [], **progress}, "quiz_sittings": []}
+
+
+def slips(skill, *days_ago):
+    return [{"at": (datetime(2026, 11, 4, 9) - timedelta(days=d)).isoformat() + "Z", "id": skill, "q": 0, "m": "x"}
+            for d in days_ago]
+
+
+def test_a_student_who_stopped_practising_needs_attention(browser, server):
+    page, errors = page_with(browser, server)
+    found = attention(page, student(days={"2026-10-27": 6}))
+    assert [(x["kind"], x["text"]) for x in found] == [("inactive", "לא תרגל 8 ימים")]
+    assert attention(page, student(days={"2026-10-28": 6})) != [] and attention(page, student(days={"2026-10-29": 6})) == []   # 7 days: yes; 6: no
+    assert attention(page, student(days={"2026-11-02": 5})) == []
+    assert attention(page, student(seen={"t_ext": "2026-11-03T10:00:00Z"}, days={"2026-10-01": 9})) == []   # the last practice counts
+    assert not errors
+
+
+def test_a_student_stuck_on_a_skill_is_named_with_it(browser, server):
+    page, errors = page_with(browser, server)
+    found = attention(page, student(days={"2026-11-03": 5}, slips=slips("t_ext", 1, 2, 3)))
+    assert [(x["kind"], x["skills"]) for x in found] == [("stuck", ["t_ext"])] and "פילוג מורחב" in found[0]["text"]
+    assert attention(page, student(days={"2026-11-03": 5}, slips=slips("t_ext", 1, 2))) == []        # two slips are not stuck
+    assert attention(page, student(days={"2026-11-03": 5}, slips=slips("t_ext", 1, 20, 30))) == []   # old ones do not count
+    assert attention(page, student(days={"2026-11-03": 5}, done={"t_ext": "2026-11-04"}, slips=slips("t_ext", 1, 2, 3))) == []
+    assert attention(page, student(days={"2026-11-03": 5}, slips=slips("other", 1, 2, 3))) == []     # not a skill of the class
+    assert not errors
+
+
+def test_a_drop_in_practice_needs_enough_practice_to_drop_from(browser, server):
+    page, errors = page_with(browser, server)
+    week = lambda this, last: {"2026-11-02": this, "2026-10-27": last // 2, "2026-10-29": last - last // 2}
+    assert page.evaluate("p => MathlySky.weekly(p, new Date(2026, 10, 4, 12))", {"days": week(14, 22)}) == {"thisWeek": 14, "lastWeek": 22}
+    found = attention(page, student(days=week(6, 20)))
+    assert kinds(found) == ["drop"] and "6" in found[0]["text"] and "20" in found[0]["text"]
+    assert attention(page, student(days=week(2, 8))) == []      # 8 last week is too little to call a drop
+    assert attention(page, student(days=week(10, 20))) == []    # exactly half is not less than half
+    assert not errors
+
+
+def test_a_low_server_grade_needs_attention_but_the_devices_does_not(browser, server):
+    page, errors = page_with(browser, server)
+    sit = lambda grade, at: {"id": at, "unit_id": "t", "grade": grade, "open": 0 if grade is not None else 1, "submitted_at": at}
+    base = student(days={"2026-11-03": 5})
+    found = attention(page, {**base, "quiz_sittings": [sit(40, "2026-11-03T10:00:00Z")]})
+    assert [(x["kind"], x["unit"]) for x in found] == [("grade", "t")] and "40" in found[0]["text"]
+    assert attention(page, {**base, "quiz_sittings": [sit(40, "2026-10-01T10:00:00Z"), sit(70, "2026-11-03T10:00:00Z")]}) == []   # the latest counts
+    assert attention(page, {**base, "quiz_sittings": [sit(40, "2026-10-01T10:00:00Z"), sit(None, "2026-11-03T10:00:00Z")]}) != []   # an open one is no grade
+    assert attention(page, {**base, "quiz_sittings": None}) == []
+    assert attention(page, {**base, "progress": {**base["progress"], "uq": {"t": {"history": [{"score": 10}]}}}}) == []
+    assert attention(page, {**base, "quiz_sittings": [sit(55, "2026-11-03T10:00:00Z")]}) == []   # 55 is not below 55
+    assert not errors
+
+
+def test_a_student_who_never_started_is_listed_only_once_signed_in(browser, server):
+    page, errors = page_with(browser, server)
+    assert [x["text"] for x in attention(page, {"signed_in": True, "progress": None, "quiz_sittings": []})] == ["עוד לא התחיל לתרגל"]
+    assert attention(page, {"signed_in": False, "progress": None, "quiz_sittings": []}) == []
+    assert not errors
+
+
+# ---- the worked example and the help panel. The page is given an example for every skill, as the data will have.
+HELP_EXAMPLE = {"question": "$(x + 5)(x − 2) = ?$",
+                "steps": [{"do": "כופלים כל איבר בכל איבר: $x² − 2x + 5x − 10$", "why": "כך לא שוכחים אף מכפלה."},
+                          {"do": "מחברים איברים דומים: $−2x + 5x = 3x$", "why": "רק איברים עם אותה חזקה מתחברים."},
+                          {"do": "התוצאה: $x² + 3x − 10$", "why": "סידרנו מהחזקה הגבוהה לנמוכה."}],
+                "answer": "$x² + 3x − 10$"}
+
+
+def page_with_examples(browser, server, progress=None):
+    """Like page_with, with a worked example added to every skill in the skills the server sends."""
+    ctx = browser.new_context(viewport={"width": 390, "height": 844})
+    ctx.add_init_script("Math.random=()=>0.99")
+    ctx.route("https://cdn.jsdelivr.net/**", lambda route: route.abort())
+    ctx.route("https://fonts.googleapis.com/**", lambda route: route.abort())
+    ctx.add_init_script("try{localStorage.setItem('mathly.sound','off')}catch{}")
+    if progress is not None:
+        ctx.add_init_script(f"localStorage.setItem({json.dumps(KEY)},{json.dumps(json.dumps(progress))})")
+
+    def skills(route):
+        graph = route.fetch().json()
+        for skill in graph["skills"]:
+            skill["example"] = HELP_EXAMPLE
+        route.fulfill(json=graph)
+
+    ctx.route("**/api/math/skills", skills)
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(server)
+    playwright.expect(page.locator(".mx-trail")).to_be_visible()
+    return page, errors
+
+
+def wrong_answer(page):
+    page.locator(".mx-choices button:not([data-right])").first.click()
+    playwright.expect(page.locator(".mx-bad")).to_be_visible()
+
+
+def test_the_worked_example_is_offered_from_the_second_mistake_in_a_round(browser, server):
+    page, errors = page_with_examples(browser, server)
+    skill = page.locator(".mx-star.st-next").get_attribute("data-id")
+    page.locator(".mx-star.st-next").click()
+    wrong_answer(page)
+    assert page.locator("[data-example]").count() == 0                       # the first mistake: only the tip
+    page.locator(".mx-bad button.solid").click()                             # on to the next question
+    asked = page.locator(".mx-q p").first.inner_text()
+    wrong_answer(page)
+    offer = page.locator(".mx-bad [data-example]")
+    playwright.expect(offer).to_have_text("איך פותרים? דוגמה פתורה")
+    # open it: a panel over the question, one step at a time, and the answer only at the end
+    offer.click()
+    help_ = page.locator(".mx-help")
+    playwright.expect(help_.locator(".mx-example")).to_be_visible()
+    playwright.expect(help_.locator(".mx-example-q")).to_contain_text("(x + 5)(x − 2)")
+    steps = help_.locator(".mx-example-steps li")
+    assert [steps.nth(i).is_visible() for i in range(3)] == [True, False, False]
+    assert not help_.locator(".mx-example-answer").is_visible()
+    help_.locator("[data-example-next]").click()
+    assert [steps.nth(i).is_visible() for i in range(3)] == [True, True, False]
+    help_.locator("[data-example-next]").click()
+    playwright.expect(help_.locator("[data-example-next]")).to_have_text("הצגת התשובה")
+    help_.locator("[data-example-next]").click()
+    playwright.expect(help_.locator(".mx-example-answer")).to_be_visible()
+    playwright.expect(help_.locator("[data-example-next]")).to_be_hidden()
+    # closing returns to the same question, with the same feedback
+    help_.locator("button.solid").click()
+    playwright.expect(page.locator(".mx-help-wrap")).to_have_count(0)
+    assert page.locator(".mx-q p").first.inner_text() == asked
+    playwright.expect(page.locator(".mx-bad")).to_be_visible()
+    # a third mistake offers it again; Escape closes the panel before the sheet
+    page.locator(".mx-bad button.solid").click()
+    wrong_answer(page)
+    page.locator(".mx-bad [data-example]").click()
+    playwright.expect(page.locator(".mx-help")).to_be_visible()
+    page.keyboard.press("Escape")
+    playwright.expect(page.locator(".mx-help-wrap")).to_have_count(0)
+    playwright.expect(page.locator(".mx-sheet").first).to_be_visible()
+    assert progress_of(page)["examples"][skill]["n"] == 2                    # both openings are kept
+    assert not errors
+
+
+def test_a_skill_without_an_example_offers_none(browser, server):
+    page, errors = page_with(browser, server)               # the data has no examples yet
+    page.locator(".mx-star.st-next").click()
+    wrong_answer(page)
+    page.locator(".mx-bad button.solid").click()
+    wrong_answer(page)
+    assert page.locator("[data-example]").count() == 0
+    page.locator(".mx-helpbtn").click()                     # the help is there all the same
+    playwright.expect(page.locator(".mx-help")).to_contain_text("לכישור הזה עוד אין דוגמה פתורה")
+    assert "examples" not in progress_of(page) or progress_of(page)["examples"] == {}
+    assert not errors
+
+
+def test_opening_the_example_is_recorded_and_changes_neither_finishing_nor_gold(browser, server):
+    page, errors = page_with_examples(browser, server)
+    nxt = page.locator(".mx-star.st-next").get_attribute("data-id")
+    page.locator(".mx-star.st-next").click()
+    page.locator(".mx-helpbtn").click()                     # the "?" shows the example before any answer
+    playwright.expect(page.locator(".mx-help .mx-example")).to_be_visible()
+    from app.math_skills import algebra9
+    description = next(x["description"] for x in algebra9()["skills"] if x["id"] == nxt)
+    playwright.expect(page.locator(".mx-help")).to_contain_text(description.split("$")[0].strip()[:20])   # and the skill's description
+    page.locator(".mx-help button.solid").click()
+    p = progress_of(page)
+    assert p["examples"][nxt]["n"] == 1 and p["examples"][nxt]["last"] and not p["done"].get(nxt)
+    answer_skill_right(page)                                # clean first-try answers still make it gold
+    playwright.expect(page.locator(".sky-cele h2").first).to_have_text("כוכב זהב!")
+    while page.locator(".sky-cele [data-sky=go]").count():
+        page.locator(".sky-cele [data-sky=go]").first.click()
+    p = progress_of(page)
+    assert p["done"][nxt] and p["gold"][nxt] and p["examples"][nxt]["n"] == 1
+    assert not errors
+
+
+# ---- assignments (MathlySky.assignmentState): created on 1 November 2026 (10:00 UTC), due 12 November, now Wednesday 4 November
+ASSIGNMENT = {"id": "a1", "created_at": "2026-11-01T10:00:00Z", "due_on": "2026-11-12", "title": "חזרה",
+              "items": [{"kind": "skill", "id": "g_pyth"}, {"kind": "unit_quiz", "unit": "g"}, {"kind": "exam", "units": ["g", "t"]}]}
+
+
+def state(page, progress=None, sittings=(), now="2026-11-04T12:00:00", assignment=ASSIGNMENT):
+    return page.evaluate("([a, p, s, n]) => MathlySky.assignmentState(a, p, s, new Date(n))",
+                         [assignment, progress or {}, None if sittings is None else list(sittings), now])
+
+
+def test_a_skill_finished_before_the_assignment_is_already_done_and_on_time(browser, server):
+    page, errors = page_with(browser, server)
+    got = state(page, {"done": {"g_pyth": "2026-09-20T08:00:00Z"}})
+    first = got["items"][0]
+    assert (first["done"], first["late"]) == (True, False) and got["doneCount"] == 1 and got["total"] == 3
+    assert got["next"] == 1 and not got["finished"] and not got["overdue"]        # the next one to do is the unit quiz
+    assert state(page, {})["items"][0]["done"] is False
+    assert not errors
+
+
+def test_a_unit_quiz_counts_only_when_handed_in_after_the_assignment_was_made(browser, server):
+    page, errors = page_with(browser, server)
+    before = [{"unit_id": "g", "submitted_at": "2026-10-30T09:00:00Z"}]
+    after = [{"unit_id": "g", "submitted_at": "2026-11-03T09:00:00Z"}]
+    other = [{"unit_id": "t", "submitted_at": "2026-11-03T09:00:00Z"}]
+    assert state(page, sittings=before)["items"][1]["done"] is False
+    assert state(page, sittings=other)["items"][1]["done"] is False
+    assert state(page, sittings=before + after)["items"][1]["done"] is True
+    assert state(page, sittings=after)["items"][1]["at"] == "2026-11-03T09:00:00Z"
+    unknown = state(page, sittings=None)["items"][1]                              # the server's record could not be read
+    assert (unknown["done"], unknown["known"]) == (False, False)
+    assert not errors
+
+
+def test_a_practice_exam_must_cover_every_unit_of_the_item_and_come_after_the_assignment(browser, server):
+    page, errors = page_with(browser, server)
+    exam = lambda at, *units: {"quizzes": [{"at": at, "n": 12, "right": 9, "units": list(units)}]}
+    assert state(page, exam("2026-11-03T09:00:00Z", "g"))["items"][2]["done"] is False            # missing a unit
+    assert state(page, exam("2026-10-30T09:00:00Z", "g", "t"))["items"][2]["done"] is False       # before the assignment
+    assert state(page, exam("2026-11-03T09:00:00Z", "g", "t"))["items"][2]["done"] is True
+    assert state(page, exam("2026-11-03T09:00:00Z", "t", "g", "k"))["items"][2]["done"] is True   # more units than asked is fine
+    assert not errors
+
+
+def test_late_means_after_the_due_day_in_jerusalem_and_overdue_means_unfinished_after_it(browser, server):
+    page, errors = page_with(browser, server)
+    all_done = lambda skill_at: {"done": {"g_pyth": skill_at}, "quizzes": [{"at": "2026-11-03T09:00:00Z", "units": ["g", "t"]}]}
+    sit = [{"unit_id": "g", "submitted_at": "2026-11-03T09:00:00Z"}]
+    on_time = state(page, all_done("2026-11-12T21:30:00Z"), sit)             # 23:30 on the 12th in Jerusalem (UTC+2)
+    assert on_time["finished"] and not on_time["late"] and not on_time["overdue"]
+    late = state(page, all_done("2026-11-12T22:30:00Z"), sit)                # 00:30 on the 13th
+    assert late["finished"] and late["late"] and late["items"][0]["late"] and not late["items"][1]["late"]
+    assert not state(page, {}, [], now="2026-11-12T20:00:00")["overdue"]      # the evening of the due day: not yet
+    assert state(page, {}, [], now="2026-11-13T09:00:00")["overdue"]           # the day after, unfinished
+    done_late = state(page, all_done("2026-11-02T09:00:00Z"), sit, now="2026-11-20T09:00:00")
+    assert done_late["finished"] and not done_late["overdue"]                  # finished: never overdue
+    assert not errors

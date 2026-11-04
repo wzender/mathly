@@ -212,3 +212,58 @@ def test_unit_t_answers_are_right_and_no_wrong_choice_is_equivalent():
                 assert same(c) == bool(c.get("correct")), (skill["id"], q["question"], c["text"])
             checked += 1
     assert checked >= 90
+
+
+# ---- worked examples
+EXAMPLE = {"question": "$(x + 5)(x − 2) = ?$",
+           "steps": [{"do": "כופלים כל איבר בסוגריים הראשונים בכל איבר בשניים: $x·x + x·(−2) + 5·x + 5·(−2)$",
+                      "why": "כך לא שוכחים אף מכפלה."},
+                     {"do": "מחברים את האיברים הדומים: $−2x + 5x = 3x$", "why": "אותו חזקה של $x$ אפשר לחבר."}],
+           "answer": "$x² + 3x − 10$"}
+
+
+def with_example(example):
+    graph = copy.deepcopy(algebra9())
+    graph["skills"][0]["example"] = example
+    return graph
+
+
+def test_a_well_formed_worked_example_loads_and_reaches_the_page():
+    graph = with_example(copy.deepcopy(EXAMPLE))
+    assert problems(graph) == []
+
+
+def test_the_skills_api_sends_a_skills_example(monkeypatch):
+    graph = with_example(copy.deepcopy(EXAMPLE))
+    monkeypatch.setattr("app.math_skills.algebra9", lambda: graph)
+    sent = practice_graph(False)
+    assert sent["skills"][0]["example"] == EXAMPLE and "example" not in sent["skills"][1]
+
+
+def test_a_broken_worked_example_is_named():
+    skill_id = algebra9()["skills"][0]["id"]
+    broken = lambda **changes: problems(with_example({**copy.deepcopy(EXAMPLE), **changes}))
+    assert f"{skill_id} example: needs at least one step" in broken(steps=[])
+    assert f"{skill_id} example: needs at least one step" in broken(steps="x")
+    assert any("step 2: needs what to do" in item for item in broken(steps=[EXAMPLE["steps"][0], {"do": "מחברים", "why": " "}]))
+    assert any("step 1: needs what to do" in item for item in broken(steps=["not an object"]))
+    assert f"{skill_id} example: an answer is required" in broken(answer="")
+    assert f"{skill_id} example: question text is required" in broken(question=" ")
+    assert problems(with_example("text")) == [f"{skill_id} example: must be an object"]
+
+
+def test_an_example_may_not_be_one_of_the_skills_practice_questions():
+    skill = algebra9()["skills"][0]
+    practice = skill["questions"][2]["question"]
+    spaced = "  " + practice.replace(" ", "   ") + "\n"   # the same question, spaced differently
+    for copied in (practice, spaced):
+        found = problems(with_example({**copy.deepcopy(EXAMPLE), "question": copied}))
+        assert f"{skill['id']} example: repeats one of the skill's practice questions" in found
+
+
+def test_the_skills_still_missing_a_worked_example_are_listed():
+    from app.math_skills import skills_without_example
+    graph = with_example(copy.deepcopy(EXAMPLE))
+    missing = skills_without_example(graph)
+    assert graph["skills"][0]["id"] not in missing and graph["skills"][1]["id"] in missing
+    assert set(missing) <= {s["id"] for s in graph["skills"]}

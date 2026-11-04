@@ -17,6 +17,7 @@ from fastapi import Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 from .access import has_permission
+from .assignments import AssignmentsUnavailable, public as assignment_public
 from .answer_scans import ScanError
 from .auth import AuthUnavailable
 from .quiz_grades import sitting_view
@@ -46,7 +47,7 @@ def report_part(data: dict) -> dict:
             "history": [{k: h.get(k) for k in ("at", "timeUp", "sid")} for h in history or [] if isinstance(h, dict)],
             "going": bool(isinstance(sitting, dict) and sitting.get("started") and not sitting.get("submitted"))}
     return {"done": obj("done"), "gold": obj("gold"), "days": obj("days"), "missed": obj("missed"),
-            "slips": items("slips")[-SLIPS_SENT:], "quizzes": quizzes, "uq": unit_quizzes,
+            "seen": obj("seen"), "tries": obj("tries"), "examples": obj("examples"), "slips": items("slips")[-SLIPS_SENT:], "quizzes": quizzes, "uq": unit_quizzes,
             "updated": data.get("updated")}
 
 
@@ -65,6 +66,33 @@ def server_sittings(app, ids: dict[str, str]):
         if view and sitting.get("user_id") in email_of:
             out[email_of[sitting["user_id"]]].append(view)
     return out
+
+
+def server_requests(app, ids: dict[str, str]):
+    """The students' open requests to look again at a checked answer (app/teacher_review.py), by email. None when
+    they cannot be read."""
+    try:
+        raw = app.state.answers.review(None, "requests", users=list(ids.values())) if ids else []
+    except ScanError as exc:
+        log.warning("review requests not read: %s", exc.code)
+        return None
+    email_of = {user_id: email for email, user_id in ids.items()}
+    out: dict[str, list] = {email: [] for email in ids}
+    for row in raw:
+        if row.get("user_id") in email_of:
+            out[email_of[row["user_id"]]].append({k: row.get(k) for k in ("attempt_id", "message", "question", "created_at")})
+    return out
+
+
+def server_assignments(app, class_id: int):
+    """The class's assignments (the teacher's view of them), or None when they cannot be read."""
+    store = getattr(app.state, "assignments", None)
+    if store is None:
+        return None
+    try:
+        return [assignment_public(r, True) for r in store.for_classes([class_id])]
+    except AssignmentsUnavailable:
+        return None
 
 
 def install_class_report_routes(app, signed_in, units_of):
@@ -89,7 +117,8 @@ def install_class_report_routes(app, signed_in, units_of):
         students = [email for email in row.get("emails", ()) if email not in teachers]
         auth = app.state.auth
         try:
-            ids = auth.user_ids(students) if students else {}
+            accounts = auth.user_accounts(students) if students else {}
+            ids = {email: account["id"] for email, account in accounts.items()}
             rows = auth._admin(f"{TABLE}?select=user_id,data,updated_at&user_id=in.({','.join(ids.values())})") \
                 if ids else []
         except AuthUnavailable as exc:
@@ -97,13 +126,18 @@ def install_class_report_routes(app, signed_in, units_of):
             raise HTTPException(503, "report_unavailable") from exc
         by_id = {r["user_id"]: r for r in rows or []}
         sittings = server_sittings(app, ids)
+        requests = server_requests(app, ids)
+        nicknames = {str(k).lower(): str(v).strip() for k, v in (row.get("nicknames") or {}).items()}
         out = []
         for email in students:
             saved = by_id.get(ids.get(email, ""))
             data = saved.get("data") if saved else None
-            out.append({"email": email, "signed_in": email in ids,
+            name = nicknames.get(email) or accounts.get(email, {}).get("name") or None
+            out.append({"email": email, "name": name, "signed_in": email in ids,
                         "progress": report_part(data) if isinstance(data, dict) else None,
                         "saved_at": saved.get("updated_at") if saved else None,
-                        "quiz_sittings": None if sittings is None else sittings.get(email, [])})
+                        "quiz_sittings": None if sittings is None else sittings.get(email, []),
+                        "review_requests": [] if requests is None else requests.get(email, [])})
         return JSONResponse({"class": {"id": row["id"], "name": row["name"], "lessons": units_of(row)},
-                             "students": out}, headers={"Cache-Control": "no-store"})
+                             "students": out, "assignments": server_assignments(app, row["id"])},
+                            headers={"Cache-Control": "no-store"})

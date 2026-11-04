@@ -372,3 +372,163 @@ def test_the_move_tool_scrolls_when_it_drags_empty_paper(browser, server):
     touch(page, [("pointerdown", 4, 300, 200), *[("pointermove", 4, 300, 200 + k * 60) for k in range(1, 11)], ("pointerup", 4, 300, 800)])
     playwright.expect(page.locator(".mx-board-top")).to_be_hidden()
     assert errors == []
+
+
+def test_an_angle_gets_an_arc_and_its_words_at_a_triangles_corner(browser, server):
+    page, errors = open_skill(browser, server, 1440, 900)
+    board_on(page)
+    page.locator(".mx-board [data-tool=line]").click()
+    drag(page, (100, 300), (300, 300))
+    drag(page, (302, 302), (200, 150))
+    drag(page, (198, 148), (102, 298))
+    page.locator(".mx-board [data-tool=angle]").click()
+    box = page.locator(".mx-board canvas").bounding_box()
+    at = lambda x, y: (box["x"] + x, box["y"] + y)
+
+    # the bottom-left corner: its edges go right (0°) and up to the top (-56°), so the arc is at radius 30, around -28°
+    arc, words = (126, 286), (138, 280)
+    ink_by = lambda x, y: max(alpha_near(page, x + dx, y + dy) for dx in (-6, -3, 0, 3, 6) for dy in (-4, 0, 4))
+    assert alpha_near(page, *arc) == 0
+    page.mouse.move(*at(112, 294))   # pointing into the corner: its arc shows, dashed, before anything is added
+    assert alpha_near(page, *arc) > 0
+    page.mouse.move(*at(400, 500))   # away from every corner: nothing
+    assert alpha_near(page, *arc) == 0
+
+    page.mouse.click(*at(112, 294))
+    field = page.locator(".mx-board-anglein")
+    playwright.expect(field).to_be_focused()
+    field.fill("60")
+    field.press("Enter")
+    playwright.expect(field).to_have_count(0)
+    assert alpha_near(page, *arc) > 0 and ink_by(*words) > 0
+
+    # the words open again for a change; a number is shown without its degree sign, which comes back by itself
+    page.mouse.click(*at(*words))
+    playwright.expect(field).to_have_value("60")
+    field.press("Escape")   # leaves it as it was, and the board open
+    playwright.expect(field).to_have_count(0)
+    playwright.expect(page.locator(".mx-board")).to_be_visible()
+    assert ink_by(*words) > 0
+
+    # the angle belongs to its corner: it moves with the triangle and goes with an undo
+    page.locator(".mx-board [data-tool=move]").click()
+    drag(page, (200, 300), (200, 400))
+    assert alpha_near(page, *arc) == 0 and alpha_near(page, arc[0], arc[1] + 100) > 0
+    page.keyboard.press("Control+z")   # the move
+    page.keyboard.press("Control+z")   # the angle
+    assert alpha_near(page, *arc) == 0 and alpha_near(page, 200, 300) > 0
+
+    # a corner where nothing meets is no angle; Escape on a new one takes it back
+    page.locator(".mx-board [data-tool=angle]").click()
+    page.mouse.click(*at(500, 500))
+    playwright.expect(field).to_have_count(0)
+    page.mouse.click(*at(112, 294))
+    field.press("Escape")
+    assert alpha_near(page, *arc) == 0
+
+    # α, β and γ are a tap away, typed where the cursor is; a number added to them is in degrees too
+    page.mouse.click(*at(112, 294))
+    page.locator(".mx-board-angleedit button", has_text="β").click()
+    playwright.expect(field).to_have_value("β")
+    playwright.expect(field).to_be_focused()
+    page.keyboard.type("+90")
+    page.keyboard.press("Enter")
+    playwright.expect(field).to_have_count(0)
+    assert alpha_near(page, *arc) > 0 and ink_by(*words) > 0
+    page.mouse.click(*at(*words))
+    playwright.expect(field).to_have_value("β+90")   # its degree sign comes back by itself
+    field.fill("180-alpha")   # the letters' names become the letters
+    field.press("Enter")
+    page.mouse.click(*at(*words))
+    playwright.expect(field).to_have_value("180-α")
+
+    # a double arc (equal angles are marked alike): a second arc 4 px outside the first, kept, and undone like the rest
+    outer = (100 + 34 * 0.883, 300 - 34 * 0.469)
+    assert alpha_near(page, *outer) == 0
+    page.locator(".mx-board-arcs [data-arcs='2']").click()
+    assert alpha_near(page, *outer) > 0   # shown at once
+    field.press("Enter")
+    assert alpha_near(page, *arc) > 0 and alpha_near(page, *outer) > 0
+    page.mouse.click(*at(112, 294))
+    playwright.expect(page.locator(".mx-board-arcs [data-arcs='2']")).to_have_attribute("aria-pressed", "true")
+    field.press("Escape")
+    page.keyboard.press("Control+z")
+    assert alpha_near(page, *arc) > 0 and alpha_near(page, *outer) == 0
+
+    # its colour, arcs and words together, picked in the same box
+    red = lambda: page.evaluate("""([x,y])=>{ const c=document.querySelector('.mx-board canvas'), d=devicePixelRatio||1;
+      const px=c.getContext('2d').getImageData(Math.round(x*d)-1,Math.round(y*d)-1,3,3).data; let n=0;
+      for(let i=0;i<px.length;i+=4) if(px[i+3]>128&&px[i]>150&&px[i+2]<130) n++; return n; }""", list(arc))
+    assert red() == 0
+    page.mouse.click(*at(112, 294))
+    page.locator(".mx-board-colors [data-color='#D3455B']").click()
+    assert red() > 0   # shown at once
+    field.press("Enter")
+    assert red() > 0
+    page.keyboard.press("Control+z")
+    assert red() == 0
+    assert errors == []
+
+
+def test_angles_where_a_line_meets_a_side_or_crosses_another(browser, server):
+    page, errors = open_skill(browser, server, 1440, 900)
+    board_on(page)
+    page.locator(".mx-board [data-tool=line]").click()
+    drag(page, (90, 438), (420, 438))
+    drag(page, (92, 436), (200, 80))
+    drag(page, (202, 82), (418, 436))
+    drag(page, (200, 82), (262, 433))   # from the top down to the base, ending a little short: it snaps onto the base
+    drag(page, (120, 300), (380, 300))   # across the triangle
+    page.locator(".mx-board [data-tool=angle]").click()
+    box = page.locator(".mx-board canvas").bounding_box()
+    field = page.locator(".mx-board-anglein")
+
+    def add(x, y, text):
+        page.mouse.click(box["x"] + x, box["y"] + y)
+        playwright.expect(field).to_be_focused()
+        field.fill(text)
+        field.press("Enter")
+
+    foot = 262 + (438 - 433) * 62 / 353   # where the middle line meets the base
+    assert alpha_near(page, foot, 437) > 0 and alpha_near(page, foot, 441) == 0   # it reached the base, not past it
+    add(250, 430, "α")   # either side of the line drawn from the base
+    add(275, 430, "β")
+    assert alpha_near(page, foot - 30, 438 - 3) > 0 and alpha_near(page, foot + 30, 438 - 3) > 0
+    add(191, 106, "x")   # the two halves of the top corner
+    add(211, 104, "y")
+    add(205, 105, "2α+β")   # pointing along the middle line: the whole top angle, a wider arc
+    assert page.locator(".mx-board-anglein").count() == 0
+    # a narrow half's words sit right by its arc (radius 30), not far down between the lines; the whole angle's arc
+    # goes around them
+    x_words = (200 + 45 * -0.07, 80 + 45 * 1.0)
+    assert max(alpha_near(page, x_words[0] + dx, x_words[1] + dy) for dx in (-4, 0, 4) for dy in (-4, 0, 4)) > 0
+    add(250, 306, "60")   # where two lines cross
+    # it all moves as one: the line from the base and the crossing line come with the triangle, their angles too
+    page.locator(".mx-board [data-tool=move]").click()
+    drag(page, (150, 438), (150, 538))
+    assert alpha_near(page, foot - 30, 535) > 0 and alpha_near(page, foot - 30, 435) == 0
+    assert alpha_near(page, 300, 400) > 0   # the crossing line, 100 lower
+    assert errors == []
+
+
+def test_a_right_angle_is_marked_with_a_square(browser, server):
+    page, errors = open_skill(browser, server, 1440, 900)
+    board_on(page)
+    page.locator(".mx-board [data-tool=line]").click()
+    drag(page, (100, 400), (340, 400))
+    drag(page, (102, 398), (100, 160))
+    drag(page, (100, 162), (338, 398))
+    page.locator(".mx-board [data-tool=angle]").click()
+    box = page.locator(".mx-board canvas").bounding_box()
+    page.mouse.click(box["x"] + 112, box["y"] + 388)
+    page.locator(".mx-board-arcs [data-arcs='right']").click()
+    page.locator(".mx-board-anglein").press("Enter")
+    # a square of side 14 in the corner: its far corner at (114, 386), and no arc at radius 30
+    assert alpha_near(page, 114, 386) > 0 and alpha_near(page, 107, 386) > 0 and alpha_near(page, 114, 393) > 0
+    assert alpha_near(page, 100 + 30 * 0.707, 400 - 30 * 0.707) == 0
+    page.mouse.click(box["x"] + 112, box["y"] + 388)   # the square opens it again, as an arc does
+    playwright.expect(page.locator(".mx-board-arcs [data-arcs='right']")).to_have_attribute("aria-pressed", "true")
+    page.locator(".mx-board-arcs [data-arcs='1']").click()
+    page.locator(".mx-board-anglein").press("Enter")
+    assert alpha_near(page, 114, 386) == 0 and alpha_near(page, 100 + 30 * 0.707, 400 - 30 * 0.707) > 0
+    assert errors == []

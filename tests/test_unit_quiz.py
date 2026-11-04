@@ -423,3 +423,65 @@ def test_a_check_that_finishes_after_handing_in_gives_the_sitting_its_grade(answ
             mine = (await c.get("/api/math/quiz-sittings", params={"unit_id": "t"})).json()["sittings"]
             assert mine[0]["grade"] == 85 and mine[0]["open"] == 0
     asyncio.run(run())
+
+
+def test_a_quiz_result_shows_the_teachers_words_and_the_home_screen_tells_about_them(quiz_server, answer_store):
+    """A sitting handed in and checked, then the teacher (OWNER is a manager in these tests) reviews one answer: the
+    student's home screen says so, the result shows the teacher above the AI's check, and the student can ask again."""
+    import uuid
+    url, calls = quiz_server
+    store = answer_store
+    ids = [quiz_answer(store, i) for i in range(4)]
+    for aid, score in zip(ids, (100, 60, 100, 40)):
+        check(store, aid, score)
+    headers = {"Authorization": f"Bearer {OWNER}"}
+    sitting = httpx.post(url + "/api/math/quiz-sittings", headers=headers, json={
+        "unit_id": "t", "attempts": ids, "client_key": str(uuid.uuid4())}).json()
+    review = httpx.put(url + f"/api/teacher/answers/{ids[1]}/review", headers=headers,
+                       json={"score": 90, "comment": "הדרך נכונה, שימו לב לסימן"})
+    assert review.status_code == 200
+    entry = {"at": "2026-11-04T09:00:00.000Z", "attempts": ids, "score": None, "timeUp": False,
+             "ck": str(uuid.uuid4()), "sid": sitting["id"]}
+    seed = json.dumps(json.dumps({"uq": {"t": {"history": [entry]}}}))
+    key = json.dumps("mathly.progress.v1:" + OWNER + "@test.invalid")
+    from test_answer_browser import session
+    with playwright.sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            context = session(browser, mobile=True)
+            context.add_init_script(f"if(!localStorage.getItem({key})) localStorage.setItem({key},{seed})")
+            page = context.new_page(); errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(url)
+            page.locator('.mx-nav [data-view="path"]').click()
+            notice = page.locator(".mx-teacher-comment")
+            playwright.expect(notice).to_contain_text("המורה הגיב על תשובה שלכם")
+            playwright.expect(notice).to_contain_text("90/100")
+            notice.click()
+            sheet = page.locator(".mx-uq-sheet")
+            playwright.expect(sheet.locator("h3")).to_have_text("בוחן מסכם: 83/100", timeout=15000)   # 25 + 23 + 25 + 10
+            second = sheet.locator(".mx-uq-q").nth(1)
+            playwright.expect(second.locator(".mx-teacher-note")).to_contain_text("הערת המורה")
+            playwright.expect(second.locator(".mx-teacher-note")).to_contain_text("90/100")
+            playwright.expect(second.locator(".mx-teacher-note")).to_contain_text("שימו לב לסימן")
+            playwright.expect(second.locator(".mx-uq-verdict")).to_have_text("נבדק על ידי המורה")
+            playwright.expect(second.locator(".mx-uq-qhead span")).to_have_text("23/25 נק׳")
+            playwright.expect(second).to_contain_text("בדיקה אוטומטית:")
+            assert sheet.locator(".mx-teacher-note").count() == 1           # only the reviewed answer has one
+            # the student asks the teacher to look again at the third answer
+            third = sheet.locator(".mx-uq-q").nth(2)
+            third.locator(".mx-ask summary").click()
+            third.locator("[data-ask-msg]").fill("כתבתי את כל השלבים")
+            third.locator("[data-ask-review]").click()
+            playwright.expect(third.locator(".mx-ask-wait")).to_contain_text("הבקשה ממתינה")
+            listed = httpx.get(url + "/api/teacher/review-requests", headers=headers).json()["requests"]
+            assert [(x["attempt_id"], x["message"]) for x in listed] == [(ids[2], "כתבתי את כל השלבים")]
+            # the answer was opened: the notice is gone, and stays gone after a reload
+            page.locator(".mx-uq-sheet .mx-x, .mx-uq-sheet [data-act=close]").first.click()
+            playwright.expect(page.locator(".mx-teacher-comment")).to_have_count(0)
+            page.reload(); page.locator('.mx-nav [data-view="path"]').click()
+            playwright.expect(page.locator(".mx-trail")).to_be_visible()
+            playwright.expect(page.locator(".mx-teacher-comment")).to_have_count(0)
+            assert not errors
+        finally:
+            browser.close()

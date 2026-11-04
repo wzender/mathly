@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import Depends
 from fastapi.responses import JSONResponse, Response
 
-from .access import has_permission
+from .access import has_permission, students_of
 from .answer_scans import ScanError, uuid_text
 from .auth import AuthUnavailable, ClassConflict
 from .math_photo import PhotoUnavailable
@@ -176,18 +176,10 @@ def install_ai_queue_routes(app, signed_in):
 
     def watched(user: dict) -> set[str] | None:
         """The students whose requests this account reviews; None: everyone's (a manager)."""
-        if has_permission(user, "management.access"):
-            return None
-        email = str(user.get("email", "")).lower()
         try:
-            classes = app.state.auth.classes()
+            return students_of(user, app.state.auth.classes())
         except AuthUnavailable as exc:
             raise ScanError(503, "queue_unavailable") from exc
-        out: set[str] = set()
-        for row in classes:
-            if email in row.get("teachers", ()):
-                out |= set(row.get("emails", ())) - set(row.get("teachers", ()))
-        return out
 
     def reviewer(user=Depends(account)) -> dict:
         if not may_send(user) or watched(user) == set():   # a teacher with no class has no one to review

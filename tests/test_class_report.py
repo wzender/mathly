@@ -5,6 +5,7 @@ import urllib.parse
 import httpx
 
 from app.answer_scans import ScanError
+from app.auth import AuthUnavailable
 from app.main import create_app
 
 TEACHER, STUDENT, NEWBIE, OUTSIDER = "t-id", "s-id", "n-id", "o-id"
@@ -17,9 +18,12 @@ class ReportAuth:
 
     def __init__(self):
         self.row = {"id": 3, "name": "ט׳1", "lessons": [], "teachers": ["teacher@x.test"],
-                    "emails": ["newbie@x.test", "student@x.test", "teacher@x.test", "ghost@x.test"]}
+                    "emails": ["newbie@x.test", "student@x.test", "teacher@x.test", "ghost@x.test"],
+                    "nicknames": {"newbie@x.test": "נועה ל."}}
         self.saved = []
         self.progress = {STUDENT: {"done": {"t1": "2026-11-01"}, "updated": 5, "comets": ["c1"],
+                                   "seen": {"t1": "2026-11-01T10:00:00Z"}, "tries": {"t1": 4, "t2": 1}, "secret_extra": 1,
+                                   "examples": {"t1": {"n": 3, "last": "2026-11-02T10:00:00Z"}},
                                    "slips": [{"at": "2026-11-01T10:00:00Z", "id": "t1", "q": 0, "m": "sign"}],
                                    "quizzes": [{"at": "2026-11-02", "n": 12, "right": 9, "ms": 600000, "units": ["t"],
                                                 "weak": ["t1"]}],
@@ -36,16 +40,18 @@ class ReportAuth:
     def access_for(self, _id, **kwargs):
         return None
 
-    def user_ids(self, emails):
-        return {e: i for i, e in EMAILS.items() if e in emails and i != NEWBIE} | (
-            {"newbie@x.test": NEWBIE} if "newbie@x.test" in emails else {})
+    NAMES = {STUDENT: "Sam Student"}   # Google names; the others have none
+
+    def user_accounts(self, emails):
+        return {e: {"id": i, "name": self.NAMES.get(i, "")} for i, e in EMAILS.items() if e in emails}
 
     def save_class(self, class_id, name, emails, nicknames, lessons, *, teachers=None):
         self.saved.append({"emails": emails, "teachers": teachers})
 
     def _admin(self, path, method="GET", body=None, prefer=""):
         table, _, query = path.partition("?")
-        assert table == "/rest/v1/math_progress"
+        if table != "/rest/v1/math_progress":
+            raise AuthUnavailable("supabase answered 404: no other tables here")   # e.g. the assignments table: not set up
         ids = dict(urllib.parse.parse_qsl(query))["user_id"].removeprefix("in.(").removesuffix(")").split(",")
         return [{"user_id": i, "data": self.progress[i], "updated_at": "2026-11-03T00:00:00Z"}
                 for i in ids if i in self.progress]
@@ -63,6 +69,12 @@ class Sittings:
         if self.fail:
             raise ScanError(503, "quiz_sittings_unavailable")
         return [s for s in self.sittings if s["user_id"] in data["users"]]
+
+    def review(self, user_id, action, **data):   # the students' open requests to look again
+        assert action == "requests"
+        if self.fail:
+            raise ScanError(503, "review_unavailable")
+        return [r for r in getattr(self, "requests", []) if r["user_id"] in data["users"]]
 
 
 def attempt(score, state="completed", photo=True, verdict="correct"):
@@ -91,13 +103,15 @@ def test_teacher_sees_the_other_students():
             students = {s["email"]: s for s in data["students"]}
             assert "teacher@x.test" not in students   # the teacher is not in their own report
             assert students["ghost@x.test"] == {"email": "ghost@x.test", "signed_in": False, "progress": None,
-                                                "saved_at": None, "quiz_sittings": []}
+                                                "saved_at": None, "quiz_sittings": [], "name": None, "review_requests": []}
             assert students["newbie@x.test"]["signed_in"] and students["newbie@x.test"]["progress"] is None
             p = students["student@x.test"]["progress"]
             assert p["done"] == {"t1": "2026-11-01"} and p["slips"][0]["m"] == "sign"
             assert p["quizzes"] == [{"at": "2026-11-02", "n": 12, "right": 9, "ms": 600000, "units": ["t"]}]
             assert p["uq"] == {"t": {"history": [{"at": "2026-11-03", "timeUp": None, "sid": None}], "going": False}}
-            assert "comets" not in p
+            assert p["seen"] == {"t1": "2026-11-01T10:00:00Z"} and p["tries"] == {"t1": 4, "t2": 1}
+            assert p["examples"] == {"t1": {"n": 3, "last": "2026-11-02T10:00:00Z"}}   # the worked examples the student opened
+            assert "comets" not in p and "secret_extra" not in p
             assert (await c.get("/api/classes/99/report")).status_code == 404
             me = (await c.get("/api/me")).json()
             assert me["classes"][0]["teacher"] is True
@@ -106,6 +120,32 @@ def test_teacher_sees_the_other_students():
                 assert (await c.get("/api/classes/3/report")).status_code == 403
 
     asyncio.run(check())
+
+
+def test_students_are_named_by_nickname_then_google_name_then_nothing():
+    app = create_app(auth=ReportAuth())
+    app.state.answers = Sittings()
+
+    async def check():
+        async with client(app, TEACHER) as c:
+            students = {s["email"]: s for s in (await c.get("/api/classes/3/report")).json()["students"]}
+            assert students["newbie@x.test"]["name"] == "נועה ל."      # the class's nickname
+            assert students["student@x.test"]["name"] == "Sam Student"  # else the Google name
+            assert students["ghost@x.test"]["name"] is None             # else the page uses the email's start
+    asyncio.run(check())
+
+
+def test_google_names_come_from_the_admin_user_list():
+    from app.auth import SupabaseAuth
+    auth = SupabaseAuth("https://x.invalid", "key", secret="secret")
+    users = [{"id": "u1", "email": "A@x.test", "user_metadata": {"full_name": " Noa   Levi "}},
+             {"id": "u2", "email": "b@x.test", "user_metadata": {"name": "Ben"}},
+             {"id": "u3", "email": "c@x.test"}, {"id": "u4", "email": "other@x.test"}]
+    auth._admin = lambda path, *a, **k: {"users": users}
+    got = auth.user_accounts(["a@x.test", "B@x.test", "c@x.test", "nobody@x.test"])
+    assert got == {"a@x.test": {"id": "u1", "name": "Noa Levi"}, "b@x.test": {"id": "u2", "name": "Ben"},
+                   "c@x.test": {"id": "u3", "name": ""}}
+    assert auth.user_ids(["a@x.test"]) == {"a@x.test": "u1"}
 
 
 def test_unit_quiz_grades_are_the_servers_and_not_the_devices():
@@ -162,4 +202,50 @@ def test_the_teacher_is_one_of_the_students():
             # a manager can open any class's report
             assert (await c.get("/api/classes/3/report")).status_code == 200
 
+    asyncio.run(check())
+
+
+def test_progress_parts_that_are_not_objects_are_dropped():
+    from app.class_report import report_part
+    part = report_part({"seen": "yesterday", "tries": [1, 2], "days": None, "examples": "many", "done": {"a": 1}})
+    assert part["seen"] == {} and part["tries"] == {} and part["days"] == {} and part["examples"] == {} and part["done"] == {"a": 1}
+
+
+def test_the_report_lists_each_students_open_requests_to_look_again():
+    app = create_app(auth=ReportAuth())
+    app.state.answers = answers = Sittings()
+    answers.requests = [
+        {"attempt_id": "a1", "user_id": STUDENT, "message": "כתבתי x=4", "question": "בוחן: שאלה 2", "created_at": "2026-11-04T10:00:00Z"},
+        {"attempt_id": "a2", "user_id": OUTSIDER, "message": "של כיתה אחרת", "question": "q", "created_at": "2026-11-04T10:00:00Z"}]
+
+    async def check():
+        async with client(app, TEACHER) as c:
+            students = {s["email"]: s for s in (await c.get("/api/classes/3/report")).json()["students"]}
+            assert students["student@x.test"]["review_requests"] == [
+                {"attempt_id": "a1", "message": "כתבתי x=4", "question": "בוחן: שאלה 2", "created_at": "2026-11-04T10:00:00Z"}]
+            assert students["newbie@x.test"]["review_requests"] == [] and "של כיתה אחרת" not in str(students)
+        answers.fail = True   # unreadable: the report still opens, without them
+        async with client(app, TEACHER) as c:
+            r = await c.get("/api/classes/3/report")
+            assert r.status_code == 200 and all(s["review_requests"] == [] for s in r.json()["students"])
+    asyncio.run(check())
+
+
+def test_the_report_carries_the_classs_assignments_for_its_teacher():
+    from test_assignments import GOOD, MemoryAssignments
+    store = MemoryAssignments()
+    app = create_app(auth=ReportAuth())
+    app.state.answers, app.state.assignments = Sittings(), store
+    store.add({**GOOD, "class_id": 3, "created_by_email": "teacher@x.test"})
+    store.add({**GOOD, "class_id": 99, "title": "של כיתה אחרת", "created_by_email": "x@x.test"})
+
+    async def check():
+        async with client(app, TEACHER) as c:
+            data = (await c.get("/api/classes/3/report")).json()
+            assert [(a["title"], a["class_id"], a["created_by_email"]) for a in data["assignments"]] == [(GOOD["title"], 3, "teacher@x.test")]
+            assert data["assignments"][0]["items"] == GOOD["items"]
+        store.fail = True
+        async with client(app, TEACHER) as c:   # the table is not there: the report opens, without assignments
+            r = await c.get("/api/classes/3/report")
+            assert r.status_code == 200 and r.json()["assignments"] is None
     asyncio.run(check())

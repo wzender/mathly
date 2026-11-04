@@ -5,7 +5,9 @@
    as long as the page is open. Nothing is sent anywhere unless the student hands it in.
 
    Everything on the board is an element that can be moved or erased: a pen stroke (with a pen's pressure),
-   a straight line, a circle (dragged from the center), typed math (the math keyboard, static/board-math.js), and a
+   a straight line, a circle (dragged from the center), an angle's arc with its words (the angle tool: pointing at a
+   corner where two lines meet shows the arc; a click adds it and asks for its words, and a number gets a degree
+   sign), typed math (the math keyboard, static/board-math.js), and a
    copy of the question (its text and figures).
    Line ends and circle centers snap to the ends and centers already drawn, so a triangle closes neatly;
    lines that meet that way move together. The eraser removes the lines and circles it touches and cuts pen strokes;
@@ -21,7 +23,7 @@ const setOn=on=>{ try{ localStorage.setItem(PREF,on?"on":"off"); }catch{} };
 
 const INKS=[["#1B2140","שחור"],["#2563D9","כחול"],["#D3455B","אדום"]];
 const ERASERS=[[16,"קטן"],[40,"בינוני"],[90,"גדול"]];
-const TOOLS=[["move","הזזה"],["pen","עט"],["line","קו ישר"],["circle","עיגול"],["math","נוסחה"],["eraser","מחק"]];
+const TOOLS=[["move","הזזה"],["pen","עט"],["line","קו ישר"],["circle","עיגול"],["angle","זווית"],["math","נוסחה"],["eraser","מחק"]];
 /* one line-drawn icon set (24×24, the button's text colour), so every button looks alike on every device and
    follows the button's hover and pressed colours; "flip" icons point the other way in a right-to-left page */
 const DOT='fill="currentColor" stroke="none"';
@@ -30,6 +32,7 @@ const ICONS={
   pen:'<path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8z"/><path d="M14.5 6.5l3 3"/>',
   line:`<path d="M6 18L18 6"/><circle cx="6" cy="18" r="2" ${DOT}/><circle cx="18" cy="6" r="2" ${DOT}/>`,
   circle:`<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.6" ${DOT}/>`,
+  angle:'<path d="M20 19H4l11-14"/><path d="M10.5 19a6.5 6.5 0 0 0-2.5-5.1"/>',
   math:'<path d="M17.5 5.5V4H6.5l6 8-6 8h11v-1.5"/>',
   eraser:'<path d="M20 20H9.5M4.6 15.4l9.8-9.8a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8L11 19H8.2l-3.6-3.6"/><path d="M9.5 10.5l5 5"/>',
   question:'<rect x="5.5" y="5" width="13" height="16" rx="2"/><path d="M9 5V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M9 11h6M9 15h4"/>',
@@ -43,8 +46,15 @@ const ICONS={
 const FLIP=new Set(["undo","back"]);
 const ic=n=>`<svg class="mx-ic${FLIP.has(n)?" mx-ic-flip":""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
 const MATH_SIZE=26;
+const GREEK=["α","β","γ"], ARC_GAP=4;   // the angle box's letters; how far apart a double or triple arc's arcs are
+const ARCS=[[1,"קשת אחת"],[2,"קשת כפולה"],[3,"קשת משולשת"],["right","זווית ישרה (ריבוע)"]];
+// a corner with one, two or three arcs: equal angles are marked alike
+const arcsIcon=n=>n==="right"?'<svg class="mx-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M3 20V4M3 12.5h7.5V20"/></svg>'
+  :`<svg class="mx-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M3 20l12-14"/>${[7,10.5,14].slice(0,n).map(r=>`<path d="M${3+r} 20A${r} ${r} 0 0 0 ${(3+r*.65).toFixed(2)} ${(20-r*.76).toFixed(2)}"/>`).join("")}</svg>`;
+const ANGLE_FONT='500 18px "STIX Two Text","Cambria Math","Times New Roman",serif', CORNER=32, CORNER_TOUCH=40;   // how near a corner the angle tool reaches: about as far as an arc
+const ON=3;   // how close a point is to count as on a line: where an angle's corner is, and what moves with what
 const PEN=2.6, SHAPE=2.4, SNAP=12, GRAB=9, STEP=2, HISTORY=100;
-const PAPER_INK="#1B2140", PAPER_FAINT="#C5CBDF", SELECT="#2563D9";
+const PAPER="#F8F7F2", PAPER_INK="#1B2140", PAPER_FAINT="#C5CBDF", SELECT="#2563D9";
 const FONT='500 17px Rubik, system-ui, "Segoe UI", sans-serif', LINE_H=27, CARD_PAD=14;
 
 /* sketch key -> {marks, past}: marks are drawn in order; past holds copies of marks for undo */
@@ -52,6 +62,8 @@ const sketches=new Map(), images=new Map();
 let el=null, canvas=null, ctx=null, key="", base="", pages=0, page=0, layer=null, source=null, hand=null, onPage=null;
 let tool="pen", ink=INKS[0][0], eraser=ERASERS[1][0], sendLabel="";
 let draft=null, drag=null, rub=null, slide=null, selection=[];   // slide: the move tool dragging empty paper, which scrolls it
+let paper=PAPER;   // the paper's colour: the board's, or white in the picture handed in
+let naming=null, hover=null;   // naming: an angle's words being typed {mark, node, input, fresh, was, key}; hover: the corner the angle tool points at
 let editing=null;   // the formula being typed: {mark (null for a new one), at, node, field, key}
 let full=null;   // the board open full screen: {saved: the context to go back to, done: called when it closes}
 const touches=new Map(); let pan=null, penSeen=false;
@@ -105,7 +117,8 @@ function build(){
   canvas.addEventListener("pointerup",up);
   canvas.addEventListener("pointercancel",up);
   canvas.addEventListener("contextmenu",e=>e.preventDefault());
-  canvas.addEventListener("dblclick",e=>{ const m=hit(at(e)); if(m?.kind==="math") editMath(m,at(e)); });   // typed math is edited where it is   // the pen's side button: no browser menu over the board
+  canvas.addEventListener("dblclick",e=>{ const m=hit(at(e)); if(m?.kind==="math") editMath(m,at(e)); else if(m?.kind==="angle") startAngle(at(e),0); });
+  canvas.addEventListener("pointerleave",()=>{ if(hover){ hover=null; paint(); } });   // typed math is edited where it is   // the pen's side button: no browser menu over the board
   canvas.addEventListener("wheel",e=>{   // endless paper: scrolls down as far as needed, never above the top
     if(e.ctrlKey) return;   // the browser's zoom
     e.preventDefault(); const s=sketch(), dy=e.deltaMode===1?e.deltaY*24:e.deltaMode===2?e.deltaY*canvas.clientHeight:e.deltaY;
@@ -115,16 +128,16 @@ function build(){
   setTool(tool);
 }
 function pressed(sel,b){ el.querySelectorAll(sel).forEach(x=>x.setAttribute("aria-pressed",x===b)); }
-function reset(){ draft=drag=rub=slide=null; select([]); if(editing) finishMath(false); }
+function reset(){ draft=drag=rub=slide=null; hover=null; select([]); if(editing) finishMath(false); if(naming) finishAngle(true); }
 function setTool(t){
-  tool=t; el.querySelectorAll("[data-tool]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.tool===t));
+  tool=t; if(hover){ hover=null; paint(); } el.querySelectorAll("[data-tool]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.tool===t));
   el.dataset.tool=t; if(t!=="move"&&selection.length){ select([]); paint(); }
   // the eraser's cursor is a ring its own size, so the student sees what it will wipe
   const r=eraser/2, svg=`<svg xmlns='http://www.w3.org/2000/svg' width='${eraser+2}' height='${eraser+2}'><circle cx='${r+1}' cy='${r+1}' r='${r}' fill='rgba(255,255,255,.35)' stroke='%231B2140' stroke-width='1.2'/></svg>`;
   canvas.style.cursor=t==="eraser"?`url("data:image/svg+xml,${svg.replace(/</g,"%3C").replace(/>/g,"%3E")}") ${r+1} ${r+1}, cell`:t==="move"?"grab":"";
 }
 function select(list){ selection=list; }
-function turn(p){ if(editing) finishMath(true); page=p; key=`${base}:${page}`; reset(); drawPages(); drawSend(); paint(); }
+function turn(p){ if(editing) finishMath(true); if(naming) finishAngle(true); page=p; key=`${base}:${page}`; reset(); drawPages(); drawSend(); paint(); }
 function drawSend(){
   const b=el.querySelector(".mx-board-send"); b.hidden=!hand; el.querySelector(".mx-board-row").hidden=pages<2&&!hand; if(!hand) return;
   b.disabled=false; b.innerHTML=`${ic("send")}<span>${sendLabel||`הגשה לשאלה ${page+1}`}</span>`; b.title=sendLabel||`הגשת הלוח כתשובה לשאלה ${page+1}`;
@@ -150,6 +163,7 @@ function paint(){
   el.querySelector(".mx-board-top").hidden=y<1;
   marks().forEach(draw);
   if(draft?.kind==="circle") guide(draft);
+  if(hover&&!naming) aimed(hover);
   if(selection.length) outline(selection);
   const del=el.querySelector(".mx-board-del"); del.hidden=!selection.length||!!drag?.before;
   if(selection.length){ const [x0,y0]=edges(selection); del.style.left=`${Math.max(4,x0)}px`; const top=y0-y; del.style.top=`${top>40?top-36:Math.max(4,top+4)}px`; }
@@ -158,6 +172,7 @@ function draw(m){
   ctx.save(); ctx.strokeStyle=m.color; ctx.lineCap="round"; ctx.lineJoin="round";
   if(m.kind==="line"){ ctx.lineWidth=SHAPE; ctx.beginPath(); ctx.moveTo(...m.a); ctx.lineTo(...m.b); ctx.stroke(); }
   else if(m.kind==="circle"){ ctx.lineWidth=SHAPE; ctx.beginPath(); ctx.arc(m.a[0],m.a[1],dist(m.a,m.b),0,Math.PI*2); ctx.stroke(); }
+  else if(m.kind==="angle") angleMark(m);
   else if(m.kind==="card") card(m);
   else if(m.kind==="math"){ const L=mathBox(m); if(L){ ctx.fillStyle=m.color; ctx.direction="ltr"; ctx.textAlign="left"; ctx.textBaseline="alphabetic"; L.paint(ctx,m.x,m.y+L.a); } }
   else{ for(let i=1;i<m.pts.length;i++) segment(m,i); if(m.pts.length===1) segment(m,0); }
@@ -175,6 +190,30 @@ function guide(m){
   ctx.beginPath(); ctx.moveTo(...m.a); ctx.lineTo(...m.b); ctx.stroke();
   ctx.setLineDash([]); ctx.beginPath(); ctx.arc(m.a[0],m.a[1],2.5,0,Math.PI*2); ctx.fill(); ctx.restore();
 }
+// an angle: the arc between its two edges, and its words just outside the arc (hidden while they are typed)
+const arcsOf=m=>naming?.mark===m?naming.arcs:m.arcs||1;   // while its box is open: the arcs picked there
+// a right angle is marked with a little square in its corner: its sides along the edges, its far corner on the line splitting the angle
+const square=m=>{
+  const k=Math.max(8,Math.min(14,arcR(m)*.5)), u=[Math.cos(m.s),Math.sin(m.s)], w=[Math.cos(m.s+m.w),Math.sin(m.s+m.w)];
+  return [[m.v[0]+k*u[0],m.v[1]+k*u[1]],[m.v[0]+k*(u[0]+w[0]),m.v[1]+k*(u[1]+w[1])],[m.v[0]+k*w[0],m.v[1]+k*w[1]]];
+};
+const rim=m=>arcsOf(m)==="right"?dist(square(m)[1],m.v):arcR(m)+ARC_GAP*(arcsOf(m)-1);   // how far out the mark reaches
+const colorOf=m=>naming?.mark===m?naming.color:m.color;   // while its box is open: the colour picked there
+function angleMark(m){
+  ctx.lineWidth=1.8; ctx.strokeStyle=colorOf(m);
+  if(arcsOf(m)==="right"){ const [a,b,c]=square(m); ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.lineTo(...c); ctx.stroke(); }
+  else for(let k=0;k<arcsOf(m);k++){ ctx.beginPath(); ctx.arc(m.v[0],m.v[1],arcR(m)+k*ARC_GAP,m.s,m.s+m.w); ctx.stroke(); }
+  if(!m.text||naming?.mark===m) return;
+  const [x,y]=labelAt(m); ctx.font=ANGLE_FONT; ctx.direction="ltr"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.strokeStyle=paper; ctx.lineWidth=5; ctx.strokeText(m.text,x,y);   // a rim of paper, where the words cross a line
+  ctx.fillStyle=m.color; ctx.fillText(m.text,x,y);
+}
+// the corner the angle tool points at: the arc it would add (or the angle it would retype), dashed
+function aimed(c){
+  ctx.save(); ctx.strokeStyle=ctx.fillStyle=SELECT; ctx.lineWidth=2; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.arc(c.v[0],c.v[1],c.r,c.s,c.s+c.w); ctx.stroke();
+  ctx.setLineDash([]); ctx.beginPath(); ctx.arc(c.v[0],c.v[1],3.5,0,TAU); ctx.fill(); ctx.restore();
+}
 function card(m){
   ctx.fillStyle="#EEF1FB"; ctx.strokeStyle=PAPER_FAINT; ctx.lineWidth=1;
   ctx.beginPath(); ctx.roundRect(m.x,m.y,m.w,m.h,12); ctx.fill(); ctx.stroke();
@@ -190,6 +229,7 @@ const mathBox=m=>window.MathlyBoardMath?.layout(m.latex,m.size||MATH_SIZE);
 function box(m){
   if(m.kind==="card") return [m.x,m.y,m.x+m.w,m.y+m.h];
   if(m.kind==="math"){ const L=mathBox(m)||{w:0,a:0,d:0}; return [m.x,m.y,m.x+L.w,m.y+L.a+L.d]; }
+  if(m.kind==="angle"){ const [x,y,w]=labelAt(m), r=rim(m); return [Math.min(m.v[0]-r,x-w/2),Math.min(m.v[1]-r,y-10),Math.max(m.v[0]+r,x+w/2),Math.max(m.v[1]+r,y+10)]; }
   if(m.kind==="circle"){ const r=dist(m.a,m.b); return [m.a[0]-r,m.a[1]-r,m.a[0]+r,m.a[1]+r]; }
   const pts=m.kind==="line"?[m.a,m.b]:m.pts, xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
   return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];
@@ -202,43 +242,50 @@ function outline(list){
 }
 
 /* ---------- geometry ---------- */
-function toSegment(p,a,b){
+function nearestOn(p,a,b){
   const dx=b[0]-a[0], dy=b[1]-a[1], l=dx*dx+dy*dy, t=l?Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/l)):0;
-  return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy);
+  return [a[0]+t*dx,a[1]+t*dy];
 }
+const toSegment=(p,a,b)=>dist(p,nearestOn(p,a,b));
 // how far p is from the element's ink
 function reach(m,p){
   if(m.kind==="line") return toSegment(p,m.a,m.b);
   if(m.kind==="circle") return Math.min(Math.abs(dist(p,m.a)-dist(m.a,m.b)),dist(p,m.a));
+  if(m.kind==="angle"&&arcsOf(m)==="right"){ const [a,b,c]=square(m); return Math.min(toSegment(p,a,b),toSegment(p,b,c),toWords(m,p)); }
+  if(m.kind==="angle") return Math.min(inWedge(Math.atan2(p[1]-m.v[1],p[0]-m.v[0]),m.s,m.w)?Math.max(0,Math.abs(dist(p,m.v)-(arcR(m)+rim(m))/2)-(rim(m)-arcR(m))/2):Infinity,toWords(m,p));
   if(m.kind==="card"||m.kind==="math"){ const [x0,y0,x1,y1]=box(m), dx=Math.max(x0-p[0],0,p[0]-x1), dy=Math.max(y0-p[1],0,p[1]-y1);
     return m.kind==="card"?(dx||dy?Infinity:0):Math.hypot(dx,dy); }
   if(m.pts.length===1) return dist(p,m.pts[0]);
   let d=Infinity; for(let i=1;i<m.pts.length;i++) d=Math.min(d,toSegment(p,m.pts[i-1],m.pts[i])); return d;
 }
 const hit=p=>{ const all=marks(); for(let i=all.length-1;i>=0;i--) if(reach(all[i],p)<=GRAB) return all[i]; return null; };
-const joints=m=>m.kind==="line"?[m.a,m.b]:m.kind==="circle"?[m.a]:[];
+const joints=m=>m.kind==="line"?[m.a,m.b]:m.kind==="circle"?[m.a]:m.kind==="angle"?[m.v]:[];   // an angle moves with its corner
 // an element and everything joined to it by a shared end or center: a triangle moves as one
 function group(m){
   const out=new Set([m]), todo=[m];
   while(todo.length){ const cur=todo.pop();
-    for(const o of marks()) if(!out.has(o)&&joints(cur).some(p=>joints(o).some(q=>same(p,q)))){ out.add(o); todo.push(o); } }
+    for(const o of marks()) if(!out.has(o)&&linked(cur,o)){ out.add(o); todo.push(o); } }
   return [...out];
 }
-// a line's ends and a circle's center pull to the ends and centers already on the board
+// joined: a shared end or center, a line's end on another line (drawn from a side), or an angle on a line through it
+const lies=(m,o)=>o.kind==="line"&&(m.kind==="line"||m.kind==="angle")&&joints(m).some(p=>toSegment(p,o.a,o.b)<=ON);
+const linked=(m,o)=>joints(m).some(p=>joints(o).some(q=>same(p,q)))||lies(m,o)||lies(o,m);
+// a line's ends and a circle's center pull to the ends and centers already on the board, or else onto a line
 function snap(p,skip){
   let best=null, d=SNAP;
   for(const m of marks()){ if(m===skip) continue; for(const q of joints(m)){ const k=dist(p,q); if(k<d){ d=k; best=q; } } }
+  if(!best) for(const m of marks()) if(m!==skip&&m.kind==="line"){ const q=nearestOn(p,m.a,m.b), k=dist(p,q); if(k<d){ d=k; best=q; } }
   return best?[best[0],best[1]]:[p[0],p[1]];
 }
 function shift(m,dx,dy){
   const by=p=>{ p[0]+=dx; p[1]+=dy; };
-  if(m.kind==="card"||m.kind==="math"){ m.x+=dx; m.y+=dy; } else if(m.kind==="free") m.pts.forEach(by); else { by(m.a); by(m.b); }
+  if(m.kind==="card"||m.kind==="math"){ m.x+=dx; m.y+=dy; } else if(m.kind==="free") m.pts.forEach(by); else if(m.kind==="angle") by(m.v); else { by(m.a); by(m.b); }
 }
 // the eraser at p: lines, circles and typed math it touches go; pen strokes are cut; the question's copy stays
 function rubOut(p){
   const r=eraser/2, all=marks(); let changed=false;
   for(let i=all.length-1;i>=0;i--){ const m=all[i];
-    if(m.kind==="line"||m.kind==="circle"||m.kind==="math"){ if(reach(m,p)<=r+SHAPE/2){ all.splice(i,1); changed=true; } continue; }
+    if(m.kind==="line"||m.kind==="circle"||m.kind==="math"||m.kind==="angle"){ if(reach(m,p)<=r+SHAPE/2){ all.splice(i,1); changed=true; } continue; }
     if(m.kind!=="free") continue;
     const gone=m.pts.map(q=>dist(p,q)<=r+PEN); if(!gone.some(Boolean)) continue;
     const runs=[]; let run=[]; m.pts.forEach((q,k)=>{ if(gone[k]){ if(run.length) runs.push(run); run=[]; } else run.push(q); }); if(run.length) runs.push(run);
@@ -246,6 +293,150 @@ function rubOut(p){
   }
   return changed;
 }
+/* ---------- angles at corners ---------- */
+const TAU=Math.PI*2, turnOf=a=>(a%TAU+TAU)%TAU, inWedge=(t,s,w)=>turnOf(t-s)<=w;
+const gap=(a,b)=>Math.abs(turnOf(a-b+Math.PI)-Math.PI);
+// where two lines cross, or null (an end on the other line counts)
+function cross(m,o){
+  const r=[m.b[0]-m.a[0],m.b[1]-m.a[1]], q=[o.b[0]-o.a[0],o.b[1]-o.a[1]], den=r[0]*q[1]-r[1]*q[0];
+  if(Math.abs(den)<1e-9) return null;
+  const ex=o.a[0]-m.a[0], ey=o.a[1]-m.a[1], t=(ex*q[1]-ey*q[0])/den, u=(ex*r[1]-ey*r[0])/den, k=.01;
+  return t>=-k&&t<=1+k&&u>=-k&&u<=1+k?[m.a[0]+t*r[0],m.a[1]+t*r[1]]:null;
+}
+// the points where lines meet: shared ends, an end partway along another line, and crossings
+function meets(){
+  const lines=marks().filter(m=>m.kind==="line"), out=lines.flatMap(m=>[m.a,m.b]);
+  lines.forEach((m,i)=>lines.slice(i+1).forEach(o=>{ const c=cross(m,o); if(c) out.push(c); }));
+  return out;
+}
+// every line through v, as rays going out of v: one for a line ending there, two for a line passing through
+function raysAt(v){
+  const rays=[], add=b=>{
+    if(dist(b,v)<=ON) return;
+    const t=turnOf(Math.atan2(b[1]-v[1],b[0]-v[0])), len=dist(v,b), twin=rays.find(r=>gap(r.t,t)<.02);
+    if(twin) twin.len=Math.min(twin.len,len); else rays.push({t,len});
+  };
+  for(const m of marks()) if(m.kind==="line"){
+    if(dist(m.a,v)<=ON) add(m.b); else if(dist(m.b,v)<=ON) add(m.a); else if(toSegment(v,m.a,m.b)<=ON){ add(m.a); add(m.b); }
+  }
+  return rays.sort((a,b)=>a.t-b.t);
+}
+/* A corner near p where lines meet, and the angle (under half a turn) between two of its rays that p points into:
+   the inside of a triangle's corner, either side of a line drawn from a side, or the smallest one when p is on the
+   corner itself. Pointing along a line that splits an angle picks the whole angle, its arc a little wider, and
+   its words go in the widest gap the inner lines leave. */
+function corner(p,near){
+  let v=null, d=near;
+  for(const q of meets()){ const k=dist(p,q); if(k<d){ d=k; v=q; } }
+  if(!v) return null;
+  const rays=raysAt(v); if(rays.length<2) return null;
+  const wedges=[];
+  rays.forEach(r=>rays.forEach(n=>{
+    const w=turnOf(n.t-r.t); if(r===n||w<.02||w>Math.PI-.01) return;
+    wedges.push({s:r.t,w,len:Math.min(r.len,n.len),inner:rays.filter(x=>x!==r&&x!==n&&turnOf(x.t-r.t)<w)});
+  }));
+  if(!wedges.length) return null;
+  wedges.sort((a,b)=>a.w-b.w);
+  const t=Math.atan2(p[1]-v[1],p[0]-v[0]), far=dist(p,v)>6, along=far&&rays.find(r=>gap(r.t,t)<.1);
+  const off=x=>inWedge(t,x.s,x.w)?0:Math.min(gap(t,x.s),gap(t,x.s+x.w))+(x.inner.length?1:0);   // outside them all: the nearest
+  const w=(along&&wedges.find(x=>x.inner.includes(along)))||(far&&wedges.reduce((a,b)=>off(b)<off(a)?b:a))||wedges[0];
+  const cuts=[0,...w.inner.map(x=>turnOf(x.t-w.s)).sort((a,b)=>a-b),w.w];
+  let f=w.w/2, g=w.w;
+  if(w.inner.length){ g=0; for(let k=1;k<cuts.length;k++) if(cuts[k]-cuts[k-1]>g){ g=cuts[k]-cuts[k-1]; f=(cuts[k]+cuts[k-1])/2; } }
+  return {v:[v[0],v[1]],s:w.s,w:w.w,r:Math.max(12,Math.min(30,w.len*.3))+10*w.inner.length,f:w.s+f};
+}
+// what the angle tool would act on at p: an angle already there (to retype its words), or a corner to add one to
+// (an angle's words come first; then the corner decides, so pointing along a middle line over a half's arc still
+// gives the whole angle; an arc whose corner is gone is still there to retype)
+function aim(p,near){
+  const all=marks().filter(m=>m.kind==="angle").reverse(), as=m=>({mark:m,v:m.v,s:m.s,w:m.w,r:arcR(m)});
+  const named=all.find(m=>toWords(m,p)<=4); if(named) return as(named);
+  const c=corner(p,near);
+  if(c){ c.mark=all.find(m=>dist(m.v,c.v)<=ON&&gap(m.s,c.s)<.05&&Math.abs(m.w-c.w)<.05)||null; if(c.mark) c.r=arcR(c.mark); return c; }
+  const old=all.find(m=>reach(m,p)<=GRAB); return old?as(old):null;
+}
+// how far p is from an angle's words
+function toWords(m,p){
+  if(!m.text) return Infinity;
+  const [x,y,w]=labelAt(m); return Math.hypot(Math.max(Math.abs(p[0]-x)-w/2,0),Math.max(Math.abs(p[1]-y)-10,0));
+}
+// where an angle's words sit: on the line splitting the angle, just past the arc, and far enough out to clear the edges
+// (right by the arc, even in a narrow angle: they are drawn over a line's ink with a rim of paper)
+function labelAt(m,text=m.text){
+  ctx.save(); ctx.font=ANGLE_FONT; const w=text?ctx.measureText(text).width:0; ctx.restore();
+  const f=m.f??m.s+m.w/2, out=Math.abs(w/2*Math.cos(f))+Math.abs(10*Math.sin(f)), c=Math.cos(f), s=Math.sin(f);   // f: the words' way
+  // words of an angle beside it at the same corner, added before it: these move out until they are clear of them
+  const all=marks(), i=all.indexOf(m), mine=inside(m);
+  const near=i<0?[]:all.slice(0,i).filter(o=>o.kind==="angle"&&o.text&&dist(o.v,m.v)<=ON&&!mine.includes(o)&&!inside(o).includes(m)).map(o=>labelAt(o));
+  let d=rim(m)+5+out;
+  for(let k=0;k<30&&near.some(([x,y,ow])=>Math.abs(m.v[0]+d*c-x)<(w+ow)/2+4&&Math.abs(m.v[1]+d*s-y)<20);k++) d+=3;
+  return [m.v[0]+d*c,m.v[1]+d*s,w,out];
+}
+// the angles inside m at its corner (the halves of an angle a line splits)
+const inside=m=>marks().filter(o=>o!==m&&o.kind==="angle"&&dist(o.v,m.v)<=ON&&o.w<m.w-.01&&turnOf(o.s-m.s)<=m.w-o.w+.01);
+// an angle's arc goes around the arcs and words of the angles inside it, so each angle's words sit by its own arc
+function arcR(m){
+  let r=m.r;
+  for(const o of inside(m)){ r=Math.max(r,rim(o)+8); if(o.text){ const [x,y,,out]=labelAt(o); r=Math.max(r,dist([x,y],m.v)+out+4); } }
+  return r;
+}
+// a number on its own or added to the rest ("60", "β+90", "180-α-β") is a size in degrees; a factor ("2β") is not
+const TERM=/(^|[+\-−=]\s*)(\d+(?:[.,]\d+)?)°?(?=\s*(?:$|[+\-−=]))/g;
+const NAMES={alpha:"α",beta:"β",gamma:"γ"};
+const degrees=v=>v.trim().replace(/(?<![a-z])(alpha|beta|gamma)(?![a-z])/gi,w=>NAMES[w.toLowerCase()]).replace(TERM,"$1$2°");
+const bare=t=>t.replace(TERM,"$1$2");   // for retyping: the signs degrees() puts back by itself
+// adds the angle at p (or opens one already there), with a box over its words
+function startAngle(p,near){
+  const c=aim(p,near); if(!c) return;
+  hover=null;
+  let m=c.mark; const fresh=!m;
+  if(fresh){ remember(); m={kind:"angle",color:ink,v:c.v,s:c.s,w:c.w,r:c.r,f:c.f,text:""}; marks().push(m); }
+  // the box for the words, with the usual names of a triangle's angles a tap away
+  const node=document.createElement("div"); node.className="mx-board-angleedit";
+  // two rows, to fit a phone: the words and the letters; the arcs and the colour
+  node.innerHTML=`<div class="mx-board-anglerow"><input type="text" class="mx-board-anglein" dir="auto" maxlength="16" placeholder="°" enterkeyhint="done"
+      aria-label="מה כתוב בזווית (מספר מקבל סימן מעלות)">${GREEK.map(g=>`<button type="button" tabindex="-1" data-letter title="${g}">${g}</button>`).join("")}</div>
+    <div class="mx-board-anglerow"><span class="mx-board-arcs">${ARCS.map(([n,name])=>`<button type="button" tabindex="-1" data-arcs="${n}" aria-pressed="${n===(m.arcs||1)}" title="${name}" aria-label="${name}">${arcsIcon(n)}</button>`).join("")}</span>
+    <span class="mx-board-colors">${INKS.map(([c,name])=>`<button type="button" tabindex="-1" data-color="${c}" aria-pressed="${c===m.color}" title="${name}" aria-label="${name}" style="--dot:${c}"></button>`).join("")}</span></div>`;
+  const input=node.querySelector("input"); input.value=bare(m.text);
+  naming={mark:m,node,input,fresh,was:m.text,arcs:m.arcs||1,color:m.color,key};
+  input.addEventListener("keydown",ev=>{
+    if(ev.key==="Enter"){ ev.preventDefault(); finishAngle(true); }
+    else if(ev.key==="Escape"){ ev.preventDefault(); ev.stopPropagation(); finishAngle(false); }
+  });
+  input.addEventListener("blur",()=>naming?.node===node&&finishAngle(true));
+  // a letter's button types it where the cursor is ("β+90" takes a tap and a few keys); the box keeps its focus
+  node.querySelectorAll("[data-letter]").forEach(b=>b.addEventListener("pointerdown",ev=>{
+    ev.preventDefault(); input.setRangeText(b.textContent,input.selectionStart??input.value.length,input.selectionEnd??input.value.length,"end");
+  }));
+  // one, two or three arcs: shown at once, kept with the words
+  node.querySelectorAll("[data-arcs]").forEach(b=>b.addEventListener("pointerdown",ev=>{
+    ev.preventDefault(); naming.arcs=b.dataset.arcs==="right"?"right":+b.dataset.arcs; node.querySelectorAll("[data-arcs]").forEach(x=>x.setAttribute("aria-pressed",x===b)); paint();
+  }));
+  // the angle's colour, its arcs and words together: shown at once on the arcs and in the box, kept with the words
+  const tint=()=>{ input.style.color=naming.color; paint(); };
+  node.querySelectorAll("[data-color]").forEach(b=>b.addEventListener("pointerdown",ev=>{
+    ev.preventDefault(); naming.color=b.dataset.color; node.querySelectorAll("[data-color]").forEach(x=>x.setAttribute("aria-pressed",x===b)); tint();
+  }));
+  input.style.color=m.color;
+  el.querySelector(".mx-board-stage").append(node);
+  const [x,y]=labelAt(m,"000°"), W=canvas.clientWidth, bw=node.offsetWidth;
+  node.style.left=`${Math.max(4,Math.min(W-4-bw,x-bw/2))}px`; node.style.top=`${Math.max(4,y-sketch().y-21)}px`;
+  paint(); input.focus({preventScroll:true});
+  if(pages>1) drawPages();
+}
+// keep: the words go in (a new angle with none keeps just its arc); otherwise a new angle is taken back
+function finishAngle(keep){
+  const n=naming; if(!n) return; naming=null; n.node.remove();
+  const s=sketches.get(n.key), m=n.mark; if(!s) return;
+  if(keep){
+    const t=degrees(n.input.value); if(!n.fresh&&(t!==n.was||n.arcs!==(m.arcs||1)||n.color!==m.color)) remember();
+    m.text=t; m.color=n.color; if(n.arcs!==1) m.arcs=n.arcs; else delete m.arcs;   // 2, 3, or "right"
+  }
+  else if(n.fresh){ const i=s.marks.indexOf(m); if(i>=0){ s.marks.splice(i,1); s.past.pop(); } }
+  paint(); if(pages>1) drawPages();
+}
+
 // points along a to b, close enough that nothing between two of them is skipped
 function along(a,b,step){ const n=Math.max(1,Math.ceil(dist(a,b)/step)), out=[]; for(let k=1;k<=n;k++) out.push([a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n,a[2]+((b[2]??a[2])-a[2])*k/n]); return out; }
 
@@ -271,6 +462,8 @@ function down(e){
   if(e.button!==0&&e.button!==5) return;   // 5: the pen's eraser end
   const p=at(e), use=e.button===5||(e.buttons&32)>0?"eraser":tool;
   if(editing){ e.preventDefault(); return finishMath(true); }   // a tap beside the formula being typed: it is done
+  if(naming){ e.preventDefault(); return finishAngle(true); }   // the same for an angle's words
+  if(use==="angle"){ e.preventDefault(); return startAngle(p,e.pointerType==="mouse"?CORNER:CORNER_TOUCH); }
   if(use==="math"){ e.preventDefault(); const m=hit(p); return editMath(m?.kind==="math"?m:null,p); }
   capture(e.pointerId); e.preventDefault();
   if(use==="move"){
@@ -292,6 +485,11 @@ function move(e){
   }
   if(slide&&e.pointerId===slide.id){ sketch().y=Math.max(0,slide.s-(e.clientY-slide.y)); return paint(); }
   if(tool==="move"&&!drag&&!e.buttons) canvas.style.cursor=hit(at(e))?"move":"grab";
+  if(tool==="angle"&&!e.buttons&&e.pointerType!=="touch"){   // a mouse or a pen over a corner: its arc, dashed
+    const c=naming?null:aim(at(e),CORNER), was=hover; hover=c; canvas.style.cursor=c?"pointer":"";
+    if(c?.v[0]!==was?.v[0]||c?.v[1]!==was?.v[1]||c?.s!==was?.s) paint();
+    return;
+  }
   if(drag&&e.pointerId===drag.id){
     const p=at(e), dx=p[0]-drag.last[0], dy=p[1]-drag.last[1]; if(!dx&&!dy) return;
     if(!drag.before){ drag.before=true; remember(); }
@@ -436,9 +634,9 @@ function snapshot(){
   const all=marks(); if(!all.some(m=>m.kind!=="card")) return null;
   const [,y0,,y1]=edges(all), top=Math.max(0,y0-24), W=canvas.clientWidth, H=Math.min(y1+24-top,8000), k=2;
   const out=document.createElement("canvas"); out.width=W*k; out.height=Math.round(H*k);
-  const keep=ctx; ctx=out.getContext("2d");
+  const keep=ctx; ctx=out.getContext("2d"); paper="#fff";
   try{ ctx.fillStyle="#fff"; ctx.fillRect(0,0,out.width,out.height); ctx.setTransform(k,0,0,k,0,-top*k); all.forEach(draw); }
-  finally{ ctx=keep; }
+  finally{ ctx=keep; paper=PAPER; }
   return new Promise(ok=>out.toBlob(ok,"image/png"));
 }
 async function send(){
@@ -504,7 +702,7 @@ function openFull({host,key:k,pages:n=1,page:p=0,question=null,submit=null,turne
   el.querySelector(".mx-board-back").focus({preventScroll:true,focusVisible:false});   // reachable by keyboard, without a ring on a tap
 }
 function closeFull(){
-  if(!full) return; if(editing) finishMath(true); const f=full; full=null;
+  if(!full) return; if(editing) finishMath(true); if(naming) finishAngle(true); const f=full; full=null;
   el.classList.remove("full"); el.removeAttribute("role"); el.removeAttribute("aria-modal"); el.remove();
   restore(f.saved); f.done?.();
   if(layer?.isConnected&&desk()) again();
