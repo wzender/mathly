@@ -139,8 +139,18 @@ def test_class_teacher_report(phone_server):
         {"email": "dana@example.com", "signed_in": True, "saved_at": None, "progress": {
             "done": {"t_ext": "2026-11-01"}, "gold": {}, "days": {}, "missed": {}, "slips": slips, "updated": 1,
             "quizzes": [{"at": "2026-11-02T10:00:00Z", "n": 12, "right": 9, "ms": 600000, "units": ["t"]}],
-            "uq": {"t": {"history": [{"at": "2026-11-03T10:00:00Z", "score": 85}], "going": False}}}},
-        {"email": "omer@example.com", "signed_in": False, "saved_at": None, "progress": None}]}
+            # the device claims 85; the server's own record of the sitting says 62
+            "uq": {"t": {"history": [{"at": "2026-11-03T10:00:00Z", "score": 85, "sid": "s1"}], "going": False}}},
+         "quiz_sittings": [{"id": "s1", "unit_id": "t", "submitted_at": "2026-11-04T10:00:00Z", "grade": 62, "open": 0}]},
+        {"email": "omer@example.com", "signed_in": False, "saved_at": None, "progress": None, "quiz_sittings": []},
+        {"email": "noa@example.com", "signed_in": True, "saved_at": None, "progress": {   # handed in, a check still waits
+            "done": {}, "gold": {}, "days": {}, "missed": {}, "slips": [], "updated": 1, "quizzes": [],
+            "uq": {"t": {"history": [{"at": "2026-11-04T09:00:00Z", "sid": "s2"}], "going": False}}},
+         "quiz_sittings": [{"id": "s2", "unit_id": "t", "submitted_at": "2026-11-04T09:00:00Z", "grade": None, "open": 1}]},
+        {"email": "ben@example.com", "signed_in": True, "saved_at": None, "progress": {   # from before the server kept sittings
+            "done": {}, "gold": {}, "days": {}, "missed": {}, "slips": [], "updated": 1, "quizzes": [],
+            "uq": {"t": {"history": [{"at": "2026-10-20T09:00:00Z", "score": 100}], "going": False}}},
+         "quiz_sittings": []}]}
     with playwright.sync_playwright() as p:
         browser = p.chromium.launch()
         try:
@@ -168,12 +178,23 @@ def test_class_teacher_report(phone_server):
             playwright.expect(sheet.locator("#mxTitle")).to_have_text("הכיתה שלי: ט׳2")
             playwright.expect(sheet.locator(".mx-report-common")).to_contain_text("1 תלמידים: dana")
             dana, omer = sheet.locator(".mx-report-student").nth(0), sheet.locator(".mx-report-student").nth(1)
-            playwright.expect(dana.locator("summary")).to_contain_text("בוחן 85")
+            playwright.expect(dana.locator("summary")).to_contain_text("בוחן 62")
             playwright.expect(dana.locator("summary")).to_contain_text("תרגול 9/12")
             playwright.expect(omer).to_contain_text("עוד לא נכנס לחשבון")
             dana.locator("summary").click()
-            playwright.expect(dana.locator(".mx-report-table").first).to_contain_text("85/100")
+            quiz = dana.locator("section", has_text="בוחן מסכם").locator(".mx-report-table")
+            playwright.expect(quiz).to_contain_text("62/100")
+            playwright.expect(quiz).not_to_contain_text("85")   # the device's number is never shown
             playwright.expect(dana.locator(".mx-report-table").nth(1)).to_contain_text("75")
+            # the practice data says it comes from the device; the quiz grades do not
+            playwright.expect(dana.locator("section h5", has_text="התקדמות ביחידות")).to_contain_text("נתוני תרגול מהמכשיר")
+            playwright.expect(dana.locator("section h5", has_text="מבחני תרגול")).to_contain_text("נתוני תרגול מהמכשיר")
+            playwright.expect(dana.locator("section h5", has_text="בוחן מסכם")).not_to_contain_text("מהמכשיר")
+            noa, ben = sheet.locator(".mx-report-student").nth(2), sheet.locator(".mx-report-student").nth(3)
+            noa.locator("summary").click(); ben.locator("summary").click()
+            playwright.expect(noa.locator(".mx-report-grade")).to_have_text("ממתין לבדיקה")
+            playwright.expect(ben.locator(".mx-report-grade")).to_have_text("לא מאומת")   # not "100"
+            playwright.expect(ben.locator(".mx-report-student, summary").first).not_to_contain_text("בוחן 100")
             page.locator(".mx-report-sheet .mx-x").click()
             playwright.expect(sheet).to_be_hidden()
         finally:

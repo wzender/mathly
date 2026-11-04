@@ -4,6 +4,10 @@ A class has one teacher, chosen from its students (`classes.teachers`). That acc
 GET /api/classes/{id}/report: for each other student of the class, the parts of their saved progress
 (app/progress.py) the teacher's page shows. The page works out the rest (stars, mistake patterns) the same way the
 student's own page does.
+
+Progress is kept by the student's device, so everything in it is only what the device reports. The unit quizzes'
+grades are the exception: they come from the server's own record of each sitting (app/quiz_grades.py), and a score
+in the uploaded progress is never passed on.
 """
 from __future__ import annotations
 
@@ -13,7 +17,9 @@ from fastapi import Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 from .access import has_permission
+from .answer_scans import ScanError
 from .auth import AuthUnavailable
+from .quiz_grades import sitting_view
 
 log = logging.getLogger("mathly.class_report")
 TABLE = "/rest/v1/math_progress"
@@ -36,11 +42,29 @@ def report_part(data: dict) -> dict:
         history = state.get("history") if isinstance(state, dict) else None
         sitting = state.get("sitting") if isinstance(state, dict) else None
         unit_quizzes[unit] = {
-            "history": [{k: h.get(k) for k in ("at", "score", "timeUp")} for h in history or [] if isinstance(h, dict)],
+            # no score: the device's copy of a grade is not evidence. `sid` ties a submission to the server's sitting.
+            "history": [{k: h.get(k) for k in ("at", "timeUp", "sid")} for h in history or [] if isinstance(h, dict)],
             "going": bool(isinstance(sitting, dict) and sitting.get("started") and not sitting.get("submitted"))}
     return {"done": obj("done"), "gold": obj("gold"), "days": obj("days"), "missed": obj("missed"),
             "slips": items("slips")[-SLIPS_SENT:], "quizzes": quizzes, "uq": unit_quizzes,
             "updated": data.get("updated")}
+
+
+def server_sittings(app, ids: dict[str, str]):
+    """The students' unit-quiz sittings with the server's grades, by email. None when they cannot be read: the report
+    then shows no quiz grades, rather than the device's."""
+    try:
+        raw = app.state.answers.quiz(None, "report", users=list(ids.values())) if ids else []
+    except ScanError as exc:
+        log.warning("quiz sittings not read: %s", exc.code)
+        return None
+    email_of = {user_id: email for email, user_id in ids.items()}
+    out: dict[str, list] = {email: [] for email in ids}
+    for sitting in raw:
+        view = sitting_view(sitting)
+        if view and sitting.get("user_id") in email_of:
+            out[email_of[sitting["user_id"]]].append(view)
+    return out
 
 
 def install_class_report_routes(app, signed_in, units_of):
@@ -72,12 +96,14 @@ def install_class_report_routes(app, signed_in, units_of):
             log.error("class report failed: %s", exc)
             raise HTTPException(503, "report_unavailable") from exc
         by_id = {r["user_id"]: r for r in rows or []}
+        sittings = server_sittings(app, ids)
         out = []
         for email in students:
             saved = by_id.get(ids.get(email, ""))
             data = saved.get("data") if saved else None
             out.append({"email": email, "signed_in": email in ids,
                         "progress": report_part(data) if isinstance(data, dict) else None,
-                        "saved_at": saved.get("updated_at") if saved else None})
+                        "saved_at": saved.get("updated_at") if saved else None,
+                        "quiz_sittings": None if sittings is None else sittings.get(email, [])})
         return JSONResponse({"class": {"id": row["id"], "name": row["name"], "lessons": units_of(row)},
                              "students": out}, headers={"Cache-Control": "no-store"})

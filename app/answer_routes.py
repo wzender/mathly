@@ -14,6 +14,7 @@ from .ai_queue import AiQueue, for_student, may_send
 from .answer_scans import AnswerScans, MAX_IMAGE, ScanError, clean_image, public_result, uuid_text
 from .answer_grading import AnswerGrader
 from .math_photo import PhotoUnavailable
+from .quiz_grades import sitting_view
 from .math_skills import algebra9, question_version, quiz_snapshot
 
 log = logging.getLogger("mathly.answer_routes")
@@ -116,6 +117,27 @@ def install_answer_routes(app, signed_in):
             raise ScanError(409, "question_changed")
         return reply(call(user, "resume", question_id=f"quiz:{unit['id']}:{index}", question_version=version,
                           snapshot=snapshot, new=body.get("new") is True))
+
+    @app.post("/api/math/quiz-sittings")
+    def submit_sitting(body: dict, user=Depends(student)):
+        """Hands a unit quiz in: the sitting is kept on the server and its grade is worked out there from the checks
+        (app/quiz_grades.py). Sending the same `client_key` again returns the same sitting."""
+        if open_ended_locked():
+            raise ScanError(403, "open_ended_locked")
+        unit = next((u for u in algebra9()["units"] if u["id"] == body.get("unit_id") and "quiz" in u), None)
+        attempts = body.get("attempts")
+        if not unit or not isinstance(attempts, list) or len(attempts) != len(unit["quiz"]["questions"]):
+            raise ScanError(404, "not_found")
+        sitting = app.state.answers.quiz(user, "submit", unit_id=unit["id"], attempt_ids=[uuid_text(a) for a in attempts],
+                                         time_up=body.get("time_up") is True, client_key=uuid_text(body.get("client_key")))
+        return JSONResponse(sitting_view(sitting), headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/math/quiz-sittings")
+    def my_sittings(unit_id: str | None = None, user=Depends(student)):
+        """The student's own sittings (newest first), each with the grade the server worked out."""
+        data = {"unit_id": unit_id} if unit_id else {}
+        views = [sitting_view(s) for s in app.state.answers.quiz(user, "list", **data)]
+        return JSONResponse({"sittings": [v for v in views if v]}, headers={"Cache-Control": "no-store"})
 
     @app.get("/api/math/answer-attempts/{attempt_id}")
     def get_attempt(attempt_id: str, user=Depends(student)):

@@ -146,6 +146,19 @@ class AnswerScans:
         raw = self._request("/rest/v1/rpc/math_grade_action", "POST", json.dumps(body).encode(), "application/json")
         return json.loads(raw)
 
+    def quiz(self, user_id: str | None, action: str, **data):
+        """Unit-quiz sittings (app/quiz_grades.py): submit, list a student's own, or `report` for a set of accounts."""
+        if not self.configured:
+            raise ScanError(503, "answer_storage_unavailable")
+        body = {"p_user": user_id, "p_action": action, "p_data": data}
+        try:
+            raw = self._request("/rest/v1/rpc/math_quiz_action", "POST", json.dumps(body).encode(), "application/json")
+        except ScanError as exc:
+            if exc.code == "answer_storage_unavailable":
+                raise ScanError(503, "quiz_sittings_unavailable") from exc
+            raise
+        return json.loads(raw)
+
     def _request(self, path, method="GET", data=None, content_type=None):
         headers = {"Authorization": "Bearer " + self.auth.secret, "apikey": self.auth.secret,
                    "User-Agent": "mathly/1.0"}
@@ -167,7 +180,7 @@ class AnswerScans:
             if code == "P0001" and message == "grading_limit":
                 raise ScanError(429, message) from exc
             if code == "P0001" and message in {"superseded", "invalid_upload", "upload_in_progress", "confirmation_required",
-                                               "answer_required", "grading_busy", "grading_interrupted"}:
+                                               "answer_required", "grading_busy", "grading_interrupted", "invalid_sitting"}:
                 raise ScanError(409, message) from exc
             raise ScanError(503, "answer_storage_unavailable") from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:

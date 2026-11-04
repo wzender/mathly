@@ -4,6 +4,7 @@ import urllib.parse
 
 import httpx
 
+from app.answer_scans import ScanError
 from app.main import create_app
 
 TEACHER, STUDENT, NEWBIE, OUTSIDER = "t-id", "s-id", "n-id", "o-id"
@@ -50,6 +51,28 @@ class ReportAuth:
                 for i in ids if i in self.progress]
 
 
+class Sittings:
+    """The server's record of unit-quiz sittings (app/quiz_grades.py), as the database returns it."""
+    configured = True
+
+    def __init__(self, sittings=(), fail=False):
+        self.sittings, self.fail, self.asked = list(sittings), fail, []
+
+    def quiz(self, user_id, action, **data):
+        self.asked.append((user_id, action, data))
+        if self.fail:
+            raise ScanError(503, "quiz_sittings_unavailable")
+        return [s for s in self.sittings if s["user_id"] in data["users"]]
+
+
+def attempt(score, state="completed", photo=True, verdict="correct"):
+    return {"attempt_id": "a", "has_photo": photo, "grade_state": state, "score": score, "verdict": verdict}
+
+
+def sitting(user, *attempts, sid="s1", at="2026-11-04T09:00:00Z"):
+    return {"id": sid, "user_id": user, "unit_id": "t", "submitted_at": at, "time_up": False, "attempts": list(attempts)}
+
+
 def client(app, user):
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test",
                              headers={"Authorization": f"Bearer {user}"})
@@ -57,6 +80,7 @@ def client(app, user):
 
 def test_teacher_sees_the_other_students():
     app = create_app(auth=ReportAuth())
+    app.state.answers = Sittings()
 
     async def check():
         async with client(app, TEACHER) as c:
@@ -67,12 +91,12 @@ def test_teacher_sees_the_other_students():
             students = {s["email"]: s for s in data["students"]}
             assert "teacher@x.test" not in students   # the teacher is not in their own report
             assert students["ghost@x.test"] == {"email": "ghost@x.test", "signed_in": False, "progress": None,
-                                                "saved_at": None}
+                                                "saved_at": None, "quiz_sittings": []}
             assert students["newbie@x.test"]["signed_in"] and students["newbie@x.test"]["progress"] is None
             p = students["student@x.test"]["progress"]
             assert p["done"] == {"t1": "2026-11-01"} and p["slips"][0]["m"] == "sign"
             assert p["quizzes"] == [{"at": "2026-11-02", "n": 12, "right": 9, "ms": 600000, "units": ["t"]}]
-            assert p["uq"] == {"t": {"history": [{"at": "2026-11-03", "score": 85, "timeUp": None}], "going": False}}
+            assert p["uq"] == {"t": {"history": [{"at": "2026-11-03", "timeUp": None, "sid": None}], "going": False}}
             assert "comets" not in p
             assert (await c.get("/api/classes/99/report")).status_code == 404
             me = (await c.get("/api/me")).json()
@@ -81,6 +105,42 @@ def test_teacher_sees_the_other_students():
             async with client(app, other) as c:
                 assert (await c.get("/api/classes/3/report")).status_code == 403
 
+    asyncio.run(check())
+
+
+def test_unit_quiz_grades_are_the_servers_and_not_the_devices():
+    auth = ReportAuth()   # the student's uploaded progress claims 85 for unit t
+    app = create_app(auth=auth)
+    app.state.answers = answers = Sittings([
+        sitting(STUDENT, attempt(100), attempt(60), attempt(40), attempt(48), sid="s-done"),   # 25 + 15 + 10 + 12
+        sitting(NEWBIE, attempt(100), attempt(None, state="grading", verdict=None), attempt(100), attempt(100),
+                sid="s-open"),
+        sitting(OUTSIDER, attempt(100), attempt(100), attempt(100), attempt(100), sid="s-other-class")])
+
+    async def check():
+        async with client(app, TEACHER) as c:
+            data = (await c.get("/api/classes/3/report")).json()
+            students = {s["email"]: s for s in data["students"]}
+            done = students["student@x.test"]["quiz_sittings"]
+            assert [(x["id"], x["grade"], x["open"]) for x in done] == [("s-done", 62, 0)]   # not 85
+            waiting = students["newbie@x.test"]["quiz_sittings"]
+            assert [(x["id"], x["grade"], x["open"]) for x in waiting] == [("s-open", None, 1)]
+            assert students["ghost@x.test"]["quiz_sittings"] == []
+            assert "score" not in str(students["student@x.test"]["progress"]["uq"])   # the device's number is not passed on
+            assert answers.asked[0][:2] == (None, "report")
+            assert OUTSIDER not in answers.asked[0][2]["users"] and "s-other-class" not in str(students)
+    asyncio.run(check())
+
+
+def test_without_the_servers_record_the_report_shows_no_quiz_grades():
+    app = create_app(auth=ReportAuth())
+    app.state.answers = Sittings(fail=True)
+
+    async def check():
+        async with client(app, TEACHER) as c:
+            r = await c.get("/api/classes/3/report")
+            assert r.status_code == 200
+            assert all(s["quiz_sittings"] is None for s in r.json()["students"])
     asyncio.run(check())
 
 

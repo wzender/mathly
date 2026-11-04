@@ -809,3 +809,4 @@ body{--keyboard-zindex:3000}
 .mx-error-details[open]>summary{border-color:var(--sumac)}
 .mx-error-details p{margin:8px 0 0}
 .mx-error-details code{display:block;margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--surface-2);color:var(--muted);font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;text-align:left}
+.mx-device{font-weight:400;color:var(--muted)}

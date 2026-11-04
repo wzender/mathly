@@ -185,6 +185,17 @@ def test_a_unit_quiz_is_written_photographed_handed_in_and_then_checked(quiz_ser
             page.locator("[data-uq-result]").first.click()
             playwright.expect(page.locator(".mx-uq-sheet h3")).to_have_text("בוחן מסכם: 65/100", timeout=10000)
             assert len(calls) == 3 and not errors
+            # a score written into this device's progress does not change what the result screen shows
+            page.evaluate("""() => { for (const k of Object.keys(localStorage)) if (k.startsWith('mathly.progress.v1:')) {
+                const p = JSON.parse(localStorage.getItem(k)); p.uq.t.history.at(-1).score = 100;
+                localStorage.setItem(k, JSON.stringify(p)); } }""")
+            page.reload()
+            page.locator('.mx-nav [data-view="path"]').click()
+            page.locator('.mx-uquiz[data-uquiz="t"]').click()
+            page.locator("[data-uq-result]").first.click()
+            playwright.expect(page.locator(".mx-uq-sheet h3")).to_have_text("בוחן מסכם: 65/100", timeout=10000)
+            playwright.expect(page.locator(".mx-uq-qhead span")).to_have_text(["25/25 נק׳", "15/25 נק׳", "25/25 נק׳", "0/25 נק׳"])
+            assert len(calls) == 3 and not errors
         finally:
             browser.close()
 
@@ -295,3 +306,120 @@ def test_on_a_phone_a_unit_quiz_answer_is_handed_in_from_the_full_screen_board(q
             assert errors == []
         finally:
             browser.close()
+
+
+# ---- sittings kept on the server (app/quiz_grades.py)
+def quiz_answer(store, index, *, unit="t", photo=True, owner=OWNER):
+    """A fresh attempt at quiz question `index` of `unit`, with a saved photo when asked."""
+    from test_answer_scans import begin, finish
+    graph_unit = next(u for u in algebra9()["units"] if u["id"] == unit)
+    snapshot = quiz_snapshot(graph_unit, index)
+    made = store.action(owner, "resume", question_id=f"quiz:{unit}:{index}", question_version=question_version(snapshot),
+                        snapshot=snapshot, new=True)
+    aid = made["attempt"]["id"]
+    if photo:
+        scan = store.action(owner, "create_scan", attempt_id=aid)
+        finish(store, begin(store, scan))
+    return aid
+
+
+def check(store, aid, score, owner=OWNER):
+    import uuid
+    lease = str(uuid.uuid4())
+    store.grade(owner, "start", attempt_id=aid, lease_id=lease)
+    store.grade(owner, "complete", attempt_id=aid, lease_id=lease, result=validate_assessment(assessment(score=score)))
+
+
+def test_the_sittings_migration_is_additive_and_service_only(answer_store):
+    import psycopg
+    with answer_store.connect() as c:
+        assert c.execute("select name from classes").fetchone()[0] == "existing math class"
+        assert c.execute("select relrowsecurity from pg_class where relname='math_quiz_sittings'").fetchone()[0]
+        c.execute("set role authenticated")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute("select * from math_quiz_sittings")
+        c.execute("reset role")
+        c.execute("set role anon")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute("select math_quiz_action(null,'report','{\"users\":[]}')")
+
+
+def sitting_app(store):
+    app = create_app(auth=ScanAuth()); app.state.answers = store
+    return app
+
+
+def api(app, user=OWNER):
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test",
+                             headers={"Authorization": f"Bearer {user}"})
+
+
+def test_handing_in_keeps_a_sitting_with_a_grade_from_the_stored_checks(answer_store):
+    store = answer_store
+    ids = [quiz_answer(store, i, photo=i < 3) for i in range(4)]   # the last question has no photo
+    for aid, score in zip(ids[:3], (100, 60, 80)):
+        check(store, aid, score)
+    key = "9f0d6c3e-8c51-4a51-9c7e-0d5f4b8a1e11"
+    app = sitting_app(store)
+
+    async def run():
+        async with api(app) as c:
+            r = await c.post("/api/math/quiz-sittings", json={"unit_id": "t", "attempts": ids, "client_key": key})
+            assert r.status_code == 200
+            sitting = r.json()
+            assert sitting["unit_id"] == "t" and sitting["attempts"] == ids
+            assert sitting["grade"] == 25 + 15 + 20 + 0 and sitting["open"] == 0
+            again = (await c.post("/api/math/quiz-sittings", json={"unit_id": "t", "attempts": ids, "client_key": key,
+                                                                   "time_up": True})).json()
+            assert again["id"] == sitting["id"]                                   # a lost response, sent again
+            mine = (await c.get("/api/math/quiz-sittings", params={"unit_id": "t"})).json()["sittings"]
+            assert [s["id"] for s in mine] == [sitting["id"]]
+            assert (await c.get("/api/math/quiz-sittings", params={"unit_id": "k"})).json() == {"sittings": []}
+    asyncio.run(run())
+    with answer_store.connect() as c:
+        assert c.execute("select count(*) from math_quiz_sittings").fetchone()[0] == 1
+
+
+def test_a_sitting_with_the_wrong_attempts_is_refused(answer_store):
+    store = answer_store
+    ids = [quiz_answer(store, i) for i in range(4)]
+    theirs = quiz_answer(store, 0, owner=OTHER, photo=False)
+    other_unit = quiz_answer(store, 0, unit="k")
+    app = sitting_app(store)
+    post = lambda c, attempts, key, unit="t": c.post("/api/math/quiz-sittings",
+                                                      json={"unit_id": unit, "attempts": attempts, "client_key": key})
+    keys = [f"00000000-0000-4000-8000-00000000000{i}" for i in range(6)]
+
+    async def run():
+        async with api(app) as c:
+            assert (await post(c, [theirs] + ids[1:], keys[0])).status_code == 409            # another student's
+            assert (await post(c, [ids[1], ids[0], ids[2], ids[3]], keys[1])).status_code == 409   # wrong order
+            assert (await post(c, [other_unit] + ids[1:], keys[2])).status_code == 409        # another unit's question
+            assert (await post(c, ids[:3], keys[3])).status_code == 404                       # a question short
+            assert (await post(c, ids, keys[4], unit="nope")).status_code == 404
+            assert (await post(c, ["x"] * 4, keys[5])).status_code == 404                     # not attempt ids
+            assert (await post(c, ids, keys[0])).status_code == 200
+            reused = await post(c, ids, keys[1])                                              # the same attempts again
+            assert (reused.status_code, reused.json()["detail"]) == (409, "invalid_sitting")
+    asyncio.run(run())
+    with answer_store.connect() as c:
+        assert c.execute("select count(*) from math_quiz_sittings").fetchone()[0] == 1
+
+
+def test_a_check_that_finishes_after_handing_in_gives_the_sitting_its_grade(answer_store):
+    store = answer_store
+    ids = [quiz_answer(store, i) for i in range(4)]
+    for aid in ids[:3]:
+        check(store, aid, 100)
+    app = sitting_app(store)
+
+    async def run():
+        async with api(app) as c:
+            first = (await c.post("/api/math/quiz-sittings", json={"unit_id": "t", "attempts": ids,
+                                  "client_key": "9f0d6c3e-8c51-4a51-9c7e-0d5f4b8a1e11"})).json()
+            assert first["grade"] is None and first["open"] == 1
+            assert first["questions"][3]["state"] == "waiting"
+            check(store, ids[3], 40)                                  # for example the teacher sends it from the queue
+            mine = (await c.get("/api/math/quiz-sittings", params={"unit_id": "t"})).json()["sittings"]
+            assert mine[0]["grade"] == 85 and mine[0]["open"] == 0
+    asyncio.run(run())

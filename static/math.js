@@ -819,7 +819,7 @@ async function uqJson(url,options={}){
   return d;
 }
 const uqPost=(url,body={})=>uqJson(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-const UQ_ERRORS={question_changed:"הבוחן עודכן. רעננו את העמוד והתחילו מחדש.",image_too_large:"התמונה גדולה מדי. צלמו שוב.",invalid_image:"לא ניתן לקרוא את התמונה. צלמו שוב.",
+const UQ_ERRORS={quiz_sittings_unavailable:"שמירת ההגשה אינה זמינה כרגע. נסו שוב מאוחר יותר.",invalid_sitting:"ההגשה לא תואמת לתשובות השמורות. פתחו את הבוחן מחדש.",question_changed:"הבוחן עודכן. רעננו את העמוד והתחילו מחדש.",image_too_large:"התמונה גדולה מדי. צלמו שוב.",invalid_image:"לא ניתן לקרוא את התמונה. צלמו שוב.",
   unsupported_image:"בחרו תמונת JPEG, PNG או WebP.",answer_storage_unavailable:"שמירת תשובות אינה זמינה כרגע.",grading_unavailable:"הבדיקה האוטומטית אינה זמינה כרגע.",
   grading_failed:"הבדיקה נכשלה. התמונה נשמרה; אפשר לנסות שוב.",grading_limit:"הגעתם למכסת הבדיקות היומית. נסו שוב מחר.",grading_busy:"כבר מתבצעות בדיקות. נסו שוב בעוד רגע.",
   upload_in_progress:"העלאה כבר מתבצעת. רגע…",open_ended_locked:"בוחנים פתוחים סגורים כרגע באתר.",sign_in_required:"יש להיכנס לחשבון."};
@@ -973,10 +973,20 @@ function uqSubmit(timeUp=false){
     return;
   }
   sit.submitted=Date.now();
-  const st=uqState(uid); st.history.push({at:new Date().toISOString(),attempts:sit.attempts.slice(),score:null,timeUp}); st.history=st.history.slice(-10);
+  const st=uqState(uid); st.history.push({at:new Date().toISOString(),attempts:sit.attempts.slice(),score:null,timeUp,ck:crypto.randomUUID()}); st.history=st.history.slice(-10);
   save(); draw();
   uqResult(uid,st.history.length-1,true);
 }
+/* The grade of a sitting is worked out by the server from the stored checks (app/quiz_grades.py); the score kept in
+   this device's progress is only a copy of it. A sitting is handed in on the server once (`sid`); the same key makes
+   a retry after a lost response the same sitting. */
+async function uqSend(uid,entry){
+  if(entry.sid) return entry.sid;
+  if(!entry.ck){ entry.ck=crypto.randomUUID(); save(); }
+  entry.sid=(await uqPost("/api/math/quiz-sittings",{unit_id:uid,attempts:entry.attempts,time_up:!!entry.timeUp,client_key:entry.ck})).id;
+  save(); return entry.sid;
+}
+async function uqSitting(uid,sid){ return (await uqJson(`/api/math/quiz-sittings?unit_id=${encodeURIComponent(uid)}`)).sittings.find(x=>x.id===sid)||null; }
 // the report: each answer is checked now (once), then points per question, feedback and the solution
 async function uqResult(uid,h,check=false){
   const u=G.units.find(x=>x.id===uid), st=uqState(uid), entry=st.history[h];
@@ -989,6 +999,9 @@ async function uqResult(uid,h,check=false){
         <small class="mx-src" aria-live="polite">${CFG.aiDirect===false?"שולחים את התשובות לבדיקת המורה":"בודקים את התשובות, זה לוקח כחצי דקה לשאלה"}</small></div>
         <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div><div class="mx-uq-report"></div></div>`;
   sheet.hidden=false; sheet.querySelector(".mx-x").focus({preventScroll:true});
+  let sendError="";
+  try{ await uqSend(uid,entry); }catch(e){ sendError=e.message; }
+  if(UQ?.uid!==uid) return;
   const results=[];
   for(let i=0;i<n;i++){
     let r=null;
@@ -1004,16 +1017,17 @@ async function uqResult(uid,h,check=false){
     if(UQ?.uid!==uid) return;
     results.push(r);
   }
-  // points: a checked answer earns its share; a missing one 0; one not checked yet leaves the total open
-  let earned=0, open=0;
+  // points: the server's, per question (a checked answer earns its share; a missing one 0; one not checked yet leaves the total open)
+  let sitting=null;
+  if(entry.sid){ try{ sitting=await uqSitting(uid,entry.sid); }catch(e){ sendError||=e.message; } }
+  if(UQ?.uid!==uid) return;
   const rows=u.quiz.questions.map((q,i)=>{
-    const r=results[i], g=r?.grading, a=g?.state==="completed"?g.result:null;
-    let pts=null, say="";
-    if(!r?.attachment) { pts=0; say="לא צולמה תשובה"; }
-    else if(a&&a.score!=null){ pts=Math.round(q.points*a.score/100); say={correct:"נכון ומלא",partial:"נכון בחלקו",incorrect:"לא נכון"}[a.verdict]||""; }
-    else { open++; const req=a?null:r.ai_request;
+    const r=results[i], g=r?.grading, a=g?.state==="completed"?g.result:null, pts=sitting?sitting.questions[i].earned:null;
+    let say="";
+    if(!r?.attachment) say="לא צולמה תשובה";
+    else if(a&&a.score!=null) say={correct:"נכון ומלא",partial:"נכון בחלקו",incorrect:"לא נכון"}[a.verdict]||"";
+    else { const req=a?null:r.ai_request;
       say=req&&["pending","sending","failed"].includes(req.state)?"מחכה למורה שיאשר את הבדיקה":req?.state==="declined"?`המורה לא אישר את הבדיקה${req.note?`: ${req.note}`:""}`:a?.verdict==="unreadable"?"לא הצלחנו לקרוא את התמונה":a?.verdict==="needs_review"?"נדרשת בדיקה של מורה":r.error||(!r.grading_available?"הבדיקה האוטומטית אינה זמינה כרגע":"עוד לא נבדקה"); }
-    if(pts!=null) earned+=pts;
     return `<li class="mx-uq-q"><div class="mx-uq-qhead"><b>שאלה ${i+1}</b><span>${pts==null?"–":pts}/${q.points} נק׳</span></div>
       <p class="mx-uq-text">${fmt(q.question).replace(/\n/g,"<br>")}</p>
       ${UQ.images[i]?`<img class="mx-uq-img" alt="התשובה שלכם לשאלה ${i+1}" src="${UQ.images[i]}">`:""}
@@ -1022,12 +1036,14 @@ async function uqResult(uid,h,check=false){
       ${a?.solution?`<details><summary>הפתרון המלא</summary><p class="mx-grade-solution">${fmtLoose(a.solution)}</p></details>`:""}
       ${r?.attachment&&!a&&r.grading_available&&!["pending","sending","failed"].includes(r.ai_request?.state)?`<button class="mx-btn" data-uq-result="${uid}:${h}:check">${CFG.aiDirect===false?"שליחה מחדש למורה":"בדיקה נוספת"}</button>`:""}</li>`;
   });
-  entry.score=open?null:earned; save(); draw();
-  const total=open?`${earned} נקודות עד עכשיו · ${open===1?"שאלה אחת לא נבדקה":`${open} שאלות לא נבדקו`}`:`${earned}/100`;
+  const earned=sitting?sitting.questions.reduce((sum,x)=>sum+(x.earned||0),0):0, open=sitting?sitting.open:n;
+  entry.score=sitting?.grade??null; save(); draw();
+  const total=!sitting?"ההגשה לא נשמרה בשרת":open?`${earned} נקודות עד עכשיו · ${open===1?"שאלה אחת לא נבדקה":`${open} שאלות לא נבדקו`}`:`${earned}/100`;
   sheet.querySelector("#mxTitle").textContent=`בוחן מסכם: ${total}`;
   sheet.querySelector(".mx-src").textContent=`הוגש ${new Date(entry.at).toLocaleString("he-IL",{dateStyle:"short",timeStyle:"short"})}${entry.timeUp?" · הוגש כשהזמן נגמר":""}`;
   const weak=u.quiz.questions.map((q,i)=>i).filter(i=>{ const a=results[i]?.grading?.result; return !results[i]?.attachment||(a&&a.score!=null&&a.score<70); });
   sheet.querySelector(".mx-uq-report").innerHTML=`<ol class="mx-uq-qs">${rows.join("")}</ol>
+    ${sendError&&!sitting?`<p class="mx-note mx-quiz-warn">${esc(sendError)} <button class="mx-btn" data-uq-result="${uid}:${h}:check">ניסיון נוסף</button></p>`:""}
     ${weak.length&&!open?`<p class="mx-note">כדאי לחזור על ${weak.map(i=>`שאלה ${i+1}`).join(", ")} ולתרגל את המיומנויות של היחידה במסלול לפני הבוחן הבא.</p>`:""}
     <p class="mx-small">הבדיקה אוטומטית באמצעות AI: בדקו שהיא תואמת למה שכתבתם, ואם משהו נראה לא נכון, הראו למורה.</p>
     <div class="mx-quiz-nav"><button class="mx-btn" data-uquiz="${uid}">לבוחן</button><button class="mx-btn solid" data-act="close">חזרה למסלול</button></div>`;
@@ -1443,11 +1459,17 @@ function reportOf(student,units){
     gold:ids.filter(id=>p.gold?.[id]).length,stuck:ids.filter(id=>!p.done?.[id]&&(p.missed?.[id]||[]).length).map(id=>BY[id])}; });
   const n=perUnit.reduce((s,x)=>s+x.n,0), done=perUnit.reduce((s,x)=>s+x.done,0);
   const {recurring}=Sky.patterns(p,G.mistakes);
-  const quizzes=units.filter(u=>u.quiz).map(u=>({u,st:p.uq?.[u.id]||{history:[]}}));
-  const scores=quizzes.map(x=>x.st.history.filter(h=>h.score!=null).at(-1)?.score).filter(s=>s!=null);
+  // the unit quizzes' grades are the server's (student.quiz_sittings, oldest first; null: they could not be read); the
+  // device's own history only says which submissions the server has not seen ("unverified")
+  const sittings=student.quiz_sittings;
+  const quizzes=units.filter(u=>u.quiz).map(u=>{
+    const st=p.uq?.[u.id]||{history:[]}, mine=(sittings||[]).filter(x=>x.unit_id===u.id), known=new Set(mine.map(x=>x.id));
+    return {u,st,last:mine.at(-1)||null,count:mine.length,unverified:st.history.filter(h=>!h.sid||!known.has(h.sid)).length};
+  });
+  const scores=quizzes.map(x=>x.last?.grade).filter(g=>g!=null);
   const exams=(p.quizzes||[]).slice().reverse();
   const days=Object.keys(p.days||{}).sort(), last=[p.updated?new Date(+p.updated):null,days.length?new Date(days.at(-1)):null].filter(d=>d&&!isNaN(d)).sort((a,b)=>b-a)[0];
-  return {perUnit,n,done,recurring:recurring.filter(x=>G.mistakes[x.m]),quizzes,quizAvg:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null,exams,last};
+  return {perUnit,n,done,recurring:recurring.filter(x=>G.mistakes[x.m]),quizzes,quizzesKnown:sittings!=null,quizAvg:scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null,exams,last};
 }
 async function classReport(id){
   const mine=teachClasses(), classId=id??REPORT?.id??mine[0]?.id; if(classId==null) return;
@@ -1479,6 +1501,7 @@ function drawReport(){
   const top=Object.entries(common).sort((a,b)=>b[1].length-a[1].length).slice(0,5);
   const name=email=>email.split("@")[0];
   const quizUnits=units.filter(u=>u.quiz);
+  const DEVICE_NOTE=' <small class="mx-device" title="המכשיר של התלמיד מדווח את הנתונים האלה, והשרת לא בודק אותם">· נתוני תרגול מהמכשיר</small>';
   const grade=score=>score==null?"–":`${score}`;
   const tone=score=>score==null?"":score>=80?" good":score>=55?" mid":" low";
   const card=({s,r})=>{
@@ -1486,17 +1509,19 @@ function drawReport(){
     const exam=r.exams[0];
     return `<details class="mx-report-student"><summary><b dir="ltr">${esc(name(s.email))}</b>
         <span class="mx-report-prog"><span class="mx-meter" aria-hidden="true"><i style="width:${pct(r.done,r.n)}%"></i></span><small>${r.done}/${r.n} מיומנויות</small></span>
-        <span class="mx-report-chip${tone(r.quizAvg)}" title="ממוצע בחנים מסכמים">בוחן ${grade(r.quizAvg)}</span>
-        <span class="mx-report-chip${tone(exam?pct(exam.right,exam.n):null)}" title="מבחן התרגול האחרון">תרגול ${exam?`${exam.right}/${exam.n}`:"–"}</span>
+        <span class="mx-report-chip${tone(r.quizAvg)}" title="ממוצע בחנים מסכמים שנבדקו">בוחן ${grade(r.quizAvg)}</span>
+        <span class="mx-report-chip${tone(exam?pct(exam.right,exam.n):null)}" title="מבחן התרגול האחרון (נתוני מכשיר)">תרגול ${exam?`${exam.right}/${exam.n}`:"–"}</span>
         ${r.recurring.length?`<span class="mx-report-chip low">${r.recurring.length} קשיים</span>`:""}</summary>
       <div class="mx-report-body">
         <p class="mx-small"><span dir="ltr">${esc(s.email)}</span>${r.last?` · פעילות אחרונה ${r.last.toLocaleDateString("he-IL")}`:""}</p>
-        <section><h5>התקדמות ביחידות</h5><div class="mx-quiz-units-score">${r.perUnit.map(x=>`<div><span>${esc(x.u.name)}${x.gold?` <small>· ${x.gold} זהב</small>`:""}</span><b>${x.done}/${x.n}</b><span class="mx-meter" aria-hidden="true"><i style="width:${pct(x.done,x.n)}%"></i></span></div>`).join("")}</div></section>
-        <section><h5>קשיים</h5>${r.recurring.length?`<ul class="mx-report-list">${r.recurring.map(x=>`<li><b>${fmt(G.mistakes[x.m].name)}</b> <small>${x.n} פעמים ב־${x.skills.length} מיומנויות, לאחרונה ${shortDate(x.last)}</small>${BY[x.practise]?`<small>לחזק: ${fmt(BY[x.practise].name)}</small>`:""}</li>`).join("")}</ul>`:'<p class="mx-small">אין טעויות שחוזרות לאחרונה.</p>'}
+        <section><h5>התקדמות ביחידות${DEVICE_NOTE}</h5><div class="mx-quiz-units-score">${r.perUnit.map(x=>`<div><span>${esc(x.u.name)}${x.gold?` <small>· ${x.gold} זהב</small>`:""}</span><b>${x.done}/${x.n}</b><span class="mx-meter" aria-hidden="true"><i style="width:${pct(x.done,x.n)}%"></i></span></div>`).join("")}</div></section>
+        <section><h5>קשיים${DEVICE_NOTE}</h5>${r.recurring.length?`<ul class="mx-report-list">${r.recurring.map(x=>`<li><b>${fmt(G.mistakes[x.m].name)}</b> <small>${x.n} פעמים ב־${x.skills.length} מיומנויות, לאחרונה ${shortDate(x.last)}</small>${BY[x.practise]?`<small>לחזק: ${fmt(BY[x.practise].name)}</small>`:""}</li>`).join("")}</ul>`:'<p class="mx-small">אין טעויות שחוזרות לאחרונה.</p>'}
           ${r.perUnit.some(x=>x.stuck.length)?`<p class="mx-small">מיומנויות עם שאלות שעוד לא נפתרו: ${r.perUnit.flatMap(x=>x.stuck).slice(0,8).map(sk=>fmt(sk.name)).join(" · ")}</p>`:""}</section>
-        <section><h5>בוחן מסכם</h5>${quizUnits.length?`<table class="mx-report-table"><thead><tr><th>יחידה</th><th>ציון אחרון</th><th>הגשות</th><th>תאריך</th></tr></thead><tbody>${r.quizzes.map(({u,st})=>{ const h=st.history.at(-1);
-            return `<tr><td>${esc(u.name)}</td><td class="mx-report-grade${tone(h?.score)}">${st.going?"בתהליך":h?(h.score==null?"ממתין לבדיקה":`${h.score}/100`):"–"}</td><td>${st.history.length||"–"}</td><td>${h?shortDate(h.at):"–"}</td></tr>`; }).join("")}</tbody></table>`:'<p class="mx-small">ליחידות של הכיתה אין בוחן מסכם.</p>'}</section>
-        <section><h5>מבחני תרגול</h5>${r.exams.length?`<table class="mx-report-table"><thead><tr><th>תאריך</th><th>ציון</th><th>תשובות נכונות</th><th>זמן</th></tr></thead><tbody>${r.exams.slice(0,10).map(q=>`<tr><td>${shortDate(q.at)}</td><td class="mx-report-grade${tone(pct(q.right,q.n))}">${pct(q.right,q.n)}</td><td>${q.right}/${q.n}</td><td>${q.ms?`${Math.round(q.ms/60000)} דק׳`:"–"}</td></tr>`).join("")}</tbody></table>`:'<p class="mx-small">עוד לא נעשו מבחני תרגול.</p>'}</section>
+        <section><h5>בוחן מסכם</h5>${quizUnits.length?`<table class="mx-report-table"><thead><tr><th>יחידה</th><th>ציון אחרון</th><th>הגשות</th><th>תאריך</th></tr></thead><tbody>${r.quizzes.map(({u,st,last,count,unverified})=>{
+            const cell=st.going?"בתהליך":!r.quizzesKnown?"לא זמין":last?(last.grade==null?"ממתין לבדיקה":`${last.grade}/100`):unverified?"לא מאומת":"–";
+            const subs=`${count||(unverified?"":"–")}${unverified&&r.quizzesKnown?`${count?" ":""}<small>(${unverified} לא מאומתות)</small>`:""}`;
+            return `<tr><td>${esc(u.name)}</td><td class="mx-report-grade${tone(last?.grade)}">${cell}</td><td>${subs}</td><td>${last?shortDate(last.submitted_at):"–"}</td></tr>`; }).join("")}</tbody></table>`:'<p class="mx-small">ליחידות של הכיתה אין בוחן מסכם.</p>'}</section>
+        <section><h5>מבחני תרגול${DEVICE_NOTE}</h5>${r.exams.length?`<table class="mx-report-table"><thead><tr><th>תאריך</th><th>ציון</th><th>תשובות נכונות</th><th>זמן</th></tr></thead><tbody>${r.exams.slice(0,10).map(q=>`<tr><td>${shortDate(q.at)}</td><td class="mx-report-grade${tone(pct(q.right,q.n))}">${pct(q.right,q.n)}</td><td>${q.right}/${q.n}</td><td>${q.ms?`${Math.round(q.ms/60000)} דק׳`:"–"}</td></tr>`).join("")}</tbody></table>`:'<p class="mx-small">עוד לא נעשו מבחני תרגול.</p>'}</section>
       </div></details>`;
   };
   sheet.querySelector(".mx-report").innerHTML=`

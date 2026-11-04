@@ -68,6 +68,9 @@ class DatabaseAnswers(AnswerScans):
     def grade(self, user_id, action, **data):
         return self.rpc('math_grade_action', user_id, action, data)
 
+    def quiz(self, user_id, action, **data):
+        return self.rpc('math_quiz_action', user_id, action, data)
+
     def rpc(self, name, user_id, action, data):
         import psycopg
         if self.fail_finalize and action == 'finalize':
@@ -125,6 +128,8 @@ def answer_store(postgres_server, tmp_path):
         for migration in sorted(Path('supabase/migrations').glob('*_math_answer_*.sql')):
             if migration.name.endswith('_math_answer_scans.sql'):
                 continue
+            c.execute(migration.read_text())
+        for migration in sorted(Path('supabase/migrations').glob('*_math_quiz_sittings.sql')):
             c.execute(migration.read_text())
         c.execute('insert into auth.users values(%s),(%s)', (OWNER, OTHER))
     yield store
