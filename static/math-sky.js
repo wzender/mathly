@@ -133,7 +133,7 @@ function attention(student,{skills={},units=[],assignments=[]}={},now=new Date()
     if(g&&g.grade<LOW_GRADE) out.push({kind:"grade",unit:u.id,text:`ציון נמוך בבוחן ${u.name}: ${g.grade}`});
   }
   for(const a of assignments){   // an assignment past its due date and not finished (left out when a unit quiz cannot be told)
-    const st=assignmentState(a,P,student.quiz_sittings,now);
+    const st=assignmentState(a,P,{sittings:student.quiz_sittings,submissions:student.worksheet_submissions},now);
     if(st.overdue&&st.items.every(x=>x.known)) out.push({kind:"assignment",assignment:a.id,text:`משימה באיחור: ${a.title}`});
   }
   return out;
@@ -144,20 +144,28 @@ function attention(student,{skills={},units=[],assignments=[]}={},now=new Date()
    screen and in the teacher's report. A skill is done when it is finished, whenever that was. A unit quiz is done when
    the server has a sitting of it handed in after the assignment was made (`sittings`: [{unit_id, submitted_at}], null
    when the server's record could not be read), and a practice exam when one covering all the item's units was taken
-   after that (P.quizzes). Dates are Jerusalem days: an item done on the due date is on time. */
+   after that (P.quizzes), and a worksheet when the student handed in a solution (`submissions`: [{worksheet_id,
+   submitted_at, …}] from app/worksheets.py, null when they could not be read). The third argument is {sittings,
+   submissions}; a bare array is the sittings. Dates are Jerusalem days: an item done on the due date is on time. */
 const jerusalemDay=t=>new Date(t).toLocaleDateString("en-CA",{timeZone:"Asia/Jerusalem"});   // YYYY-MM-DD
-function assignmentState(a,P,sittings,now=new Date()){
+function assignmentState(a,P,server,now=new Date()){
+  const {sittings,submissions}=Array.isArray(server)||server==null?{sittings:server,submissions:[]}:server;
   const created=Date.parse(a.created_at)||0, due=String(a.due_on);
   const earliest=list=>list.filter(Boolean).sort()[0]||null;
   const items=(a.items||[]).map(item=>{
-    let at=null, known=true;
+    let at=null, known=true, submission=null;
     if(item.kind==="skill") at=P?.done?.[item.id]||null;
     else if(item.kind==="unit_quiz"){
       known=Array.isArray(sittings);
       at=earliest((sittings||[]).filter(x=>x.unit_id===item.unit&&Date.parse(x.submitted_at)>created).map(x=>x.submitted_at));
     }else if(item.kind==="exam")
       at=earliest((P?.quizzes||[]).filter(x=>Date.parse(x.at)>created&&(item.units||[]).every(u=>(x.units||[]).includes(u))).map(x=>x.at));
-    return {item,done:!!at,at,known,late:!!at&&jerusalemDay(at)>due};
+    else if(item.kind==="worksheet"){
+      known=Array.isArray(submissions);
+      submission=(submissions||[]).find(x=>x.worksheet_id===item.id)||null;
+      at=submission?.submitted_at||null;
+    }
+    return {item,done:!!at,at,known,submission,late:!!at&&jerusalemDay(at)>due};
   });
   const doneCount=items.filter(x=>x.done).length, finished=items.length>0&&doneCount===items.length;
   return {items,doneCount,total:items.length,finished,overdue:!finished&&jerusalemDay(now)>due,

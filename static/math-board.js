@@ -42,7 +42,8 @@ const ICONS={
   send:'<path d="M12 15V4M7 9l5-5 5 5M5 15v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4"/>',
   done:'<path d="M5 12.5l4.5 4.5L19 7"/>',
   back:'<path d="M19 12H5M11 6l-6 6 6 6"/>',
-  top:'<path d="M12 19V5M6 11l6-6 6 6"/>'};
+  top:'<path d="M12 19V5M6 11l6-6 6 6"/>',
+  calc:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8.5 7.5h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/>'};
 const FLIP=new Set(["undo","back"]);
 const ic=n=>`<svg class="mx-ic${FLIP.has(n)?" mx-ic-flip":""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
 const MATH_SIZE=26;
@@ -79,6 +80,139 @@ const shown=()=>!!el?.isConnected&&canvas.clientWidth>0;
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 const same=(a,b)=>dist(a,b)<.5;
 
+/* The calculator: a scientific one in the layout of the Casio fx-991ES PLUS, on a panel over the paper's corner
+   (the toolbar's calculator button). SHIFT gives the second function printed above a key (sin⁻¹, 10ˣ, x³, nCr, ...),
+   DEG/RAD/GRA is the angle unit, S⇔D turns an answer into a fraction and back, Ans is the last answer.
+   The expression is read by a small parser, never evaluated as code. */
+// [label, what it types (or an @command), shift label, what shift types, class]
+const CALC_KEYS=[
+  ["SHIFT","@shift",,,"fn shift"],["DEG","@mode",,,"fn"],["S⇔D","@sd",,,"fn"],["nPr","nPr","nCr","nCr","fn"],["%","%",,,"fn"],
+  ["sin","sin(","sin⁻¹","sin⁻¹(","fn"],["cos","cos(","cos⁻¹","cos⁻¹(","fn"],["tan","tan(","tan⁻¹","tan⁻¹(","fn"],["log","log(","10ˣ","10^(","fn"],["ln","ln(","eˣ","e^(","fn"],
+  ["(","(",,,"fn"],[")",")",,,"fn"],["x²","^2","x³","^3","fn"],["xʸ","^",,,"fn"],["√","√(","³√","³√(","fn"],
+  ["x⁻¹","^(−1)","x!","!","fn"],["|x|","Abs(",,,"fn"],["π","π","e","e","fn"],["(−)","−",,,"fn"],["Ans","Ans",,,"fn"],
+  ["7","7"],["8","8"],["9","9"],["DEL","@del",,,"del"],["AC","@ac",,,"del"],
+  ["4","4"],["5","5"],["6","6"],["×","×",,,"op"],["÷","÷",,,"op"],
+  ["1","1"],["2","2"],["3","3"],["+","+",,,"op"],["−","−",,,"op"],
+  ["0","0"],[".","."],["ᴇ","ᴇ",,,"fn"],["=","@eq",,,"eq"]];
+const cs={expr:"",res:null,done:false,shift:false,mode:"DEG",ans:0,frac:false};
+const CALC_FUNS=["sin⁻¹(","cos⁻¹(","tan⁻¹(","sin(","cos(","tan(","log(","ln(","³√(","√(","Abs("];
+const CALC_NAMES=[...CALC_FUNS,"Ans","nPr","nCr","π"];
+function calcTrig(k,x,inv){
+  const d=cs.mode, full=d==="DEG"?360:d==="GRA"?400:2*Math.PI, f={s:"sin",c:"cos",t:"tan"}[k];
+  if(inv){ const r=Math[`a${f}`](x); return d==="DEG"?r*180/Math.PI:d==="GRA"?r*200/Math.PI:r; }
+  if(d!=="RAD"){   // whole turns, halves and quarters give exact answers (sin 180 is 0, not 1.2e-16)
+    const q=((x%full)+full)%full, half=full/2, quarter=full/4;
+    if(k==="s"){ if(q%half===0) return 0; if(q===quarter) return 1; if(q===3*quarter) return -1; }
+    if(k==="c"){ if(q===0) return 1; if(q===half) return -1; if(q===quarter||q===3*quarter) return 0; }
+    if(k==="t"){ if(q%half===0) return 0; if(q%half===quarter) throw 0; }
+  }
+  return Math[f](d==="DEG"?x*Math.PI/180:d==="GRA"?x*Math.PI/200:x);
+}
+const calcFact=n=>{ if(!Number.isInteger(n)||n<0||n>170) throw 0; let r=1; for(let k=2;k<=n;k++) r*=k; return r; };
+function calcValue(text){
+  const T=[], src=text.replace(/\s+/g,"").replace(/-/g,"−").replace(/\*/g,"×").replace(/\//g,"÷");
+  for(let i=0;i<src.length;){
+    const r=src.slice(i); let m=/^(?:\d+\.?\d*|\.\d+)(?:ᴇ[−]?\d+)?/.exec(r);
+    if(m){ T.push({n:parseFloat(m[0].replace("ᴇ","e").replace("−","-"))}); i+=m[0].length; continue; }
+    const nm=CALC_NAMES.find(x=>r.startsWith(x))||("+−×÷()^!%e".includes(r[0])?r[0]:null);
+    if(!nm) throw 0; T.push(nm); i+=nm.length;
+  }
+  let p=0; const nx=()=>T[p];
+  const starts=t=>t!==undefined&&(typeof t==="object"||t==="("||t==="e"||t==="π"||t==="Ans"||CALC_FUNS.includes(t));
+  const close=()=>{ if(nx()===")") p++; else if(p<T.length) throw 0; };   // a bracket left open at the end is fine
+  function atom(){
+    const t=T[p++]; if(t===undefined) throw 0;
+    if(typeof t==="object") return t.n;
+    if(t==="π") return Math.PI;
+    if(t==="e") return Math.E;
+    if(t==="Ans") return cs.ans;
+    if(t==="(" ){ const v=sum(); close(); return v; }
+    if(!CALC_FUNS.includes(t)) throw 0;
+    const x=sum(); close();
+    switch(t){
+      case "sin(": return calcTrig("s",x); case "cos(": return calcTrig("c",x); case "tan(": return calcTrig("t",x);
+      case "sin⁻¹(": return calcTrig("s",x,1); case "cos⁻¹(": return calcTrig("c",x,1); case "tan⁻¹(": return calcTrig("t",x,1);
+      case "log(": return Math.log10(x); case "ln(": return Math.log(x);
+      case "√(": return Math.sqrt(x); case "³√(": return Math.cbrt(x); default: return Math.abs(x);
+    }
+  }
+  function post(){ let v=atom(); for(;;){ if(nx()==="!"){ p++; v=calcFact(v); } else if(nx()==="%"){ p++; v/=100; } else return v; } }
+  function power(){ const b=post(); if(nx()==="^"){ p++; return Math.pow(b,unary()); } return b; }
+  function unary(){ if(nx()==="−"){ p++; return -unary(); } if(nx()==="+"){ p++; return unary(); } return power(); }
+  function perm(){ let v=unary(); while(nx()==="nPr"||nx()==="nCr"){
+    const c=T[p++]==="nCr", r=unary();
+    if(!Number.isInteger(v)||!Number.isInteger(r)||r<0||r>v) throw 0;
+    v=calcFact(v)/calcFact(v-r)/(c?calcFact(r):1); } return v; }
+  function prod(){ let v=perm(); for(;;){ const t=nx();
+    if(t==="×"){ p++; v*=perm(); } else if(t==="÷"){ p++; v/=perm(); } else if(starts(t)) v*=perm(); else return v; } }   // 2π and 2(3+4) multiply
+  function sum(){ let v=prod(); for(;;){ if(nx()==="+"){ p++; v+=prod(); } else if(nx()==="−"){ p++; v-=prod(); } else return v; } }
+  const v=sum(); if(p<T.length||!Number.isFinite(v)) throw 0; return v;
+}
+const calcShow=v=>String(+v.toPrecision(10)).replace("e+","ᴇ").replace("e-","ᴇ−").replace("-","−");
+function calcFrac(v){   // a decimal answer as a fraction with a denominator up to 10000, when it is one
+  if(!Number.isFinite(v)||Number.isInteger(v)) return null;
+  const x=Math.abs(v); let h0=0,h1=1,k0=1,k1=0,b=x;
+  for(let n=0;n<24;n++){
+    const a=Math.floor(b), h2=a*h1+h0, k2=a*k1+k0; h0=h1; h1=h2; k0=k1; k1=k2;
+    if(k1>10000) return null;
+    if(Math.abs(x-h1/k1)<1e-11*Math.max(1,x)) return `${v<0?"−":""}${h1}/${k1}`;
+    const f=b-a; if(f<1e-14) return null; b=1/f;
+  }
+  return null;
+}
+function calcDraw(){
+  const box=el.querySelector(".mx-calc"), ex=box.querySelector("[data-calc-expr]"), out=box.querySelector("[data-calc-out]");
+  let text="", cls="";
+  if(cs.res?.err) text="שגיאה";
+  else if(cs.res){ text=(cs.frac&&calcFrac(cs.res.v))||calcShow(cs.res.v); }
+  else if(cs.expr){ try{ if(/[^0-9.]/.test(cs.expr)) text=calcShow(calcValue(cs.expr)); }catch{} cls="live"; }
+  ex.textContent=cs.expr||"0"; ex.scrollLeft=ex.scrollWidth;
+  out.textContent=text||" "; out.className=cls;
+  box.querySelector("[data-calc-flags]").textContent=[cs.shift?"S":"",cs.mode==="DEG"?"D":cs.mode==="RAD"?"R":"G"].filter(Boolean).join(" ");
+  box.querySelector('[data-calc-do="mode"]').textContent=cs.mode;
+  box.querySelectorAll("[data-calc]").forEach(b=>b.classList.toggle("shifted",cs.shift));
+  box.querySelector(".shift").setAttribute("aria-pressed",cs.shift);
+}
+function calcAct(act){
+  if(act==="@shift"){ cs.shift=!cs.shift; return calcDraw(); }
+  cs.shift=false;
+  if(act==="@mode"){ cs.mode=cs.mode==="DEG"?"RAD":cs.mode==="RAD"?"GRA":"DEG"; if(cs.res&&!cs.res.err&&cs.done) calcAct("@eq"); return calcDraw(); }
+  if(act==="@sd"){ if(cs.res&&!cs.res.err&&calcFrac(cs.res.v)) cs.frac=!cs.frac; return calcDraw(); }
+  if(act==="@ac"){ cs.expr=""; cs.res=null; cs.done=false; cs.frac=false; return calcDraw(); }
+  if(act==="@del"){
+    if(cs.done){ cs.done=false; cs.res=null; }
+    else cs.expr=cs.expr.replace(/(?:sin⁻¹\(|cos⁻¹\(|tan⁻¹\(|sin\(|cos\(|tan\(|log\(|ln\(|³√\(|√\(|Abs\(|Ans|nPr|nCr|.)$/u,"");
+    return calcDraw();
+  }
+  if(act==="@eq"){
+    if(!cs.expr) return calcDraw();
+    try{ const v=calcValue(cs.expr); cs.res={v}; cs.ans=v; }catch{ cs.res={err:true}; }
+    cs.done=true; cs.frac=false; return calcDraw();
+  }
+  if(cs.done){ cs.expr=/^(?:\^|!|%|nPr|nCr|[+−×÷])/.test(act)?"Ans"+act:act; cs.done=false; cs.res=null; cs.frac=false; }   // an operator goes on from the answer
+  else cs.expr+=act;
+  calcDraw();
+}
+function calcPress(i){ const [,ins,,sins]=CALC_KEYS[i]; calcAct(cs.shift&&sins!==undefined?sins:ins); }
+const calcKeysHtml=()=>CALC_KEYS.map(([label,,sl,,cls="num"],i)=>
+  `<button type="button" data-calc="${i}" class="${cls}"${label==="DEG"?' data-calc-do="mode"':""}>${sl?`<i>${sl}</i>`:""}<b>${label}</b></button>`).join("");
+function toggleCalc(){
+  const box=el.querySelector(".mx-calc"), on=box.hidden;
+  box.hidden=!on; el.querySelector('[data-do="calc"]').setAttribute("aria-pressed",on);
+  if(on){ calcDraw(); box.querySelector("button").focus({preventScroll:true,focusVisible:false}); }
+}
+document.addEventListener("keydown",e=>{
+  const box=el?.querySelector(".mx-calc");
+  if(!box||box.hidden||!box.contains(document.activeElement)||e.ctrlKey||e.metaKey||e.altKey) return;
+  const k={"*":"×","/":"÷","-":"−"}[e.key]||e.key;
+  if(/^[0-9.+−×÷()^!%]$/.test(k)) calcAct(k);
+  else if(k==="Enter"||k==="=") calcAct("@eq");
+  else if(k==="Backspace") calcAct("@del");
+  else if(k==="Escape"&&(cs.expr||cs.res)) calcAct("@ac");
+  else return;
+  e.preventDefault(); e.stopImmediatePropagation();
+},true);
+
 function build(){
   el=document.createElement("aside"); el.className="mx-board"; el.setAttribute("aria-label","לוח טיוטה");
   el.innerHTML=`<div class="mx-board-head"><b data-title>לוח טיוטה</b><button type="button" data-do="hide" class="mx-board-back">${ic("back")}<span>חזרה לשאלה</span></button></div>
@@ -87,6 +221,7 @@ function build(){
       <span class="mx-board-group mx-board-inks">${INKS.map(([c,name])=>`<button type="button" data-ink="${c}" aria-pressed="${c===ink}" aria-label="${name}" title="${name}" style="--dot:${c}"></button>`).join("")}</span>
       <span class="mx-board-group mx-board-sizes">${ERASERS.map(([w,name])=>`<button type="button" data-eraser="${w}" aria-pressed="${w===eraser}" aria-label="מחק ${name}" title="מחק ${name}" style="--d:${Math.round(6+w/6)}px"></button>`).join("")}</span>
       <span class="mx-board-group mx-board-acts">
+        <button type="button" data-do="calc" aria-pressed="false" title="מחשבון">${ic("calc")}<span>מחשבון</span></button>
         <button type="button" data-do="question" title="העתקת השאלה לראש הלוח">${ic("question")}<span>השאלה</span></button>
         <button type="button" data-do="undo" title="ביטול (Ctrl+Z)">${ic("undo")}<span>ביטול</span></button>
         <button type="button" data-do="clear" title="ניקוי הלוח">${ic("clear")}<span>ניקוי</span></button></span>
@@ -95,7 +230,10 @@ function build(){
       <button type="button" data-do="send" class="mx-board-send" hidden></button></div>
     <div class="mx-board-stage"><canvas></canvas>
       <button type="button" data-do="delete" class="mx-board-del" title="מחיקת מה שנבחר (Delete)" hidden>${ic("clear")}מחיקה</button>
-      <button type="button" data-do="top" class="mx-board-top" hidden>${ic("top")}לראש הדף</button></div>`;
+      <button type="button" data-do="top" class="mx-board-top" hidden>${ic("top")}לראש הדף</button>
+      <div class="mx-calc" dir="ltr" role="group" aria-label="מחשבון מדעי" hidden>
+        <div class="mx-calc-screen"><span class="mx-calc-flags" data-calc-flags></span><div class="mx-calc-expr" data-calc-expr>0</div><output data-calc-out>&nbsp;</output></div>
+        <div class="mx-calc-keys">${calcKeysHtml()}</div></div></div>`;
   canvas=el.querySelector("canvas"); ctx=canvas.getContext("2d");
   el.addEventListener("click",e=>{
     const b=e.target.closest("button"); if(!b) return;
@@ -109,6 +247,8 @@ function build(){
     if(act==="delete") removeSelection();
     if(act==="question") copyQuestion();
     if(act==="send") send();
+    if(b.dataset.calc) calcPress(+b.dataset.calc);
+    if(act==="calc") toggleCalc();
     if(act==="top"){ sketch().y=0; paint(); }
     if(act==="hide") full?closeFull():toggle();
   });

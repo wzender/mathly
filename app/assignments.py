@@ -3,8 +3,9 @@
 An assignment (Supabase `math_assignments`) has a title, a note, a due date and 1 to 20 items, each one of
   {"kind": "skill", "id"}                     finish this skill,
   {"kind": "unit_quiz", "unit"}               hand in this unit's summarizing quiz,
-  {"kind": "exam", "units": [...]}            take a practice exam over these units.
-Every item must belong to the units open to the class. Whether an item is done is not stored: the page works it out from
+  {"kind": "exam", "units": [...]}            take a practice exam over these units,
+  {"kind": "worksheet", "id"}                 hand in a solution to this worksheet (app/worksheets.py).
+Every item must belong to the units open to the class, and a worksheet to the class itself. Whether an item is done is not stored: the page works it out from
 the student's progress and the server's quiz sittings (`assignmentState` in static/math-sky.js), the same way for the
 student's home screen and for the teacher's report. The class's teacher (or a manager) writes them; the class reads them.
 """
@@ -22,12 +23,13 @@ from .access import has_permission
 from .answer_scans import ScanError
 from .auth import AuthUnavailable
 from .math_skills import algebra9
+from .worksheets import WorksheetsUnavailable, drop_ids, submission_public, worksheet_ids, worksheet_public
 
 log = logging.getLogger("mathly.assignments")
 MIGRATION = "supabase/migrations/20261104210000_math_assignments.sql"
 TABLE = "/rest/v1/math_assignments"
 FIELDS = "id,class_id,title,note,due_on,items,created_by_email,created_at,updated_at"
-MAX_ITEMS, MAX_TITLE, MAX_NOTE, PER_CLASS = 20, 80, 500, 50
+MAX_ITEMS, MAX_TITLE, MAX_NOTE, PER_CLASS = 20, 80, 500, 500
 JERUSALEM = ZoneInfo("Asia/Jerusalem")
 
 
@@ -81,8 +83,9 @@ class Assignments:
         self._rest(f"?id=eq.{urllib.parse.quote(assignment_id)}", "DELETE")
 
 
-def clean_assignment(body, class_units: list[str]) -> dict:
-    """The fields of an assignment as sent, checked against the class's units; HTTPException 400 when something is off."""
+def clean_assignment(body, class_units: list[str], worksheets: set[str] | None = None) -> dict:
+    """The fields of an assignment as sent, checked against the class's units and worksheets (their ids; None when they
+    cannot be read); HTTPException 400 when something is off."""
     if not isinstance(body, dict):
         raise HTTPException(400, "send the assignment as an object")
     title = " ".join(str(body.get("title") or "").split())
@@ -116,6 +119,11 @@ def clean_assignment(body, class_units: list[str]) -> dict:
             units = item.get("units")
             ok = isinstance(units, list) and bool(units) and len(set(units)) == len(units) and all(u in allowed for u in units)
             clean = {"kind": "exam", "units": sorted(units) if ok else []}
+        elif kind == "worksheet":
+            if worksheets is None:
+                raise HTTPException(503, "worksheets_unavailable")
+            ok = item.get("id") in worksheets
+            clean = {"kind": "worksheet", "id": item.get("id")}
         else:
             ok, clean = False, None
         if not ok:
@@ -165,6 +173,36 @@ def install_assignment_routes(app, signed_in, units_of):
     def reply(value, status=200):
         return JSONResponse(value, status_code=status, headers={"Cache-Control": "no-store"})
 
+    def class_worksheets(class_id: int, body) -> set[str] | None:
+        """The ids of the class's worksheets, read only when the assignment sent has a worksheet item."""
+        items = body.get("items") if isinstance(body, dict) else None
+        if not isinstance(items, list) or not any(isinstance(i, dict) and i.get("kind") == "worksheet" for i in items):
+            return set()
+        store = getattr(app.state, "worksheets", None)
+        try:
+            return {r["id"] for r in store.of_class(class_id)} if store else None
+        except WorksheetsUnavailable:
+            return None
+
+    def drop_worksheets(ids) -> None:
+        """Deletes worksheets an assignment no longer uses, with their submissions."""
+        store = getattr(app.state, "worksheets", None)
+        if not ids or store is None:
+            return
+        try:
+            drop_ids(store, ids)
+        except WorksheetsUnavailable:
+            log.warning("worksheets dropped from an assignment stay until the hourly cleanup")
+
+    def worksheets_only(user, fields, old=None):
+        """A teacher gives worksheets only; skills, unit quizzes and practice exams are for managers (developers). Items
+        that were already in the assignment stay, so a teacher can still edit an older one."""
+        if has_permission(user, "management.access"):
+            return
+        kept = [i for i in (old or {}).get("items") or [] if i.get("kind") != "worksheet"]
+        if any(i["kind"] != "worksheet" and i not in kept for i in fields["items"]):
+            raise HTTPException(400, "teachers_give_worksheets_only")
+
     def note(user, kind, row, label):
         actions = getattr(app.state, "actions", None)
         if actions is not None:
@@ -182,7 +220,8 @@ def install_assignment_routes(app, signed_in, units_of):
     @app.post("/api/classes/{class_id}/assignments")
     def create_assignment(class_id: int, body: dict, user=Depends(signed_in)):
         row = class_row(class_id, user)
-        fields = clean_assignment(body, units_of(row))
+        fields = clean_assignment(body, units_of(row), class_worksheets(class_id, body))
+        worksheets_only(user, fields)
         try:
             saved = store().add({**fields, "class_id": class_id, "created_by_email": str(user.get("email", "")).lower()})
         except AssignmentsUnavailable as exc:
@@ -202,14 +241,16 @@ def install_assignment_routes(app, signed_in, units_of):
     @app.put("/api/classes/{class_id}/assignments/{assignment_id}")
     def update_assignment(class_id: int, assignment_id: str, body: dict, user=Depends(signed_in)):
         row = class_row(class_id, user)
-        owned(class_id, assignment_id)
-        fields = clean_assignment(body, units_of(row))
+        old = owned(class_id, assignment_id)
+        fields = clean_assignment(body, units_of(row), class_worksheets(class_id, body))
+        worksheets_only(user, fields, old)
         try:
             saved = store().update(assignment_id, {**fields, "updated_at": datetime.now(timezone.utc).isoformat()})
         except AssignmentsUnavailable as exc:
             raise unavailable(exc) from exc
         if not saved:
             raise HTTPException(404, "assignment not found")
+        drop_worksheets(set(worksheet_ids(old.get("items"))) - set(worksheet_ids(saved.get("items"))))
         note(user, "assignment_saved", saved, row["name"])
         return reply(public(saved, True))
 
@@ -221,6 +262,7 @@ def install_assignment_routes(app, signed_in, units_of):
             store().remove(assignment_id)
         except AssignmentsUnavailable as exc:
             raise unavailable(exc) from exc
+        drop_worksheets(worksheet_ids(found.get("items")))
         note(user, "assignment_deleted", found, row["name"])
         return reply({"ok": True})
 
@@ -244,5 +286,17 @@ def install_assignment_routes(app, signed_in, units_of):
                                  for s in app.state.answers.quiz(user["id"], "list", unit_id=unit)]
             except ScanError:
                 sittings = None   # the server's record could not be read: unit-quiz items cannot be told done
+        worksheets, submissions = [], []
+        wanted = [w for r in rows for w in worksheet_ids(r.get("items"))]
+        if wanted:
+            ws = getattr(app.state, "worksheets", None)
+            try:
+                if ws is None:
+                    raise WorksheetsUnavailable("worksheets_unavailable")
+                worksheets = [worksheet_public(w) for w in ws.by_ids(wanted)]
+                submissions = [submission_public(s) for s in ws.submissions(wanted, user["id"])]
+            except WorksheetsUnavailable:
+                worksheets = submissions = None   # worksheet items cannot be shown or told done
         return reply({"assignments": [{**public(r), "class_name": names.get(r["class_id"], "")} for r in rows],
-                      "sittings": sittings, "today": today_in_jerusalem().isoformat()})
+                      "sittings": sittings, "worksheets": worksheets, "submissions": submissions,
+                      "today": today_in_jerusalem().isoformat()})

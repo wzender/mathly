@@ -21,7 +21,7 @@ TEACHER = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 COLLEAGUE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 STUDENT = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
 ADMIN = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
-ROLES = {TEACHER: ['teacher'], COLLEAGUE: ['teacher'], STUDENT: ['student'], ADMIN: ['admin']}
+ROLES = {TEACHER: ['teacher'], COLLEAGUE: ['teacher'], STUDENT: ['student'], ADMIN: ['developer']}   # managers are developers
 
 
 class Auth:

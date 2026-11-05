@@ -139,7 +139,7 @@ def checked(store, aid, score=40, verdict='partial'):
 def review_app(store, manager=False):
     auth = ReviewAuth()
     if manager:
-        auth.teachers = frozenset({mail(STRANGER)})   # STRANGER is a manager here
+        auth.developers = frozenset({mail(STRANGER)})   # STRANGER is a manager (a developer) here
     app = create_app(auth=auth)
     app.state.answers = store
     return app

@@ -31,6 +31,8 @@ from .progress import install_progress_routes
 from .push import install_push_routes
 from .monitoring import ActionLog, RETURN_GAP, install_monitoring_routes
 from .unit_resources import install_resource_routes
+from .worksheets import install_worksheet_routes
+from .teacher_ai import MESSAGE as TEACHER_AI_MESSAGE, LimitReached, TeacherQuota
 from .science import install_science_routes
 
 logging.basicConfig(level=logging.INFO)
@@ -69,6 +71,7 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
     app.state.seen = {}
     app.state.actions = ActionLog()
     app.state.photo_counts = {}
+    app.state.teacher_ai = TeacherQuota()   # a teacher's 3 AI requests a day (app/teacher_ai.py)
     app.mount("/static", FreshStatic(directory=STATIC), name="static")
 
     async def signed_in(request: Request) -> dict | None:
@@ -137,13 +140,17 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
                 # the AI: this account sends to it itself (ai_direct), or asks its teacher (app/ai_queue.py);
                 # ai_review: it reviews students' requests
                 "ai_direct": may_send(user),
+                "ai_left": app.state.teacher_ai.left(user),   # a teacher's AI requests left today; None: no limit
                 "ai_review": bool(user) and may_send(user) and (
                     has_permission(user, "management.access")
                     or any(email.lower() in (row.get("teachers") or []) for row in mine)),
                 "classes": [{"id": row["id"], "name": row["name"], "lessons": units_of(row),
                              "exams": row.get("exams") or [], "exam_note": row.get("exam_note") or "",
                              "exam_title": row.get("exam_title") or "",
-                             "teacher": email.lower() in (row.get("teachers") or [])} for row in mine]}
+                             "teacher": email.lower() in (row.get("teachers") or []),
+                             # for the teacher's classes card: how many students (the class's teachers left out)
+                             **({"students": len(set(row.get("emails") or []) - set(row.get("teachers") or []))}
+                                if email.lower() in (row.get("teachers") or []) else {})} for row in mine]}
 
     @app.get("/api/math/skills")
     async def math_skills():
@@ -169,10 +176,12 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
         raw = body.get("emails", "")
         parts = raw.replace(",", " ").split() if isinstance(raw, str) else raw
         emails = sorted({str(part).strip().lower() for part in parts if str(part).strip()})
-        # the class's teacher is one of its students (or none yet)
+        # the class has at most one teacher, a free email of its own: a teacher is never also a student
         teachers = sorted({str(t).strip().lower() for t in body.get("teachers") or [] if str(t).strip()})
-        if len(teachers) > 1 or not set(teachers) <= set(emails):
-            raise HTTPException(400, "choose one of the class's students as its teacher")
+        if len(teachers) > 1 or any("@" not in t for t in teachers):
+            raise HTTPException(400, "a class has one teacher, given by email")
+        if set(teachers) & set(emails):
+            raise HTTPException(400, "a teacher cannot also be a student of the class")
         try:
             app.state.auth.save_class(class_id, name, emails, {}, selected, teachers=teachers)
         except ClassConflict as exc:
@@ -275,6 +284,10 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
             raise HTTPException(413, "the image is too large")
         if counter and photo_counts.get(counter, 0) >= DAILY_PHOTOS:
             raise HTTPException(429, "daily photo limit reached")
+        try:
+            quota = app.state.teacher_ai.take(user)
+        except LimitReached as exc:
+            raise HTTPException(429, TEACHER_AI_MESSAGE) from exc
         if counter:
             photo_counts[counter] = photo_counts.get(counter, 0) + 1
         try:
@@ -282,14 +295,18 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
         except PhotoUnavailable as exc:
             if counter:
                 photo_counts[counter] -= 1
+            app.state.teacher_ai.give_back(quota)
             raise HTTPException(503, str(exc)) from exc
         except Exception:
             if counter:
                 photo_counts[counter] -= 1
+            app.state.teacher_ai.give_back(quota)
             raise
         ai_usage.record(app.state.auth, (user or {}).get("id"), "photo", result.pop("usage", None))
-        if counter and not result.get("readable"):
-            photo_counts[counter] -= 1
+        if not result.get("readable"):
+            if counter:
+                photo_counts[counter] -= 1
+            app.state.teacher_ai.give_back(quota)
         skill = next((s["name"] for s in algebra9()["skills"] if s["id"] == result.get("skill")), "")
         app.state.actions.record(user, "photo", skill if result.get("readable") else "התמונה לא נקראה")
         return {**result, "left": DAILY_PHOTOS - photo_counts.get(counter, 0) if counter else None}
@@ -301,6 +318,7 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
     install_ai_queue_routes(app, signed_in)
     install_teacher_review_routes(app, signed_in)
     install_assignment_routes(app, signed_in, units_of)
+    install_worksheet_routes(app, signed_in)
     install_resource_routes(app, signed_in, units_of)
     install_science_routes(app)
     install_monitoring_routes(app, manager)

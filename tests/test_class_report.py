@@ -103,7 +103,8 @@ def test_teacher_sees_the_other_students():
             students = {s["email"]: s for s in data["students"]}
             assert "teacher@x.test" not in students   # the teacher is not in their own report
             assert students["ghost@x.test"] == {"email": "ghost@x.test", "signed_in": False, "progress": None,
-                                                "saved_at": None, "quiz_sittings": [], "name": None, "review_requests": []}
+                                                "saved_at": None, "quiz_sittings": [], "name": None, "review_requests": [],
+                                                "worksheet_submissions": None}   # no worksheet tables here
             assert students["newbie@x.test"]["signed_in"] and students["newbie@x.test"]["progress"] is None
             p = students["student@x.test"]["progress"]
             assert p["done"] == {"t1": "2026-11-01"} and p["slips"][0]["m"] == "sign"
@@ -184,20 +185,22 @@ def test_without_the_servers_record_the_report_shows_no_quiz_grades():
     asyncio.run(check())
 
 
-def test_the_teacher_is_one_of_the_students():
+def test_the_teacher_is_free_text_and_never_a_student():
     auth = ReportAuth()
     app = create_app(auth=auth)
 
     async def check():
         # a manager (TEACHER_EMAILS) saves the class
-        auth.teachers = frozenset({"out@x.test"})
+        auth.developers = frozenset({"out@x.test"})
         async with client(app, OUTSIDER) as c:
             body = {"name": "ט׳1", "emails": ["a@x.test", "b@x.test"], "lessons": ["t"]}
-            assert (await c.put("/api/classes/3", json={**body, "teachers": ["c@x.test"]})).status_code == 400
-            assert (await c.put("/api/classes/3", json={**body, "teachers": ["a@x.test", "b@x.test"]})).status_code == 400
-            assert (await c.put("/api/classes/3", json={**body, "teachers": ["B@x.test"]})).status_code == 200
+            assert (await c.put("/api/classes/3", json={**body, "teachers": ["a@x.test"]})).status_code == 400   # a student
+            assert (await c.put("/api/classes/3", json={**body, "teachers": ["B@x.test"]})).status_code == 400
+            assert (await c.put("/api/classes/3", json={**body, "teachers": ["c@x.test", "d@x.test"]})).status_code == 400
+            assert (await c.put("/api/classes/3", json={**body, "teachers": ["nope"]})).status_code == 400
+            assert (await c.put("/api/classes/3", json={**body, "teachers": ["C@x.test"]})).status_code == 200
             assert (await c.put("/api/classes/3", json=body)).status_code == 200
-            assert auth.saved == [{"emails": ["a@x.test", "b@x.test"], "teachers": ["b@x.test"]},
+            assert auth.saved == [{"emails": ["a@x.test", "b@x.test"], "teachers": ["c@x.test"]},
                                   {"emails": ["a@x.test", "b@x.test"], "teachers": []}]
             # a manager can open any class's report
             assert (await c.get("/api/classes/3/report")).status_code == 200

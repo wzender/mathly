@@ -84,6 +84,7 @@ def test_the_teacher_sends_a_students_quiz_answer_to_the_ai(queue_server, tmp_pa
             playwright.expect(card).to_have_count(1)
             playwright.expect(card.locator(".mx-aq-img")).to_be_visible()
             card.locator("[data-aq-send]").click()
+            teacher.locator('[data-aq-tab="done"]').click()
             playwright.expect(teacher.locator(".mx-aq-card.done")).to_contain_text("נכונה · 100/100")
             assert len(calls) == 1
 

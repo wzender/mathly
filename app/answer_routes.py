@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import uuid
 
 from fastapi import BackgroundTasks, Depends, File, UploadFile
@@ -15,6 +16,7 @@ from .answer_scans import AnswerScans, MAX_IMAGE, ScanError, clean_image, public
 from .answer_grading import AnswerGrader
 from .math_photo import PhotoUnavailable
 from .quiz_grades import sitting_view
+from .teacher_ai import LIMIT_CODE as TEACHER_AI_LIMIT, LimitReached, NO_LIMIT
 from .teacher_review import MAX_MESSAGE, effective_score, for_student as review_for_student, request_for_student
 from .math_skills import algebra9, question_version, quiz_snapshot
 
@@ -145,14 +147,23 @@ def install_answer_routes(app, signed_in):
         sitting = app.state.answers.quiz(user, "submit", unit_id=unit["id"], attempt_ids=[uuid_text(a) for a in attempts],
                                          time_up=body.get("time_up") is True, client_key=uuid_text(body.get("client_key")))
         if account is not None and not may_send(account) and grading_key():
-            for aid in [a["attempt_id"] for a in sitting.get("attempts") or []]:
+            aids = [a["attempt_id"] for a in sitting.get("attempts") or []]
+            code = ""
+            for aid in aids:   # a hand-in sent again keeps its number
+                try:
+                    code = (app.state.ai_queue.for_attempt(user, aid) or {}).get("code") or code
+                except ScanError:
+                    pass
+            code = code or f"{secrets.randbelow(10000):04d}"
+            sitting["code"] = code
+            for aid in aids:
                 try:
                     found = app.state.answers.action(user, "get", attempt_id=aid)
                     if found.get("attachment") and not app.state.answers.grade(user, "get", attempt_id=aid):
-                        ask_teacher(user, account, aid, found, True)   # automatic: an answer the teacher declined stays declined
+                        ask_teacher(user, account, aid, found, True, code)   # automatic: an answer the teacher declined stays declined
                 except ScanError as exc:   # one answer that cannot be queued now must not lose the hand-in
                     log.warning("quiz answer not queued for the teacher: %s", exc.code)
-        return JSONResponse(sitting_view(sitting), headers={"Cache-Control": "no-store"})
+        return JSONResponse({**sitting_view(sitting), **({"code": sitting["code"]} if sitting.get("code") else {})}, headers={"Cache-Control": "no-store"})
 
     @app.get("/api/math/quiz-sittings")
     def my_sittings(unit_id: str | None = None, user=Depends(student)):
@@ -199,6 +210,8 @@ def install_answer_routes(app, signed_in):
         result = app.state.answers.action(user, "get", attempt_id=aid)
         if not result.get("attachment"):
             raise ScanError(409, "answer_required")
+        if str(result["attempt"].get("question_id", "")).startswith("worksheet:"):
+            raise ScanError(409, "not_gradable")   # homework pages are checked by the teacher, from the hand-in
         existing = app.state.answers.grade(user, "get", attempt_id=aid)
         if existing and (automatic or existing["state"] in ("grading", "completed")):
             return reply(call(user, "get", attempt_id=aid))
@@ -207,9 +220,19 @@ def install_answer_routes(app, signed_in):
             raise ScanError(503, "grading_unavailable", "missing_key", "ANTHROPIC_API_KEY is not set")
         if account is not None and not may_send(account):
             return ask_teacher(user, account, aid, result, automatic)
+        quota = getattr(app.state, "teacher_ai", None) or NO_LIMIT
+        try:   # a teacher's own check counts toward their 3 a day; the queue's sends are counted where they are sent
+            taken = quota.take(account) if account is not None else None
+        except LimitReached as exc:
+            raise ScanError(429, TEACHER_AI_LIMIT) from exc
         lease = str(uuid.uuid4())
-        grading = app.state.answers.grade(user, "start", attempt_id=aid, lease_id=lease)
+        try:
+            grading = app.state.answers.grade(user, "start", attempt_id=aid, lease_id=lease)
+        except Exception:
+            quota.give_back(taken)
+            raise
         if grading["state"] != "grading" or grading["lease_id"] != lease:
+            quota.give_back(taken)   # another check is already running
             return reply(call(user, "get", attempt_id=aid))
         try:
             grader = getattr(app.state, "answer_grader", None) or AnswerGrader(key)
@@ -219,6 +242,7 @@ def install_answer_routes(app, signed_in):
             app.state.answers.grade(user, "complete", attempt_id=aid, lease_id=lease, result=assessment)
             note(user, "answer_graded", result, VERDICTS.get(assessment.get("verdict"), ""))
         except Exception as exc:
+            quota.give_back(taken)   # a failed check is not one of the teacher's 3
             # Retain both the image and a retryable failure; never award credit on error.
             try:
                 app.state.answers.grade(user, "fail", attempt_id=aid, lease_id=lease)
@@ -234,7 +258,7 @@ def install_answer_routes(app, signed_in):
             raise ScanError(503, "grading_failed", reason, detail) from exc
         return reply(call(user, "get", attempt_id=aid))
 
-    def ask_teacher(user, account, aid, result, automatic):
+    def ask_teacher(user, account, aid, result, automatic, code=""):
         queue = app.state.ai_queue
         if not queue.configured:
             raise ScanError(503, "grading_unavailable")
@@ -250,7 +274,7 @@ def install_answer_routes(app, signed_in):
             snapshot = result["attempt"].get("snapshot") or {}
             queue.add({"user_id": user, "email": str(account.get("email", "")).lower(), "kind": "grading",
                        "attempt_id": aid, "label": str(snapshot.get("name", ""))[:300],
-                       "question": str(snapshot.get("question", ""))[:4000]})
+                       "question": str(snapshot.get("question", ""))[:4000], **({"code": code} if code else {})})
             note(user, "ai_request", result)
         return reply(call(user, "get", attempt_id=aid))
 
@@ -260,16 +284,20 @@ def install_answer_routes(app, signed_in):
         return call(user_id, "get", attempt_id=aid)
     app.state.grade_attempt = grade_for_queue
 
-    def automatic_grade(user, attempt_id, account=None):
-        try:
-            evaluate_answer(user, attempt_id, automatic=True, account=account)
-        except ScanError as exc:
-            # Upload is already committed. Keep failures separate and retryable.
-            log.info("automatic answer grading stopped: %s", exc.code)
-
     # Requests a device makes for its own upload (a photo or the board, sent from the same screen): no other device
     # is asked to answer them, so no phone rings and no phone lists them. Kept in memory like Push.notified: a request
     # lives 15 minutes, so a restart only means one may show on a phone.
+    @app.post("/api/math/worksheet-attempts")
+    async def worksheet_attempt(body: dict, user=Depends(student), account=Depends(signed_in)):
+        """A page of a homework worksheet's hand-in, photographed by this device or by the phone like any answer. It is
+        only a place for the photo to arrive: the page is added to the hand-in (app/worksheets.py), never checked here."""
+        found, _ = await app.state.member_worksheet(account, str(body.get("worksheet_id") or ""))
+        snapshot = {"name": f"שיעורי בית: {found['title']}", "type": "open-ended",
+                    "question": f"שיעורי בית: {found['title']}. כתבו את הפתרון על דף וצלמו אותו."}
+        return reply(await run_in_threadpool(
+            lambda: call(user, "resume", student_view=True, question_id=f"worksheet:{found['id']}",
+                         question_version=question_version(snapshot), snapshot=snapshot, new=body.get("new") is True)))
+
     direct_scans: dict[str, None] = {}
 
     @app.post("/api/math/answer-attempts/{attempt_id}/scans")
@@ -315,16 +343,13 @@ def install_answer_routes(app, signed_in):
         return JSONResponse(response, headers={"Cache-Control": "no-store"})
 
     @app.post("/api/math/answer-scans/{scan_id}/uploads/{lease_id}")
-    async def upload(scan_id: str, lease_id: str, background_tasks: BackgroundTasks,
-                     photo: UploadFile = File(...), user=Depends(student), account=Depends(signed_in)):
+    async def upload(scan_id: str, lease_id: str, photo: UploadFile = File(...), user=Depends(student)):
         sid, lease = uuid_text(scan_id), uuid_text(lease_id)
         data = await photo.read(MAX_IMAGE + 1)
         result = await run_in_threadpool(submit, user, sid, lease, data, photo.content_type)
         note(user, "answer_upload", result)
-        # a quiz answer is graded only once the quiz is handed in (the page asks for it then)
-        quiz = str(result.get("attempt", {}).get("question_id", "")).startswith("quiz:")
-        if result.get("grading_available") and not result.get("grading") and not quiz:
-            background_tasks.add_task(automatic_grade, user, result["attempt"]["id"], account)
+        # an upload only keeps the answer: nothing is checked, and nothing reaches a teacher, until the student presses
+        # "send to the teacher" (POST .../grade), or hands a unit quiz in (submit_sitting)
         return reply(result)
 
     def submit(user, sid, lease, data, content_type):

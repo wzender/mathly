@@ -21,8 +21,8 @@ NO_QUIZ = next(u["id"] for u in UNITS if "quiz" not in u)
 
 class ClassAuth:
     url, key, secret = "https://test.invalid", "public-test", "server-test"
-    developers = frozenset()
-    teachers = frozenset({"boss@x.test"})   # a manager
+    developers = frozenset({"boss@x.test"})   # a manager (management is for developers)
+    teachers = frozenset()
 
     def __init__(self):
         self.rows = [
@@ -105,17 +105,43 @@ GOOD = {"title": "חזרה לפני המבחן", "note": "בהצלחה", "due_on
                   {"kind": "exam", "units": ["k", "t"]}]}   # exam units are kept sorted
 
 
+def test_a_class_teacher_gives_worksheets_only():
+    """Skills, unit quizzes and practice exams are for managers (developers); a class teacher's assignment holds worksheets.
+    Items already in an assignment stay when the teacher edits it."""
+    from test_worksheets import MemoryWorksheets
+    store = MemoryAssignments()
+    app = make_app(store)
+    app.state.worksheets = sheets = MemoryWorksheets()
+    sheets.add({"id": "11111111-1111-4111-8111-111111111111", "class_id": 3, "title": "דף", "source": "images", "pages": 1,
+                "original_key": None, "page_keys": ["k"], "byte_size": 1})
+    sheet = {"kind": "worksheet", "id": "11111111-1111-4111-8111-111111111111"}
+
+    async def check():
+        async with client(app, TEACHER) as teacher, client(app, MANAGER) as manager:
+            for item in GOOD["items"]:
+                r = await teacher.post("/api/classes/3/assignments", json={**GOOD, "items": [item, sheet]})
+                assert (r.status_code, r.json()["detail"]) == (400, "teachers_give_worksheets_only"), item
+            made = await teacher.post("/api/classes/3/assignments", json={**GOOD, "items": [sheet]})
+            assert made.status_code == 201
+            old = (await manager.post("/api/classes/3/assignments", json=GOOD)).json()   # a manager's, with skills
+            kept = await teacher.put(f"/api/classes/3/assignments/{old['id']}", json={**GOOD, "title": "שונה"})
+            assert kept.status_code == 200                                               # the same items: fine
+            more = {**GOOD, "items": GOOD["items"] + [{"kind": "skill", "id": "t_simplify"}]}
+            assert (await teacher.put(f"/api/classes/3/assignments/{old['id']}", json=more)).status_code == 400
+    asyncio.run(check())
+
+
 def test_the_class_teacher_creates_lists_edits_and_deletes_assignments():
     store = MemoryAssignments()
     app = make_app(store)
 
     async def check():
-        async with client(app, TEACHER) as teacher:
+        async with client(app, MANAGER) as teacher:
             made = await teacher.post("/api/classes/3/assignments", json=GOOD)
             assert made.status_code == 201
             row = made.json()
             assert (row["title"], row["note"], row["due_on"], row["class_id"]) == ("חזרה לפני המבחן", "בהצלחה", "2026-11-12", 3)
-            assert row["items"] == GOOD["items"] and row["created_by_email"] == "teacher@x.test"
+            assert row["items"] == GOOD["items"] and row["created_by_email"] == "boss@x.test"
             assert [r["id"] for r in store.rows.values()] == [row["id"]] and store.rows[row["id"]]["class_id"] == 3
             listed = (await teacher.get("/api/classes/3/assignments")).json()["assignments"]
             assert [r["id"] for r in listed] == [row["id"]]
@@ -150,14 +176,14 @@ def test_an_assignment_is_checked_against_the_classs_units():
         {**GOOD, "items": "t_ext"}]
 
     async def check():
-        async with client(app, TEACHER) as teacher:
+        async with client(app, MANAGER) as teacher:
             for body in bad:
                 assert (await teacher.post("/api/classes/3/assignments", json=body)).status_code == 400, body
             assert (await teacher.post("/api/classes/3/assignments", json=GOOD)).status_code == 201
             twenty = [{"kind": "skill", "id": sid} for sid in class_skills[:20]]
             assert (await teacher.post("/api/classes/3/assignments", json={**GOOD, "items": twenty})).status_code == 201
             assert len(app.state.assignments.rows) == 2   # nothing else was stored
-        async with client(app, OTHER_TEACHER) as other:   # class 4 has unit t (and t2, split off from it), not k
+        async with client(app, MANAGER) as other:   # a manager on class 4 has unit t (and t2, split off from it), not k
             ok = {"kind": "skill", "id": "t_ext"}
             for foreign in ({"kind": "skill", "id": next(s["id"] for s in skills if s["unit"] == "k")},
                             {"kind": "unit_quiz", "unit": "k"}, {"kind": "exam", "units": ["t", "k"]}):
@@ -171,7 +197,7 @@ def test_only_the_classs_teacher_or_a_manager_may_manage_its_assignments():
     app = make_app(store)
 
     async def check():
-        async with client(app, TEACHER) as teacher:
+        async with client(app, MANAGER) as teacher:
             row = (await teacher.post("/api/classes/3/assignments", json=GOOD)).json()
         for who in (STUDENT, OTHER_TEACHER, OUTSIDER):
             async with client(app, who) as c:
@@ -199,7 +225,7 @@ def test_students_get_only_their_classs_assignments_and_when_they_handed_in_each
         {"id": "s2", "unit_id": "t", "submitted_at": "2026-11-01T10:00:00Z", "grade": 90}]}))
 
     async def check():
-        async with client(app, TEACHER) as teacher, client(app, OTHER_TEACHER) as other:
+        async with client(app, MANAGER) as teacher, client(app, MANAGER) as other:
             mine = (await teacher.post("/api/classes/3/assignments", json=GOOD)).json()
             await other.post("/api/classes/4/assignments", json={**GOOD, "title": "של כיתה אחרת", "items": [{"kind": "skill", "id": "t_ext"}]})
         async with client(app, STUDENT) as student:
@@ -222,13 +248,13 @@ def test_without_the_servers_sittings_or_table_the_answers_say_so():
     app = make_app(store, Sittings(fail=True))
 
     async def check():
-        async with client(app, TEACHER) as teacher:
+        async with client(app, MANAGER) as teacher:
             await teacher.post("/api/classes/3/assignments", json=GOOD)
         async with client(app, STUDENT) as student:
             data = (await student.get("/api/math/assignments")).json()
             assert len(data["assignments"]) == 1 and data["sittings"] is None   # unit-quiz items cannot be told done
         store.fail = True
-        async with client(app, STUDENT) as student, client(app, TEACHER) as teacher:
+        async with client(app, STUDENT) as student, client(app, MANAGER) as teacher:
             r = await student.get("/api/math/assignments")
             assert (r.status_code, r.json()["detail"]) == (503, "assignments_unavailable")
             assert (await teacher.post("/api/classes/3/assignments", json=GOOD)).status_code == 503
@@ -274,7 +300,7 @@ def test_a_student_in_two_classes_gets_the_assignments_of_both_and_none_of_a_thi
                                 "emails": ["pupil4@x.test"], "nicknames": {}, "exams": []})
 
     async def check():
-        async with client(app, TEACHER) as teacher, client(app, OTHER_TEACHER) as other:
+        async with client(app, MANAGER) as teacher, client(app, MANAGER) as other:
             await teacher.post("/api/classes/3/assignments", json={**GOOD, "title": "כיתה 3"})
             await other.post("/api/classes/4/assignments", json={**GOOD, "title": "כיתה 4", "items": [{"kind": "skill", "id": "t_ext"}]})
             await other.post("/api/classes/5/assignments", json={**GOOD, "title": "כיתה 5", "items": [{"kind": "skill", "id": "t_ext"}]})
@@ -304,7 +330,8 @@ def test_an_assignment_given_by_the_teacher_is_completed_by_the_student_and_show
     mail = lambda uid: uid + "@test.invalid"
 
     class SchoolAuth(ScanAuth):
-        teachers = frozenset()   # nobody is a manager: OTHER is the class teacher, OWNER a student
+        teachers = frozenset()   # OTHER is the class teacher, OWNER a student
+        developers = frozenset({mail(OTHER)})   # skills and unit quizzes in an assignment are for developers
 
         def __init__(self):
             self.progress = {}

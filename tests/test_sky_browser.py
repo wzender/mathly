@@ -744,3 +744,24 @@ def test_late_means_after_the_due_day_in_jerusalem_and_overdue_means_unfinished_
     done_late = state(page, all_done("2026-11-02T09:00:00Z"), sit, now="2026-11-20T09:00:00")
     assert done_late["finished"] and not done_late["overdue"]                  # finished: never overdue
     assert not errors
+
+
+def test_a_worksheet_is_done_when_handed_in_and_late_after_the_due_day(browser, server):
+    page, errors = page_with(browser, server)
+    sheet = {**ASSIGNMENT, "items": [{"kind": "worksheet", "id": "w1"}, {"kind": "skill", "id": "g_pyth"}]}
+    handed = lambda at, wid="w1": {"sittings": [], "submissions": [{"worksheet_id": wid, "submitted_at": at, "score": None}]}
+    on_time = page.evaluate("([a, s, n]) => MathlySky.assignmentState(a, {}, s, new Date(n))",
+                            [sheet, handed("2026-11-12T20:00:00Z"), "2026-11-04T12:00:00"])
+    first = on_time["items"][0]                                              # 22:00 on the due day in Jerusalem
+    assert (first["done"], first["late"], first["known"]) == (True, False, True) and first["submission"]["worksheet_id"] == "w1"
+    assert on_time["next"] == 1
+    run = lambda server_data: page.evaluate("([a, s]) => MathlySky.assignmentState(a, {}, s, new Date('2026-11-04T12:00:00'))",
+                                            [sheet, server_data])["items"][0]
+    late = run(handed("2026-11-12T22:30:00Z"))                                 # 00:30 on the 13th
+    assert late["done"] and late["late"]
+    assert not run(handed("2026-11-03T09:00:00Z", "w2"))["done"]                # another worksheet's submission
+    assert not run({"sittings": [], "submissions": []})["done"]                 # opened, not handed in
+    unknown = run({"sittings": [], "submissions": None})                       # could not be read
+    assert (unknown["done"], unknown["known"]) == (False, False)
+    assert run([])["known"] and not run([])["done"]                            # a bare array is the sittings
+    assert not errors

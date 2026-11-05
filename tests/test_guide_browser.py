@@ -49,7 +49,7 @@ def test_guide_opens_with_student_and_teacher_tabs(server):
             playwright.expect(page.locator("#mgS")).to_contain_text("בוחן מסכם")
             playwright.expect(page.locator("#mgT")).to_be_hidden()
             page.get_by_role("tab", name="למורים").click()
-            playwright.expect(page.locator("#mgT")).to_contain_text("הכיתה שלי")
+            playwright.expect(page.locator("#mgT")).to_contain_text("הכיתות שלי")
             playwright.expect(page.locator("#mgT")).to_contain_text("תור AI")
             playwright.expect(page.locator("#mgS")).to_be_hidden()
             page.keyboard.press("Escape")

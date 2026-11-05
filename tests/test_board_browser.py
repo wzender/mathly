@@ -532,3 +532,27 @@ def test_a_right_angle_is_marked_with_a_square(browser, server):
     page.locator(".mx-board-anglein").press("Enter")
     assert alpha_near(page, 114, 386) == 0 and alpha_near(page, 100 + 30 * 0.707, 400 - 30 * 0.707) > 0
     assert errors == []
+
+
+def test_the_board_has_a_scientific_calculator(browser, server):
+    page, errors = open_skill(browser, server, 1400, 900)
+    page.locator("[data-board-toggle]").click()
+    page.locator('.mx-board [data-do="calc"]').click()
+    calc = page.locator(".mx-calc")
+    playwright.expect(calc).to_be_visible()
+
+    def tap(*labels):
+        for label in labels:
+            calc.locator("button", has=page.locator(f"b:text-is('{label}')")).first.click()
+
+    tap("sin", "3", "0", ")", "=")
+    playwright.expect(calc.locator("output")).to_have_text("0.5")
+    tap("S⇔D")
+    playwright.expect(calc.locator("output")).to_have_text("1/2")
+    tap("×", "4", "=")   # carries on from the answer
+    playwright.expect(calc.locator("output")).to_have_text("2")
+    tap("AC", "SHIFT", "sin", "1", ")", "=")   # sin⁻¹(1) in degrees
+    playwright.expect(calc.locator("output")).to_have_text("90")
+    tap("AC", "2", "÷", "0", "=")
+    playwright.expect(calc.locator("output")).to_have_text("שגיאה")
+    assert not errors

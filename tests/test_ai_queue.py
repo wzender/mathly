@@ -12,6 +12,7 @@ from app.ai_queue import AiQueue, may_send
 from app.answer_grading import validate_assessment
 from app.answer_scans import ScanError
 from app.main import create_app
+from app.teacher_ai import TeacherQuota
 from scan_support import OWNER, OTHER, ScanAuth, answer_store, postgres_server
 from test_answer_grading import assessment
 from test_answer_scans import begin, finish, png, request
@@ -168,12 +169,16 @@ def test_a_students_answer_waits_for_the_teacher_who_sends_it(answer_store):
             me = (await student.get('/api/me')).json()
             assert me['ai_direct'] is False and me['ai_review'] is False
             assert (await teacher.get('/api/me')).json()['ai_review'] is True
-            # the upload asks the teacher, never the AI
+            # the upload only keeps the answer: it reaches neither the teacher nor the AI
             up = await student.post(f'/api/math/answer-scans/{sid}/uploads/{lid}',
                                     files={'photo': ('a.png', png(), 'image/png')})
             assert up.status_code == 200 and not grader.calls
-            got = (await student.get(f'/api/math/answer-attempts/{aid}')).json()
-            assert got['grading'] is None and got['ai_request']['state'] == 'pending'
+            kept = (await student.get(f'/api/math/answer-attempts/{aid}')).json()
+            assert kept['grading'] is None and kept['ai_request'] is None and not queue.rows
+            assert (await teacher.get('/api/ai-queue')).json()['requests'] == []
+            # the student's click sends it to the teacher, never to the AI
+            got = (await student.post(f'/api/math/answer-attempts/{aid}/grade')).json()
+            assert got['grading'] is None and got['ai_request']['state'] == 'pending' and not grader.calls
             assert 'email' not in got['ai_request']
             # asking again does not make a second request, and does not call the AI
             again = (await student.post(f'/api/math/answer-attempts/{aid}/grade')).json()
@@ -398,6 +403,7 @@ def test_a_quiz_checked_through_the_teachers_queue_has_one_grade_for_student_and
     store = answer_store
     app = create_app(auth=ReportAuth())
     app.state.answers, app.state.ai_queue = store, MemoryQueue()
+    app.state.teacher_ai = TeacherQuota(daily=100)   # a whole quiz's answers: more than the teacher's 3 a day
     scores = {0: 100, 1: 60, 2: 100, 3: 40}
 
     class ByQuestion:
@@ -434,6 +440,7 @@ def test_a_student_disputes_a_check_and_the_teachers_correction_reaches_both_scr
 
     app = create_app(auth=ReportAuth())
     app.state.answers, app.state.ai_queue = answer_store, MemoryQueue()
+    app.state.teacher_ai = TeacherQuota(daily=100)   # a whole quiz's answers: more than the teacher's 3 a day
     scores = {0: 100, 1: 60, 2: 100, 3: 40}
 
     class ByQuestion:

@@ -112,7 +112,9 @@ playwright = pytest.importorskip("playwright.sync_api")
 @pytest.fixture
 def quiz_server(answer_store):
     """The app with real answer storage, and an AI check that scores by question: 100, 60, 100, ..."""
-    app = create_app(auth=ScanAuth()); app.state.answers = answer_store
+    auth = ScanAuth()
+    auth.developers = frozenset({OWNER + "@test.invalid"})   # OWNER manages (a developer), so it may review its own answers
+    app = create_app(auth=auth); app.state.answers = answer_store
     calls = []
 
     class Grader:

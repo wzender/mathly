@@ -8,7 +8,8 @@ DEFAULT_ROLES = ("student",)
 ROLE_PERMISSIONS = {
     "student": frozenset({"path.use"}),
     "teacher": frozenset({"path.use", "students.view"}),
-    "admin": frozenset({"path.use", "students.view", "management.access", "classes.manage"}),
+    # management (the ניהול sheet: classes, monitoring, every class's data) is for developers only
+    "admin": frozenset({"path.use", "students.view"}),
     "developer": frozenset({"*"}),
 }
 
@@ -23,7 +24,7 @@ def resolve_access(store: SupabaseAuth, token: str, *, fresh_permissions: bool =
     assigned = store.access_for(user["id"], fresh=fresh_permissions)
     roles = set((assigned or {}).get("roles") or DEFAULT_ROLES) & ROLES
     if email in store.teachers:
-        roles.update({"teacher", "admin"})
+        roles.add("teacher")
     if email in store.developers:
         roles.add("developer")
     if classes and not mine and roles == {"student"}:

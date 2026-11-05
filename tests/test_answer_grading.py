@@ -208,7 +208,7 @@ def test_in_progress_check_is_visible_and_duplicate_does_not_call_ai(answer_stor
 
 
 @pytest.mark.parametrize('provider_failure', [False, True])
-def test_upload_starts_grading_without_a_desktop_or_extra_click(answer_store, monkeypatch, provider_failure):
+def test_an_upload_checks_nothing_until_the_owner_asks(answer_store, monkeypatch, provider_failure):
     from test_answer_scans import png
     monkeypatch.delenv('ANTHROPIC_API_KEY', raising=False)
     monkeypatch.setenv('CLAUDE_API_KEY', 'test-legacy-key')
@@ -230,14 +230,19 @@ def test_upload_starts_grading_without_a_desktop_or_extra_click(answer_store, mo
                                      headers={'Authorization': f'Bearer {OWNER}'}) as c:
             url = f'/api/math/answer-scans/{sid}/uploads/{lid}'
             response = await c.post(url, files={'photo': ('answer.png', png(), 'image/png')})
-            assert response.status_code == 200  # grading failure must not fail the upload
+            assert response.status_code == 200
             assert response.json()['attachment']
+            assert calls == []   # the upload only keeps the answer: nothing is checked by itself
+            assert (await c.get(f'/api/math/answer-attempts/{aid}')).json()['grading'] is None
+            assert (await c.post(url, files={'photo': ('answer.png', png(), 'image/png')})).status_code == 200   # a lost response, sent again
+            assert calls == []
+            asked = await c.post(f'/api/math/answer-attempts/{aid}/grade')   # the owner's own click
+            assert asked.status_code == (503 if provider_failure else 200)
             assert len(calls) == 1 and calls[0][1] == upload['attempt']['snapshot']
             result = (await c.get(f'/api/math/answer-attempts/{aid}')).json()
             assert result['grading']['state'] == ('failed' if provider_failure else 'completed')
-            assert (await c.post(url, files={'photo': ('answer.png', png(), 'image/png')})).status_code == 200
             assert (await c.post(f'/api/math/answer-attempts/{aid}/grade', json={'automatic': True})).status_code == 200
-            assert len(calls) == 1  # lost upload responses / automatic polling never retry failures
+            assert len(calls) == 1  # automatic polling never retries failures
             if provider_failure:
                 retry = await c.post(f'/api/math/answer-attempts/{aid}/grade')
                 assert retry.json()['grading']['state'] == 'completed'

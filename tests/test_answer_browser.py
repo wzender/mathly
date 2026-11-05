@@ -240,8 +240,12 @@ def test_check_feedback_progress_reload_and_retake(scan_server, monkeypatch, ver
             computer.on('pageerror', lambda error: errors.append(str(error)))
             computer.goto(url); open_question(computer)
             playwright.expect(computer.locator('.mx-answer-image')).to_be_visible()
-            # Opening a received answer starts its first check automatically.
+            # Opening a received answer checks nothing: the owner presses the button, and the first check fails.
+            playwright.expect(computer.locator('[data-grade]')).to_have_text('בדיקת התשובה')
+            assert calls == []
+            computer.locator('[data-grade]').click()
             playwright.expect(computer.locator('[data-grade]')).to_have_text('ניסיון בדיקה נוסף')
+            assert len(calls) == 1
             computer.locator('[data-grade]').click()
             playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('בודקים את התשובה…')
             assert started.wait(timeout=5)
@@ -271,16 +275,14 @@ def test_check_feedback_progress_reload_and_retake(scan_server, monkeypatch, ver
             release.set(); browser.close()
 
 
-def test_upload_is_acknowledged_before_automatic_grading_finishes(scan_server, monkeypatch):
+def test_a_phone_upload_is_kept_and_checked_only_when_the_computer_asks(scan_server, monkeypatch):
     url, store = scan_server
     monkeypatch.setenv('ANTHROPIC_API_KEY', 'browser-test-key')
-    started, release = threading.Event(), threading.Event()
     calls=[]
     class Grader:
         def __init__(self, key): pass
         def grade(self, image, snapshot):
-            calls.append(snapshot);started.set()
-            assert release.wait(timeout=20)
+            calls.append(snapshot)
             return validate_assessment(assessment())
     monkeypatch.setattr('app.answer_routes.AnswerGrader', Grader)
     with playwright.sync_playwright() as p:
@@ -292,17 +294,16 @@ def test_upload_is_acknowledged_before_automatic_grading_finishes(scan_server, m
             phone=session(browser,mobile=True).new_page();phone.goto(url)
             playwright.expect(phone.locator('.mx-scan-overlay')).to_be_visible()
             phone.locator('[data-camera]').set_input_files({'name':'answer.png','mimeType':'image/png','buffer':png()})
-            playwright.expect(phone.locator('.mx-scan-card')).to_contain_text('יישלח לבדיקה באמצעות AI')
+            playwright.expect(phone.locator('.mx-scan-card')).to_contain_text('הצילום יישמר כתשובה')
             phone.locator('[data-submit]').click()
             playwright.expect(phone.locator('[data-status]')).to_contain_text('נשלחה למחשב')
-            assert started.wait(timeout=5)
-            playwright.expect(computer.locator('.mx-answer [role=status]')).to_have_text('בודקים את התשובה…')
-            assert len(calls)==1
-            release.set()
+            playwright.expect(computer.locator('[data-grade]')).to_have_text('בדיקת התשובה')   # kept, not checked
+            assert calls==[]
+            computer.locator('[data-grade]').click()
             playwright.expect(computer.locator('.mx-grade')).to_contain_text('100/100',timeout=10000)
             assert len(calls)==1
         finally:
-            release.set();browser.close()
+            browser.close()
 
 
 def test_phone_declines_and_computer_withdraws(scan_server):

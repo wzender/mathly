@@ -238,6 +238,22 @@ def pupil(email, days=None, slips=(), signed_in=True, progress=True, **extra):
             "progress": {**base, **extra} if progress else None}
 
 
+def test_a_class_teacher_sees_only_their_classes_until_they_view_as_a_student(phone_server):
+    with playwright.sync_playwright() as p:
+        browser, page, sheet = open_report(p, phone_server, [pupil("dana@example.com")])
+        try:
+            sheet.locator('[data-act="preview-on"]').click()
+            playwright.expect(page.locator(".mx-preview")).to_contain_text("מצב תצוגה כתלמיד")
+            playwright.expect(page.locator(".mx-pghead")).to_contain_text("המסלול שלי")   # the trail, as a student has it
+            playwright.expect(page.locator('[data-act="class-report"]')).to_have_count(0)
+            page.locator('[data-act="preview-off"]').click()
+            playwright.expect(page.locator(".mx-preview")).to_have_count(0)
+            playwright.expect(page.locator(".mx-pghead")).to_have_count(0)
+            playwright.expect(page.locator('[data-act="class-report"]')).to_have_count(1)
+        finally:
+            browser.close()
+
+
 def test_a_students_card_lists_the_skills_where_they_opened_the_worked_example(phone_server):
     students = [pupil("dana@example.com", {"2026-11-03": 5}, examples={
                     "t_ext": {"n": 3, "last": "2026-11-02T10:00:00Z"},       # this week
@@ -306,49 +322,75 @@ def test_the_report_says_when_nobody_needs_attention(phone_server):
             browser.close()
 
 
-def test_the_report_grid_shows_every_students_skills_and_where_the_class_is_stuck(phone_server):
+def test_the_class_map_colours_each_students_units_and_opens_a_unit_by_skill(phone_server):
     from app.math_skills import algebra9
     skills = [x["id"] for x in algebra9()["skills"] if x["unit"] == "t"]
     first, second = skills[0], skills[1]
-    fresh, old = "2026-10-30T10:00:00Z", "2026-09-01T10:00:00Z"
+    fresh = "2026-10-30T10:00:00Z"
     students = [
-        pupil("cy@example.com", {"2026-10-20": 5}, tries={second: 2}),
-        pupil("ana@example.com", {"2026-11-03": 5}, done={first: fresh}, gold={first: fresh}, seen={first: fresh}, tries={first: 6, second: 3}),
-        {**pupil("eve@example.com", progress=False), "name": "נועה ל."},
-        pupil("bo@example.com", {"2026-09-01": 5}, done={first: old}, seen={first: old}, tries={second: 1}),
-        pupil("dov@example.com")]
+        pupil("ana@example.com", {"2026-11-03": 5}, done={first: fresh}, gold={first: fresh}, seen={first: fresh}, tries={first: 6, second: 3}, missed={second: ["m"]}),
+        pupil("cy@example.com", {"2026-10-20": 5}, tries={second: 2}, missed={second: ["m"]}),
+        {**pupil("eve@example.com", progress=False), "name": "נועה ל."}]
     with playwright.sync_playwright() as p:
         browser, page, sheet = open_report(p, phone_server, students, lessons=[u["id"] for u in algebra9()["units"][:6]])
         try:
-            sheet.locator("[data-report-tab=grid]").click()
-            sheet.locator("[data-report-sort]").select_option("name")
-            names = sheet.locator("tbody th")
-            playwright.expect(names).to_have_text(["נועה ל.", "ana", "bo", "cy", "dov"])   # by name (Hebrew first); a class name wins over the email
-            sheet.locator("[data-report-unit]").select_option("t")
-            playwright.expect(sheet.locator("thead th")).to_have_count(1 + len(skills))
             row = lambda who: sheet.locator("tbody tr", has=page.locator(f"th:text-is('{who}')"))
-            cell = lambda who, skill_no: row(who).locator("td").nth(skill_no).locator(".mx-cell")
-            playwright.expect(cell("ana", 0)).to_have_attribute("aria-label", "כוכב זהב")
-            playwright.expect(cell("bo", 0)).to_have_attribute("aria-label", "הושלמה, הכוכב דועך")   # not practised for two weeks
-            playwright.expect(cell("cy", 0)).to_have_attribute("aria-label", "לא התחיל")
-            playwright.expect(cell("ana", 1)).to_have_attribute("aria-label", "מתרגל, עוד לא סיים")
-            playwright.expect(cell("נועה ל.", 1)).to_have_attribute("aria-label", "לא התחיל")
-            # four students have progress: two finished the first skill; three are on the second without finishing it
-            foot = sheet.locator("tfoot tr")
-            playwright.expect(foot.nth(0).locator("td").nth(0)).to_have_text("2/4")
-            playwright.expect(foot.nth(1).locator("td").nth(1)).to_have_text("3")
-            playwright.expect(sheet.locator("thead th.hard")).to_have_count(1)   # only the second skill is a class-wide difficulty
-            assert "hard" in sheet.locator("thead th").nth(2).get_attribute("class")
-            # the unit overview
+            # a choice saved by the topic version of the map (other column names) does not keep November closed
+            page.evaluate("localStorage.setItem('mathly.report.mapOpen', '|אלגברה וחזקות'); localStorage.setItem('mathly.report.unit', 't')")   # and a unit saved by the old table: the map still opens on its months
+            sheet.locator("[data-report-tab=map]").click()
+            sheet.locator("[data-report-sort]").select_option("name")
+            playwright.expect(sheet.locator("tbody th")).to_have_text(["נועה ל.", "ana", "cy"])
+            # first level: a column per month of the syllabus, with the students' progress over all its units; the current month (November) is open
+            months = sheet.locator("thead [data-heat-group]")
+            playwright.expect(months).to_have_count(3)            # September, October, November: the first six units
+            playwright.expect(months.first).to_contain_text("ספטמבר")
+            playwright.expect(sheet.locator(".mx-heat-unit")).to_have_count(2)   # November's units (q, q2) are open
+            playwright.expect(sheet.locator("[data-heat-group=נובמבר]")).to_have_attribute("aria-expanded", "true")
+            assert "stuck" in row("ana").locator(".mx-heat-cell").first.get_attribute("class")
+            months.first.click()                                   # opens into its two units (t and k)
+            playwright.expect(sheet.locator(".mx-heat-unit")).to_have_count(4)
+            playwright.expect(months.first).to_have_attribute("aria-expanded", "true")
+            ana, cy, eve = (row(w).locator(".mx-heat-cell").first for w in ("ana", "cy", "נועה ל."))
+            playwright.expect(ana).to_have_text(f"{round(100 / len(skills))}%")     # one skill finished
+            assert "stuck" in ana.get_attribute("class")                            # and the second is still open
+            assert "h0" in cy.get_attribute("class") and "stuck" in cy.get_attribute("class")   # practised, finished nothing
+            playwright.expect(eve).to_have_attribute("aria-label", "עוד לא התחיל לתרגל")
+            # a unit's name opens that unit by skill, and the choice shows in the unit list
+            sheet.locator("[data-heat-all=close]").click()
+            playwright.expect(sheet.locator(".mx-heat-unit")).to_have_count(0)
+            sheet.locator("[data-heat-all=open]").click()
+            playwright.expect(sheet.locator(".mx-heat-unit")).to_have_count(6)
+            sheet.locator("[data-heat-unit=t]").click()
+            playwright.expect(sheet.locator("[data-report-unit]")).to_have_value("t")
+            playwright.expect(sheet.locator("thead th")).to_have_count(1 + len(skills))
+            playwright.expect(row("ana").locator(".mx-cell").first).to_have_attribute("aria-label", "כוכב זהב")
             sheet.locator("[data-report-unit]").select_option("overview")
-            playwright.expect(row("ana").locator("td").first).to_have_text(f"1/{len(skills)}")
-            playwright.expect(row("dov").locator("td").first).to_have_text(f"0/{len(skills)}")
-            playwright.expect(row("נועה ל.").locator("td").first).to_have_text("–")
-            # six units are wider than a phone: the table scrolls inside its own box, never the page or the sheet
+            playwright.expect(sheet.locator(".mx-heat")).to_be_visible()
+            # many units are wider than a phone: the map scrolls inside its own box, never the page or the sheet
             page.set_viewport_size({"width": 375, "height": 700})
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
             assert sheet.evaluate("el => el.scrollWidth <= el.clientWidth")
-            assert sheet.locator(".mx-grid-wrap").evaluate("el => el.scrollWidth > el.clientWidth")
+        finally:
+            browser.close()
+
+
+def test_a_students_card_says_where_they_stand_and_lists_only_the_units_they_started(phone_server):
+    from app.math_skills import algebra9
+    skills = [x["id"] for x in algebra9()["skills"] if x["unit"] == "t"]
+    students = [pupil("ana@example.com", {"2026-11-03": 5}, missed={skills[1]: ["m"]}),
+                pupil("bo@example.com", {"2026-11-03": 5}, done={skills[0]: "2026-11-03T10:00:00Z"}),
+                pupil("cy@example.com", {"2026-10-01": 5}, done={skills[0]: "2026-10-01T10:00:00Z"})]
+    with playwright.sync_playwright() as p:
+        browser, page, sheet = open_report(p, phone_server, students, lessons=[u["id"] for u in algebra9()["units"][:3]])
+        try:
+            card = lambda who: sheet.locator(".mx-report-student", has=page.locator(f"b:text-is('{who}')"))
+            playwright.expect(card("ana").locator("summary .mx-report-chip").first).to_have_text("תקוע")
+            playwright.expect(card("bo").locator("summary .mx-report-chip").first).to_have_text("פעיל")
+            playwright.expect(card("cy").locator("summary .mx-report-chip").first).to_have_text("לא פעיל")   # a month ago
+            playwright.expect(card("bo").locator(".mx-spark")).to_have_attribute("aria-label", "5 תשובות נכונות ב־14 הימים האחרונים")
+            card("bo").locator("summary").click()
+            playwright.expect(card("bo").locator(".mx-quiz-units-score > div")).to_have_count(1)   # the unit they started
+            playwright.expect(card("bo")).to_contain_text("עוד 2 יחידות בלי פעילות")
         finally:
             browser.close()
 
@@ -371,13 +413,12 @@ def test_the_reports_order_and_view_are_kept_and_names_come_from_the_class(phone
             sheet.locator("#rs-1 summary").click()
             playwright.expect(sheet.locator("#rs-1")).to_contain_text("ana@example.com")   # the full email stays in the card
             sort.select_option("progress")
-            sheet.locator("[data-report-tab=grid]").click()
+            sheet.locator("[data-report-tab=subs]").click()
             # the choices stay when the report is opened again
             sheet.locator(".mx-x").click()
             page.locator('[data-act="class-report"]').click()
             playwright.expect(sheet.locator("[data-report-sort]")).to_have_value("progress")
-            playwright.expect(sheet.locator("[data-report-tab=grid]")).to_have_attribute("aria-pressed", "true")
-            playwright.expect(sheet.locator(".mx-grid")).to_be_visible()
+            playwright.expect(sheet.locator("[data-report-tab=subs]")).to_have_attribute("aria-pressed", "true")
         finally:
             browser.close()
 
@@ -678,6 +719,27 @@ def test_a_finished_assignment_leaves_the_card_and_the_skills_of_open_ones_wear_
             browser.close()
 
 
+def test_each_assignment_says_how_much_time_is_left_to_hand_in(phone_server):
+    """Noon UTC on Wednesday 4 November is 14:00 in Jerusalem: the due day itself has 10 hours left."""
+    assignments = [given(title, due, [SKILL], title) for title, due in (
+        ("אתמול", "2026-11-03"), ("לפני שלושה ימים", "2026-11-01"), ("היום", "2026-11-04"), ("מחר", "2026-11-05"),
+        ("בעוד שלושה ימים", "2026-11-07"))]
+    with playwright.sync_playwright() as p:
+        from datetime import datetime, timezone
+        browser, page = open_student_app(p, phone_server, assignments, now=datetime(2026, 11, 4, 12, tzinfo=timezone.utc))
+        try:
+            due = lambda title: page.locator(".mx-asg", has_text=title).locator(".mx-asg-due")
+            playwright.expect(due("לפני שלושה ימים")).to_contain_text("באיחור של 3 ימים")
+            playwright.expect(due("אתמול")).to_contain_text("באיחור של יום")
+            playwright.expect(due("היום")).to_contain_text("היום, נשארו כ־10 שעות")
+            playwright.expect(due("מחר")).to_contain_text("מחר, נשאר יום אחד")
+            playwright.expect(due("בעוד שלושה ימים")).to_contain_text("נשארו 3 ימים")
+            assert "soon" in due("היום").get_attribute("class") and "soon" in due("מחר").get_attribute("class")
+            assert "soon" not in due("בעוד שלושה ימים").get_attribute("class")
+        finally:
+            browser.close()
+
+
 def test_the_home_screen_is_quiet_without_assignments(phone_server):
     with playwright.sync_playwright() as p:
         browser, page = open_student_app(p, phone_server, [])
@@ -749,6 +811,9 @@ def test_the_assignments_tab_says_when_assignments_cannot_be_read(phone_server):
             browser.close()
 
 
+MANAGES = {"permissions": ["path.use", "management.access"]}   # skills, quizzes and exams in an assignment: developers only
+
+
 def asg_routes(sent, saved):
     """POST/PUT/DELETE of class 4's assignments, kept in `sent`; `saved(body, id)` makes the answer."""
     import json
@@ -769,7 +834,7 @@ def test_the_teacher_makes_an_assignment_with_the_form(phone_server):
     made = lambda body, _id: {**taught(body["title"], body["due_on"], body["items"], "new"), "note": body["note"]}
     with playwright.sync_playwright() as p:
         browser, page, sheet = open_report(p, phone_server, ASG_STUDENTS, lessons=["t", "k"], assignments=[],
-                                           routes=asg_routes(sent, made))
+                                           routes=asg_routes(sent, made), me=MANAGES)
         try:
             sheet.locator("[data-report-tab=tasks]").click()
             playwright.expect(sheet).to_contain_text("עוד לא נתתם משימות")
@@ -807,7 +872,7 @@ def test_the_teacher_edits_an_assignment_and_a_refusal_is_explained(phone_server
     assignments = [taught("חזרה", "2026-11-12", [SKILL, QUIZ, EXAM], "a")]
     with playwright.sync_playwright() as p:
         browser, page, sheet = open_report(p, phone_server, ASG_STUDENTS, lessons=["t", "k"], assignments=assignments,
-                                           routes=asg_routes(sent, changed))
+                                           routes=asg_routes(sent, changed), me=MANAGES)
         try:
             sheet.locator("[data-report-tab=tasks]").click()
             sheet.locator("[data-asg-edit=a]").click()
@@ -830,7 +895,7 @@ def test_the_teacher_edits_an_assignment_and_a_refusal_is_explained(phone_server
             browser.close()
     with playwright.sync_playwright() as p:
         browser, page, sheet = open_report(p, phone_server, ASG_STUDENTS, assignments=[], routes=lambda pg: pg.route(
-            "**/api/classes/4/assignments**", lambda route: route.fulfill(status=403, json={"detail": "x"})))
+            "**/api/classes/4/assignments**", lambda route: route.fulfill(status=403, json={"detail": "x"})), me=MANAGES)
         try:
             sheet.locator("[data-report-tab=tasks]").click()
             sheet.locator("[data-asg-new]").click()
@@ -873,7 +938,7 @@ def test_deleting_an_assignment_asks_first_and_says_how_many_already_did_part_of
             browser.close()
 
 
-def test_class_editor_picks_the_teacher_from_the_students(phone_server):
+def test_class_editor_takes_the_teacher_as_free_text(phone_server):
     import json
 
     row = {"id": 7, "name": "ט׳3", "lessons": ["t"], "emails": ["a@example.com", "b@example.com"],
@@ -909,16 +974,16 @@ def test_class_editor_picks_the_teacher_from_the_students(phone_server):
             page.locator('[data-act="manage"]').click()
             playwright.expect(page.locator(".mx-class-card")).to_contain_text("b@example.com")
             page.get_by_role("button", name="עריכה").click()
-            teacher = page.locator('select[name="teacher"]')
+            teacher = page.locator('input[name="teacher"]')
             playwright.expect(teacher).to_have_value("b@example.com")
-            assert teacher.locator("option").all_inner_texts() == ["ללא מורה", "a@example.com", "b@example.com"]
+            teacher.fill("t@example.com")
+            page.locator('textarea[name="emails"]').fill("a@example.com\nt@example.com\nc@example.com")
+            page.get_by_role("button", name="שמירת השינויים").click()
+            playwright.expect(page.locator(".mx-class-form [role=status]")).to_contain_text("מורה לא יכול להיות גם תלמיד")
             page.locator('textarea[name="emails"]').fill("a@example.com\nb@example.com\nc@example.com")
-            playwright.expect(teacher.locator("option")).to_have_count(4)
-            playwright.expect(teacher).to_have_value("b@example.com")   # the choice stays while the list grows
-            teacher.select_option("c@example.com")
             page.get_by_role("button", name="שמירת השינויים").click()
             playwright.expect(page.locator(".mx-manage-state")).not_to_have_text("שומרים…")
-            assert writes[-1]["teachers"] == ["c@example.com"]
+            assert writes[-1]["teachers"] == ["t@example.com"]
             assert writes[-1]["emails"] == ["a@example.com", "b@example.com", "c@example.com"]
         finally:
             browser.close()

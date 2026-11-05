@@ -16,7 +16,7 @@ const cssReady=new Promise(done=>{ css.onload=css.onerror=done; });   // until t
 document.head.append(css);
 
 const CFG=window.MATHLY||{}, AUTH_URL=CFG.supabaseUrl||"";
-let ME_EMAIL="", MY_CLASSES=[], MY_CLASS=null, client=null;
+let ME_EMAIL="", MY_CLASSES=[], MY_CLASS=null, client=null, PREVIEW=false;   // PREVIEW: a teacher looking at the app as a student
 const can=permission=>(CFG.permissions||[]).includes("*")||(CFG.permissions||[]).includes(permission);
 const api=(url,options={})=>fetch(url,{...options,headers:{...(options.headers||{}),...(CFG.token?{Authorization:`Bearer ${CFG.token}`}:{})}});
 
@@ -158,8 +158,9 @@ async function show(){
     root.addEventListener("submit",e=>{
       if(e.target.matches?.("[data-review-form]")){ e.preventDefault(); reviewSave(e.target); }
       else if(e.target.matches?.("[data-asg-form]")){ e.preventDefault(); asgSave(e.target); }
+      else if(e.target.matches?.("[data-ws-check]")){ e.preventDefault(); wsCheck(e.target); }
     });
-    root.addEventListener("change",e=>{ if(e.target.matches?.("[data-report-sort],[data-report-unit]")) reportControl(e.target); });
+    root.addEventListener("change",e=>{ if(e.target.matches?.("[data-report-sort],[data-report-unit]")) reportControl(e.target); else if(e.target.matches?.("[data-ws-file]")) wsAddPhotos(e.target); });
     document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&helpOpen()) return helpClose(); if(e.key==="Escape"&&cur) QZ?.items?quizQuit():closeSheet(); });   // an exam asks before it is left
   }
   root.hidden=false;
@@ -189,10 +190,12 @@ function hide(){ cancelAdvance(); if(root) root.hidden=true; document.documentEl
 
 // subjects with a path of their own: always offered, even before the class has an exam in them
 const PATH_SUBJECTS=["מתמטיקה","מדעים"];
-const hasExams=()=>MY_CLASSES.some(row=>(row.exams||[]).some(exam=>exam?.subject&&exam?.date));
+// the classes whose exams a screen shows: a student's own. A teacher sees no exam schedule at all (it is edited under ניהול)
+const examClasses=()=>!PREVIEW&&(can("students.view")||teachClasses().length)?[]:MY_CLASS?[MY_CLASS]:MY_CLASSES;
+const hasExams=()=>examClasses().some(row=>(row.exams||[]).some(exam=>exam?.subject&&exam?.date));
 function subjectOptions(){
   const bySubject=new Map(PATH_SUBJECTS.map(name=>[name,{name,dates:[],classes:new Set()}]));
-  MY_CLASSES.forEach(row=>(row.exams||[]).forEach(exam=>{
+  examClasses().forEach(row=>(row.exams||[]).forEach(exam=>{
     if(!exam?.subject||!exam?.date)return;
     const item=bySubject.get(exam.subject)||{name:exam.subject,dates:[],classes:new Set()};
     item.dates.push(exam.date);item.classes.add(row.name);bySubject.set(exam.subject,item);
@@ -221,8 +224,8 @@ function subjectCard(item,today){
 function drawSubjectPicker(){
   ACTIVE_SUBJECT=""; nav.hidden=true;
   const manage=can("management.access"), subjects=subjectOptions(), today=new Date();today.setHours(0,0,0,0);
-  path.innerHTML=`<header class="mx-top"><div><h1>המקצועות שלי</h1><p class="mx-sub">בחרו מקצוע כדי לפתוח את המסלול שלו</p></div><div class="mx-acts">${window.MathlyGuide?.button()||""}${teachButton()}${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${window.MathlyAnswers?.pushButton?.()||""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
-    <section class="mx-subject-grid" aria-label="מקצועות הכיתה">${subjects.map(item=>subjectCard(item,today)).join("")}</section>`;
+  path.innerHTML=`${previewBar()}<header class="mx-top"><div><h1>המקצועות שלי</h1><p class="mx-sub">בחרו מקצוע כדי לפתוח את המסלול שלו</p></div><div class="mx-acts">${window.MathlyGuide?.button()||""}${teachButton()}${manage?'<button class="mx-btn" data-act="manage">ניהול</button>':""}${window.MathlyAnswers?.pushButton?.()||""}${AUTH_URL?'<button class="mx-btn" data-act="out">יציאה</button>':""}</div></header>
+    ${classesCard()}<section class="mx-subject-grid" aria-label="מקצועות הכיתה">${subjects.map(item=>subjectCard(item,today)).join("")}</section>`;
 }
 function selectSubject(subject){
   ACTIVE_SUBJECT=subject;
@@ -264,7 +267,7 @@ function skyStats(){
 // the class's next exam in a subject of its units
 function nextExam(){
   const today=new Date(); today.setHours(0,0,0,0);
-  const exams=(MY_CLASS?[MY_CLASS]:MY_CLASSES).flatMap(row=>{ const subjects=classSubjects(row); return (row.exams||[]).filter(e=>e?.date&&subjects.includes(e.subject)); })
+  const exams=examClasses().flatMap(row=>{ const subjects=classSubjects(row); return (row.exams||[]).filter(e=>e?.date&&subjects.includes(e.subject)); })
     .filter(e=>examDate(e.date)>=today).sort((a,b)=>a.date.localeCompare(b.date));
   return exams.length?{...exams[0],days:Math.round((examDate(exams[0].date)-today)/86400000)}:null;
 }
@@ -360,7 +363,9 @@ function orbitRing(sts){
   return `<svg class="mx-ring" viewBox="0 0 100 100" aria-hidden="true">${back}${arcs}</svg>`;
 }
 function pathView(){
-  const nxt=next(), cls=MY_CLASS?` · כיתת ${esc(MY_CLASS.name)}`:"", teach=can("students.view"), marks=asgMarks();
+  // a class's teacher gets the classes, not a learning path: no assignments, comments, practice or trail of their own
+  if(!PREVIEW&&teachClasses().length) return `${topBar()}${classesCard()}`;
+  const nxt=next(), cls=MY_CLASS?` · כיתת ${esc(MY_CLASS.name)}`:"", teach=can("students.view")&&!PREVIEW, marks=asgMarks();
   const fix=new Set(myPatterns().recurring.map(x=>x.practise));   // skills that a recurring mistake sends back to
   const units=mineUnits().map(u=>{
     const ids=unitIds(u), act=ids.filter(live), lit=act.filter(id=>P.done[id]).length, n=ids.length, full=unitDone(u);
@@ -379,7 +384,7 @@ function pathView(){
         ${steps}</div>
       ${teach?`<button class="mx-res-open"${res} aria-label="משאבי השיעור ${esc(u.name)}">📷 משאבים</button>`:""}</section>${quizStep(u)}`;
   }).join("");
-  return `${topBar()}${commentsCard()}${assignmentsCard()}${daily()}${reviewCard()}${patternsCard()}${examSoon()}${quizCard()}<div class="mx-pghead"><h2>המסלול שלי</h2><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
+  return `${previewBar()}${topBar()}${classesCard()}${commentsCard()}${assignmentsCard()}${daily()}${reviewCard()}${patternsCard()}${examSoon()}${quizCard()}<div class="mx-pghead"><h2>המסלול שלי</h2><p class="mx-sub">אלגברה וגאומטריה כיתה ט׳ · 5 יח״ל${cls}</p></div>
     <div class="mx-trail">
       <div class="mx-start"><span class="mx-flag">${Sky.owl(40)}</span><b>התחלה</b></div>${units}
       <div class="mx-finish" aria-hidden="true">${Sky.spark()}<b>סוף המסלול</b></div></div>
@@ -398,7 +403,7 @@ function collectionView(){
     <p class="mx-note">שביטים חולפים לפעמים על המסך בזמן תרגול. מי שלוחץ עליהם בזמן תופס אותם.</p>
     <div class="mx-comets">${Sky.COMETS.map(c=>{ const have=P.comets.includes(c.id);
       return `<button class="mx-comet${have?" have":""}" data-comet="${c.id}" aria-label="${have?esc(c.name):"שביט שעוד לא נתפס"}"><span class="sym">${have?esc(c.sym):"?"}</span><small>${have?esc(c.name):"עוד לא נתפס"}</small></button>`; }).join("")}</div>
-    ${(MY_CLASS?[MY_CLASS]:MY_CLASSES).filter(row=>(row.exams||[]).length).map(row=>examBoard(row,true)).join("")}`;
+    ${examClasses().filter(row=>(row.exams||[]).length).map(row=>examBoard(row,true)).join("")}`;
 }
 
 function draw(){
@@ -462,7 +467,7 @@ async function loadAssignments(){
 function asgView(){
   if(!ASG?.assignments?.length) return null;
   const now=new Date(), cutoff=Sky.jerusalemDay(now-14*864e5);
-  const rows=ASG.assignments.map(a=>({a,s:Sky.assignmentState(a,P,ASG.sittings,now)}));
+  const rows=ASG.assignments.map(a=>({a,s:Sky.assignmentState(a,P,{sittings:ASG.sittings,submissions:ASG.submissions},now)}));
   return {open:rows.filter(x=>!x.s.finished).sort((p,q)=>p.a.due_on.localeCompare(q.a.due_on)),
     done:rows.filter(x=>x.s.finished&&x.a.due_on>=cutoff).sort((p,q)=>q.a.due_on.localeCompare(p.a.due_on))};
 }
@@ -471,6 +476,7 @@ const asgUnit=id=>esc(G.units.find(u=>u.id===id)?.name||id);
 function asgItemLabel(item){
   if(item.kind==="skill") return BY[item.id]?fmt(BY[item.id].name):esc(item.id);
   if(item.kind==="unit_quiz") return `בוחן מסכם: ${asgUnit(item.unit)}`;
+  if(item.kind==="worksheet") return `שיעורי בית: ${esc(wsTitle(item.id))}`;
   return `מבחן תרגול: ${(item.units||[]).map(asgUnit).join(", ")}`;
 }
 // the skills of unfinished assignments, with the titles, for the marker on the path
@@ -479,24 +485,42 @@ function asgMarks(){
   for(const {a} of asgView()?.open||[]) for(const item of a.items) if(item.kind==="skill") marks.set(item.id,[...(marks.get(item.id)||[]),a.title]);
   return marks;
 }
+// the time left to hand in, by Jerusalem's days; the last day counts the hours to midnight
+function asgLeft(due,now=new Date()){
+  const day=Sky.jerusalemDay(now), d=Math.round((Date.parse(due+"T00:00:00Z")-Date.parse(day+"T00:00:00Z"))/864e5);
+  if(d<0) return {late:true,text:d===-1?"באיחור של יום":`באיחור של ${-d} ימים`};
+  if(d===0){
+    const hour=+new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Jerusalem",hour:"numeric",hourCycle:"h23"}).format(now), left=24-hour;
+    return {late:false,soon:true,text:left<=1?"היום, נשארה פחות משעה":`היום, נשארו כ־${left} שעות`};
+  }
+  return {late:false,soon:d<=1,text:d===1?"מחר, נשאר יום אחד":d>60?"":`נשארו ${d} ימים`};   // far away: just the date
+}
 function assignmentsCard(){
   const v=asgView(); if(!v||(!v.open.length&&!v.done.length)) return "";
-  const several=new Set(ASG.assignments.map(a=>a.class_id)).size>1;
+  const several=new Set(ASG.assignments.map(a=>a.class_id)).size>1, left=a=>asgLeft(a.due_on);
   const open=v.open.map(({a,s})=>`<article class="mx-asg${s.overdue?" late":""}">
-      <div class="mx-asg-head"><b>${esc(a.title)}</b><span class="mx-asg-due">${s.overdue?"באיחור · ":""}עד ${asgDate(a.due_on)}</span></div>
+      <div class="mx-asg-head"><b>${esc(a.title)}</b><span class="mx-asg-due${left(a).soon?" soon":""}">${s.overdue?"באיחור · ":""}${left(a).text?`⏳ ${left(a).text} · `:""}עד ${asgDate(a.due_on)}</span></div>
       ${several?`<small class="mx-small">${esc(a.class_name)}</small>`:""}${a.note?`<p class="mx-asg-note">${esc(a.note)}</p>`:""}
       <p class="mx-asg-count"><b>${s.doneCount}</b> מתוך ${s.total} הושלמו</p>
-      <ul class="mx-asg-items">${s.items.map(x=>`<li class="${x.done?"done":""}"><span aria-hidden="true">${x.done?"✓":"○"}</span> ${asgItemLabel(x.item)}${x.done?'<span class="mx-sr"> (הושלם)</span>':""}${x.known?"":" <small>(לא ניתן לבדוק כרגע)</small>"}</li>`).join("")}</ul>
+      <ul class="mx-asg-items">${s.items.map(x=>`<li class="${x.done?"done":""}"><span aria-hidden="true">${x.done?"✓":"○"}</span> ${asgItemLabel(x.item)}${x.done?'<span class="mx-sr"> (הושלם)</span>':""}${x.known?"":" <small>(לא ניתן לבדוק כרגע)</small>"}${x.item.kind==="worksheet"?asgSheetHtml(x):""}</li>`).join("")}</ul>
       <button type="button" class="mx-btn solid" data-asg-go="${esc(a.id)}">${s.doneCount?"להמשיך":"להתחיל"}: ${asgItemLabel(s.items[s.next].item)}</button></article>`).join("");
   const done=v.done.length?`<details class="mx-asg-done"><summary>הושלמו (${v.done.length})</summary><ul>${v.done.map(({a,s})=>
-    `<li>✓ ${esc(a.title)} <small>עד ${asgDate(a.due_on)}${s.late?" · הוגשה באיחור":""}</small></li>`).join("")}</ul></details>`:"";
+    `<li>✓ ${esc(a.title)} <small>עד ${asgDate(a.due_on)}${s.late?" · הוגשה באיחור":""}</small>${s.items.filter(x=>x.item.kind==="worksheet").map(x=>`<div>${asgItemLabel(x.item)}${asgSheetHtml(x)}</div>`).join("")}</li>`).join("")}</ul></details>`:"";
   return `<section class="mx-asgs" aria-label="משימות מהמורה"><h2>משימות מהמורה</h2>${open}${done}</section>`;
+}
+// a worksheet item on the card: handed in or checked (with the teacher's score and comment), and the button that opens it
+function asgSheetHtml(x){
+  const sub=x.submission, checked=sub?.checked_at;
+  const badge=checked?` <small class="mx-ws-badge checked">נבדק${sub.score!=null?` · ${sub.score}`:""}</small>`:x.done?' <small class="mx-ws-badge">הוגש</small>':"";
+  return `${badge} <button type="button" class="mx-link" data-ws-open="${esc(x.item.id)}">${checked?"לצפייה":x.done?"פתיחה או החלפת ההגשה":"פתיחה והגשה"}</button>
+    ${checked&&sub.comment?`<p class="mx-ws-comment"><b>המורה:</b> ${esc(sub.comment)}</p>`:""}`;
 }
 // opens the first item of the assignment that is not done
 function asgGo(id){
   const a=ASG?.assignments.find(x=>x.id===id); if(!a) return;
-  const s=Sky.assignmentState(a,P,ASG.sittings), item=s.items[s.next]?.item; if(!item) return;
+  const s=Sky.assignmentState(a,P,{sittings:ASG.sittings,submissions:ASG.submissions}), item=s.items[s.next]?.item; if(!item) return;
   if(item.kind==="skill") return BY[item.id]&&open(item.id);
+  if(item.kind==="worksheet") return wsOpen(item.id);
   if(item.kind==="unit_quiz") return uqIntro(item.unit);
   stopQuizClock(); QZ=null; return quizSetup(item.units);
 }
@@ -593,7 +617,7 @@ function open(id){
   if(openEnded&&st!=="off")window.MathlyAnswers?.mountQuestion(sheet.querySelector(".mx-answer"),id,s.question_version);
   fillExplanations(sheet.querySelector("[data-skill-res]"),s.unit,r=>r.skill_id===id);
 }
-function closeSheet(){ stopPhone(); dropResources(); dropQueue(); dropReview(); cancelAdvance(); REV=null; stopQuizClock(); QZ=null; stopUnitQuiz(); if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
+function closeSheet(){ stopPhone(); dropResources(); dropWorksheet(); dropQueue(); dropReview(); cancelAdvance(); REV=null; stopQuizClock(); QZ=null; stopUnitQuiz(); if(sheet)sheet.hidden=true; cur=null; back?.focus?.({preventScroll:true}); back=null; }
 
 // counts down, then opens `target` (a skill id); stops if the student moved on in the meantime
 function autoAdvance(id,target){
@@ -1049,6 +1073,12 @@ async function uqRefresh(i){
   // waiting for the phone: look again soon
   if(UQ?.uid===uid&&!UQ.res[i]?.attachment&&["waiting","confirmed","uploading","failed"].includes(UQ.res[i]?.scan?.state)){ clearTimeout(UQ.poll); UQ.poll=setTimeout(()=>sit.attempts.forEach((_,k)=>uqRefresh(k)),2000); }
 }
+// a photo is on its way (this device's, or the phone's): handing in now would leave that answer out
+const uqUploading=()=>Object.values(UQ?.busy||{}).some(Boolean)||Object.values(UQ?.res||{}).some(r=>r&&!r.attachment&&r.scan?.state==="uploading");
+function uqPaintSubmit(){
+  const b=sheet.querySelector('[data-act="uq-submit"]'); if(!b) return;
+  const up=uqUploading(); b.disabled=up; b.textContent=up?"מעלים תמונה…":"הגשת הבוחן";
+}
 function uqDrawAnswer(i){
   const box=sheet.querySelector(`[data-uq-i="${i}"]`); if(!box) return;
   const r=UQ.res[i], has=!!r?.attachment, busy=UQ.busy[i], st=r?.scan?.state, phone=["waiting","confirmed","uploading","failed"].includes(st)&&!has;
@@ -1061,6 +1091,7 @@ function uqDrawAnswer(i){
     <span class="mx-chips">${window.MathlyBoard?`<button class="mx-btn mx-board-only" data-uq-board="${i}"${busy?" disabled":""}>✏️ פתרון בלוח</button>`:""}${phoneBtn}<button class="mx-btn${has||!touch?"":" solid"}" data-uq-photo="${i}"${busy?" disabled":""}>${has&&touch?"צילום מחדש":touch?"צילום התשובה":"העלאת תמונה מהמחשב"}</button></span>`;
   const done=Object.values(UQ.res).filter(x=>x?.attachment).length, n=uqState(UQ.uid).sitting.attempts.length;
   const c=sheet.querySelector("[data-uq-count]"); if(c) c.textContent=`צולמו ${done} מתוך ${n} תשובות`;
+  uqPaintSubmit();
 }
 // a photo replaces an answer by a fresh attempt for that question (an attempt keeps the one photo it received)
 async function uqFresh(i){
@@ -1103,6 +1134,7 @@ async function uqCancel(i){   // the computer withdraws the request
 }
 function uqSubmit(timeUp=false){
   const uid=UQ.uid, sit=uqState(uid).sitting; if(!sit||sit.submitted) return;
+  if(!timeUp&&uqUploading()) return;   // the button is disabled too; this covers a key press
   const missing=sit.attempts.filter((_,i)=>!UQ.res[i]?.attachment).length;
   if(!timeUp&&missing&&!UQ.sure){
     UQ.sure=true;
@@ -1120,7 +1152,8 @@ function uqSubmit(timeUp=false){
 async function uqSend(uid,entry){
   if(entry.sid) return entry.sid;
   if(!entry.ck){ entry.ck=crypto.randomUUID(); save(); }
-  entry.sid=(await uqPost("/api/math/quiz-sittings",{unit_id:uid,attempts:entry.attempts,time_up:!!entry.timeUp,client_key:entry.ck})).id;
+  const d=await uqPost("/api/math/quiz-sittings",{unit_id:uid,attempts:entry.attempts,time_up:!!entry.timeUp,client_key:entry.ck});
+  entry.sid=d.id; if(d.code) entry.code=d.code;
   save(); return entry.sid;
 }
 async function uqSitting(uid,sid){ return (await uqJson(`/api/math/quiz-sittings?unit_id=${encodeURIComponent(uid)}`)).sittings.find(x=>x.id===sid)||null; }
@@ -1133,21 +1166,23 @@ async function uqResult(uid,h,check=false){
   sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
     <div class="mx-sheet mx-uq-sheet u-${uid}" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
       <div class="mx-shtop"><div><span class="mx-uchip">${esc(u.name)}</span><h3 id="mxTitle">בוחן מסכם: בודקים…</h3>
-        <small class="mx-src" aria-live="polite">${CFG.aiDirect===false?"שולחים את התשובות לבדיקת המורה":"בודקים את התשובות, זה לוקח כחצי דקה לשאלה"}</small></div>
+        <small class="mx-src" aria-live="polite">${CFG.aiDirect===false?"שולחים את התשובות לבדיקת המורה":check?"בודקים את התשובות, זה לוקח כחצי דקה לשאלה":"טוענים את התשובות"}</small></div>
         <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div><div class="mx-uq-report"></div></div>`;
   sheet.hidden=false; sheet.querySelector(".mx-x").focus({preventScroll:true});
   let sendError="";
   commentSeen(c=>entry.attempts.includes(c.attempt_id));
   try{ await uqSend(uid,entry); }catch(e){ sendError=e.message; }
   if(UQ?.uid!==uid) return;
+  const codeTag=()=>entry.code?` · מספר הבוחן: <b dir="ltr" class="mx-uq-code">${esc(entry.code)}</b>`:"";
+  if(entry.code) sheet.querySelector(".mx-src").innerHTML=(CFG.aiDirect===false?"שולחים את התשובות לבדיקת המורה":"בודקים את התשובות")+codeTag();
   const results=[];
   for(let i=0;i<n;i++){
     let r=null;
     try{
       r=await uqJson(`${UQ_BASE}/${entry.attempts[i]}`);
-      if(r.attachment&&r.grading_available&&(!r.grading||(check&&r.grading.state==="failed"))){
+      if(r.attachment&&r.grading_available&&(check||CFG.aiDirect===false)&&(!r.grading||(check&&r.grading.state==="failed"))){   // a student's hand-in sends the answers to the teacher; a teacher's checks are only the ones they press
         if(UQ?.uid!==uid) return;
-        sheet.querySelector(".mx-src").textContent=CFG.aiDirect===false?`שולחים את שאלה ${i+1} מתוך ${n} למורה…`:`בודקים את שאלה ${i+1} מתוך ${n}…`;
+        sheet.querySelector(".mx-src").innerHTML=(CFG.aiDirect===false?`שולחים את שאלה ${i+1} מתוך ${n} למורה…`:`בודקים את שאלה ${i+1} מתוך ${n}…`)+codeTag();
         try{ r=await uqPost(`${UQ_BASE}/${entry.attempts[i]}/grade`,{automatic:!check}); }catch(e){ r.error=e.message; }
       }
       if(r.attachment){ const b=await api(`${UQ_BASE}/${entry.attempts[i]}/image`,{cache:"no-store"}); if(b.ok&&UQ?.uid===uid) UQ.images[i]=URL.createObjectURL(await b.blob()); }
@@ -1155,6 +1190,8 @@ async function uqResult(uid,h,check=false){
     if(UQ?.uid!==uid) return;
     results.push(r);
   }
+  entry.code||=results.map(r=>r?.ai_request?.code).find(Boolean)||"";   // a hand-in from before, or another device
+  sheet.querySelector(".mx-src").innerHTML=(CFG.aiDirect===false?"שולחים את התשובות לבדיקת המורה":"")+codeTag();
   // points: the server's, per question (a checked answer earns its share; a missing one 0; one not checked yet leaves the total open)
   let sitting=null;
   if(entry.sid){ try{ sitting=await uqSitting(uid,entry.sid); }catch(e){ sendError||=e.message; } }
@@ -1175,13 +1212,13 @@ async function uqResult(uid,h,check=false){
       ${a?.feedback?`<p>${r.teacher_review?"<b>בדיקה אוטומטית: </b>":""}${fmtLoose(a.feedback)}</p>`:""}${a?.next_step?`<p><b>הצעד הבא: </b>${fmtLoose(a.next_step)}</p>`:""}
       ${a?.solution?`<details><summary>הפתרון המלא</summary><p class="mx-grade-solution">${fmtLoose(a.solution)}</p></details>`:""}
       ${r?.attachment?window.MathlyAnswers?.reviewBox?.(entry.attempts[i],r)||"":""}
-      ${r?.attachment&&!a&&r.grading_available&&!["pending","sending","failed"].includes(r.ai_request?.state)?`<button class="mx-btn" data-uq-result="${uid}:${h}:check">${CFG.aiDirect===false?"שליחה מחדש למורה":"בדיקה נוספת"}</button>`:""}</li>`;
+      ${r?.attachment&&!a&&r.grading_available&&!["pending","sending","failed"].includes(r.ai_request?.state)?`<button class="mx-btn" data-uq-result="${uid}:${h}:check">${CFG.aiDirect===false?"שליחה מחדש למורה":"בדיקת התשובות באמצעות AI"}</button>`:""}</li>`;
   });
   const earned=sitting?sitting.questions.reduce((sum,x)=>sum+(x.earned||0),0):0, open=sitting?sitting.open:n;
   entry.score=sitting?.grade??null; save(); draw();
   const total=!sitting?"ההגשה לא נשמרה בשרת":open?`${earned} נקודות עד עכשיו · ${open===1?"שאלה אחת לא נבדקה":`${open} שאלות לא נבדקו`}`:`${earned}/100`;
   sheet.querySelector("#mxTitle").textContent=`בוחן מסכם: ${total}`;
-  sheet.querySelector(".mx-src").textContent=`הוגש ${new Date(entry.at).toLocaleString("he-IL",{dateStyle:"short",timeStyle:"short"})}${entry.timeUp?" · הוגש כשהזמן נגמר":""}`;
+  sheet.querySelector(".mx-src").innerHTML=esc(`הוגש ${new Date(entry.at).toLocaleString("he-IL",{dateStyle:"short",timeStyle:"short"})}${entry.timeUp?" · הוגש כשהזמן נגמר":""}`)+codeTag();
   const weak=u.quiz.questions.map((q,i)=>i).filter(i=>{ const a=results[i]?.grading?.result; return !results[i]?.attachment||(a&&a.score!=null&&a.score<70); });
   sheet.querySelector(".mx-uq-report").innerHTML=`<ol class="mx-uq-qs">${rows.join("")}</ol>
     ${sendError&&!sitting?`<p class="mx-note mx-quiz-warn">${esc(sendError)} <button class="mx-btn" data-uq-result="${uid}:${h}:check">ניסיון נוסף</button></p>`:""}
@@ -1210,8 +1247,22 @@ function onClick(e){
   if(t.dataset.asgGo) return asgGo(t.dataset.asgGo);
   if(t.dataset.asgNew!=null){ REPORT.form={id:null}; drawReport(); return sheet.querySelector(".mx-asg-form input[name=title]")?.focus(); }
   if(t.dataset.asgEdit){ REPORT.form={id:t.dataset.asgEdit}; drawReport(); return sheet.querySelector(".mx-asg-form input[name=title]")?.focus(); }
-  if(t.dataset.asgCancel!=null){ REPORT.form=null; return drawReport(); }
+  if(t.dataset.asgCancel!=null){ wsCancel(); REPORT.form=null; return drawReport(); }
   if(t.dataset.asgDel) return asgDelete(t.dataset.asgDel);
+  if(t.dataset.wsOpen) return wsOpen(t.dataset.wsOpen);
+  if(t.dataset.wsUpload!=null) return wsUpload(t);
+  if(t.dataset.wsRemove) return wsRemove(t.dataset.wsRemove);
+  if(t.dataset.wsSub) return wsSubOpen(t.dataset.wsSub);
+  if(t.dataset.wsSubBack!=null){ wsSubClose(); drawReport(); return sheet.querySelector(`[data-report-tab="${REPORT.tab}"]`)?.focus(); }
+  if(t.dataset.wsAi!=null) return wsAiCheck(t);
+  if(t.dataset.wsPick!=null) return sheet.querySelector("[data-ws-file]")?.click();
+  if(t.dataset.wsSend!=null) return wsSend();
+  if(t.dataset.wsBoard!=null) return wsBoard();
+  if(t.dataset.wsPhone!=null) return wsPhone();
+  if(t.dataset.wsCancel!=null) return wsPhoneCancel();
+  if(t.dataset.wsUp) return wsMove(+t.dataset.wsUp,false);
+  if(t.dataset.wsDrop) return wsMove(+t.dataset.wsDrop,true);
+  if(t.dataset.wsDownload!=null) return wsDownload(t);
   if(t.dataset.uqResult){ const [uid,h,check]=t.dataset.uqResult.split(":"); return uqResult(uid,+h,check==="check"); }
   if(t.dataset.uqPhoto!=null){ UQ.pick=+t.dataset.uqPhoto; return sheet.querySelector("[data-uq-file]").click(); }
   if(t.dataset.uqPhone!=null) return uqPhone(+t.dataset.uqPhone);
@@ -1225,19 +1276,21 @@ function onClick(e){
   if(t.dataset.classAction) return manageClassAction(t.dataset.classAction,t.dataset.classId);
   if(t.dataset.reportClass!=null) return classReport(t.dataset.reportClass);
   if(t.dataset.reportStudent!=null) return reportOpenStudent(t.dataset.reportStudent);
-  if(t.dataset.reportTab) return reportControl(t);
+  if(t.dataset.reportTab||t.dataset.heatUnit||t.dataset.heatGroup||t.dataset.heatAll) return reportControl(t);
   if(t.dataset.aqSend) return aqSend(t.dataset.aqSend);
   if(t.dataset.aqDecline) return aqDecline(t.dataset.aqDecline);
   switch(t.dataset.act){
     case "help-close": return helpClose();
     case "manage": return manageClasses();
-    case "class-report": return classReport();
+    case "class-report": return classReport(t.dataset.classId);
     case "ai-queue": return aiQueue();
     case "aq-all": return aqAll();
     case "photo-cancel": return photoCancel();
     case "manage-refresh": return loadManagedClasses(true);
     case "manage-lab": return showManageMode("lab");
     case "manage-practice": return closeSheet();
+    case "preview-on": return setPreview(true);
+    case "preview-off": return setPreview(false);
     case "subjects": return drawSubjectPicker();
     case "streak": return showStreak();
     case "review": return startReview();
@@ -1369,6 +1422,7 @@ function showManageMode(mode){
    Each source loads and fails on its own, so a slow Supabase does not hold up the rest. */
 const MON_RANGES={day:["יום","24 השעות האחרונות","15 דקות"],week:["שבוע","7 הימים האחרונים","שעה"],month:["חודש","30 הימים האחרונים","יום"]};
 const MON_ACTIONS={visit:["👋","נכנס/ה לאפליקציה"],photo:["📷","צילם/ה תרגיל לעזרה"],answer_upload:["📝","שלח/ה תשובה פתוחה"],answer_graded:["✔️","תשובה נבדקה"],class_saved:["🏫","שמר/ה כיתה"],class_deleted:["🗑️","מחק/ה כיתה"],resource_added:["🖼️","הוסיף/ה תמונה למשאבי שיעור"],
+  worksheet_added:["📄","העלה/תה שיעורי בית"],worksheet_submitted:["📬","הגיש/ה שיעורי בית"],worksheet_checked:["✅","בדק/ה שיעורי בית"],worksheet_ai_checked:["🤖","בדק/ה שיעורי בית עם AI"],
   ai_request:["🙋","ביקש/ה בדיקת AI מהמורה"],ai_sent:["🤖","שלח/ה בקשה של תלמיד ל-AI"],ai_failed:["⚠️","שליחה ל-AI נכשלה"],ai_declined:["✋","דחה/תה בקשת AI"]};
 const VERDICTS={correct:"נכונות",partial:"נכונות חלקית",incorrect:"שגויות",unreadable:"לא קריאות",needs_review:"דורשות בדיקה",grading:"בבדיקה",failed:"הבדיקה נכשלה"};
 let MON={}, MON_RANGE=(()=>{try{return localStorage.getItem("mathly.monRange")}catch{return null}})();
@@ -1537,7 +1591,7 @@ function openClassEditor(row){
         <p class="mx-note mx-no-subject">בחרו מקצוע כדי לראות את יחידות הלימוד שלו.</p>
         ${subjects.map(subject=>`<section class="mx-subject-units" data-subject-units="${esc(subject)}"><h6 class="mx-pick-subject">${esc(subject)}</h6><div class="mx-unit-picks">${subjectUnits(subject).map(unit=>{const skills=unitSkills(unit.id);return `<label class="u-${unit.id}"><input type="checkbox" name="unit" value="${esc(unit.id)}" data-subject="${esc(subject)}"${selected.has(unit.id)?" checked":""}><span>${esc(unit.name)}<small>${skills.length} תת־נושאים · ${questionCount(skills)} שאלות</small></span></label>`}).join("")}</div></section>`).join("")}</fieldset>
       <label>התלמידים<small>כתובת דוא״ל אחת בכל שורה. תלמיד יכול להשתייך ליותר מכיתה אחת.</small><textarea name="emails" dir="ltr" spellcheck="false" placeholder="student@example.com">${esc((row?.emails||[]).join("\n"))}</textarea></label>
-      <label>מורה הכיתה<small>אחד מתלמידי הכיתה. המורה רואה את ההתקדמות, הקשיים והציונים של כל התלמידים בכיתה.</small><select name="teacher" dir="ltr"></select></label>
+      <label>מורה הכיתה<small>כתובת דוא״ל אחת, לא מרשימת התלמידים: מורה אינו תלמיד בכיתה. המורה רואה את ההתקדמות, הקשיים והציונים של כל התלמידים בכיתה.</small><input type="text" name="teacher" dir="ltr" spellcheck="false" autocomplete="off" placeholder="teacher@example.com" value="${esc((row?.teachers||[])[0]||"")}"></label>
       <div class="mx-class-form-actions"><button class="mx-btn solid" type="submit">${creating?"פתיחת הכיתה":"שמירת השינויים"}</button><button class="mx-btn" type="button" data-class-action="cancel">ביטול</button><span role="status" aria-live="polite"></span></div></form>`;
   const form=box.querySelector("form"), message=form.querySelector('[role="status"]');
   const unitBoxes=subject=>[...form.querySelectorAll('input[name="unit"]')].filter(input=>input.dataset.subject===subject);
@@ -1560,20 +1614,17 @@ function openClassEditor(row){
     if(input.name==="subject"||input.name==="unit") syncSubjects();
   });
   syncSubjects();
-  // the teacher is picked from the students: the list follows the students box as it is edited
   const lines=name=>form.elements[name].value.split(/[\n,;]+/).map(value=>value.trim().toLowerCase()).filter(Boolean);
   const pickTeacher=form.elements.teacher;
-  const syncTeacher=()=>{
-    const chosen=pickTeacher.options.length?pickTeacher.value:(row?.teachers||[])[0]||"", students=[...new Set(lines("emails"))];
-    pickTeacher.innerHTML=`<option value="">ללא מורה</option>${students.map(email=>`<option value="${esc(email)}"${email===chosen?" selected":""}>${esc(email)}</option>`).join("")}`;
-  };
-  form.elements.emails.addEventListener("input",syncTeacher); syncTeacher();
   form.querySelector('input[name="name"]').focus();
   form.onsubmit=async event=>{
     event.preventDefault();
     const lessons=[...form.querySelectorAll('input[name="unit"]:checked')].map(input=>input.value);
     if(!lessons.length){message.textContent="בחרו לפחות מקצוע אחד.";return;}
-    const body={name:form.elements.name.value.trim(),emails:lines("emails"),teachers:pickTeacher.value?[pickTeacher.value]:[],lessons};
+    const teacher=pickTeacher.value.trim().toLowerCase(), students=lines("emails");
+    if(teacher&&!teacher.includes("@")){message.textContent="כתבו כתובת דוא״ל תקינה למורה.";return;}
+    if(students.includes(teacher)){message.textContent="מורה לא יכול להיות גם תלמיד בכיתה. הסירו אותו מרשימת התלמידים.";return;}
+    const body={name:form.elements.name.value.trim(),emails:students,teachers:teacher?[teacher]:[],lessons};
     const buttons=form.querySelectorAll("button"); buttons.forEach(button=>button.disabled=true); message.textContent=creating?"פותחים את הכיתה…":"שומרים…";
     try{
       const response=await api(creating?"/api/classes":`/api/classes/${encodeURIComponent(row.id)}`,{method:creating?"POST":"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
@@ -1608,8 +1659,19 @@ async function deleteManagedClass(row){
    the mistakes that keep coming back (Sky.patterns), the summarizing quizzes' grades and the practice exams' results,
    and above them the mistakes most common in the class. */
 const teachClasses=()=>MY_CLASSES.filter(row=>row.teacher);
-const teachButton=()=>(teachClasses().length?'<button class="mx-btn" data-act="class-report">הכיתה שלי</button>':"")
-  +(CFG.aiReview?`<button class="mx-btn" data-act="ai-queue">${aqLabel()}</button>`:"");
+// "view as student": the teacher sees the home screen the way a student of the class does, until they switch back
+const previewBar=()=>PREVIEW?`<div class="mx-preview" role="status"><span>מצב תצוגה כתלמיד</span><button class="mx-btn" data-act="preview-off">חזרה למצב מורה</button></div>`:"";
+function setPreview(on){ PREVIEW=on; closeSheet(); if(hasExams()) drawSubjectPicker(); else selectSubject("מתמטיקה"); window.scrollTo?.(0,0); }
+const teachButton=()=>CFG.aiReview?`<button class="mx-btn" data-act="ai-queue">${aqLabel()}</button>`:"";
+// the teacher's classes, at the top of the home screen: each opens its report (students, progress, assignments)
+function classesCard(){
+  const mine=PREVIEW?[]:teachClasses(); if(!mine.length) return "";
+  return `<section class="mx-classes" aria-labelledby="mxClasses"><h2 id="mxClasses">הכיתות שלי</h2>
+    <div class="mx-classes-grid">${mine.map(row=>`<button type="button" class="mx-myclass" data-act="class-report" data-class-id="${esc(row.id)}">
+      <b>${esc(row.name)}</b><small>${row.students!=null?`${row.students} תלמידים`:"תלמידים, התקדמות ומשימות"}</small><i aria-hidden="true">‹</i></button>`).join("")}</div>
+    ${CFG.aiLeft!=null?`<p class="mx-small mx-ai-left">${CFG.aiLeft?`נשארו לכם היום ${CFG.aiLeft===1?"בקשת AI אחת":`${CFG.aiLeft} בקשות AI`} מתוך 3.`:"השתמשתם היום בכל 3 בקשות ה-AI. אפשר שוב מחר."}</p>`:""}</section>`;
+}
+const aiUsed=()=>{ if(CFG.aiLeft!=null) CFG.aiLeft=Math.max(0,CFG.aiLeft-1); };
 let REPORT=null;
 const shortDate=at=>{ const d=new Date(at); return isNaN(d)?"":d.toLocaleDateString("he-IL",{day:"numeric",month:"numeric"}); };
 const pct=(a,b)=>b?Math.round(100*a/b):0;
@@ -1639,7 +1701,7 @@ function reportOf(student,units){
 async function classReport(id){
   const mine=teachClasses(), classId=id??REPORT?.id??mine[0]?.id; if(classId==null) return;
   if(!cur) back=document.activeElement;
-  closeSheetQuietly(); cur="report"; REPORT={id:classId,data:null,form:null,tab:repGet("tab","list"),sort:repGet("sort","attention"),unit:repGet("unit","overview")};
+  closeSheetQuietly(); cur="report"; REPORT={id:classId,data:null,form:null,tab:repGet("tab","list"),sort:repGet("sort","attention"),unit:"overview",open:repGet("mapMonths",null)};
   const tabs=mine.length>1?`<div class="mx-report-tabs">${mine.map(row=>`<button class="mx-btn" data-report-class="${esc(row.id)}" aria-pressed="${String(row.id)===String(classId)}">${esc(row.name)}</button>`).join("")}</div>`:"";
   sheet.innerHTML=`<div class="mx-scrim"></div>
     <div class="mx-sheet mx-manage-sheet mx-report-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
@@ -1660,7 +1722,7 @@ function reportOpenStudent(i){
   card.open=true; card.scrollIntoView({block:"nearest"}); card.querySelector("summary").focus({preventScroll:true});
 }
 function closeSheetQuietly(){ const b=back; closeSheet(); back=b; }
-// the teacher's choices in the report (list or grid, which unit, the order) are kept on this device
+// the teacher's choices in the report (which tab, the order) are kept on this device
 const repGet=(k,def)=>{ try{ return localStorage.getItem("mathly.report."+k)||def; }catch{ return def; } };
 const repSet=(k,v)=>{ try{ localStorage.setItem("mathly.report."+k,v); }catch{} };
 const REPORT_SORTS={attention:"דורשים תשומת לב קודם",name:"שם",progress:"התקדמות",activity:"פעילות אחרונה (הישנה קודם)"};
@@ -1672,6 +1734,11 @@ function cellState(p,id){
 }
 const CELL_TEXT={gold:"כוכב זהב",lit:"הושלמה",fading:"הושלמה, הכוכב דועך",trying:"מתרגל, עוד לא סיים",none:"לא התחיל"};
 const HARD_SHARE=1/3;   // a skill is a class-wide difficulty when this share of the students are on it without finishing
+// a unit's share of finished skills as a heat level: 0 not started, 1 under a third, 2 under two thirds, 3 under all, 4 all
+const heatLevel=(done,n,started)=>!n||(!done&&!started)?0:done>=n?4:done*3<n?1:done*3<2*n?2:3;
+// the map's open months: the teacher's choice, kept on this device; until they choose, the current month is open
+const heatOpen=()=>REPORT.open==null?new Set([new Date().toLocaleDateString("he-IL",{month:"long",timeZone:"Asia/Jerusalem"})])
+  :new Set(REPORT.open.split("|").filter(Boolean));
 function drawReport(){
   const {class:row,students}=REPORT.data, ids=new Set(row.lessons||[]);
   const units=G.units.filter(u=>ids.has(u.id)&&unitIds(u).some(live));
@@ -1689,11 +1756,19 @@ function drawReport(){
   const DEVICE_NOTE=' <small class="mx-device" title="המכשיר של התלמיד מדווח את הנתונים האלה, והשרת לא בודק אותם">· נתוני תרגול מהמכשיר</small>';
   const grade=score=>score==null?"–":`${score}`;
   const tone=score=>score==null?"":score>=80?" good":score>=55?" mid":" low";
-  const card=({s,r},i)=>{
+  // a student's state at a glance: stuck on something, active this week, or quiet; and the last 14 days as small bars
+  const dayKey=d=>d.toLocaleDateString("en-CA",{timeZone:"Asia/Jerusalem"});
+  const status=r=>{ const week=Date.now()-7*864e5;
+    return r.perUnit.some(x=>x.stuck.length)?['low',"תקוע","יש לתלמיד לפחות מיומנות אחת שלא הושלמה ושיש בה שאלות שנענו לא נכון ועדיין לא נפתרו. זה לא ציון: אין סף, ומספיק שאלה אחת. נתוני המכשיר של התלמיד, והשרת לא בודק אותם."]:r.last&&r.last.getTime()>=week?['good',"פעיל"]:['mid',"לא פעיל"]; };
+  const spark=s=>{ const days=s.progress?.days||{}, now=Date.now();
+    const bars=Array.from({length:14},(_,k)=>days[dayKey(new Date(now-(13-k)*864e5))]||0), top=Math.max(5,...bars);
+    return `<span class="mx-spark" role="img" aria-label="${bars.reduce((a,b)=>a+b,0)} תשובות נכונות ב־14 הימים האחרונים" title="14 הימים האחרונים">${bars.map(n=>`<i style="height:${n?Math.max(15,Math.round(n/top*100)):6}%"${n?"":' class="off"'}></i>`).join("")}</span>`; };
+  const card=({s,r,att},i)=>{
     if(!r) return `<details class="mx-report-student" id="rs-${i}"><summary><b dir="ltr">${esc(name(s.email))}</b><span class="mx-small">${s.signed_in?"עוד לא התחיל לתרגל":"עוד לא נכנס לחשבון"}</span></summary><p class="mx-small" dir="ltr">${esc(s.email)}</p></details>`;
     const exam=r.exams[0];
-    return `<details class="mx-report-student" id="rs-${i}"><summary><b dir="ltr">${esc(name(s.email))}</b>
-        <span class="mx-report-prog"><span class="mx-meter" aria-hidden="true"><i style="width:${pct(r.done,r.n)}%"></i></span><small>${r.done}/${r.n} מיומנויות</small></span>
+    const [stTone,stText,stHint]=status(r);
+    return `<details class="mx-report-student" id="rs-${i}"><summary><b dir="ltr">${esc(name(s.email))}</b><span class="mx-report-chip ${stTone}"${stHint?` title="${esc(stHint)}"`:""}>${stText}</span>
+        <span class="mx-report-prog"><span class="mx-meter" aria-hidden="true"><i style="width:${pct(r.done,r.n)}%"></i></span><small>${r.done}/${r.n} מיומנויות</small></span>${spark(s)}
         <span class="mx-report-chip${tone(r.quizAvg)}" title="ממוצע בחנים מסכמים שנבדקו">בוחן ${grade(r.quizAvg)}</span>
         <span class="mx-report-chip${tone(exam?pct(exam.right,exam.n):null)}" title="מבחן התרגול האחרון (נתוני מכשיר)">תרגול ${exam?`${exam.right}/${exam.n}`:"–"}</span>
         ${r.recurring.length?`<span class="mx-report-chip low">${r.recurring.length} קשיים</span>`:""}
@@ -1705,13 +1780,14 @@ function drawReport(){
         ${r.helped.length?`<section><h5>דוגמאות פתורות שנפתחו בשבועיים האחרונים${DEVICE_NOTE}</h5><ul class="mx-report-list">${r.helped.map(x=>
           `<li><b>${fmt(BY[x.id].name)}</b> <small>${x.n===1?"פעם אחת":`${x.n} פעמים`}, לאחרונה ${shortDate(x.last)}</small></li>`).join("")}</ul></section>`:""}
         <p class="mx-report-week"><b>${r.week.thisWeek}</b> תשובות נכונות השבוע · <b>${r.week.lastWeek}</b> בשבוע שעבר</p>
-        <section><h5>התקדמות ביחידות${DEVICE_NOTE}</h5><div class="mx-quiz-units-score">${r.perUnit.map(x=>`<div><span>${esc(x.u.name)}${x.gold?` <small>· ${x.gold} זהב</small>`:""}</span><b>${x.done}/${x.n}</b><span class="mx-meter" aria-hidden="true"><i style="width:${pct(x.done,x.n)}%"></i></span></div>`).join("")}</div></section>
-        <section><h5>קשיים${DEVICE_NOTE}</h5>${r.recurring.length?`<ul class="mx-report-list">${r.recurring.map(x=>`<li><b>${fmt(G.mistakes[x.m].name)}</b> <small>${x.n} פעמים ב־${x.skills.length} מיומנויות, לאחרונה ${shortDate(x.last)}</small>${BY[x.practise]?`<small>לחזק: ${fmt(BY[x.practise].name)}</small>`:""}</li>`).join("")}</ul>`:'<p class="mx-small">אין טעויות שחוזרות לאחרונה.</p>'}
+        <section><h5>התקדמות ביחידות${DEVICE_NOTE}</h5><div class="mx-quiz-units-score">${r.perUnit.filter(x=>x.done||x.gold||x.stuck.length).map(x=>`<div><span>${esc(x.u.name)}${x.gold?` <small>· ${x.gold} זהב</small>`:""}</span><b>${x.done}/${x.n}</b><span class="mx-meter" aria-hidden="true"><i style="width:${pct(x.done,x.n)}%"></i></span></div>`).join("")||'<p class="mx-small">עוד אין פעילות ביחידות.</p>'}</div>${r.perUnit.some(x=>!x.done&&!x.gold&&!x.stuck.length)?`<p class="mx-small">עוד ${r.perUnit.filter(x=>!x.done&&!x.gold&&!x.stuck.length).length} יחידות בלי פעילות</p>`:""}</section>
+        <section><h5>קשיים${DEVICE_NOTE}</h5>${r.recurring.length?`<div class="mx-chips">${r.recurring.map(x=>`<span class="mx-report-chip low" title="${x.n} פעמים ב־${x.skills.length} מיומנויות, לאחרונה ${shortDate(x.last)}">${fmt(G.mistakes[x.m].name)} <em>×${x.n}</em></span>`).join("")}</div>
+      <p class="mx-small">${r.recurring.map(x=>`<b>${fmt(G.mistakes[x.m].name)}</b>: ${x.n} פעמים ב־${x.skills.length} מיומנויות, לאחרונה ${shortDate(x.last)}${BY[x.practise]?`. לחזק: ${fmt(BY[x.practise].name)}`:""}`).join("<br>")}</p>`:'<p class="mx-small">אין טעויות שחוזרות לאחרונה.</p>'}
           ${r.perUnit.some(x=>x.stuck.length)?`<p class="mx-small">מיומנויות עם שאלות שעוד לא נפתרו: ${r.perUnit.flatMap(x=>x.stuck).slice(0,8).map(sk=>fmt(sk.name)).join(" · ")}</p>`:""}</section>
         <section><h5>בוחן מסכם</h5>${quizUnits.length?`<table class="mx-report-table"><thead><tr><th>יחידה</th><th>ציון אחרון</th><th>הגשות</th><th>תאריך</th><th>תשובות</th></tr></thead><tbody>${r.quizzes.map(({u,st,last,count,unverified})=>{
             const cell=st.going?"בתהליך":!r.quizzesKnown?"לא זמין":last?(last.grade==null?"ממתין לבדיקה":`${last.grade}/100`):unverified?"לא מאומת":"–";
             const subs=`${count||(unverified?"":"–")}${unverified&&r.quizzesKnown?`${count?" ":""}<small>(${unverified} לא מאומתות)</small>`:""}`;
-            return `<tr><td>${esc(u.name)}</td><td class="mx-report-grade${tone(last?.grade)}">${cell}</td><td>${subs}</td><td>${last?shortDate(last.submitted_at):"–"}</td><td>${last?`<button type="button" class="mx-btn" data-answers="${i}:${esc(u.id)}">פתיחה</button>`:""}</td></tr>`; }).join("")}</tbody></table>`:'<p class="mx-small">ליחידות של הכיתה אין בוחן מסכם.</p>'}</section>
+            return `<tr><td>${esc(u.name)}</td><td class="mx-report-grade${tone(last?.grade)}">${cell}</td><td>${subs}</td><td>${last?shortDate(last.submitted_at):"–"}</td><td>${last?`<button type="button" class="mx-btn${last.grade==null?" solid":""}" data-answers="${i}:${esc(u.id)}">פתיחה</button>`:""}</td></tr>`; }).join("")}</tbody></table>`:'<p class="mx-small">ליחידות של הכיתה אין בוחן מסכם.</p>'}</section>
         <section><h5>מבחני תרגול${DEVICE_NOTE}</h5>${r.exams.length?`<table class="mx-report-table"><thead><tr><th>תאריך</th><th>ציון</th><th>תשובות נכונות</th><th>זמן</th></tr></thead><tbody>${r.exams.slice(0,10).map(q=>`<tr><td>${shortDate(q.at)}</td><td class="mx-report-grade${tone(pct(q.right,q.n))}">${pct(q.right,q.n)}</td><td>${q.right}/${q.n}</td><td>${q.ms?`${Math.round(q.ms/60000)} דק׳`:"–"}</td></tr>`).join("")}</tbody></table>`:'<p class="mx-small">עוד לא נעשו מבחני תרגול.</p>'}</section>
       </div></details>`;
   };
@@ -1730,36 +1806,57 @@ function drawReport(){
     ${top.length?`<section class="mx-report-common"><h4>קשיים נפוצים בכיתה</h4><ul class="mx-report-list">${top.map(([m,who])=>`<li><b>${fmt(G.mistakes[m].name)}</b> <small>${who.length} תלמידים: ${who.map(e=>esc(name(e))).join(", ")}</small></li>`).join("")}</ul></section>`:""}
     <h4>תלמידים</h4>${students.length?order.map(x=>card(x,x.i)).join(""):'<p class="mx-note">אין עדיין תלמידים בכיתה.</p>'}`;
 
-  // the grid: a row per student; a column per skill of one unit, or per unit in the overview
+  // the map: a row per student; a column per unit, or (one unit chosen) per skill. The colour says how far the student is,
+  // the red mark says they are stuck on something there. It is the device's data, as the rest of the progress
+  const mapUnit=units.find(u=>u.id===REPORT.unit);
   const started=all.filter(x=>x.r).length;
-  const gridUnit=units.find(u=>u.id===REPORT.unit);
-  let grid;
-  if(!students.length) grid='<p class="mx-note">אין עדיין תלמידים בכיתה.</p>';
-  else if(!gridUnit){
-    grid=`<table class="mx-grid"><thead><tr><th class="mx-grid-name" scope="col">תלמיד</th>${units.map(u=>`<th scope="col" class="mx-grid-unit">${esc(u.name)}</th>`).join("")}</tr></thead><tbody>${
-      order.map(({s,r})=>`<tr><th scope="row" class="mx-grid-name" dir="ltr">${esc(name(s.email))}</th>${units.map((u,k)=>{ const x=r?.perUnit[k];
-        return x?`<td class="mx-grid-num${tone(pct(x.done,x.n))}">${x.done}/${x.n}</td>`:'<td class="mx-grid-num">–</td>'; }).join("")}</tr>`).join("")}</tbody></table>`;
+  let map;
+  if(!students.length) map='<p class="mx-note">אין עדיין תלמידים בכיתה.</p>';
+  else if(!mapUnit){
+    // two levels: the units are grouped by the month the syllabus teaches them in; a month's column opens into its units
+    const monthOf=u=>(u.when||"ללא מועד").split(/[–-]/)[0].trim();
+    const groups=[]; units.forEach((u,k)=>{ const key=monthOf(u); let g=groups.find(x=>x.key===key); if(!g) groups.push(g={key,ks:[]}); g.ks.push(k); });
+    const openG=heatOpen(), isOpen=g=>openG.has(g.key), rows=groups.some(isOpen)?2:1;
+    const stuckIn=ks=>order.filter(({r})=>r&&ks.some(k=>r.perUnit[k].stuck.length)).length;
+    const hard=ks=>stuckIn(ks)>0&&stuckIn(ks)*3>=Math.max(started,1);
+    const cell=(s,r,ks,title)=>{
+      if(!r) return `<td><span class="mx-heat-cell h0" role="img" aria-label="${s.signed_in?"עוד לא התחיל לתרגל":"עוד לא נכנס לחשבון"}"></span></td>`;
+      const done=ks.reduce((t,k)=>t+r.perUnit[k].done,0), n=ks.reduce((t,k)=>t+r.perUnit[k].n,0), stuck=ks.reduce((t,k)=>t+r.perUnit[k].stuck.length,0);
+      const label=`${title}: ${done} מתוך ${n} מיומנויות${stuck?`, תקוע ב־${stuck}`:""}`;
+      return `<td><span class="mx-heat-cell h${heatLevel(done,n,0)}${stuck?" stuck":""}" role="img" aria-label="${esc(label)}" title="${esc(label)}">${done?`${pct(done,n)}%`:""}</span></td>`; };
+    const head1=groups.map(g=>isOpen(g)
+      ?`<th scope="colgroup" colspan="${g.ks.length}" class="mx-heat-gopen"><button type="button" class="mx-heat-group" data-heat-group="${esc(g.key)}" aria-expanded="true" title="קיפול ${esc(g.key)}">◂ ${esc(g.key)}</button></th>`
+      :`<th scope="col" rowspan="${rows}" class="mx-heat-gcol${hard(g.ks)?" hard":""}"><button type="button" class="mx-heat-group" data-heat-group="${esc(g.key)}" aria-expanded="false" title="פתיחת ${esc(g.key)}: ${g.ks.length} יחידות">${esc(g.key)}<small>${g.ks.length} יחידות ▸</small></button></th>`).join("");
+    const head2=rows===2?`<tr>${groups.filter(isOpen).flatMap(g=>g.ks).map(k=>
+      `<th scope="col" class="mx-heat-col${hard([k])?" hard":""}"><button type="button" class="mx-heat-unit" data-heat-unit="${esc(units[k].id)}" title="${esc(units[k].name)}: פתיחה לפי מיומנויות">${esc(units[k].name)}</button></th>`).join("")}</tr>`:"";
+    map=`<table class="mx-heat"><thead><tr><th class="mx-grid-name" scope="col" rowspan="${rows}">תלמיד</th>${head1}</tr>${head2}</thead><tbody>${
+      order.map(({s,r})=>`<tr><th scope="row" class="mx-grid-name" dir="ltr">${esc(name(s.email))}</th>${groups.map(g=>isOpen(g)?g.ks.map(k=>cell(s,r,[k],units[k].name)).join(""):cell(s,r,g.ks,g.key)).join("")}</tr>`).join("")}</tbody></table>
+      <p class="mx-small">לחיצה על חודש פותחת אותו ליחידות שלו, ולחיצה על שם יחידה פותחת אותה לפי מיומנויות. נקודה אדומה: התלמיד תקוע בלפחות מיומנות אחת.</p>`;
   }else{
-    const skills=unitIds(gridUnit).filter(live);
+    const skills=unitIds(mapUnit).filter(live);
     const count=skills.map(id=>{ const st=all.map(x=>cellState(x.s.progress,id));
       const trying=st.filter(t=>t==="trying").length; return {id,done:st.filter(t=>["gold","lit","fading"].includes(t)).length,trying,hard:trying>0&&trying>=started*HARD_SHARE}; });
-    grid=`<table class="mx-grid"><thead><tr><th class="mx-grid-name" scope="col">תלמיד</th>${count.map(c=>
-      `<th scope="col" class="mx-grid-skill${c.hard?" hard":""}"${c.hard?' aria-label="קושי כיתתי"':""}><span title="${esc(BY[c.id].name)}">${c.hard?"⚠ ":""}${fmt(BY[c.id].short)}</span></th>`).join("")}</tr></thead><tbody>${
+    map=`<table class="mx-grid"><thead><tr><th class="mx-grid-name" scope="col">תלמיד</th>${count.map(c=>
+      `<th scope="col" class="mx-grid-skill${c.hard?" hard":""}"${c.hard?' aria-label="קושי כיתתי"':""}><span title="${esc(BY[c.id].name)}">${c.hard?"⚠ ":""}${fmt(BY[c.id].short||BY[c.id].name)}</span></th>`).join("")}</tr></thead><tbody>${
       order.map(({s})=>`<tr><th scope="row" class="mx-grid-name" dir="ltr">${esc(name(s.email))}</th>${skills.map(id=>{ const st=cellState(s.progress,id);
         return `<td><span class="mx-cell ${st}" role="img" aria-label="${CELL_TEXT[st]}" title="${CELL_TEXT[st]}"></span></td>`; }).join("")}</tr>`).join("")}</tbody><tfoot>
       <tr><th scope="row" class="mx-grid-name">סיימו</th>${count.map(c=>`<td class="mx-grid-sum">${c.done}/${started}</td>`).join("")}</tr>
       <tr><th scope="row" class="mx-grid-name">מתקשים</th>${count.map(c=>`<td class="mx-grid-sum${c.hard?" hard":""}">${c.trying||""}</td>`).join("")}</tr></tfoot></table>
       <p class="mx-small">⚠ מיומנות שלפחות שליש מהתלמידים מתרגלים ועוד לא סיימו.</p>`;
   }
-  const view=["grid","tasks"].includes(REPORT.tab)?REPORT.tab:"list";
+  const mapLegend=mapUnit?"":`<div class="mx-heat-legend" aria-hidden="true"><span><i class="h0"></i>לא התחיל</span><span><i class="h1"></i>עד שליש</span><span><i class="h2"></i>עד שני שלישים</span><span><i class="h3"></i>כמעט הכול</span><span><i class="h4"></i>סיים</span></div>`;
+  const view=["map","tasks","subs"].includes(REPORT.tab)?REPORT.tab:"list";
   const bar=`<div class="mx-report-bar"><div class="mx-report-views" role="group" aria-label="תצוגה">
       <button type="button" class="mx-btn" data-report-tab="list" aria-pressed="${view==="list"}">רשימה</button>
-      <button type="button" class="mx-btn" data-report-tab="grid" aria-pressed="${view==="grid"}">טבלת מיומנויות</button>
-      <button type="button" class="mx-btn" data-report-tab="tasks" aria-pressed="${view==="tasks"}">משימות</button></div>
+      <button type="button" class="mx-btn" data-report-tab="map" aria-pressed="${view==="map"}">מפת כיתה</button>
+      <button type="button" class="mx-btn" data-report-tab="tasks" aria-pressed="${view==="tasks"}">${asgFull()?"משימות":"שיעורי בית"}</button>
+      <button type="button" class="mx-btn" data-report-tab="subs" aria-pressed="${view==="subs"}">הגשות</button>
+      <button type="button" class="mx-btn" data-act="preview-on" title="לראות את האפליקציה כמו שתלמיד בכיתה רואה אותה">הצגה כתלמיד</button></div>
     <label class="mx-small">מיון <select data-report-sort>${Object.entries(REPORT_SORTS).map(([k,v])=>`<option value="${k}"${k===sort?" selected":""}>${v}</option>`).join("")}</select></label>
-    ${view==="grid"?`<label class="mx-small">יחידה <select data-report-unit><option value="overview">כל היחידות</option>${units.map(u=>`<option value="${esc(u.id)}"${u.id===REPORT.unit?" selected":""}>${esc(u.name)}</option>`).join("")}</select></label>`:""}</div>`;
-  sheet.querySelector(".mx-report").innerHTML=bar+(view==="grid"?`<div class="mx-grid-wrap" tabindex="0" role="region" aria-label="טבלת מיומנויות של הכיתה">${grid}</div>`
-    :view==="tasks"?(REPORT.form?asgFormHtml(units):asgTasksHtml(order,name)):list);
+    ${view==="map"&&!mapUnit?`<button type="button" class="mx-btn" data-heat-all="open">פתיחת הכול</button><button type="button" class="mx-btn" data-heat-all="close">קיפול הכול</button>`:""}
+    ${view==="map"?`<label class="mx-small">יחידה <select data-report-unit><option value="overview">כל היחידות</option>${units.map(u=>`<option value="${esc(u.id)}"${u.id===REPORT.unit?" selected":""}>${esc(u.name)}</option>`).join("")}</select></label>`:""}</div>`;
+  sheet.querySelector(".mx-report").innerHTML=bar+(view==="map"?`${mapLegend}<div class="mx-grid-wrap${mapUnit?"":" mx-heat-wrap"}" tabindex="0" role="region" aria-label="מפת הכיתה">${map}</div>`:view==="tasks"||view==="subs"?(REPORT.sub?wsSubHtml(name):view==="subs"?subsTabHtml(order,name):REPORT.form?asgFormHtml(units):asgTasksHtml(order,name)):list);
+  if((view==="tasks"||view==="subs")&&REPORT.sub) wsSubImages();
 }
 
 /* ---------- the class's assignments, in the report (app/assignments.py) ----------
@@ -1768,7 +1865,7 @@ function drawReport(){
    and gives the teacher the form to make, change or delete one. */
 const ASG_ERR={400:"אחד הפריטים אינו שייך ליחידות של הכיתה, או שהתאריך אינו תקין.",403:"רק מורה הכיתה יכול לתת לה משימות.",404:"הכיתה או המשימה לא נמצאו.",
   503:"המשימות אינן זמינות כרגע. נסו שוב מאוחר יותר."};
-const asgStates=(a,order)=>order.map(({s})=>({s,st:Sky.assignmentState(a,s.progress,s.quiz_sittings)}));
+const asgStates=(a,order)=>order.map(({s})=>({s,st:Sky.assignmentState(a,s.progress,wsServer(s))}));
 function asgTasksHtml(order,name){
   const list=REPORT.data.assignments;
   if(list===null) return '<p class="mx-note">המשימות אינן זמינות כרגע באתר.</p>';
@@ -1778,75 +1875,498 @@ function asgTasksHtml(order,name){
     return `<article class="mx-asg-t${past?" past":""}"><div class="mx-asg-head"><b>${esc(a.title)}</b><span class="mx-asg-due">${past?"המועד עבר · ":""}עד ${asgDate(a.due_on)}</span></div>
       ${a.note?`<p class="mx-asg-note">${esc(a.note)}</p>`:""}
       <p class="mx-asg-count"><b>${finished}</b> מתוך ${rows.length} תלמידים סיימו</p>
-      <ul class="mx-asg-items">${a.items.map(i=>`<li>${asgItemLabel(i)}</li>`).join("")}</ul>
-      ${rows.length?`<details class="mx-asg-who"><summary>מי עשה מה</summary><div class="mx-grid-wrap" tabindex="0" role="region" aria-label="מצב התלמידים במשימה"><table class="mx-grid">
+      <ul class="mx-asg-items">${a.items.map(i=>`<li>${asgItemLabel(i)}</li>`).join("")}</ul>${wsSummaryHtml(a,order)}
+      ${rows.length?`<details class="mx-asg-who"${rows.some(({st})=>st.items.some(x=>x.submission&&!x.submission.checked_at))?" open":""}><summary>מי עשה מה</summary><div class="mx-grid-wrap" tabindex="0" role="region" aria-label="מצב התלמידים במשימה"><table class="mx-grid">
         <thead><tr><th class="mx-grid-name" scope="col">תלמיד</th>${a.items.map(i=>`<th scope="col" class="mx-grid-unit">${asgItemLabel(i)}</th>`).join("")}</tr></thead><tbody>
-        ${rows.map(({s,st})=>`<tr><th scope="row" class="mx-grid-name" dir="ltr">${esc(name(s.email))}</th>${st.items.map(x=>
+        ${rows.map(({s,st})=>`<tr><th scope="row" class="mx-grid-name" dir="ltr">${esc(name(s.email))}</th>${st.items.map(x=>wsCellHtml(x,a,s)||
           `<td class="mx-asg-cell ${x.done?(x.late?"late":"ok"):x.known?"none":"unknown"}">${x.done?(x.late?"✓ באיחור":"✓"):x.known?"–":"?"}</td>`).join("")}</tr>`).join("")}
         </tbody></table></div></details>`:""}
       <div class="mx-row"><button type="button" class="mx-btn" data-asg-edit="${esc(a.id)}">עריכה</button>
         <button type="button" class="mx-btn" data-asg-del="${esc(a.id)}">מחיקה</button></div></article>`;
   }).join("");
-  return `<div class="mx-row"><button type="button" class="mx-btn solid" data-asg-new>משימה חדשה</button></div>
-    ${cards||'<p class="mx-note">עוד לא נתתם משימות לכיתה. משימה היא מיומנויות לסיים, בוחן מסכם להגיש או מבחן תרגול, עד תאריך.</p>'}`;
+  return `<div class="mx-row"><button type="button" class="mx-btn solid" data-asg-new>${asgFull()?"משימה חדשה":"שיעורי בית חדשים"}</button></div>
+    ${cards||`<p class="mx-note">${asgFull()?"עוד לא נתתם משימות לכיתה. ":"עוד לא נתתם שיעורי בית לכיתה. "}${asgFull()?"משימה היא מיומנויות לסיים, בוחן מסכם להגיש, מבחן תרגול או שיעורי בית, עד תאריך.":"שיעורי בית הם PDF או תמונות שהתלמידים פותרים ומגישים עד תאריך יעד."}</p>`}`;
 }
+// a teacher gives worksheets only; the full picker (skills, unit quizzes, practice exams) is for developers
+const asgFull=()=>can("management.access");
 function asgFormHtml(units){
   const old=REPORT.data.assignments.find(x=>x.id===REPORT.form.id);
   const a=old||{title:"",note:"",due_on:new Date(Date.now()+7*864e5).toLocaleDateString("en-CA",{timeZone:"Asia/Jerusalem"}),items:[]};
   const skills=new Set(a.items.filter(i=>i.kind==="skill").map(i=>i.id)), quizzes=new Set(a.items.filter(i=>i.kind==="unit_quiz").map(i=>i.unit));
   const exam=new Set(a.items.find(i=>i.kind==="exam")?.units||[]);
   const box=(name,value,on,label)=>`<label><input type="checkbox" name="${name}" value="${esc(value)}"${on?" checked":""}> ${label}</label>`;
-  return `<form class="mx-asg-form" data-asg-form="${esc(old?.id||"")}" novalidate><h4>${old?"עריכת משימה":"משימה חדשה"}</h4>
+  return `<form class="mx-asg-form" data-asg-form="${esc(old?.id||"")}" novalidate><h4>${asgFull()?(old?"עריכת משימה":"משימה חדשה"):(old?"עריכת שיעורי בית":"שיעורי בית חדשים")}</h4>
     <label>כותרת<input name="title" maxlength="80" value="${esc(a.title)}" required></label>
     <label>הערה לתלמידים <small>(לא חובה)</small><textarea name="note" rows="2" maxlength="500">${esc(a.note)}</textarea></label>
-    <label>להגיש עד<input type="date" name="due_on" value="${esc(a.due_on)}" required></label>
-    <fieldset><legend>מיומנויות לסיים</legend>${units.map(u=>{ const ids=unitIds(u).filter(live);
+    <label>תאריך יעד<input type="date" name="due_on" value="${esc(a.due_on)}" required></label>
+    ${asgFull()?`<fieldset><legend>מיומנויות לסיים</legend>${units.map(u=>{ const ids=unitIds(u).filter(live);
       return `<details${ids.some(id=>skills.has(id))?" open":""}><summary>${esc(u.name)}</summary><div class="mx-asg-checks">${ids.map(id=>box("skill",id,skills.has(id),fmt(BY[id].short||BY[id].name))).join("")}</div></details>`; }).join("")}</fieldset>
     <fieldset><legend>בוחן מסכם להגשה</legend><div class="mx-asg-checks">${units.filter(u=>u.quiz).map(u=>box("quiz",u.id,quizzes.has(u.id),esc(u.name))).join("")||"<small>ליחידות של הכיתה אין בוחן מסכם.</small>"}</div></fieldset>
     <fieldset><legend>מבחן תרגול על היחידות</legend><div class="mx-asg-checks">${units.map(u=>box("exam",u.id,exam.has(u.id),esc(u.name))).join("")}</div>
-      <small>מי שיסמן כמה יחידות יבקש מבחן תרגול שכולל את כולן.</small></fieldset>
+      <small>מי שיסמן כמה יחידות יבקש מבחן תרגול שכולל את כולן.</small></fieldset>`:""}
+    ${wsFieldHtml(old)||(asgFull()?"":'<p class="mx-note">שיעורי הבית אינם זמינים כרגע, ולכן אי אפשר לשמור אותם.</p>')}
     <div class="mx-row"><button type="submit" class="mx-btn solid">שמירה</button><button type="button" class="mx-btn" data-asg-cancel>ביטול</button>
       <span class="mx-small" role="status" aria-live="polite"></span></div></form>`;
 }
 async function asgSave(form){
-  const id=form.dataset.asgForm, status=form.querySelector("[role=status]"), button=form.querySelector("[type=submit]"), classId=REPORT.id;
+  const id=form.dataset.asgForm, status=form.querySelector(":scope>.mx-row>[role=status]"), button=form.querySelector("[type=submit]"), classId=REPORT.id;   // the save's own line, not the worksheet upload's
   const picked=name=>[...form.querySelectorAll(`[name=${name}]:checked`)].map(c=>c.value);
   const items=[...picked("skill").map(v=>({kind:"skill",id:v})),...picked("quiz").map(v=>({kind:"unit_quiz",unit:v}))];
   if(picked("exam").length) items.push({kind:"exam",units:picked("exam")});
+  if(!asgFull()) items.push(...(REPORT.data.assignments.find(x=>x.id===id)?.items||[]).filter(i=>i.kind!=="worksheet"));   // kept as they were
+  const before=(REPORT.data.assignments.find(x=>x.id===id)?.items||[]).filter(i=>i.kind==="worksheet").map(i=>i.id);
+  // without the worksheet list (not available), the assignment keeps the worksheets it had
+  for(const w of REPORT.form?.sheets||before.map(wid=>({id:wid}))) items.push({kind:"worksheet",id:w.id});
   const body={title:form.elements.title.value,note:form.elements.note.value,due_on:form.elements.due_on.value,items};
   if(!body.title.trim()){ status.textContent="כתבו כותרת למשימה."; form.elements.title.focus(); return; }
   if(!body.due_on){ status.textContent="בחרו תאריך להגשה."; return; }
-  if(!items.length){ status.textContent="בחרו לפחות פריט אחד: מיומנות, בוחן מסכם או מבחן תרגול."; return; }
+  if(!items.length){ status.textContent=asgFull()?"בחרו לפחות פריט אחד: מיומנות, בוחן מסכם, מבחן תרגול או שיעורי בית.":"העלו שיעורי בית אחד לפחות."; return; }
   button.disabled=true; status.textContent="שומרים…";
   try{
     const r=await api(`/api/classes/${encodeURIComponent(classId)}/assignments${id?`/${encodeURIComponent(id)}`:""}`,
       {method:id?"PUT":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     const d=await r.json().catch(()=>({}));
-    if(!r.ok) throw Error(ASG_ERR[r.status]||"השמירה נכשלה. נסו שוב.");
+    if(!r.ok) throw Error(d.detail==="teachers_give_worksheets_only"?"מורה נותן שיעורי בית בלבד.":ASG_ERR[r.status]||"השמירה נכשלה. נסו שוב.");
     if(cur!=="report"||REPORT?.id!==classId) return;
     const list=REPORT.data.assignments||[];
     REPORT.data.assignments=id?list.map(x=>x.id===id?d:x):[d,...list];
+    wsAfterSave(before,d.items.filter(i=>i.kind==="worksheet").map(i=>i.id));
     REPORT.form=null; drawReport();
     sheet.querySelector(".mx-report").insertAdjacentHTML("afterbegin",`<p class="mx-small" role="status">${id?"המשימה עודכנה.":"המשימה נשמרה. התלמידים רואים אותה בבית."}</p>`);
   }catch(e){ if(cur==="report"){ button.disabled=false; status.textContent=e.message; } }
 }
 async function asgDelete(id){
   const a=REPORT.data.assignments.find(x=>x.id===id); if(!a) return;
-  const started=REPORT.data.students.filter(s=>Sky.assignmentState(a,s.progress,s.quiz_sittings).doneCount>0).length;
-  if(!confirm(`למחוק את המשימה "${a.title}"? התלמידים לא יראו אותה יותר.${started?` ${started} תלמידים כבר השלימו לפחות פריט אחד ממנה.`:""}`)) return;
+  const started=REPORT.data.students.filter(s=>Sky.assignmentState(a,s.progress,wsServer(s)).doneCount>0).length;
+  const sheets=a.items.filter(i=>i.kind==="worksheet").map(i=>i.id), handed=REPORT.data.students.filter(s=>(s.worksheet_submissions||[]).some(x=>sheets.includes(x.worksheet_id))).length;
+  if(!confirm(`למחוק את המשימה "${a.title}"? התלמידים לא יראו אותה יותר.${started?` ${started} תלמידים כבר השלימו לפחות פריט אחד ממנה.`:""}${handed?` ${handed} תלמידים הגישו דפי עבודה, וההגשות יימחקו.`:""}`)) return;
   const classId=REPORT.id;
   try{
     const r=await api(`/api/classes/${encodeURIComponent(classId)}/assignments/${encodeURIComponent(id)}`,{method:"DELETE"});
     if(!r.ok) throw Error(ASG_ERR[r.status]||"המחיקה נכשלה. נסו שוב.");
     if(cur!=="report"||REPORT?.id!==classId) return;
-    REPORT.data.assignments=REPORT.data.assignments.filter(x=>x.id!==id); drawReport();
+    REPORT.data.assignments=REPORT.data.assignments.filter(x=>x.id!==id); wsAfterSave(sheets,[]); drawReport();
   }catch(e){ if(cur==="report") sheet.querySelector(".mx-manage-state").textContent=e.message; }
 }
-// the report's own controls: the view, the order and the unit of the grid
+/* ---------- worksheets on assignments (app/worksheets.py) ----------
+   The teacher uploads a PDF or photos from the assignment form; it becomes a {kind:"worksheet", id} item when the
+   assignment is saved. Students open its pages (rendered on the server) from the card, and hand in photos of their
+   solution, which they can replace until the teacher checks. The teacher checks each submission from the report's
+   "משימות" tab: a score and a comment, both optional. */
+const WS_ERR={too_many_pages:"אפשר עד 10 עמודים.",pdf_too_large:"הקובץ גדול מדי (עד 10MB).",file_too_large:"הקובץ גדול מדי.",
+  image_too_large:"תמונה גדולה מדי (עד 5MB).",not_a_pdf:"הקובץ אינו PDF תקין.",unreadable_pdf:"לא הצלחנו לקרוא את ה־PDF. אם הוא מוגן בסיסמה, שמרו עותק בלי סיסמה.",
+  pdf_too_slow:"ה־PDF כבד מדי לעיבוד. נסו לשמור אותו מחדש, או להעלות צילומים.",unsupported_image:"אפשר להעלות PDF או תמונות (JPEG, PNG, WebP).",
+  empty_image:"הקובץ ריק.",one_pdf_or_photos:"העלו PDF אחד, או תמונות, לא את שניהם יחד.",no_files:"בחרו קובץ.",
+  worksheets_unavailable:"שיעורי הבית אינם זמינים כרגע. נסו שוב מאוחר יותר.",already_checked:"המורה כבר בדק/ה את ההגשה, ולכן אי אפשר להחליף אותה.",
+  worksheet_in_use:"שיעורי הבית כבר נשמרו במשימה.",
+  open_ended_locked:"בדיקת AI נעולה כרגע.",grading_unavailable:"בדיקה אוטומטית אינה זמינה כרגע באתר.",
+  teacher_ai_limit:"הגעתם למכסה של 3 בקשות AI ביום. אפשר לבדוק ידנית, או לנסות שוב מחר."};
+const wsError=(r,fallback)=>WS_ERR[typeof r.data?.detail==="string"?r.data.detail:""]||(r.status===0?"אין חיבור לשרת. בדקו את החיבור ונסו שוב.":r.status===403?"אין לכם הרשאה לפעולה הזו.":r.status===404?"שיעורי הבית לא נמצאו.":fallback);
+// a form sent with upload progress (fetch has none)
+function sendForm(url,method,body,onProgress){
+  return new Promise(resolve=>{
+    const x=new XMLHttpRequest(); x.open(method,url);
+    if(CFG.token) x.setRequestHeader("Authorization",`Bearer ${CFG.token}`);
+    x.upload.onprogress=e=>{ if(e.lengthComputable) onProgress?.(e.loaded/e.total); };
+    x.onload=()=>{ let data={}; try{ data=JSON.parse(x.responseText); }catch{} resolve({ok:x.status>=200&&x.status<300,status:x.status,data}); };
+    x.onerror=x.ontimeout=()=>resolve({ok:false,status:0,data:{}});
+    x.send(body);
+  });
+}
+// a photo made smaller on the phone before it is sent; the file itself when that fails and it is an image we take
+async function wsPrepare(file){
+  let blob=null;
+  try{ blob=await window.MathlyPhoto.prepare(file); }catch{}
+  if(!blob&&["image/jpeg","image/png","image/webp"].includes(file.type)) blob=file;
+  return blob&&blob.size<=5000000?blob:null;
+}
+const wsAll=()=>[...(REPORT?.data?.worksheets||[]),...(REPORT?.form?.sheets||[]),...(ASG?.worksheets||[])];
+const wsInfo=id=>wsAll().find(w=>w.id===id)||null;
+const wsTitle=id=>wsInfo(id)?.title||"שיעורי בית";
+const wsWhen=t=>new Date(t).toLocaleString("he-IL",{day:"numeric",month:"numeric",hour:"2-digit",minute:"2-digit",timeZone:"Asia/Jerusalem"});
+const wsLate=(sub,a)=>!!sub&&Sky.jerusalemDay(sub.submitted_at)>a.due_on;
+const wsServer=s=>({sittings:s.quiz_sittings,submissions:s.worksheet_submissions});
+const wsHanded=id=>(REPORT?.data?.students||[]).filter(s=>(s.worksheet_submissions||[]).some(x=>x.worksheet_id===id)).length;
+async function wsBlob(url){ try{ const r=await api(url); return r.ok?URL.createObjectURL(await r.blob()):null; }catch{ return null; } }
+
+// ---- the teacher: in the assignment form
+function wsListHtml(){
+  const list=REPORT.form?.sheets||[];
+  return list.map(w=>`<li><span>📄 <b>${esc(w.title)}</b> <small>${w.pages} עמ׳ · ${w.source==="pdf"?"PDF":"תמונות"}</small></span>
+    <button type="button" class="mx-link" data-ws-remove="${esc(w.id)}">הסרה</button></li>`).join("");
+}
+function wsFieldHtml(old){
+  if(!Array.isArray(REPORT.data.worksheets)) return "";   // the worksheet tables are not there: no worksheets
+  if(!REPORT.form.sheets) REPORT.form.sheets=(old?.items||[]).filter(i=>i.kind==="worksheet").map(i=>wsInfo(i.id)||{id:i.id,title:"שיעורי בית",pages:"?",source:""});
+  return `<fieldset class="mx-ws-field"><legend>שיעורי בית</legend>
+    <ul class="mx-ws-list" data-ws-list>${wsListHtml()}</ul>
+    <div class="mx-ws-add"><label>שם שיעורי הבית<input name="ws_title" maxlength="80" autocomplete="off" placeholder="למשל: שיעורי בית – פיתגורס"></label>
+      <label>קובץ<input type="file" name="ws_files" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp" multiple></label>
+      <div class="mx-row"><button type="button" class="mx-btn" data-ws-upload>העלאה</button>
+        <progress max="1" value="0" hidden data-ws-progress></progress><span class="mx-small" data-ws-status role="status" aria-live="polite"></span></div></div>
+    <small>PDF אחד של עד 10 עמודים, או עד 10 תמונות. אפשר להוסיף כמה שיעורי בית שרוצים. התלמידים פותחים אותם, מצלמים את הפתרון ומגישים עד תאריך היעד, ואתם בודקים בלשונית שיעורי בית או הגשות.</small></fieldset>`;
+}
+async function wsUpload(button){
+  const form=button.closest("form"), status=form.querySelector("[data-ws-status]"), bar=form.querySelector("[data-ws-progress]");
+  const title=form.elements.ws_title.value.trim(), files=[...form.elements.ws_files.files], classId=REPORT.id, mine=REPORT.form;
+  const pdfs=files.filter(f=>f.type==="application/pdf"||/\.pdf$/i.test(f.name));
+  if(!title){ status.textContent="כתבו שם לשיעורי הבית."; return form.elements.ws_title.focus(); }
+  if(!files.length){ status.textContent="בחרו PDF או תמונות."; return form.elements.ws_files.focus(); }
+  if(pdfs.length&&files.length>1){ status.textContent=WS_ERR.one_pdf_or_photos; return; }
+  if(files.length>10){ status.textContent="אפשר עד 10 תמונות."; return; }
+  button.disabled=true; status.textContent="מכינים…";
+  const body=new FormData(); body.append("title",title);
+  if(pdfs.length) body.append("files",files[0],files[0].name||"worksheet.pdf");
+  else for(const [i,f] of files.entries()){
+    const blob=await wsPrepare(f);
+    if(!blob){ button.disabled=false; status.textContent=`לא הצלחנו להכין את התמונה ${i+1}. נסו תמונה אחרת.`; return; }
+    body.append("files",blob,`page${i+1}.jpg`);
+  }
+  status.textContent="מעלים…"; bar.hidden=false; bar.value=0;
+  const r=await sendForm(`/api/classes/${encodeURIComponent(classId)}/worksheets`,"POST",body,p=>bar.value=p);
+  if(cur!=="report"||REPORT?.form!==mine) return;
+  button.disabled=false; bar.hidden=true;
+  if(!r.ok){ status.textContent=wsError(r,"ההעלאה נכשלה. נסו שוב."); return; }
+  mine.sheets=[...(mine.sheets||[]),r.data];
+  form.querySelector("[data-ws-list]").innerHTML=wsListHtml();
+  form.elements.ws_title.value=""; form.elements.ws_files.value="";
+  status.textContent=`"${r.data.title}" הועלו (${r.data.pages} עמ׳). התלמידים יראו אותם כשתשמרו.`;
+}
+function wsRemove(id){
+  const mine=REPORT.form, old=REPORT.data.assignments.find(x=>x.id===mine.id), saved=(old?.items||[]).some(i=>i.kind==="worksheet"&&i.id===id);
+  const n=saved?wsHanded(id):0;
+  if(n&&!confirm(`להסיר את "${wsTitle(id)}"? ${n} תלמידים כבר הגישו אותו, וההגשות שלהם יימחקו כשתשמרו את המשימה.`)) return;
+  mine.sheets=(mine.sheets||[]).filter(w=>w.id!==id);
+  const list=sheet.querySelector("[data-ws-list]"); if(list) list.innerHTML=wsListHtml();
+  if(!saved) api(`/api/classes/${encodeURIComponent(REPORT.id)}/worksheets/${encodeURIComponent(id)}`,{method:"DELETE"}).catch(()=>{});   // not saved yet: gone now
+}
+// the form closed without saving: worksheets uploaded in it, and not in the assignment, go now (else the hourly cleanup)
+function wsCancel(){
+  const old=REPORT.data.assignments.find(x=>x.id===REPORT.form?.id), kept=new Set((old?.items||[]).filter(i=>i.kind==="worksheet").map(i=>i.id));
+  for(const w of REPORT.form?.sheets||[]) if(!kept.has(w.id))
+    api(`/api/classes/${encodeURIComponent(REPORT.id)}/worksheets/${encodeURIComponent(w.id)}`,{method:"DELETE"}).catch(()=>{});
+}
+// after a save: the report knows the assignment's worksheets, and forgets those it lost
+function wsAfterSave(before,after){
+  const gone=new Set(before.filter(id=>!after.includes(id)));
+  const known=(REPORT.data.worksheets||[]).filter(w=>!gone.has(w.id));
+  for(const w of REPORT.form?.sheets||[]) if(after.includes(w.id)&&!known.some(k=>k.id===w.id)) known.push(w);
+  if(Array.isArray(REPORT.data.worksheets)) REPORT.data.worksheets=known;
+  for(const s of REPORT.data.students) if(s.worksheet_submissions) s.worksheet_submissions=s.worksheet_submissions.filter(x=>!gone.has(x.worksheet_id));
+}
+
+// ---- the teacher: in the report's assignments tab
+function wsSummaryHtml(a,order){
+  return a.items.filter(i=>i.kind==="worksheet").map(i=>{
+    if(order.some(({s})=>s.worksheet_submissions==null)) return `<p class="mx-ws-sum">📄 ${esc(wsTitle(i.id))}: ההגשות אינן זמינות כרגע.</p>`;
+    const subs=order.map(({s})=>s.worksheet_submissions.find(x=>x.worksheet_id===i.id)).filter(Boolean);
+    const late=subs.filter(x=>wsLate(x,a)).length, waiting=subs.filter(x=>!x.checked_at).length;
+    return `<p class="mx-ws-sum">📄 <b>${esc(wsTitle(i.id))}</b>: הגישו <b>${subs.length}</b> מתוך ${order.length}${late?` (${late} באיחור)`:""} · ${order.length-subs.length} לא הגישו · <span class="${waiting?"mx-ws-wait":""}">${waiting} ממתינים לבדיקה</span></p>`;
+  }).join("");
+}
+function wsCellHtml(x,a,s){
+  const sub=x.submission;
+  if(!sub) return null;
+  const label=sub.checked_at?(sub.score!=null?`✔ ${sub.score}`:"✔ נבדק"):"לבדיקה";
+  return `<td class="mx-asg-cell ${x.late?"late":"ok"}"><button type="button" class="mx-link mx-ws-cell${sub.checked_at?"":" wait"}" data-ws-sub="${esc(sub.worksheet_id)}|${esc(s.email)}">${x.late?"באיחור · ":""}${label}</button></td>`;
+}
+function wsSubOpen(key){
+  const [wid,email]=key.split("|");
+  REPORT.sub={wid,email,urls:[]}; drawReport();
+  sheet.querySelector(".mx-ws-review [data-ws-sub-back]")?.focus();
+}
+function wsSubClose(){ for(const u of REPORT?.sub?.urls||[]) if(u) URL.revokeObjectURL(u); if(REPORT) REPORT.sub=null; }
+function wsSubHtml(name){
+  const {wid,email}=REPORT.sub, s=REPORT.data.students.find(x=>x.email===email);
+  const sub=(s?.worksheet_submissions||[]).find(x=>x.worksheet_id===wid);
+  const a=REPORT.data.assignments.find(x=>x.items.some(i=>i.kind==="worksheet"&&i.id===wid));
+  if(!s||!sub) return `<div class="mx-ws-review"><button type="button" class="mx-btn" data-ws-sub-back>חזרה למשימות</button><p class="mx-note">ההגשה לא נמצאה.</p></div>`;
+  return `<div class="mx-ws-review"><div class="mx-row"><button type="button" class="mx-btn" data-ws-sub-back>חזרה למשימות</button></div>
+    <h4>${esc(wsTitle(wid))} · <span dir="ltr">${esc(name(email))}</span></h4>
+    <p class="mx-small">הוגש ${esc(wsWhen(sub.submitted_at))}${a&&wsLate(sub,a)?' · <b class="mx-ws-late">באיחור</b>':""} · ${sub.pages} עמ׳${sub.checked_at?` · נבדק ${esc(wsWhen(sub.checked_at))}`:""}</p>
+    <div class="mx-ws-pages">${Array.from({length:sub.pages},(_,i)=>`<a class="mx-ws-page" data-ws-sublink="${i}" target="_blank" rel="noopener" aria-label="עמוד ${i+1} בגודל מלא"><img data-ws-subimg="${i}" alt="עמוד ${i+1} של ההגשה"></a>`).join("")}</div>
+    <div class="mx-row"><button type="button" class="mx-btn" data-ws-ai="${esc(sub.id)}">🤖 בדיקה עם AI</button>
+      <span class="mx-small" data-ws-ai-status role="status" aria-live="polite">${CFG.aiLeft!=null?`נשארו לכם היום ${CFG.aiLeft} מתוך 3 בקשות AI. `:""}ה־AI מציע ציון והערה, ואתם מאשרים או מתקנים.</span></div>
+    <form class="mx-ws-check" data-ws-check="${esc(sub.id)}" novalidate>
+      <label>ציון <small>(0–100, לא חובה)</small><input type="number" name="score" min="0" max="100" step="1" inputmode="numeric" value="${sub.score??""}"></label>
+      <label>הערה לתלמיד <small>(לא חובה)</small><textarea name="comment" rows="3" maxlength="1000">${esc(sub.comment||"")}</textarea></label>
+      <div class="mx-row"><button type="submit" class="mx-btn solid">${sub.checked_at?"עדכון הבדיקה":"סימון כנבדק"}</button><span class="mx-small" role="status" aria-live="polite"></span></div></form></div>`;
+}
+async function wsSubImages(){
+  const mine=REPORT?.sub; if(!mine) return;
+  const s=REPORT.data.students.find(x=>x.email===mine.email), sub=(s?.worksheet_submissions||[]).find(x=>x.worksheet_id===mine.wid);
+  if(!sub) return;
+  for(let i=0;i<sub.pages;i++){
+    if(!(i in mine.urls)){ mine.urls[i]=null; mine.urls[i]=await wsBlob(`/api/classes/${encodeURIComponent(REPORT.id)}/worksheets/${encodeURIComponent(mine.wid)}/submissions/${encodeURIComponent(sub.id)}/pages/${i+1}`); }
+    if(REPORT?.sub!==mine){ if(mine.urls[i]) URL.revokeObjectURL(mine.urls[i]); return; }
+    const url=mine.urls[i]; if(!url) continue;
+    const img=sheet.querySelector(`[data-ws-subimg="${i}"]`), link=sheet.querySelector(`[data-ws-sublink="${i}"]`);
+    if(img) img.src=url; if(link) link.href=url;
+  }
+}
+async function wsCheck(form){
+  const mine=REPORT.sub, status=form.querySelector("[role=status]"), button=form.querySelector("[type=submit]");
+  const raw=form.elements.score.value.trim(), score=raw===""?null:Number(raw), comment=form.elements.comment.value;
+  if(score!==null&&!(Number.isInteger(score)&&score>=0&&score<=100)){ status.textContent="הציון הוא מספר שלם בין 0 ל־100, או ריק."; return form.elements.score.focus(); }
+  button.disabled=true; status.textContent="שומרים…";
+  try{
+    const r=await api(`/api/classes/${encodeURIComponent(REPORT.id)}/worksheets/${encodeURIComponent(mine.wid)}/submissions/${encodeURIComponent(form.dataset.wsCheck)}`,
+      {method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({score,comment})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw Error(wsError({status:r.status,data:d},"השמירה נכשלה. נסו שוב."));
+    if(REPORT?.sub!==mine) return;
+    const s=REPORT.data.students.find(x=>x.email===mine.email);
+    s.worksheet_submissions=s.worksheet_submissions.map(x=>x.id===d.id?d:x);
+    wsSubClose(); drawReport();
+    sheet.querySelector(".mx-report").insertAdjacentHTML("afterbegin",'<p class="mx-small" role="status">הבדיקה נשמרה. התלמיד/ה רואה אותה בכרטיס המשימה.</p>');
+  }catch(e){ if(REPORT?.sub===mine){ button.disabled=false; status.textContent=e.message; } }
+}
+
+// the AI's suggestion for this submission fills the form; the teacher decides what is saved
+async function wsAiCheck(button){
+  const mine=REPORT?.sub, status=sheet.querySelector("[data-ws-ai-status]"), form=sheet.querySelector("[data-ws-check]");
+  if(!mine||!form) return;
+  button.disabled=true; status.textContent="ה־AI בודק… זה לוקח כחצי דקה.";
+  try{
+    const r=await api(`/api/classes/${encodeURIComponent(REPORT.id)}/worksheets/${encodeURIComponent(mine.wid)}/submissions/${encodeURIComponent(form.dataset.wsCheck)}/ai-check`,{method:"POST"});
+    const d=await r.json().catch(()=>({}));
+    if(REPORT?.sub!==mine) return;
+    if(!r.ok){
+      if(d.detail==="teacher_ai_limit") CFG.aiLeft=0;
+      throw Error(String(d.detail||"").startsWith("ai_check_failed")?"הבדיקה של ה־AI נכשלה. אפשר לנסות שוב או לבדוק ידנית.":wsError({status:r.status,data:d},"הבדיקה של ה־AI נכשלה. אפשר לבדוק ידנית."));
+    }
+    if(typeof d.left==="number") CFG.aiLeft=d.left;
+    if(d.score!=null) form.elements.score.value=d.score;
+    form.elements.comment.value=d.comment||"";
+    status.textContent=d.readable?"הצעת ה־AI הוכנסה לטופס. בדקו, תקנו אם צריך, ולחצו על הכפתור כדי לשמור.":"ה־AI לא הצליח לקרוא את הפתרון (לא נספר מהמכסה). ההערה שלו בטופס, ואפשר לבדוק ידנית.";
+    form.elements.comment.focus({preventScroll:true});
+  }catch(e){ if(REPORT?.sub===mine) status.textContent=e.message; }
+  finally{ button.disabled=false; }
+}
+
+// ---- the report's "הגשות" tab: everything the students handed in, by student and by kind
+function subsTabHtml(order,name){
+  const students=REPORT.data.students, noteDevice=' <small class="mx-device">· מהמכשיר</small>';
+  const hwRows=s=>(s.worksheet_submissions||[]).slice().sort((p,q)=>String(q.submitted_at).localeCompare(String(p.submitted_at)));
+  const cards=order.map(({s,i})=>{
+    const exams=(s.progress?.quizzes||[]).slice().reverse();
+    const sit=s.quiz_sittings, latest=new Map((sit||[]).map(x=>[x.unit_id,x.id]));
+    const quizzes=(sit||[]).slice().reverse(), homework=hwRows(s);
+    const waiting=homework.filter(x=>!x.checked_at).length+quizzes.filter(x=>x.grade==null).length;
+    const total=exams.length+quizzes.length+homework.length;
+    const group=(title,rows,empty)=>`<section><h5>${title}</h5>${rows.length?`<ul class="mx-report-list mx-subs">${rows.join("")}</ul>`:`<p class="mx-small">${empty}</p>`}</section>`;
+    const examRows=exams.map(q=>`<li><b>${(q.units||[]).map(asgUnit).join(", ")||"מבחן תרגול"}</b> <small>${esc(shortDate(q.at))} · ${q.right}/${q.n} נכונות (${pct(q.right,q.n)}%)</small></li>`);
+    const quizRows=sit==null?[]:quizzes.map(x=>`<li><b>${asgUnit(x.unit_id)}</b> <small>${esc(shortDate(x.submitted_at))} · ${x.grade==null?'<span class="mx-ws-wait">ממתין לבדיקה</span>':`ציון ${x.grade}/100`}</small>
+      ${latest.get(x.unit_id)===x.id?`<button type="button" class="mx-btn" data-answers="${i}:${esc(x.unit_id)}">פתיחה ובדיקה</button>`:""}</li>`);
+    const hwList=homework.map(x=>{ const a=REPORT.data.assignments?.find(y=>y.items.some(it=>it.kind==="worksheet"&&it.id===x.worksheet_id)), late=a&&wsLate(x,a);
+      return `<li><b>${esc(wsTitle(x.worksheet_id))}</b> <small>${esc(wsWhen(x.submitted_at))}${late?" · באיחור":""} · ${x.checked_at?(x.score!=null?`נבדק, ציון ${x.score}`:"נבדק"):'<span class="mx-ws-wait">ממתין לבדיקה</span>'}</small>
+        <button type="button" class="mx-btn" data-ws-sub="${esc(x.worksheet_id)}|${esc(s.email)}">${x.checked_at?"צפייה ועדכון":"בדיקה"}</button></li>`; });
+    return `<details class="mx-report-student"${waiting?" open":""}><summary><b dir="ltr">${esc(name(s.email))}</b>
+        <span class="mx-small">${total} הגשות</span>${waiting?`<span class="mx-report-chip low">${waiting} ממתינות לבדיקה</span>`:""}</summary>
+      <div class="mx-report-body">
+        ${group(`שיעורי בית`,hwList,"עוד לא הוגשו שיעורי בית.")}
+        ${group(`בחנים מסכמים`,quizRows,sit==null?"הבחנים אינם זמינים כרגע.":"עוד לא הוגש בוחן מסכם.")}
+        ${group(`מבחני תרגול${noteDevice}`,examRows,"עוד לא נעשה מבחן תרגול.")}
+      </div></details>`;
+  }).join("");
+  const waitingAll=order.reduce((n,{s})=>n+hwRows(s).filter(x=>!x.checked_at).length+(s.quiz_sittings||[]).filter(x=>x.grade==null).length,0);
+  return `<p class="mx-small">${waitingAll?`<b>${waitingAll}</b> הגשות ממתינות לבדיקה. `:"אין הגשות שממתינות לבדיקה. "}שיעורי בית אפשר לבדוק ידנית או עם AI בפתיחת ההגשה. בחנים מסכמים נבדקים בפתיחה, וה־AI בודק אותם דרך תור ה־AI.${CFG.aiReview?' <button type="button" class="mx-link" data-act="ai-queue">לתור ה־AI</button>':""}</p>
+    ${cards||'<p class="mx-note">עוד אין תלמידים בכיתה.</p>'}`;
+}
+
+// ---- the student: the worksheet and the hand-in
+let WS=null;   // {id, urls (pages), files (chosen photos, prepared), previews, msg, busy, progress}
+function dropWorksheet(){
+  if(WS){
+    clearTimeout(WS.timer); const sid=WS.phone?.res?.scan?.id;
+    if(sid) uqPost(`/api/math/answer-scans/${sid}/decline`).catch(()=>{});   // a request for the phone that nobody waits for
+    window.MathlyBoard?.closeFull();
+    for(const u of [...WS.urls,...WS.previews]) if(u) URL.revokeObjectURL(u); WS=null;
+  }
+  wsSubClose();
+}
+const wsAssignment=id=>ASG?.assignments.find(a=>a.items.some(i=>i.kind==="worksheet"&&i.id===id));
+const wsMine=id=>(ASG?.submissions||[]).find(x=>x.worksheet_id===id)||null;
+function wsOpen(id){
+  if(!cur) back=document.activeElement;
+  closeSheetQuietly(); cur="worksheet";
+  WS={id,urls:[],files:[],previews:[],msg:"",busy:false,progress:0,fresh:true};
+  drawWorksheet(); wsPages(WS);
+}
+function wsHandHtml(w,a){
+  const sub=wsMine(w.id);
+  if(ASG.submissions===null) return '<p class="mx-note">אי אפשר לבדוק כרגע אם הגשתם. נסו שוב מאוחר יותר.</p>';
+  if(sub?.checked_at) return `<p class="mx-ws-checked">✔ המורה בדק/ה${sub.score!=null?` · ציון <b>${sub.score}</b>`:""}</p>
+    ${sub.comment?`<p class="mx-ws-comment">${esc(sub.comment)}</p>`:""}<p class="mx-small">הוגש ${esc(wsWhen(sub.submitted_at))}${wsLate(sub,a)?" · באיחור":""} · ${sub.pages} עמ׳</p>`;
+  const chosen=WS.files.length?`<ol class="mx-ws-chosen">${WS.files.map((_,i)=>`<li><img src="${WS.previews[i]}" alt="תמונה ${i+1}">
+      <span>עמוד ${i+1}</span><span class="mx-ws-acts">${i?`<button type="button" class="mx-link" data-ws-up="${i}" aria-label="להזיז את עמוד ${i+1} למעלה">↑</button>`:""}
+      <button type="button" class="mx-link" data-ws-drop="${i}" aria-label="להסיר את עמוד ${i+1}">✕</button></span></li>`).join("")}</ol>`:"";
+  return `${sub?`<p class="mx-ws-done">✓ הוגש ${esc(wsWhen(sub.submitted_at))}${wsLate(sub,a)?" · באיחור":""} · ${sub.pages} עמ׳. אפשר להחליף את ההגשה עד שהמורה יבדוק.</p>`
+      :`<p class="mx-small">פתרתם? צלמו את הדפים של הפתרון (עד 10) והגישו למורה.${Sky.jerusalemDay(new Date())>a.due_on?" תאריך היעד עבר, ואפשר עדיין להגיש. ההגשה תסומן באיחור.":""}</p>`}
+    ${chosen}
+    <input type="file" accept="image/*" multiple hidden data-ws-file>
+    <div class="mx-row"><button type="button" class="mx-btn" data-ws-pick${WS.busy||WS.files.length>=10?" disabled":""}>📷 ${WS.files.length?"עוד עמוד":"צילום או העלאת תמונה"}</button>
+      ${window.MathlyBoard?`<button type="button" class="mx-btn" data-ws-board${WS.busy||WS.files.length>=10?" disabled":""}>✏️ כתיבה בלוח</button>`:""}
+      ${wsPhoneHtml()}
+      ${WS.files.length?`<button type="button" class="mx-btn solid" data-ws-send${WS.busy?" disabled":""}>${WS.busy?"שולחים…":sub?"החלפת ההגשה":"הגשה"} (${WS.files.length} עמ׳)</button>`:""}</div>
+    ${WS.busy?`<progress max="1" value="${WS.progress}" aria-label="התקדמות השליחה"></progress>`:""}`;
+}
+// on a computer the phone is asked to photograph a page: its code and progress show in the box (like an exercise's answer)
+function wsPhoneHtml(){
+  const touch=matchMedia("(max-width: 700px)").matches||navigator.maxTouchPoints>0;
+  if(touch||!window.MathlyAnswers||!CFG.answerScans||!CFG.userId) return "";
+  return window.MathlyAnswers.phoneLive(WS.phone?.res?.scan,"data-ws-phone","data-ws-cancel","צילום בטלפון",WS.busy||WS.files.length>=10||!!WS.phone?.starting);
+}
+function drawWorksheet(){
+  const top=sheet.querySelector(".mx-sheet")?.scrollTop||0;
+  const w=ASG?.worksheets?.find(x=>x.id===WS.id), a=wsAssignment(WS.id);
+  const body=!w||!a?'<p class="mx-note">שיעורי הבית אינם זמינים כרגע.</p>':`
+    <div class="mx-row">${w.source==="pdf"?'<button type="button" class="mx-btn" data-ws-download>⬇ הורדת ה־PDF להדפסה</button>':'<small class="mx-small">אפשר לפתוח כל עמוד בגודל מלא ולשמור אותו.</small>'}</div>
+    <div class="mx-ws-pages">${Array.from({length:w.pages},(_,i)=>`<a class="mx-ws-page" data-ws-link="${i}" target="_blank" rel="noopener" download="${esc(w.title)}-${i+1}.jpg" aria-label="עמוד ${i+1} בגודל מלא"><img data-ws-img="${i}" alt="עמוד ${i+1} מתוך ${w.pages}"${WS.urls[i]?` src="${WS.urls[i]}"`:""}></a>`).join("")}</div>
+    <section class="mx-sec mx-ws-hand" aria-labelledby="wsHand"><h4 id="wsHand">ההגשה שלי</h4>${wsHandHtml(w,a)}
+      <p class="mx-res-msg" role="status" aria-live="polite">${esc(WS.msg)}</p></section>`;
+  sheet.innerHTML=`<div class="mx-scrim" data-act="close"></div>
+    <div class="mx-sheet mx-ws-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
+      <div class="mx-shtop"><div><span class="mx-uchip">שיעורי בית</span><h3 id="mxTitle">${esc(w?.title||"שיעורי בית")}</h3>
+        ${a?`<small class="mx-src">${esc(a.title)} · עד ${asgDate(a.due_on)}</small>`:""}</div>
+        <button class="mx-x" data-act="close" aria-label="סגירה">✕</button></div>${body}</div>`;
+  sheet.hidden=false;
+  if(WS.fresh){ WS.fresh=false; sheet.querySelector(".mx-x").focus({preventScroll:true}); }
+  else sheet.querySelector(".mx-sheet").scrollTop=top;
+}
+// a page written on the board joins the hand-in like a photo
+function wsBoard(){
+  const mine=WS; if(!mine||mine.busy||!window.MathlyBoard) return;
+  window.MathlyBoard.openFull({host:document.body,key:`ws:${mine.id}`,title:"פתרון בלוח",sendLabel:"הוספה להגשה",
+    submit:async(_,picture)=>{
+      if(WS!==mine) return {error:"החלון נסגר"};
+      if(mine.files.length>=10) return {error:"אפשר עד 10 עמודים."};
+      const blob=await wsPrepare(picture); if(WS!==mine) return {error:"החלון נסגר"};
+      if(!blob) return {error:"לא ניתן להכין את התמונה"};
+      mine.files.push(blob); mine.previews.push(URL.createObjectURL(blob)); mine.msg="העמוד מהלוח נוסף להגשה.";
+      drawWorksheet(); return {close:true};
+    }});
+}
+async function wsPhone(){
+  const mine=WS; if(!mine||mine.busy||mine.phone) return;
+  mine.phone={starting:true}; mine.msg=""; drawWorksheet();
+  try{
+    const r=await uqPost("/api/math/worksheet-attempts",{worksheet_id:mine.id,new:true});
+    const res=await uqPost(`${UQ_BASE}/${r.attempt.id}/scans`,{renew:true});
+    if(WS!==mine) return;
+    mine.phone={aid:r.attempt.id,res,state:res.scan?.state};
+  }catch(e){ if(WS!==mine) return; mine.phone=null; mine.msg=e.message; }
+  drawWorksheet(); wsPhoneWatch(mine);
+}
+async function wsPhoneCancel(){
+  const mine=WS, sid=mine?.phone?.res?.scan?.id; if(!sid) return;
+  clearTimeout(mine.timer); mine.phone=null;
+  try{ await uqPost(`/api/math/answer-scans/${sid}/decline`); }catch{}
+  if(WS===mine){ mine.msg="הבקשה בוטלה."; drawWorksheet(); }
+}
+// looks every 2 seconds until the phone has sent the photo (it joins the hand-in) or the request ends
+function wsPhoneWatch(mine){
+  clearTimeout(mine.timer);
+  const p=mine.phone; if(!p?.aid) return;
+  mine.timer=setTimeout(async()=>{
+    if(WS!==mine||mine.phone!==p) return;
+    try{
+      const r=await uqJson(`${UQ_BASE}/${p.aid}`);
+      if(WS!==mine||mine.phone!==p) return;
+      p.res=r;
+      if(r.attachment){
+        const b=await api(`${UQ_BASE}/${p.aid}/image`,{cache:"no-store"});
+        if(WS!==mine||mine.phone!==p) return;
+        if(!b.ok) throw Error("לא הצלחנו לקבל את התמונה מהטלפון. נסו שוב.");
+        const blob=await b.blob(); if(WS!==mine||mine.phone!==p) return;
+        mine.phone=null;
+        if(mine.files.length>=10) mine.msg="אפשר עד 10 עמודים.";
+        else{ mine.files.push(blob); mine.previews.push(URL.createObjectURL(blob)); mine.msg="התמונה מהטלפון נוספה להגשה."; }
+        return drawWorksheet();
+      }
+      const st=r.scan?.state;
+      if(["waiting","confirmed","uploading","failed"].includes(st)){
+        if(st!==p.state){ p.state=st; drawWorksheet(); }   // redraw only when the phone moved on
+        return wsPhoneWatch(mine);
+      }
+      mine.phone=null; mine.msg=st==="declined"?"הבקשה נדחתה בטלפון.":st==="expired"?"בקשת הצילום פגה. אפשר לבקש שוב.":"הבקשה הסתיימה.";
+    }catch(e){ if(WS!==mine||mine.phone!==p) return; mine.phone=null; mine.msg=e.message; }
+    drawWorksheet();
+  },2000);
+}
+async function wsPages(mine){
+  const w=ASG?.worksheets?.find(x=>x.id===mine.id); if(!w) return;
+  for(let i=0;i<w.pages;i++){
+    const url=await wsBlob(`/api/math/worksheets/${encodeURIComponent(w.id)}/pages/${i+1}`);
+    if(WS!==mine){ if(url) URL.revokeObjectURL(url); return; }
+    mine.urls[i]=url; if(!url) continue;
+    const img=sheet.querySelector(`[data-ws-img="${i}"]`), link=sheet.querySelector(`[data-ws-link="${i}"]`);
+    if(img) img.src=url; if(link) link.href=url;
+  }
+}
+async function wsDownload(button){
+  const mine=WS, w=ASG?.worksheets?.find(x=>x.id===mine.id); if(!w) return;
+  button.disabled=true;
+  const url=await wsBlob(`/api/math/worksheets/${encodeURIComponent(w.id)}/original`);
+  if(WS!==mine) return url&&URL.revokeObjectURL(url);
+  button.disabled=false;
+  if(!url){ mine.msg="ההורדה נכשלה. נסו שוב."; return drawWorksheet(); }
+  const link=document.createElement("a"); link.href=url; link.download=`${w.title}.pdf`; document.body.append(link); link.click(); link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+async function wsAddPhotos(input){
+  const mine=WS, files=[...input.files]; input.value="";
+  if(!mine||!files.length) return;
+  mine.msg="מכינים את התמונות…"; drawWorksheet();
+  let failed=0;
+  for(const f of files){
+    if(mine.files.length>=10){ mine.msg="אפשר עד 10 עמודים."; break; }
+    const blob=await wsPrepare(f);
+    if(WS!==mine) return;
+    if(!blob){ failed++; continue; }
+    mine.files.push(blob); mine.previews.push(URL.createObjectURL(blob));
+  }
+  if(mine.files.length<10||failed) mine.msg=failed?`לא הצלחנו להכין ${failed===1?"תמונה אחת":`${failed} תמונות`}. צלמו שוב.`:"";
+  drawWorksheet();
+}
+function wsMove(i,drop){
+  if(!WS||WS.busy) return;
+  if(drop){ URL.revokeObjectURL(WS.previews[i]); WS.files.splice(i,1); WS.previews.splice(i,1); }
+  else if(i>0){ for(const k of ["files","previews"]) [WS[k][i-1],WS[k][i]]=[WS[k][i],WS[k][i-1]]; }
+  WS.msg=""; drawWorksheet();
+}
+async function wsSend(){
+  const mine=WS; if(!mine||mine.busy||!mine.files.length) return;
+  mine.busy=true; mine.progress=0; mine.msg="שולחים…"; drawWorksheet();
+  const body=new FormData(); mine.files.forEach((f,i)=>body.append("files",f,`page${i+1}.jpg`));
+  const r=await sendForm(`/api/math/worksheets/${encodeURIComponent(mine.id)}/submission`,"PUT",body,p=>{
+    mine.progress=p; const bar=WS===mine&&sheet.querySelector(".mx-ws-hand progress"); if(bar) bar.value=p; });
+  if(WS!==mine) return;
+  mine.busy=false;
+  if(!r.ok){
+    mine.msg=wsError(r,"השליחה נכשלה. התמונות נשמרו כאן: נסו לשלוח שוב.");   // the chosen photos stay
+    if(r.data?.detail==="already_checked") loadAssignments();
+    return drawWorksheet();
+  }
+  ASG.submissions=[...(ASG.submissions||[]).filter(x=>x.worksheet_id!==mine.id),r.data];
+  for(const u of mine.previews) URL.revokeObjectURL(u);
+  mine.files=[]; mine.previews=[]; mine.msg="ההגשה נשלחה למורה. 🎉";
+  drawWorksheet(); draw();   // the card on the home screen behind the sheet
+}
+
+// the report's own controls: the view and the order
 function reportControl(t){
-  if(t.dataset.reportTab){ REPORT.tab=t.dataset.reportTab; repSet("tab",REPORT.tab); drawReport(); sheet.querySelector(`[data-report-tab="${REPORT.tab}"]`)?.focus(); }
+  if(t.dataset.reportTab){ wsSubClose(); REPORT.tab=t.dataset.reportTab; repSet("tab",REPORT.tab); drawReport(); sheet.querySelector(`[data-report-tab="${REPORT.tab}"]`)?.focus(); }
+  else if(t.matches("[data-report-unit]")){ REPORT.unit=t.value; drawReport(); sheet.querySelector("[data-report-unit]")?.focus(); }
+  else if(t.dataset.heatGroup||t.dataset.heatAll){
+    const open=heatOpen(), key=t.dataset.heatGroup;
+    if(key) open.has(key)?open.delete(key):open.add(key);
+    else if(t.dataset.heatAll==="close") open.clear();
+    else [...sheet.querySelectorAll("[data-heat-group]")].forEach(b=>open.add(b.dataset.heatGroup));
+    REPORT.open="|"+[...open].join("|"); repSet("mapMonths",REPORT.open); drawReport();
+    sheet.querySelector(key?`[data-heat-group="${CSS.escape(key)}"]`:`[data-heat-all="${t.dataset.heatAll}"]`)?.focus(); }
+  else if(t.dataset.heatUnit){ REPORT.unit=t.dataset.heatUnit; drawReport(); sheet.querySelector("[data-report-unit]")?.focus(); }
   else if(t.matches("[data-report-sort]")){ REPORT.sort=t.value; repSet("sort",t.value); drawReport(); sheet.querySelector("[data-report-sort]")?.focus(); }
-  else if(t.matches("[data-report-unit]")){ REPORT.unit=t.value; repSet("unit",t.value); drawReport(); sheet.querySelector("[data-report-unit]")?.focus(); }
 }
 
 /* ---------- the teacher's review of a student's answer (app/teacher_review.py) ----------
@@ -1943,13 +2463,15 @@ const AQ_STATE={pending:"ממתינה",sending:"נשלחת…",done:"נשלחה 
 const AQ_ERR={grading_failed:"הבדיקה נכשלה. אפשר לנסות שוב.",grading_unavailable:"בדיקה אוטומטית אינה זמינה כרגע באתר.",open_ended_locked:"שאלות פתוחות נעולות כרגע.",
   grading_limit:"התלמיד הגיע למכסת הבדיקות היומית.",grading_busy:"כבר מתבצעות בדיקות לתלמיד הזה. נסו שוב בעוד רגע.",grading_interrupted:"הבדיקה הופסקה. אפשר לנסות שוב.",
   request_taken:"הבקשה כבר טופלה (אולי ממכשיר אחר). רעננו את התור.",queue_unavailable:"התור אינו זמין כרגע.",
-  answer_storage_unavailable:"לא הצלחנו לקרוא את התמונה השמורה.",photo_failed:"פתרון התמונה נכשל. אפשר לנסות שוב."};
+  answer_storage_unavailable:"לא הצלחנו לקרוא את התמונה השמורה.",photo_failed:"פתרון התמונה נכשל. אפשר לנסות שוב.",
+  teacher_ai_limit:"הגעתם למכסה של 3 בקשות AI ביום. אפשר לשלוח שוב מחר."};
 // a failed send's error is "code|reason|technical detail" (app/ai_queue.py)
 function aqError(error){
   const [code,reason="",...rest]=String(error||"").split("|"), detail=rest.join("|");
   return `<p class="mx-aq-error">${esc(AQ_ERR[code]||code||"השליחה נכשלה.")}</p>${window.MathlyAnswers?.errorDetails?.(reason,detail)||""}`;
 }
 const AQ_VERDICT={correct:"נכונה",partial:"נכונה חלקית",incorrect:"שגויה",unreadable:"לא קריאה",needs_review:"דורשת בדיקה שלכם"};
+const aqCode=list=>{ const c=list.map(r=>r.code).find(Boolean); return c?`<span class="mx-aq-code" dir="ltr" title="מספר הבוחן">#${esc(c)}</span>`:""; };
 const aqWaiting=r=>["pending","sending","failed"].includes(r.state);
 const aqLabel=()=>`תור AI${(AQ_OPEN||0)+RQ_OPEN?` <span class="mx-aq-badge">${(AQ_OPEN||0)+RQ_OPEN}</span>`:""}`;   // waiting requests, and students asking to look again
 function aqPaintBadge(){ document.querySelectorAll('[data-act="ai-queue"]').forEach(b=>{ if(!b.closest(".mx-sheet")) b.innerHTML=aqLabel(); }); }
@@ -1961,7 +2483,7 @@ async function aqCount(){
 }
 function dropQueue(){ if(AQ) Object.values(AQ.urls).forEach(u=>u&&URL.revokeObjectURL(u)); AQ=null; }
 async function aiQueue(){
-  if(cur!=="aiqueue"){ if(!cur) back=document.activeElement; closeSheetQuietly(); cur="aiqueue"; AQ={rows:null,reqs:null,tab:AQ_TAB,urls:{},busy:new Set()}; }
+  if(cur!=="aiqueue"){ if(!cur) back=document.activeElement; closeSheetQuietly(); cur="aiqueue"; AQ={rows:null,reqs:null,tab:AQ_TAB,urls:{},busy:new Set(),openGroups:new Set()}; }
   const mine=AQ;
   sheet.innerHTML=`<div class="mx-scrim"></div>
     <div class="mx-sheet mx-manage-sheet mx-aq-sheet" role="dialog" aria-modal="true" aria-labelledby="mxTitle">
@@ -1992,7 +2514,8 @@ function aqResult(r){
 function drawQueue(){
   const box=sheet.querySelector(".mx-aq"); if(!box) return;
   const tabs=sheet.querySelector("[data-aq-tabs]"), asks=AQ?.reqs;
-  if(tabs) tabs.innerHTML=`<button type="button" class="mx-btn" data-aq-tab="queue" aria-pressed="${AQ.tab!=="requests"}">בקשות לבדיקה</button>
+  if(tabs) tabs.innerHTML=`<button type="button" class="mx-btn" data-aq-tab="queue" aria-pressed="${AQ.tab!=="requests"&&AQ.tab!=="done"}">בקשות לבדיקה</button>
+    <button type="button" class="mx-btn" data-aq-tab="done" aria-pressed="${AQ.tab==="done"}">טופלו${AQ.rows?.some(r=>!aqWaiting(r))?` <span class="mx-aq-badge done">${AQ.rows.filter(r=>!aqWaiting(r)).length}</span>`:""}</button>
     <button type="button" class="mx-btn" data-aq-tab="requests" aria-pressed="${AQ.tab==="requests"}">בקשות לבדיקה חוזרת${asks?.length?` <span class="mx-aq-badge">${asks.length}</span>`:""}</button>`;
   if(AQ?.tab==="requests") return drawRequests();
   sheet.querySelector('[data-act="aq-all"]').hidden=true;
@@ -2000,12 +2523,13 @@ function drawQueue(){
   if(!AQ?.rows) return;
   const open=AQ.rows.filter(aqWaiting), rest=AQ.rows.filter(r=>!aqWaiting(r));
   aqBadge(AQ.rows);
-  sheet.querySelector(".mx-manage-state").textContent=open.length?(open.length===1?"בקשה אחת ממתינה":`${open.length} בקשות ממתינות`):"אין בקשות ממתינות.";
-  sheet.querySelector('[data-act="aq-all"]').hidden=open.filter(r=>r.state==="pending").length<2;
+  const done=AQ.tab==="done";
+  sheet.querySelector(".mx-manage-state").textContent=(done?(rest.length?`${rest.length} בקשות שטופלו ביממה האחרונה`:"אין בקשות שטופלו ביממה האחרונה."):open.length?(open.length===1?"בקשה אחת ממתינה":`${open.length} בקשות ממתינות`):"אין בקשות ממתינות.")+(CFG.aiLeft!=null?` · נשארו לכם היום ${CFG.aiLeft} מתוך 3 בקשות AI`:"");
+  sheet.querySelector('[data-act="aq-all"]').hidden=done||open.filter(r=>r.state==="pending").length<2;
   const when=at=>new Date(at).toLocaleString("he-IL",{dateStyle:"short",timeStyle:"short"});
   const card=r=>{
     const busy=AQ.busy.has(r.id), act=r.state==="pending"||r.state==="failed";
-    return `<article class="mx-aq-card ${esc(r.state)}"><div class="mx-aq-head"><b dir="ltr">${esc(String(r.email).split("@")[0])}</b><span>${AQ_KIND[r.kind]||""}</span>
+    return `<article class="mx-aq-card ${esc(r.state)}"><div class="mx-aq-head"><span>${AQ_KIND[r.kind]||""}</span>${aqCode([r])}
         <small>${when(r.created_at)}</small><span class="mx-aq-state">${busy?"שולחים ל-AI…":AQ_STATE[r.state]||esc(r.state)}</span></div>
       ${r.label?`<p class="mx-aq-label">${fmt(r.label)}</p>`:""}${r.question?`<p class="mx-aq-q">${fmtLoose(r.question).replace(/\n/g,"<br>")}</p>`:""}
       ${aqWaiting(r)?`<img class="mx-aq-img" alt="התמונה ששלח התלמיד" data-aq-img="${esc(r.id)}" hidden>`:""}
@@ -2016,8 +2540,29 @@ function drawQueue(){
       ${act?`<div class="mx-row"><button class="mx-btn solid" data-aq-send="${esc(r.id)}"${busy?" disabled":""}>${r.state==="failed"?"שליחה חוזרת ל-AI":"שליחה ל-AI"}</button>
         <button class="mx-btn" data-aq-decline="${esc(r.id)}"${busy?" disabled":""}>דחייה</button></div>`:""}</article>`;
   };
-  box.innerHTML=`${open.map(card).join("")}${rest.length?`<h4 class="mx-aq-done">טופלו ביממה האחרונה</h4>${rest.map(card).join("")}`:""}`;
-  open.forEach(r=>aqImage(r.id));
+  // by student, then by subject (the same quiz: its label without the " · שאלה N"); newest first within each
+  const subjectOf=r=>String(r.label||"").replace(/\s*·\s*שאלה\s*\d+\s*$/,"").trim()||(r.kind==="photo"?"תרגילים מצולמים":"ללא נושא");
+  const grouped=rows=>{
+    const students=new Map(), last=new Map();
+    // a request before the codes existed has none: the requests of one hand-in were made within moments of each other
+    const clusterKey=r=>{
+      const id=`${r.email}|${subjectOf(r)}`, t=Date.parse(r.created_at), prev=last.get(id);
+      if(!prev||Math.abs(prev.t-t)>120000) last.set(id,{t,n:(prev?.n||0)+1}); else prev.t=t;
+      return `${subjectOf(r)}@${last.get(id).n}`;
+    };
+    rows.forEach(r=>{ const s=students.get(r.email)||students.set(r.email,new Map()).get(r.email), k=r.code?`${subjectOf(r)}#${r.code}`:/·\s*שאלה\s*\d+\s*$/.test(r.label||"")?clusterKey(r):subjectOf(r); (s.get(k)||s.set(k,[]).get(k)).push(r); });   // one hand-in (its code) is one group: two sittings of the same quiz stay apart
+    return [...students].map(([email,subjects])=>`<section class="mx-aq-student"><h4 class="mx-aq-who" dir="ltr">${esc(String(email).split("@")[0])}</h4>
+      ${[...subjects].map(([key0,list])=>{ const name=subjectOf(list[0]);
+        if(list.length===1) return `<div class="mx-aq-subject">${card(list[0])}</div>`;   // one request: a plain card (its card shows the hand-in number)
+        // a collection (a quiz): one request that opens into a card per question, each handled on its own
+        const key=email+"|"+key0, waiting=list.filter(aqWaiting).length;
+        return `<details class="mx-aq-subject mx-aq-group" data-aq-group="${esc(key)}"${AQ.openGroups.has(key)?" open":""}><summary><b>${fmtLoose(name)}</b>
+          <span class="mx-aq-badge">${list.length}</span>${aqCode(list)}<small>${waiting?`${waiting} ממתינות`:"טופלו"}</small></summary>${list.map(card).join("")}</details>`;
+      }).join("")}</section>`).join("");
+  };
+  box.innerHTML=grouped(done?rest:open);
+  box.querySelectorAll("[data-aq-group]").forEach(d=>d.addEventListener("toggle",()=>{ const k=d.dataset.aqGroup; d.open?AQ.openGroups.add(k):AQ.openGroups.delete(k); }));
+  (done?[]:open).forEach(r=>aqImage(r.id));
 }
 // students who asked the teacher to look again at a checked answer
 function drawRequests(){
@@ -2052,8 +2597,9 @@ async function aqPost(id,what,body){
   try{
     const r=await api(`/api/ai-queue/${encodeURIComponent(id)}/${what}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
     const d=await r.json().catch(()=>({}));
+    if(d.detail==="teacher_ai_limit") CFG.aiLeft=0;
     if(!r.ok) throw Error(AQ_ERR[d.detail]||"הפעולה נכשלה. נסו שוב.");
-    row=d;
+    row=d; if(what==="send"&&d.state==="done") aiUsed();
   }catch(e){ err=e.message; }
   mine.busy.delete(id); if(AQ!==mine) return;
   if(row){ const i=mine.rows.findIndex(x=>x.id===id); if(i>=0) mine.rows[i]=row; }
@@ -2064,7 +2610,7 @@ function aqDecline(id){
   const note=prompt("הערה לתלמיד (לא חובה), למשל: צלמו שוב, התמונה לא ברורה");
   if(note!==null) return aqPost(id,"decline",{note});
 }
-async function aqAll(){ for(const r of (AQ?.rows||[]).filter(x=>x.state==="pending")){ if(!AQ) return; await aqSend(r.id); } }
+async function aqAll(){ for(const r of (AQ?.rows||[]).filter(x=>x.state==="pending")){ if(!AQ||CFG.aiLeft===0) return; await aqSend(r.id); } }
 
 /* A photographed problem (/api/math/photo, app/math_photo.py): hints first. The sheet shows the problem as it was
    read (a wrong reading is the student's cue to photograph again), then one hint; each further hint, each step and
@@ -2082,7 +2628,7 @@ async function photo(file){
     const form=new FormData(); form.append("photo",blob,"problem.jpg");
     const res=await api("/api/math/photo",{method:"POST",body:form}), data=await res.json().catch(()=>({}));
     if(!res.ok) throw new Error(typeof data.detail==="string"?data.detail:`השרת ענה ${res.status}`);
-    if(data.queued){ mine.req=data.request; mine.left=data.left; } else mine.data=data;
+    if(data.queued){ mine.req=data.request; mine.left=data.left; } else { mine.data=data; if(data.readable) aiUsed(); }
   }catch(e){ mine.error=e.message; }
   mine.busy=false;
   if(PH===mine&&cur==="photo") drawPhoto();   // a newer photo, or a closed sheet, keeps its own
@@ -2476,6 +3022,7 @@ async function boot(){
     if(!response.ok){ state.className="error"; state.textContent=response.status===403?"החשבון אינו משויך לכיתת מתמטיקה.":"לא ניתן להשלים את הכניסה."; return; }
     const me=await response.json();CFG.userId=me.user_id;CFG.answerScans=me.answer_scans; ME_EMAIL=me.email||""; MY_CLASSES=me.classes||[]; MY_CLASS=MY_CLASSES.length===1?MY_CLASSES[0]:null;
     CFG.permissions=me.permissions||[]; CFG.roles=me.roles||[]; CFG.aiDirect=me.ai_direct!==false; CFG.aiReview=!!me.ai_review;
+    CFG.aiLeft=typeof me.ai_left==="number"?me.ai_left:null;   // a teacher's AI requests left today (app/teacher_ai.py)
   }
   document.getElementById("boot").hidden=true;
   show();

@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 
 from .access import has_permission
 from .assignments import AssignmentsUnavailable, public as assignment_public
+from .worksheets import WorksheetsUnavailable, submission_public, worksheet_public
 from .answer_scans import ScanError
 from .auth import AuthUnavailable
 from .quiz_grades import sitting_view
@@ -95,6 +96,26 @@ def server_assignments(app, class_id: int):
         return None
 
 
+def server_worksheets(app, class_id: int, ids: dict[str, str]):
+    """The class's worksheets and each student's (email) submissions, without storage paths; (None, None) when they cannot
+    be read."""
+    store = getattr(app.state, "worksheets", None)
+    if store is None:
+        return None, None
+    try:
+        rows = store.of_class(class_id)
+        subs = store.submissions([r["id"] for r in rows])
+    except WorksheetsUnavailable:
+        return None, None
+    email_of = {uid: email for email, uid in ids.items()}
+    out: dict[str, list] = {email: [] for email in ids}
+    for sub in subs:
+        email = email_of.get(sub.get("student_id"))
+        if email is not None:
+            out[email].append(submission_public(sub))
+    return [worksheet_public(r) for r in rows], out
+
+
 def install_class_report_routes(app, signed_in, units_of):
     def class_of(class_id: int, user) -> dict:
         try:
@@ -127,6 +148,7 @@ def install_class_report_routes(app, signed_in, units_of):
         by_id = {r["user_id"]: r for r in rows or []}
         sittings = server_sittings(app, ids)
         requests = server_requests(app, ids)
+        worksheets, handed = server_worksheets(app, row["id"], ids)
         nicknames = {str(k).lower(): str(v).strip() for k, v in (row.get("nicknames") or {}).items()}
         out = []
         for email in students:
@@ -137,7 +159,9 @@ def install_class_report_routes(app, signed_in, units_of):
                         "progress": report_part(data) if isinstance(data, dict) else None,
                         "saved_at": saved.get("updated_at") if saved else None,
                         "quiz_sittings": None if sittings is None else sittings.get(email, []),
-                        "review_requests": [] if requests is None else requests.get(email, [])})
+                        "review_requests": [] if requests is None else requests.get(email, []),
+                        "worksheet_submissions": None if handed is None else handed.get(email, [])})
         return JSONResponse({"class": {"id": row["id"], "name": row["name"], "lessons": units_of(row)},
-                             "students": out, "assignments": server_assignments(app, row["id"])},
+                             "students": out, "assignments": server_assignments(app, row["id"]),
+                             "worksheets": worksheets},
                             headers={"Cache-Control": "no-store"})

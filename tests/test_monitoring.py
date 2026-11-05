@@ -13,7 +13,7 @@ TEACHER, STUDENT = "teacher-token", "student-token"
 
 class MonitorAuth:
     url, key, secret = "https://test.invalid", "public", "server"
-    teachers, developers = frozenset({"t@test.invalid"}), frozenset()
+    teachers, developers = frozenset(), frozenset({"t@test.invalid"})   # management is for developers
 
     def __init__(self, rows=None):
         self.rows = rows

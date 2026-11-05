@@ -1,7 +1,8 @@
 """The teacher's AI queue: a student never calls Claude. A teacher reviews each request and sends it.
 
 A student's photographed problem (POST /api/math/photo) or the answer they want checked
-(POST /api/math/answer-attempts/{id}/grade, and the automatic check after an upload) becomes a request in the
+(POST /api/math/answer-attempts/{id}/grade, which the student presses to send it to their teacher; a unit quiz's hand-in
+sends all its answers) becomes a request in the
 Supabase table `math_ai_requests`. The class's teacher (the account chosen in the class editor) sees the requests of
 their class's students, and a manager sees every request. The teacher looks at the photo and either sends it to the
 AI or declines it with an optional note. The student's page shows the request waiting, and then its result.
@@ -23,12 +24,13 @@ from .access import has_permission, students_of
 from .answer_scans import ScanError, uuid_text
 from .auth import AuthUnavailable, ClassConflict
 from .math_photo import PhotoUnavailable
+from .teacher_ai import LIMIT_CODE as TEACHER_AI_LIMIT, LimitReached, NO_LIMIT
 
 log = logging.getLogger("mathly.ai_queue")
 MIGRATION = "supabase/migrations/20261104090000_math_ai_requests.sql"
 TABLE = "/rest/v1/math_ai_requests"
 FIELDS = ("id,created_at,user_id,email,kind,state,attempt_id,label,question,result,note,error,"
-          "reviewed_by,sent_at,finished_at")
+          "reviewed_by,sent_at,finished_at,code")
 OPEN = ("pending", "sending")
 MAX_OPEN = 5                          # a student's requests waiting at once
 STALE_SEND = timedelta(minutes=5)     # a send that never finished (a restart) may be sent again after this
@@ -159,7 +161,7 @@ def for_student(row: dict | None) -> dict | None:
     """What the student's page reads of a request: no teacher email, no other student's data."""
     if not row:
         return None
-    return {k: row.get(k) for k in ("id", "created_at", "kind", "state", "label", "result", "note", "finished_at")}
+    return {k: row.get(k) for k in ("id", "created_at", "kind", "state", "label", "result", "note", "finished_at", "code")}
 
 
 def install_ai_queue_routes(app, signed_in):
@@ -242,11 +244,22 @@ def install_ai_queue_routes(app, signed_in):
     @app.post("/api/ai-queue/{request_id}/send")
     def send(request_id: str, user=Depends(reviewer)):
         reviewed(user, request_id)   # visibility first: another class's request is "not found"
-        row = queue().claim(uuid_text(request_id), user.get("email", ""))
-        if row["kind"] == "photo":
-            row = send_photo(row)
-        else:
-            row = send_answer(row)
+        quota = getattr(app.state, "teacher_ai", None) or NO_LIMIT
+        try:   # each send is one of the teacher's 3 AI requests a day (app/teacher_ai.py); a failed one is given back
+            taken = quota.take(user)
+        except LimitReached as exc:
+            raise ScanError(429, TEACHER_AI_LIMIT) from exc
+        try:
+            row = queue().claim(uuid_text(request_id), user.get("email", ""))
+            if row["kind"] == "photo":
+                row = send_photo(row)
+            else:
+                row = send_answer(row)
+        except Exception:
+            quota.give_back(taken)
+            raise
+        if row.get("state") != "done":
+            quota.give_back(taken)
         note(user, "ai_sent" if row.get("state") == "done" else "ai_failed", row)
         return reply(row)
 

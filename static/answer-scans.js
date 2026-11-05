@@ -5,7 +5,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const fmt=s=>esc(s).replace(/\$([^$]+)\$/g,'<span class="m">$1</span>');
 const states={waiting:"ממתינים לטלפון",confirmed:"ממתינים לטלפון",uploading:"מעלים את התשובה…",received:"התשובה התקבלה",failed:"ההעלאה נכשלה",expired:"בקשת הצילום פגה",superseded:"הבקשה הוחלפה",declined:"הבקשה נדחתה בטלפון"};
 const errors={expired:"בקשת הצילום פגה. צרו בקשה חדשה ונסו שוב.",superseded:"הבקשה הוחלפה. בחרו את הבקשה העדכנית.",upload_in_progress:"העלאה כבר מתבצעת. ממתינים לעדכון…",confirmation_required:"יש לאשר את בקשת הצילום תחילה.",invalid_upload:"ההעלאה הופסקה. נסו שוב.",question_changed:"השאלה השתנתה. רעננו את העמוד ופתחו אותה מחדש.",invalid_image:"לא ניתן לקרוא את התמונה. צלמו שוב.",image_too_large:"התמונה גדולה מדי. צלמו שוב.",unsupported_image:"בחרו תמונת JPEG, PNG או WebP.",answer_storage_unavailable:"שמירת תשובות אינה זמינה כרגע. נסו שוב מאוחר יותר.",sign_in_required:"יש להיכנס לאותו חשבון בשני המכשירים.",review_limit:"יש כבר 5 בקשות פתוחות למורה. אפשר לבקש שוב אחרי שהמורה יענה.",message_too_long:"ההודעה ארוכה מדי (עד 300 תווים).",invalid_message:"ההודעה אינה תקינה.",answer_required:"צריך לצלם את התשובה קודם.",review_unavailable:"הבקשה למורה אינה זמינה כרגע. נסו שוב מאוחר יותר."};
-Object.assign(errors,{grading_unavailable:"בדיקת תשובות אינה זמינה כרגע באתר.",grading_failed:"הבדיקה נכשלה. התמונה נשמרה; אפשר לנסות שוב.",grading_interrupted:"הבדיקה הופסקה. אפשר לנסות שוב.",grading_limit:"הגעתם למכסת 20 הבדיקות היומית. נסו שוב מחר.",grading_busy:"כבר מתבצעות בדיקות בחשבון. נסו שוב בעוד רגע.",answer_required:"יש לצלם ולשלוח תשובה לפני הבדיקה.",queue_unavailable:"שליחת תשובות לבדיקת המורה אינה זמינה כרגע.",request_taken:"המורה כבר טיפל בבקשה. רעננו את העמוד."});
+Object.assign(errors,{grading_unavailable:"בדיקת תשובות אינה זמינה כרגע באתר.",grading_failed:"הבדיקה נכשלה. התמונה נשמרה; אפשר לנסות שוב.",grading_interrupted:"הבדיקה הופסקה. אפשר לנסות שוב.",grading_limit:"הגעתם למכסת 20 הבדיקות היומית. נסו שוב מחר.",grading_busy:"כבר מתבצעות בדיקות בחשבון. נסו שוב בעוד רגע.",answer_required:"יש לצלם ולשלוח תשובה לפני הבדיקה.",queue_unavailable:"שליחת תשובות לבדיקת המורה אינה זמינה כרגע.",request_taken:"המורה כבר טיפל בבקשה. רעננו את העמוד.",teacher_ai_limit:"הגעתם למכסה של 3 בקשות AI ביום. אפשר לבדוק שוב מחר."});
 /* Why an AI check failed (the server's `reason`, app/math_photo.py: failure_reason), for the people who can fix it:
    a teacher sending from the AI queue, or checking their own answer. Each is what happened and what to do. */
 const reasons={
@@ -301,12 +301,7 @@ async function renderQuestion(q){
     }catch(error){if(current(q))q.node.querySelector("[role=status]").textContent=error.message;}
     finally{q.loadingImage=false;}
   }else if(q.image&&q.node.querySelector("img")){const img=q.node.querySelector("img");img.src=q.image;img.hidden=false;}
-  // Resume a first check if the page closed or the server restarted just after
-  // receipt. Failed checks require an explicit retry, so polling cannot spend
-  // the student's daily allowance on repeated provider failures.
-  if(received&&r.grading_available&&!g&&!q.autoStarted){
-    q.autoStarted=true;checkAnswer(q,true);
-  }
+  // Nothing is sent by itself: a student sends the answer to their teacher, a teacher checks it, each with a click.
 }
 /* The teacher's review of the answer (its own score and comment), shown above the automatic check, and the student's
    request to look again. Used by the answer panel here and by the unit quiz's result in math.js. */
@@ -354,7 +349,7 @@ function gradingPanel(r,checking){
     return `<p>${g?.state==="failed"||req?.state==="failed"?"הבדיקה נכשלה. אפשר לשלוח שוב למורה.":"שלחו את התשובה למורה, והמורה יעביר אותה לבדיקה."}</p>
       <button class="mx-btn solid" data-grade>שליחה לבדיקת המורה</button>`;
   }
-  return `<p>התשובה נשלחת לבדיקה אוטומטית באמצעות AI.</p>
+  return `<p>התשובה נשמרה. ${g?.state==="failed"?"הבדיקה נכשלה. אפשר לנסות שוב.":"לחצו כדי לבדוק אותה באמצעות AI."}</p>
     <button class="mx-btn solid" data-grade ${checking?"disabled":""}>${checking?"בודקים את התשובה…":g?.state==="failed"?"ניסיון בדיקה נוסף":"בדיקת התשובה"}</button>`;
 }
 // the answer's request is in the teacher's queue (a failed send stays there for the teacher to try again)
@@ -407,7 +402,7 @@ function openCapture(result){
       <button class="mx-btn mx-btn-quiet" data-decline>סירוב</button>
       <button class="mx-btn" data-close hidden>סגירה</button>
     </div>
-    <small>כשהבדיקה האוטומטית זמינה, צילום התשובה יישלח לבדיקה באמצעות AI. המשוב יופיע בשאלה במחשב.</small></div>`;
+    <small>הצילום יישמר כתשובה בשאלה במחשב. שם אפשר לשלוח אותו לבדיקה.</small></div>`;
   const c=capture={node,e,result,photo:null,url:null,key:null,busy:false,ended:false,confirming:null,returnFocus:document.activeElement};visibleRoot.append(node);
   const $=sel=>node.querySelector(sel);
   const status=$("[data-status]"),camera=$("[data-camera]"),take=$("[data-take]"),draw=$("[data-draw]"),send=$("[data-submit]"),preview=$("[data-preview]"),renew=$("[data-renew]"),decline=$("[data-decline]"),close=$("[data-close]");
