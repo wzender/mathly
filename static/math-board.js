@@ -44,8 +44,6 @@ const ICONS={
   done:'<path d="M5 12.5l4.5 4.5L19 7"/>',
   back:'<path d="M19 12H5M11 6l-6 6 6 6"/>',
   top:'<path d="M12 19V5M6 11l6-6 6 6"/>',
-  expand:'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
-  shrink:'<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
   calc:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8.5 7.5h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/>'};
 const FLIP=new Set(["undo","back"]);
 const ic=n=>`<svg class="mx-ic${FLIP.has(n)?" mx-ic-flip":""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -199,13 +197,32 @@ function calcAct(act){
   else cs.expr+=act;
   calcDraw();
 }
+/* the calculator's bar on top drags it anywhere over the paper; it keeps its place while the page is open,
+   and stays whole inside the board when the board gets smaller */
+let calcAt=null;   // {x, y}: its corner in the board's stage; null: the corner it starts in
+function calcPlace(){
+  const box=el?.querySelector(".mx-calc"); if(!box||box.hidden||!calcAt) return;
+  const st=box.parentElement, x=Math.max(0,Math.min(calcAt.x,st.clientWidth-box.offsetWidth)), y=Math.max(0,Math.min(calcAt.y,st.clientHeight-box.offsetHeight));
+  box.style.inset="auto"; box.style.left=x+"px"; box.style.top=y+"px";   // inset first: it would undo left and top
+}
+function calcGrip(){
+  const box=el.querySelector(".mx-calc"), grip=box.querySelector(".mx-calc-grip"); let from=null;
+  grip.addEventListener("pointerdown",e=>{
+    e.preventDefault(); try{ grip.setPointerCapture(e.pointerId); }catch{}
+    from={id:e.pointerId,x:e.clientX-box.offsetLeft,y:e.clientY-box.offsetTop}; box.classList.add("moving");
+  });
+  grip.addEventListener("pointermove",e=>{ if(from?.id!==e.pointerId) return; calcAt={x:e.clientX-from.x,y:e.clientY-from.y}; calcPlace(); });
+  const end=e=>{ if(from?.id===e.pointerId){ from=null; box.classList.remove("moving"); } };
+  grip.addEventListener("pointerup",end); grip.addEventListener("pointercancel",end);
+  new ResizeObserver(calcPlace).observe(box.parentElement);
+}
 function calcPress(i){ const [,ins,,sins]=CALC_KEYS[i]; calcAct(cs.shift&&sins!==undefined?sins:ins); }
 const calcKeysHtml=()=>CALC_KEYS.map(([label,,sl,,cls="num"],i)=>
   `<button type="button" data-calc="${i}" class="${cls}"${label==="DEG"?' data-calc-do="mode"':""}>${sl?`<i>${sl}</i>`:""}<b>${label}</b></button>`).join("");
 function toggleCalc(){
   const box=el.querySelector(".mx-calc"), on=box.hidden;
   box.hidden=!on; el.querySelector('[data-do="calc"]').setAttribute("aria-pressed",on);
-  if(on){ calcDraw(); box.querySelector("button").focus({preventScroll:true,focusVisible:false}); }
+  if(on){ calcDraw(); calcPlace(); box.querySelector("button").focus({preventScroll:true,focusVisible:false}); }
 }
 document.addEventListener("keydown",e=>{
   const box=el?.querySelector(".mx-calc");
@@ -230,18 +247,20 @@ function build(){
         <button type="button" data-do="calc" aria-pressed="false" title="מחשבון">${ic("calc")}<span>מחשבון</span></button>
         <button type="button" data-do="question" title="העתקת השאלה לראש הלוח">${ic("question")}<span>השאלה</span></button>
         <button type="button" data-do="undo" title="ביטול (Ctrl+Z)">${ic("undo")}<span>ביטול</span></button>
-        <button type="button" data-do="clear" title="ניקוי הלוח">${ic("clear")}<span>ניקוי</span></button>
-        <button type="button" data-do="screen" aria-pressed="false" title="מסך מלא"${canScreen()?"":" hidden"}>${ic("expand")}<span>מסך מלא</span></button></span>
+        <button type="button" data-do="clear" title="ניקוי הלוח">${ic("clear")}<span>ניקוי</span></button></span>
       <button type="button" data-do="hide" class="mx-board-close" aria-label="סגירת הלוח" title="סגירת הלוח">${ic("close")}</button>
-    </div><div class="mx-board-row"><div class="mx-board-pages" role="tablist" aria-label="הדף של כל שאלה"></div>
+    </div><button type="button" data-do="door" class="mx-board-door" aria-expanded="false" title="הרחבת הלוח" aria-label="הרחבת הלוח"></button>
+    <div class="mx-board-row"><div class="mx-board-pages" role="tablist" aria-label="הדף של כל שאלה"></div>
       <button type="button" data-do="send" class="mx-board-send" hidden></button></div>
     <div class="mx-board-stage"><canvas></canvas>
       <button type="button" data-do="delete" class="mx-board-del" title="מחיקת מה שנבחר (Delete)" hidden>${ic("clear")}מחיקה</button>
       <button type="button" data-do="top" class="mx-board-top" hidden>${ic("top")}לראש הדף</button>
       <div class="mx-calc" dir="ltr" role="group" aria-label="מחשבון מדעי" hidden>
+        <div class="mx-calc-grip" title="גררו כדי להזיז את המחשבון" aria-hidden="true"></div>
         <div class="mx-calc-screen"><span class="mx-calc-flags" data-calc-flags></span><div class="mx-calc-expr" data-calc-expr>0</div><output data-calc-out>&nbsp;</output></div>
         <div class="mx-calc-keys">${calcKeysHtml()}</div></div></div>`;
   canvas=el.querySelector("canvas"); ctx=canvas.getContext("2d");
+  calcGrip(); doorGrip();
   el.addEventListener("click",e=>{
     const b=e.target.closest("button"); if(!b) return;
     if(b.dataset.tool) setTool(b.dataset.tool);
@@ -257,8 +276,9 @@ function build(){
     if(b.dataset.calc) calcPress(+b.dataset.calc);
     if(act==="calc") toggleCalc();
     if(act==="top"){ sketch().y=0; paint(); }
-    if(act==="screen") toggleScreen();
-    if(act==="hide"){ leaveScreen(); full?closeFull():toggle(); }
+    if(act==="door"&&!doorDragged) setDoor(doorOpen()?null:DOOR_OPEN);
+    doorDragged=false;
+    if(act==="hide") full?closeFull():toggle();
   });
   canvas.addEventListener("pointerdown",down);
   canvas.addEventListener("pointermove",move);
@@ -275,28 +295,38 @@ function build(){
   new ResizeObserver(fit).observe(canvas);
   setTool(tool);
 }
-/* the whole screen for the board alone (a classroom's smart board, a tablet): the browser's own full screen.
-   Not on an iPhone, which has none for a page. The math keyboard moves into the board while it fills the screen. */
-const screenEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
-function canScreen(){ return !!(document.fullscreenEnabled||document.webkitFullscreenEnabled); }
-function toggleScreen(){
-  if(screenEl()===el) return leaveScreen();
-  const go=el.requestFullscreen||el.webkitRequestFullscreen;
-  try{ const r=go?.call(el); r?.catch?.(()=>{}); }catch{}
+/* the board's right edge slides like a closet door: a tap on its handle opens the board over the exercise and
+   closes it back; dragging the handle stops it anywhere between. The CSS keeps it between the two
+   (--door: the gap on the board's right, in px). It stays as it was left while the page is open. */
+const DOOR_OPEN=16;
+const doorShut=()=>Math.min(600,innerWidth*.42)+32;   // the gap beside the exercise: the same sum as math.css
+const doorOpen=()=>innerWidth-el.getBoundingClientRect().right<doorShut()-1;
+let doorDragged=false;
+function setDoor(r){
+  if(r===null) el.style.removeProperty("--door"); else el.style.setProperty("--door",r+"px");
+  const b=el.querySelector(".mx-board-door"), open=r!==null&&r<doorShut()-1, t=open?"החזרת הלוח למקומו":"הרחבת הלוח";
+  b.setAttribute("aria-expanded",open); b.title=t; b.setAttribute("aria-label",t); el.classList.toggle("wide",open);
 }
-function leaveScreen(){
-  if(screenEl()!==el) return;
-  const out=document.exitFullscreen||document.webkitExitFullscreen;
-  try{ const r=out?.call(document); r?.catch?.(()=>{}); }catch{}
+function doorGrip(){
+  const b=el.querySelector(".mx-board-door"); let from=null;
+  b.addEventListener("pointerdown",e=>{
+    e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch{}
+    from={id:e.pointerId,x:e.clientX,r:innerWidth-el.getBoundingClientRect().right,moved:false};
+  });
+  b.addEventListener("pointermove",e=>{
+    if(from?.id!==e.pointerId) return; const dx=e.clientX-from.x;
+    if(!from.moved&&Math.abs(dx)<6) return;
+    if(!from.moved){ from.moved=true; el.classList.add("sliding"); }
+    setDoor(Math.max(DOOR_OPEN,Math.min(doorShut(),from.r-dx)));
+  });
+  const end=e=>{
+    if(from?.id!==e.pointerId) return; const f=from; from=null; el.classList.remove("sliding");
+    if(!f.moved) return; doorDragged=true;   // the click that follows is not a tap
+    const r=innerWidth-el.getBoundingClientRect().right;
+    setDoor(r>=doorShut()-24?null:r<=DOOR_OPEN+24?DOOR_OPEN:r);   // near either end: all the way
+  };
+  b.addEventListener("pointerup",end); b.addEventListener("pointercancel",end);
 }
-function onScreen(){
-  if(!el) return; const on=screenEl()===el, b=el.querySelector('[data-do="screen"]');
-  el.classList.toggle("screen",on); b.setAttribute("aria-pressed",on);
-  b.title=on?"יציאה ממסך מלא":"מסך מלא"; b.innerHTML=`${ic(on?"shrink":"expand")}<span>${b.title}</span>`;
-  const k=window.mathVirtualKeyboard; if(k) try{ k.container=on?el:document.body; }catch{}
-}
-document.addEventListener("fullscreenchange",onScreen);
-document.addEventListener("webkitfullscreenchange",onScreen);
 function pressed(sel,b){ el.querySelectorAll(sel).forEach(x=>x.setAttribute("aria-pressed",x===b)); }
 function reset(){ draft=drag=rub=slide=null; hover=null; select([]); if(editing) finishMath(false); if(naming) finishAngle(true); }
 function setTool(t){
@@ -883,7 +913,7 @@ function openFull({host,key:k,pages:n=1,page:p=0,question=null,submit=null,turne
   el.querySelector(".mx-board-back").focus({preventScroll:true,focusVisible:false});   // reachable by keyboard, without a ring on a tap
 }
 function closeFull(){
-  if(!full) return; leaveScreen(); if(editing) finishMath(true); if(naming) finishAngle(true); const f=full; full=null;
+  if(!full) return; if(editing) finishMath(true); if(naming) finishAngle(true); const f=full; full=null;
   el.classList.remove("full"); el.removeAttribute("role"); el.removeAttribute("aria-modal"); el.remove();
   restore(f.saved); f.done?.();
   if(layer?.isConnected&&desk()) again();

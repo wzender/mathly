@@ -682,7 +682,7 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
 .mx-board-btn[aria-pressed="true"]{border-color:var(--mx-accent);background:var(--mx-accent-soft);color:var(--ink)}
 @media (min-width:1000px) and (any-pointer:fine){
   .mx-sheet.with-board{inset:16px 16px 16px auto;width:min(600px,42vw);max-height:none;border-radius:20px}
-  .mx-board{display:flex;flex-direction:column;position:fixed;z-index:62;top:16px;bottom:16px;left:16px;right:calc(min(600px,42vw) + 32px);
+  .mx-board{display:flex;flex-direction:column;position:fixed;z-index:62;top:16px;bottom:16px;left:16px;right:clamp(16px,var(--door,100vw),calc(min(600px,42vw) + 32px));transition:right .28s ease;
     background:var(--surface);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 6px 30px rgb(0 0 0/.25)}
 }
 .mx-board-bar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
@@ -728,6 +728,24 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
 .mx-calc{position:absolute;z-index:2;inset-block-end:12px;inset-inline-start:12px;width:min(340px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;
   padding:12px;border:1px solid #2A2F45;border-radius:18px;background:#3A3F55;color:#fff;box-shadow:0 8px 24px rgb(27 33 64/.35);display:flex;flex-direction:column;gap:10px}
 .mx-calc[hidden]{display:none}
+/* the closet door's handle on the board's right edge (a desktop screen): tap or drag it to slide the board over the exercise */
+.mx-board-door{display:none}
+@media (min-width:1000px) and (any-pointer:fine){
+  .mx-board-door{display:flex;align-items:center;justify-content:center;position:absolute;z-index:3;right:0;top:50%;transform:translateY(-50%);
+    width:22px;height:110px;padding:0;border:1px solid var(--line);border-right:0;border-radius:12px 0 0 12px;background:var(--surface-2);cursor:ew-resize;touch-action:none}
+  .mx-board-door::before{content:"";width:5px;height:56px;border-radius:3px;background:var(--muted);opacity:.6}
+  .mx-board-door:hover::before{opacity:1;background:var(--mx-accent)}
+  .mx-board.wide{z-index:63}   /* over the exercise it slid onto */
+  .mx-board.sliding{transition:none}
+  .mx-board.full .mx-board-door{display:none}
+}
+@media (prefers-reduced-motion:reduce){.mx-board{transition:none}}
+/* the bar that drags the calculator: wide enough for a finger, with a grip in the middle */
+.mx-calc-grip{height:22px;margin:-6px -4px -4px;border-radius:10px;cursor:grab;touch-action:none;display:flex;align-items:center;justify-content:center}
+.mx-calc-grip::before{content:"";width:48px;height:5px;border-radius:3px;background:rgb(255 255 255/.45)}
+.mx-calc-grip:hover::before{background:rgb(255 255 255/.75)}
+.mx-calc.moving{box-shadow:0 14px 34px rgb(27 33 64/.45)}
+.mx-calc.moving .mx-calc-grip{cursor:grabbing}
 .mx-calc-screen{position:relative;background:#C9D3B4;color:#1E2418;border-radius:8px;padding:16px 10px 6px;text-align:right;display:flex;flex-direction:column;box-shadow:inset 0 2px 5px rgb(0 0 0/.3)}
 .mx-calc-flags{position:absolute;top:3px;left:8px;font:700 10px/1 var(--f-body);letter-spacing:.08em}
 .mx-calc-expr{font:500 17px/1.3 ui-monospace,Menlo,Consolas,monospace;overflow-x:auto;white-space:nowrap;scrollbar-width:none;min-height:22px}
@@ -764,10 +782,7 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
 .mx-board.full .mx-board-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);color:var(--ink)}
 .mx-board-back{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--mx-accent);background:var(--mx-accent-soft);color:var(--ink);font:700 14px/1 var(--f-body);padding:9px 14px;border-radius:999px;cursor:pointer}
 .mx-board.full .mx-board-bar{flex-wrap:wrap;row-gap:4px}   /* every tool in sight: two rows on a phone rather than hidden off the edge */
-.mx-board.full .mx-board-bar [data-do="hide"]{display:none}
-/* the browser's full screen: the board alone, edge to edge, whatever size it had beside the exercise */
-.mx-board.screen{display:flex;flex-direction:column;position:fixed;inset:0;width:100%;height:100%;border:0;border-radius:0;box-shadow:none;background:var(--surface)}
-.mx-board.screen::backdrop{background:var(--surface)}   /* the head's "back" does it */
+.mx-board.full .mx-board-bar [data-do="hide"]{display:none}   /* the head's "back" does it */   /* the head's "back" does it */
 .mx-board.full .mx-board-bar button{height:40px;min-width:40px}
 .mx-board.full .mx-board-bar .mx-board-inks button,.mx-board.full .mx-board-bar .mx-board-sizes button{height:36px;width:40px}
 

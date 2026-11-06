@@ -129,25 +129,41 @@ def test_on_a_phone_the_board_opens_full_screen_over_the_exercise(browser, serve
     assert errors == []
 
 
-def test_the_board_fills_the_whole_screen_and_back(browser, server):
+def test_the_board_slides_over_the_exercise_like_a_closet_door(browser, server):
     page, errors = open_skill(browser, server, 1440, 900)
     page.locator("[data-board-toggle]").click()
-    board = page.locator(".mx-board")
-    playwright.expect(board).to_be_visible()
-    screen = page.locator('.mx-board-bar [data-do="screen"]')
-    playwright.expect(screen).to_be_visible()
-    screen.click()
-    page.wait_for_function("document.fullscreenElement?.classList.contains('mx-board')")
-    playwright.expect(board).to_have_class(re.compile(r"\bscreen\b"))
-    playwright.expect(screen).to_have_attribute("aria-pressed", "true")
-    box = board.bounding_box()
-    assert box["x"] == 0 and box["y"] == 0
-    drag(page, (200, 300), (500, 300))   # still draws while it fills the screen
-    assert alpha_near(page, 300, 300) > 0
-    screen.click()
-    page.wait_for_function("!document.fullscreenElement")
-    playwright.expect(board).not_to_have_class(re.compile(r"\bscreen\b"))
-    playwright.expect(screen).to_have_attribute("aria-pressed", "false")
+    board, sheet = page.locator(".mx-board"), page.locator(".mx-sheet")
+    door = page.locator(".mx-board-door")
+    playwright.expect(door).to_be_visible()
+    playwright.expect(door).to_have_attribute("aria-expanded", "false")
+    shut = board.bounding_box()
+    sheet_box = sheet.bounding_box()
+    assert shut["x"] + shut["width"] < sheet_box["x"]   # beside the exercise
+
+    door.click()   # a tap: all the way open, over the exercise, and never full screen
+    playwright.expect(door).to_have_attribute("aria-expanded", "true")
+    page.wait_for_timeout(400)
+    wide = board.bounding_box()
+    assert wide["x"] == shut["x"] and abs(wide["x"] + wide["width"] - (1440 - 16)) < 2
+    assert page.evaluate("!document.fullscreenElement")
+    assert page.evaluate("document.elementFromPoint(1300, 450).closest('.mx-board') !== null")
+    drag(page, (900, 300), (1200, 300))   # it draws on the part that slid open
+    assert alpha_near(page, 1050, 300) > 0
+
+    door.click()   # a tap again: back beside the exercise
+    playwright.expect(door).to_have_attribute("aria-expanded", "false")
+    page.wait_for_timeout(400)
+    assert abs(board.bounding_box()["width"] - shut["width"]) < 2
+
+    # dragged by its handle, it stops where it is let go
+    d = door.bounding_box()
+    x, y = d["x"] + d["width"] / 2, d["y"] + d["height"] / 2
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.move(x + 250, y, steps=8)
+    page.mouse.up()
+    playwright.expect(door).to_have_attribute("aria-expanded", "true")
+    assert abs(board.bounding_box()["width"] - shut["width"] - 250) < 3
     assert errors == []
 
 
@@ -595,3 +611,39 @@ def test_the_board_has_a_scientific_calculator(browser, server):
     tap("AC", "2", "÷", "0", "=")
     playwright.expect(calc.locator("output")).to_have_text("שגיאה")
     assert not errors
+
+
+def test_the_calculator_is_dragged_by_its_bar(browser, server):
+    page, errors = open_skill(browser, server, 1400, 900)
+    page.locator("[data-board-toggle]").click()
+    page.locator('.mx-board [data-do="calc"]').click()
+    calc = page.locator(".mx-calc")
+    playwright.expect(calc).to_be_visible()
+    stage = page.locator(".mx-board-stage").bounding_box()
+    before = calc.bounding_box()
+    grip = page.locator(".mx-calc-grip").bounding_box()
+    gx, gy = grip["x"] + grip["width"] / 2, grip["y"] + grip["height"] / 2
+    page.mouse.move(gx, gy)
+    page.mouse.down()
+    for k in range(1, 11):
+        page.mouse.move(gx + k * 20, gy - k * 15)
+    page.mouse.up()
+    after = calc.bounding_box()
+    assert abs(after["x"] - before["x"] - 200) < 2 and abs(after["y"] - before["y"] + 150) < 2
+
+    # dragged far past the edge: it stays whole inside the board
+    grip = page.locator(".mx-calc-grip").bounding_box()
+    gx, gy = grip["x"] + grip["width"] / 2, grip["y"] + grip["height"] / 2
+    page.mouse.move(gx, gy)
+    page.mouse.down()
+    page.mouse.move(gx - 2000, gy - 2000, steps=5)
+    page.mouse.up()
+    box = calc.bounding_box()
+    assert abs(box["x"] - stage["x"]) < 2 and abs(box["y"] - stage["y"]) < 2
+
+    # closed and opened again: it comes back where it was left
+    page.locator('.mx-board [data-do="calc"]').click()
+    page.locator('.mx-board [data-do="calc"]').click()
+    again = calc.bounding_box()
+    assert abs(again["x"] - box["x"]) < 2 and abs(again["y"] - box["y"]) < 2
+    assert errors == []
