@@ -24,14 +24,13 @@ Much of the app already exists. Each requirement below is tagged:
 
 | Term | Hebrew | Meaning |
 |---|---|---|
-| skill | מיומנות | One specific topic, e.g. פירוק טרינום |
-| exercise | תרגיל | One question on a skill. Open-ended or multiple choice |
-| lesson | שיעור / יחידה | A set of skills, e.g. טכניקה אלגברית 1 |
-| quiz | בוחן | A test on a single lesson. Can be retaken; best grade wins; each retake draws new questions |
-| exercise test | מבחן תרגול | A timed test on several lessons. Can be retaken; best grade wins |
-| simulation test | מבחן סימולציה | A timed test on several lessons, taken one time only, like the real test |
-| test | מבחן | The real test at school. In the app it is a date + the lessons it covers, set by the teacher |
-| weak skill | – | A skill in the "learning" state, or one the student failed in an exercise test |
+| skill | מיומנות | A specific topic, e.g. פירוק טרינום |
+| exercise | תרגיל | A question on a certain topic. Can be either open-ended or multiple choice |
+| lesson | שיעור | A set of skills, e.g. טכניקה אלגברית 1 |
+| quiz | בוחן | A test on a single lesson. Can be retaken; best grade wins; each retake draws new questions. It is the only quiz type (no one-time summary quiz); its best grade is the lesson's grade |
+| exercise test | מבחן תרגול | A timed test on a set of lessons. Can be retaken; best grade wins |
+| simulation test | מבחן סימולציה | A timed test on a set of lessons. One time only |
+| test | מבחן | The real-life test. Appears in the app as a date + the lessons it covers + number of questions and time limit (default 12 questions, 90 minutes). Set by the teacher |
 
 ## 2. Goals
 
