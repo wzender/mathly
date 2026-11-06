@@ -1906,6 +1906,7 @@ function showManageMode(mode){
     box.innerHTML=`<div class="mx-manage-title"><h4>פרומפטר</h4><span>טקסט לקריאה מול המצלמה</span></div>
       <textarea id="mxPrompterText" class="mx-prompter-text" dir="auto" rows="12" placeholder="הדביקו או כתבו כאן את הטקסט…" aria-label="טקסט לפרומפטר">${esc(saved)}</textarea>
       <p class="mx-note">רווח: הפעלה/עצירה · ↑/↓: מהירות · +/−: גודל · M: מראה · F: מסך מלא · Esc: יציאה</p>
+      <p class="mx-note">עכבר: לחיצה – הפעלה/עצירה · גלגלת בזמן ריצה – מהירות · לחצן ימני – כמה שורות אחורה · לחצן אמצעי או "אחורה" – להתחלה. שלט מצגות (Page Down/Up) עובד גם הוא.</p>
       <button class="mx-btn solid" data-act="prompter-go">הצגה בפרומפטר</button>`;
     const area=box.querySelector("#mxPrompterText");
     area.addEventListener("input",()=>{try{localStorage.setItem("mathly.prompterText",area.value);}catch{}});

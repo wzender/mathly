@@ -1,6 +1,9 @@
 /* Prompter (פרומפטר): a full-screen teleprompter for developers, opened from ניהול.
    It stands alone, with its own styles. window.MathlyPrompter.open(text) shows it.
-   Keys: Space play/pause · ↑/↓ speed · +/- text size · M mirror · Home back to start · Esc close. */
+   Keys: Space play/pause · ↑/↓ speed · +/- text size · M mirror · Home back to start · Esc close.
+   A presentation clicker: Page Down / → play/pause, Page Up / ← back a few lines.
+   A mouse: click play/pause · wheel changes the speed while playing (scrolls the text while paused) ·
+   right-click back a few lines · middle-click or the mouse's back button to the start · forward button play/pause. */
 (()=>{
 const CSS=`
 .mxp{position:fixed;inset:0;z-index:2147483000;background:#000;color:#fff;display:flex;flex-direction:column;font-family:"Rubik","Assistant",system-ui,sans-serif}
@@ -25,7 +28,7 @@ const CSS=`
 .mxp-progress{height:3px;background:#222}.mxp-progress i{display:block;height:100%;width:0;background:#f5c518}
 .mxp-count{position:absolute;inset:0;display:grid;place-items:center;font-size:30vh;font-weight:700;color:#f5c518;background:rgba(0,0,0,.6);pointer-events:none}
 `;
-let root,scroller,textEl,guide,bar,raf=0,last=0,playing=false,speed=40,size=64,mirror=false,acc=0,countTimer=0,back=null;
+let wheel=0,root,scroller,textEl,guide,bar,raf=0,last=0,playing=false,speed=40,size=64,mirror=false,acc=0,countTimer=0,back=null;
 
 function save(){try{localStorage.setItem("mathly.prompter",JSON.stringify({speed,size,mirror}))}catch{}}
 function load(){try{const s=JSON.parse(localStorage.getItem("mathly.prompter")||"{}");if(s.speed)speed=s.speed;if(s.size)size=s.size;mirror=!!s.mirror}catch{}}
@@ -66,7 +69,7 @@ function play(on){
 }
 
 function countdown(){
-  if(playing) return play(false);
+  if(playing||root.querySelector(".mxp-count")) return play(false);   // a second press during 3-2-1 cancels it
   let n=3; const el=document.createElement("div"); el.className="mxp-count"; el.textContent=n; root.querySelector(".mxp-view").appendChild(el);
   countTimer=setInterval(()=>{n--; if(n>0) el.textContent=n; else play(true);},700);
 }
@@ -79,7 +82,8 @@ function act(p){
     case "smaller": size=Math.max(24,size-6); break;
     case "bigger": size=Math.min(200,size+6); break;
     case "mirror": mirror=!mirror; break;
-    case "top": scroller.scrollTop=0; progress(); break;
+    case "top": scroller.scrollTop=0; acc=0; progress(); break;
+    case "back": scroller.scrollTop-=size*1.45*3; acc=0; progress(); return;
     case "full": if(document.fullscreenElement) document.exitFullscreen?.(); else root.requestFullscreen?.().catch(()=>{}); return;
     case "close": return close();
   }
@@ -88,7 +92,7 @@ function act(p){
 
 function onKey(e){
   if(!root) return;
-  const map={" ":"play",ArrowUp:"faster",ArrowDown:"slower","+":"bigger","=":"bigger","-":"smaller",m:"mirror",M:"mirror","מ":"mirror",Home:"top",f:"full",F:"full",Escape:"close"};
+  const map={" ":"play",ArrowUp:"faster",ArrowDown:"slower","+":"bigger","=":"bigger","-":"smaller",m:"mirror",M:"mirror","מ":"mirror",Home:"top",PageDown:"play",ArrowRight:"play",PageUp:"back",ArrowLeft:"back",f:"full",F:"full",Escape:"close"};
   const p=map[e.key]; if(!p) return;
   if(e.target.closest?.("input")&&p!=="close") return;
   e.preventDefault(); e.stopImmediatePropagation(); act(p);
@@ -117,8 +121,18 @@ function open(text){
   bar.addEventListener("click",e=>{const b=e.target.closest("[data-p]"); if(b) act(b.dataset.p);});
   bar.querySelector(".mxp-speed").addEventListener("input",e=>{speed=+e.target.value; save(); sync();});
   scroller.addEventListener("scroll",progress,{passive:true});
-  scroller.addEventListener("wheel",()=>{acc=0;},{passive:true});
-  root.querySelector(".mxp-view").addEventListener("click",()=>countdown());
+  const view=root.querySelector(".mxp-view");
+  view.addEventListener("click",()=>countdown());
+  view.addEventListener("wheel",e=>{            // while playing the wheel is a speed knob: down faster, up slower
+    if(!playing){acc=0; return;}
+    e.preventDefault(); wheel+=e.deltaMode?e.deltaY*40:e.deltaY;
+    if(Math.abs(wheel)>=60){act(wheel>0?"faster":"slower"); wheel=0;}
+  },{passive:false});
+  view.addEventListener("contextmenu",e=>{e.preventDefault(); act("back");});
+  // middle and side buttons: mouseup is where the browser would scroll or go back a page, so both are stopped
+  const extra={1:"top",3:"top",4:"play"};
+  view.addEventListener("mousedown",e=>{if(extra[e.button]) e.preventDefault();});
+  view.addEventListener("mouseup",e=>{const p=extra[e.button]; if(p){e.preventDefault(); act(p);}});
   document.body.appendChild(root);
   document.addEventListener("keydown",onKey,true);
   sync(); bar.querySelector(".mxp-play").focus();

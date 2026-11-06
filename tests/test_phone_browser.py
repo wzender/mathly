@@ -1195,14 +1195,27 @@ def test_prompter_from_management(phone_server):
             page.goto(phone_server)
             page.locator('[data-act="manage"]').click()
             page.locator('[data-act="manage-prompter"]').click()
-            page.locator("#mxPrompterText").fill("שלום לכולם\nזה טקסט לפרומפטר")
+            text = "שלום לכולם\nזה טקסט לפרומפטר" + "\nעוד שורה" * 60      # long enough to still be scrolling
+            page.locator("#mxPrompterText").fill(text)
             page.locator('[data-act="prompter-go"]').click()
             prompter = page.locator(".mxp")
-            playwright.expect(prompter.locator(".mxp-text")).to_have_text("שלום לכולם\nזה טקסט לפרומפטר")
+            playwright.expect(prompter.locator(".mxp-text")).to_have_text(text)
             page.keyboard.press("m")
             playwright.expect(prompter).to_have_class("mxp mirror")
             page.keyboard.press(" ")
             playwright.expect(prompter).to_have_class("mxp mirror playing", timeout=5000)
+            speed = page.locator(".mxp-speed-v").inner_text()
+            page.locator(".mxp-text").hover()
+            page.mouse.wheel(0, 120)                                   # while playing, the wheel is the speed
+            playwright.expect(page.locator(".mxp-speed-v")).not_to_have_text(speed)
+            page.locator(".mxp-view").click()                          # a click pauses
+            playwright.expect(prompter).to_have_class("mxp mirror")
+            page.keyboard.press("PageDown")                            # a presentation clicker plays
+            playwright.expect(prompter).to_have_class("mxp mirror playing", timeout=5000)
+            page.locator(".mxp-view").click()
+            top = page.locator(".mxp-scroll").evaluate("e=>e.scrollTop")
+            page.locator(".mxp-view").click(button="right")            # right-click goes back a few lines
+            assert page.locator(".mxp-scroll").evaluate("e=>e.scrollTop") <= top
             page.keyboard.press("Escape")
             playwright.expect(prompter).to_have_count(0)
             playwright.expect(page.locator(".mx-manage-sheet")).to_be_visible()   # Esc closes only the prompter
