@@ -647,3 +647,43 @@ def test_the_calculator_is_dragged_by_its_bar(browser, server):
     again = calc.bounding_box()
     assert abs(again["x"] - box["x"]) < 2 and abs(again["y"] - box["y"]) < 2
     assert errors == []
+
+
+def test_the_paper_scrolls_sideways_to_what_was_written_on_the_wide_board(browser, server):
+    page, errors = open_skill(browser, server, 1440, 900)
+    page.locator("[data-board-toggle]").click()
+    door = page.locator(".mx-board-door")
+    door.click()
+    page.wait_for_timeout(400)
+    drag(page, (1100, 300), (1300, 300))   # written on the part that slid open
+    assert alpha_near(page, 1200, 300) > 0
+    door.click()   # slid back: that writing is past the board's right edge
+    page.wait_for_timeout(400)
+    width = page.locator(".mx-board canvas").bounding_box()["width"]
+    assert width < 1100
+
+    # two fingers moving left bring it into sight
+    touch(page, [("pointerdown", 1, 500, 400), ("pointerdown", 2, 500, 500),
+                 *[e for k in range(1, 11) for e in (("pointermove", 1, 500 - k * 60, 400), ("pointermove", 2, 500 - k * 60, 500))],
+                 ("pointerup", 1, -100, 400), ("pointerup", 2, -100, 500)])
+    assert alpha_near(page, 600, 300) > 0
+    playwright.expect(page.locator(".mx-board-top")).to_be_visible()
+
+    # Shift and the wheel scroll sideways too, never past the paper's left edge
+    box = page.locator(".mx-board canvas").bounding_box()
+    page.mouse.move(box["x"] + 200, box["y"] + 200)
+    page.keyboard.down("Shift")
+    page.mouse.wheel(0, -2000)
+    page.keyboard.up("Shift")
+    page.wait_for_timeout(100)
+    assert alpha_near(page, 600, 300) == 0   # back at the left edge: the writing is out of sight again
+
+    # the move tool drags the paper sideways
+    page.locator('.mx-board [data-tool="move"]').click()
+    drag(page, (700, 600), (100, 600))
+    assert alpha_near(page, 600, 300) > 0
+
+    page.locator(".mx-board-top").click()   # back to the paper's corner
+    assert alpha_near(page, 600, 300) == 0
+    playwright.expect(page.locator(".mx-board-top")).to_be_hidden()
+    assert errors == []

@@ -12,8 +12,9 @@
    Line ends and circle centers snap to the ends and centers already drawn, so a triangle closes neatly;
    lines that meet that way move together. The eraser removes the lines and circles it touches and cuts pen strokes;
    it leaves the question's copy alone (select it and delete it instead).
-   The paper is endless downwards: the mouse wheel over the board scrolls it, and so do two fingers on a touch
-   screen (one finger draws), and so does dragging empty paper with the move tool. Once a pen has touched the screen,
+   The paper is endless downwards and to the right (what was written while the board was slid open stays in reach
+   when it slides back): the mouse wheel over the board scrolls it (sideways with Shift or a trackpad), and so do
+   two fingers on a touch screen in any direction (one finger draws), and so does dragging empty paper with the move tool. Once a pen has touched the screen,
    a single finger is ignored: a hand resting on it. While the pen writes (and for a moment after it lifts) every
    touch is ignored, so a palm neither scrolls the paper nor takes back the stroke, and a wide contact is a palm too.
    A sheet can let the board hand in a question's answer (the unit quiz): the sketch becomes a picture. */
@@ -76,7 +77,8 @@ const desk=()=>matchMedia("(min-width:1000px) and (any-pointer:fine)").matches; 
 const context=()=>({layer,base,pages,page,source,hand,onPage,sendLabel,key});
 function restore(c){ ({layer,base,pages,page,source,hand,onPage,sendLabel,key}=c); }
 
-const sketch=()=>{ if(!sketches.has(key)) sketches.set(key,{marks:[],past:[],y:0}); return sketches.get(key); };   // y: how far down the paper is scrolled
+const sketch=()=>{ if(!sketches.has(key)) sketches.set(key,{marks:[],past:[],x:0,y:0}); return sketches.get(key); };   // x, y: how far right and down the paper is scrolled
+const scrollTo=(x,y)=>{ const s=sketch(); s.x=Math.max(0,x); s.y=Math.max(0,y); paint(); };   // never left of or above the paper's corner
 const marks=()=>sketch().marks;
 const copy=list=>JSON.parse(JSON.stringify(list));
 function remember(before=copy(marks())){ const s=sketch(); s.past.push(before); if(s.past.length>HISTORY) s.past.shift(); }
@@ -254,7 +256,7 @@ function build(){
       <button type="button" data-do="send" class="mx-board-send" hidden></button></div>
     <div class="mx-board-stage"><canvas></canvas>
       <button type="button" data-do="delete" class="mx-board-del" title="מחיקת מה שנבחר (Delete)" hidden>${ic("clear")}מחיקה</button>
-      <button type="button" data-do="top" class="mx-board-top" hidden>${ic("top")}לראש הדף</button>
+      <button type="button" data-do="top" class="mx-board-top" hidden>${ic("top")}לתחילת הדף</button>
       <div class="mx-calc" dir="ltr" role="group" aria-label="מחשבון מדעי" hidden>
         <div class="mx-calc-grip" title="גררו כדי להזיז את המחשבון" aria-hidden="true"></div>
         <div class="mx-calc-screen"><span class="mx-calc-flags" data-calc-flags></span><div class="mx-calc-expr" data-calc-expr>0</div><output data-calc-out>&nbsp;</output></div>
@@ -275,7 +277,7 @@ function build(){
     if(act==="send") send();
     if(b.dataset.calc) calcPress(+b.dataset.calc);
     if(act==="calc") toggleCalc();
-    if(act==="top"){ sketch().y=0; paint(); }
+    if(act==="top") scrollTo(0,0);
     if(act==="door"&&!doorDragged) setDoor(doorOpen()?null:DOOR_OPEN);
     doorDragged=false;
     if(act==="hide") full?closeFull():toggle();
@@ -289,8 +291,9 @@ function build(){
   canvas.addEventListener("pointerleave",()=>{ if(hover){ hover=null; paint(); } });   // typed math is edited where it is   // the pen's side button: no browser menu over the board
   canvas.addEventListener("wheel",e=>{   // endless paper: scrolls down as far as needed, never above the top
     if(e.ctrlKey) return;   // the browser's zoom
-    e.preventDefault(); const s=sketch(), dy=e.deltaMode===1?e.deltaY*24:e.deltaMode===2?e.deltaY*canvas.clientHeight:e.deltaY;
-    s.y=Math.max(0,s.y+dy); paint();
+    e.preventDefault(); const s=sketch(), k=e.deltaMode===1?24:e.deltaMode===2?canvas.clientHeight:1;
+    let dx=e.deltaX*k, dy=e.deltaY*k; if(e.shiftKey&&!dx){ dx=dy; dy=0; }   // Shift and the wheel: sideways
+    scrollTo(s.x+dx,s.y+dy);
   },{passive:false});
   new ResizeObserver(fit).observe(canvas);
   setTool(tool);
@@ -358,9 +361,9 @@ function fit(){
 }
 function paint(){
   if(!ctx) return;
-  const d=devicePixelRatio||1, y=sketch().y; ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.setTransform(d,0,0,d,0,-y*d);
-  canvas.style.backgroundPosition=`0 ${-y}px`;   // the grid scrolls with the paper
-  el.querySelector(".mx-board-top").hidden=y<1;
+  const d=devicePixelRatio||1, {x,y}=sketch(); ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.setTransform(d,0,0,d,-x*d,-y*d);
+  canvas.style.backgroundPosition=`${-x}px ${-y}px`;   // the grid scrolls with the paper
+  el.querySelector(".mx-board-top").hidden=x<1&&y<1;
   marks().forEach(draw);
   if(draft?.kind==="circle") guide(draft);
   if(hover&&!naming) aimed(hover);
@@ -621,7 +624,7 @@ function startAngle(p,near){
   input.style.color=m.color;
   el.querySelector(".mx-board-stage").append(node);
   const [x,y]=labelAt(m,"000°"), W=canvas.clientWidth, bw=node.offsetWidth;
-  node.style.left=`${Math.max(4,Math.min(W-4-bw,x-bw/2))}px`; node.style.top=`${Math.max(4,y-sketch().y-21)}px`;
+  node.style.left=`${Math.max(4,Math.min(W-4-bw,x-sketch().x-bw/2))}px`; node.style.top=`${Math.max(4,y-sketch().y-21)}px`;
   paint(); input.focus({preventScroll:true});
   if(pages>1) drawPages();
 }
@@ -641,9 +644,9 @@ function finishAngle(keep){
 function along(a,b,step){ const n=Math.max(1,Math.ceil(dist(a,b)/step)), out=[]; for(let k=1;k<=n;k++) out.push([a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n,a[2]+((b[2]??a[2])-a[2])*k/n]); return out; }
 
 /* ---------- the pointer ---------- */
-const at=e=>{ const r=canvas.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top+sketch().y,e.pointerType==="pen"?e.pressure:.5]; };   // a point on the paper, not on the screen
+const at=e=>{ const r=canvas.getBoundingClientRect(); return [e.clientX-r.left+sketch().x,e.clientY-r.top+sketch().y,e.pointerType==="pen"?e.pressure:.5]; };   // a point on the paper, not on the screen
 const capture=id=>{ try{ canvas.setPointerCapture(id); }catch{} };   // a pointer the browser no longer knows: draw anyway
-const fingersY=()=>{ let t=0; touches.forEach(p=>t+=p[1]); return t/touches.size; };
+const fingers=()=>{ let x=0,y=0; touches.forEach(p=>{ x+=p[0]; y+=p[1]; }); return [x/touches.size,y/touches.size]; };   // where the fingers are, together
 // a second finger came down: what the first one started is taken back, and the two scroll the paper
 function stopLive(){
   const s=sketch();
@@ -664,7 +667,7 @@ function down(e){
   }
   if(e.pointerType==="touch"){
     touches.set(e.pointerId,[e.clientX,e.clientY]); capture(e.pointerId); e.preventDefault();
-    if(touches.size===2){ stopLive(); pan={y:fingersY(),s:sketch().y}; return; }
+    if(touches.size===2){ stopLive(); pan={at:fingers(),x:sketch().x,y:sketch().y}; return; }
     if(touches.size>2||pan||penSeen) return;   // a hand resting on the screen while a pen writes
   }
   if(e.button!==0&&e.button!==5) return;   // 5: the pen's eraser end
@@ -676,7 +679,7 @@ function down(e){
   capture(e.pointerId); e.preventDefault();
   if(use==="move"){
     const m=hit(p);
-    if(!m){ select([]); slide={id:e.pointerId,y:e.clientY,s:sketch().y}; canvas.style.cursor="grabbing"; return paint(); }   // empty paper: scroll it
+    if(!m){ select([]); slide={id:e.pointerId,at:[e.clientX,e.clientY],x:sketch().x,y:sketch().y}; canvas.style.cursor="grabbing"; return paint(); }   // empty paper: scroll it
     if(!selection.includes(m)) select(group(m));
     drag={id:e.pointerId,last:p,before:null}; return paint();
   }
@@ -690,9 +693,9 @@ function move(e){
   if(palms.has(e.pointerId)) return;
   if(touches.has(e.pointerId)){
     touches.set(e.pointerId,[e.clientX,e.clientY]);
-    if(pan){ if(touches.size>=2){ sketch().y=Math.max(0,pan.s-(fingersY()-pan.y)); paint(); } return; }
+    if(pan){ if(touches.size>=2){ const [fx,fy]=fingers(); scrollTo(pan.x-(fx-pan.at[0]),pan.y-(fy-pan.at[1])); } return; }
   }
-  if(slide&&e.pointerId===slide.id){ sketch().y=Math.max(0,slide.s-(e.clientY-slide.y)); return paint(); }
+  if(slide&&e.pointerId===slide.id) return scrollTo(slide.x-(e.clientX-slide.at[0]),slide.y-(e.clientY-slide.at[1]));
   if(tool==="move"&&!drag&&!e.buttons) canvas.style.cursor=hit(at(e))?"move":"grab";
   if(tool==="angle"&&!e.buttons&&e.pointerType!=="touch"){   // a mouse or a pen over a corner: its arc, dashed
     const c=naming?null:aim(at(e),CORNER), was=hover; hover=c; canvas.style.cursor=c?"pointer":"";
@@ -794,7 +797,7 @@ function copyQuestion(){
   }
   if(!lines.length&&!figs.length) return;
   remember();
-  const m={kind:"card",x:canvas.clientWidth-16-W,y:sketch().y+16,w:W,h:y+CARD_PAD-(figs.length?8:0),lines,figs};
+  const m={kind:"card",x:sketch().x+canvas.clientWidth-16-W,y:sketch().y+16,w:W,h:y+CARD_PAD-(figs.length?8:0),lines,figs};
   marks().push(m); setTool("move"); select([m]); paint(); if(pages>1) drawPages();
 }
 
@@ -833,17 +836,17 @@ function finishMath(keep){
   }else if(latex){
     const L=window.MathlyBoardMath.layout(latex,MATH_SIZE), W=canvas.clientWidth;
     remember();
-    all.push({kind:"math",latex,color:ink,size:MATH_SIZE,x:Math.max(8,Math.min(e.at[0],W-8-L.w)),y:Math.max(0,e.at[1]-(L.a+L.d)/2)});
+    all.push({kind:"math",latex,color:ink,size:MATH_SIZE,x:Math.max(8,Math.min(e.at[0],sketch().x+W-8-L.w)),y:Math.max(0,e.at[1]-(L.a+L.d)/2)});
   }else return;
   paint(); if(pages>1) drawPages();
 }
 if(window.MathlyBoardMath) window.MathlyBoardMath.onFonts=()=>el&&paint();
 
 /* ---------- handing in ---------- */
-// the whole sketch as a picture on white paper: as wide as the board, as tall as what is drawn
+// the whole sketch as a picture on white paper: as wide as the board (wider when it was written further right), as tall as what is drawn
 function snapshot(){
   const all=marks(); if(!all.some(m=>m.kind!=="card")) return null;
-  const [,y0,,y1]=edges(all), top=Math.max(0,y0-24), W=canvas.clientWidth, H=Math.min(y1+24-top,8000), k=2;
+  const [,y0,x1,y1]=edges(all), top=Math.max(0,y0-24), W=Math.min(Math.max(canvas.clientWidth,x1+24),8000), H=Math.min(y1+24-top,8000), k=2;
   const out=document.createElement("canvas"); out.width=W*k; out.height=Math.round(H*k);
   const keep=ctx; ctx=out.getContext("2d"); paper="#fff";
   try{ ctx.fillStyle="#fff"; ctx.fillRect(0,0,out.width,out.height); ctx.setTransform(k,0,0,k,0,-top*k); all.forEach(draw); }

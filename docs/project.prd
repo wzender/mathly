@@ -25,17 +25,16 @@ Each skill goes through these stages:
 2. faded examples: steps are removed one at a time, the student fills them in
 3. practice: immediate feedback that names the specific mistake.
    after a wrong answer, the student gets a similar question (not the same one)
-4. mastered: 3 correct answers in a row, without hints, across at least 2 different days
+4. mastered: 3 correct answers in a row, without hints, across at least 2 different days.
+   a mastered skill stays mastered (math does not rot)
 
 Skill states:
 - not started
 - learning
 - mastered
-- needs review: a mastered skill becomes "needs review" after some days without practice
 
 Path rules:
 - all lessons are open: the student can enter any lesson at any time, in any order
-- daily review: a short mixed set of "needs review" skills from different lessons
 
 
 
@@ -44,10 +43,10 @@ Goal 2: Getting ready for the real test
 The teacher sets the test date and the lessons it covers.
 The app plans backwards from the date:
 
-- 3+ weeks before: finish the path for all the covered lessons
+- until 9 days before: finish the path for all the covered lessons
 - 9-7 days before: exercise tests (מבחן תרגול) - timed, mixing all the covered lessons.
   each result points back to the weak skills in the path (see "Exercise tests" below)
-- final week: simulation test (מבחן סימלוציה) - required. one attempt,
+- final week: simulation test (מבחן סימלוציה) - required. one attempt, open until the test day,
   same length and timing as the real test
 - last days: targeted review of the skills that failed in the simulation,
   light mixed review the day before
@@ -57,7 +56,7 @@ Exercise tests:
   and placed on the student's countdown
 - the teacher can also send one to the class as an assignment
 - the student can start or retake one at any time. each retake draws new questions, best grade wins
-- weak skill: a skill in "learning" or "needs review" state, or one failed in a previous exercise test
+- weak skill: a skill in "learning" state, or one failed in a previous exercise test
 - 2 exercise tests, then the simulation test:
 
   | days before the test | step                       | weak skills | other covered skills |
@@ -100,7 +99,7 @@ Teacher Screen:
   - see who took the required simulation test
 - class heat map
   - rows: students, columns: skills
-  - each cell is colored by the skill state (not started / learning / mastered / needs review)
+  - each cell is colored by the skill state (not started / learning / mastered)
   - period tabs: sep-dec, jan-jun
 - student lesson coverage
   - rows: students, columns: lessons
