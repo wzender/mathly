@@ -103,6 +103,21 @@ def test_on_a_phone_the_board_opens_full_screen_over_the_exercise(browser, serve
     touch(page, [("pointerdown", 6, 60, 700), ("pointermove", 6, 200, 700), ("pointerup", 6, 200, 700)])
     assert alpha_near(page, 130, 600) > 0 and alpha_near(page, 130, 700) == 0
 
+    # a palm (two contacts) lands while the pen writes: the stroke stays and the paper does not scroll
+    touch(page, [("pointerdown", 7, 60, 400, "pen"), ("pointermove", 7, 120, 400, "pen"),
+                 ("pointerdown", 8, 150, 600), ("pointerdown", 9, 200, 620),
+                 ("pointermove", 8, 150, 450), ("pointermove", 9, 200, 470),
+                 ("pointermove", 7, 200, 400, "pen"), ("pointerup", 7, 200, 400, "pen"),
+                 ("pointerup", 8, 150, 450), ("pointerup", 9, 200, 470)])
+    assert alpha_near(page, 160, 400) > 0 and alpha_near(page, 130, 600) > 0
+
+    # the hand rests first, then the pen comes down: the hand's mark is taken back, the pen writes
+    page.wait_for_timeout(600)
+    touch(page, [("pointerdown", 10, 60, 300), ("pointermove", 10, 120, 300),
+                 ("pointerdown", 11, 60, 250, "pen"), ("pointermove", 11, 200, 250, "pen"), ("pointerup", 11, 200, 250, "pen"),
+                 ("pointermove", 10, 200, 300), ("pointerup", 10, 200, 300)])
+    assert alpha_near(page, 130, 250) > 0 and alpha_near(page, 90, 300) == 0
+
     page.locator(".mx-board-back").click()   # back to the question; the sketch waits
     playwright.expect(page.locator(".mx-board")).to_have_count(0)
     playwright.expect(page.locator(".mx-sheet")).to_be_visible()
@@ -111,6 +126,28 @@ def test_on_a_phone_the_board_opens_full_screen_over_the_exercise(browser, serve
     page.keyboard.press("Escape")   # closes the board, not the exercise
     playwright.expect(page.locator(".mx-board")).to_have_count(0)
     playwright.expect(page.locator(".mx-sheet")).to_be_visible()
+    assert errors == []
+
+
+def test_the_board_fills_the_whole_screen_and_back(browser, server):
+    page, errors = open_skill(browser, server, 1440, 900)
+    page.locator("[data-board-toggle]").click()
+    board = page.locator(".mx-board")
+    playwright.expect(board).to_be_visible()
+    screen = page.locator('.mx-board-bar [data-do="screen"]')
+    playwright.expect(screen).to_be_visible()
+    screen.click()
+    page.wait_for_function("document.fullscreenElement?.classList.contains('mx-board')")
+    playwright.expect(board).to_have_class(re.compile(r"\bscreen\b"))
+    playwright.expect(screen).to_have_attribute("aria-pressed", "true")
+    box = board.bounding_box()
+    assert box["x"] == 0 and box["y"] == 0
+    drag(page, (200, 300), (500, 300))   # still draws while it fills the screen
+    assert alpha_near(page, 300, 300) > 0
+    screen.click()
+    page.wait_for_function("!document.fullscreenElement")
+    playwright.expect(board).not_to_have_class(re.compile(r"\bscreen\b"))
+    playwright.expect(screen).to_have_attribute("aria-pressed", "false")
     assert errors == []
 
 

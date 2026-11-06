@@ -14,7 +14,8 @@
    it leaves the question's copy alone (select it and delete it instead).
    The paper is endless downwards: the mouse wheel over the board scrolls it, and so do two fingers on a touch
    screen (one finger draws), and so does dragging empty paper with the move tool. Once a pen has touched the screen,
-   a single finger is ignored: a hand resting on it.
+   a single finger is ignored: a hand resting on it. While the pen writes (and for a moment after it lifts) every
+   touch is ignored, so a palm neither scrolls the paper nor takes back the stroke, and a wide contact is a palm too.
    A sheet can let the board hand in a question's answer (the unit quiz): the sketch becomes a picture. */
 (()=>{
 const PREF="mathly.board";
@@ -43,6 +44,8 @@ const ICONS={
   done:'<path d="M5 12.5l4.5 4.5L19 7"/>',
   back:'<path d="M19 12H5M11 6l-6 6 6 6"/>',
   top:'<path d="M12 19V5M6 11l6-6 6 6"/>',
+  expand:'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  shrink:'<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
   calc:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8.5 7.5h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/>'};
 const FLIP=new Set(["undo","back"]);
 const ic=n=>`<svg class="mx-ic${FLIP.has(n)?" mx-ic-flip":""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
@@ -68,6 +71,9 @@ let naming=null, hover=null;   // naming: an angle's words being typed {mark, no
 let editing=null;   // the formula being typed: {mark (null for a new one), at, node, field, key}
 let full=null;   // the board open full screen: {saved: the context to go back to, done: called when it closes}
 const touches=new Map(); let pan=null, penSeen=false;
+// a hand resting on the screen while a pen writes: its touches are ignored until they lift
+const palms=new Set(); let pensDown=0, penUpAt=-1e9;
+const PALM_AFTER_PEN=500, PALM_SIZE=60;   // ms after the pen lifts; a contact this wide (css px) is a palm, not a finger
 const desk=()=>matchMedia("(min-width:1000px) and (any-pointer:fine)").matches;   // the same test as math.css
 const context=()=>({layer,base,pages,page,source,hand,onPage,sendLabel,key});
 function restore(c){ ({layer,base,pages,page,source,hand,onPage,sendLabel,key}=c); }
@@ -224,7 +230,8 @@ function build(){
         <button type="button" data-do="calc" aria-pressed="false" title="מחשבון">${ic("calc")}<span>מחשבון</span></button>
         <button type="button" data-do="question" title="העתקת השאלה לראש הלוח">${ic("question")}<span>השאלה</span></button>
         <button type="button" data-do="undo" title="ביטול (Ctrl+Z)">${ic("undo")}<span>ביטול</span></button>
-        <button type="button" data-do="clear" title="ניקוי הלוח">${ic("clear")}<span>ניקוי</span></button></span>
+        <button type="button" data-do="clear" title="ניקוי הלוח">${ic("clear")}<span>ניקוי</span></button>
+        <button type="button" data-do="screen" aria-pressed="false" title="מסך מלא"${canScreen()?"":" hidden"}>${ic("expand")}<span>מסך מלא</span></button></span>
       <button type="button" data-do="hide" class="mx-board-close" aria-label="סגירת הלוח" title="סגירת הלוח">${ic("close")}</button>
     </div><div class="mx-board-row"><div class="mx-board-pages" role="tablist" aria-label="הדף של כל שאלה"></div>
       <button type="button" data-do="send" class="mx-board-send" hidden></button></div>
@@ -250,7 +257,8 @@ function build(){
     if(b.dataset.calc) calcPress(+b.dataset.calc);
     if(act==="calc") toggleCalc();
     if(act==="top"){ sketch().y=0; paint(); }
-    if(act==="hide") full?closeFull():toggle();
+    if(act==="screen") toggleScreen();
+    if(act==="hide"){ leaveScreen(); full?closeFull():toggle(); }
   });
   canvas.addEventListener("pointerdown",down);
   canvas.addEventListener("pointermove",move);
@@ -267,6 +275,28 @@ function build(){
   new ResizeObserver(fit).observe(canvas);
   setTool(tool);
 }
+/* the whole screen for the board alone (a classroom's smart board, a tablet): the browser's own full screen.
+   Not on an iPhone, which has none for a page. The math keyboard moves into the board while it fills the screen. */
+const screenEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
+function canScreen(){ return !!(document.fullscreenEnabled||document.webkitFullscreenEnabled); }
+function toggleScreen(){
+  if(screenEl()===el) return leaveScreen();
+  const go=el.requestFullscreen||el.webkitRequestFullscreen;
+  try{ const r=go?.call(el); r?.catch?.(()=>{}); }catch{}
+}
+function leaveScreen(){
+  if(screenEl()!==el) return;
+  const out=document.exitFullscreen||document.webkitExitFullscreen;
+  try{ const r=out?.call(document); r?.catch?.(()=>{}); }catch{}
+}
+function onScreen(){
+  if(!el) return; const on=screenEl()===el, b=el.querySelector('[data-do="screen"]');
+  el.classList.toggle("screen",on); b.setAttribute("aria-pressed",on);
+  b.title=on?"יציאה ממסך מלא":"מסך מלא"; b.innerHTML=`${ic(on?"shrink":"expand")}<span>${b.title}</span>`;
+  const k=window.mathVirtualKeyboard; if(k) try{ k.container=on?el:document.body; }catch{}
+}
+document.addEventListener("fullscreenchange",onScreen);
+document.addEventListener("webkitfullscreenchange",onScreen);
 function pressed(sel,b){ el.querySelectorAll(sel).forEach(x=>x.setAttribute("aria-pressed",x===b)); }
 function reset(){ draft=drag=rub=slide=null; hover=null; select([]); if(editing) finishMath(false); if(naming) finishAngle(true); }
 function setTool(t){
@@ -593,7 +623,15 @@ function stopLive(){
   slide=null; paint();
 }
 function down(e){
-  if(e.pointerType==="pen") penSeen=true;
+  if(e.pointerType==="pen"){
+    penSeen=true; pensDown++;
+    if(touches.size){   // the hand came down first: whatever it started is taken back, and it is a palm now
+      stopLive(); touches.forEach((_,id)=>palms.add(id)); touches.clear(); pan=null;
+    }
+  }
+  if(e.pointerType==="touch"&&penSeen&&(pensDown||performance.now()-penUpAt<PALM_AFTER_PEN||Math.max(e.width||0,e.height||0)>=PALM_SIZE)){
+    palms.add(e.pointerId); e.preventDefault(); return;
+  }
   if(e.pointerType==="touch"){
     touches.set(e.pointerId,[e.clientX,e.clientY]); capture(e.pointerId); e.preventDefault();
     if(touches.size===2){ stopLive(); pan={y:fingersY(),s:sketch().y}; return; }
@@ -619,6 +657,7 @@ function down(e){
   draft.id=e.pointerId; marks().push(draft); paint();
 }
 function move(e){
+  if(palms.has(e.pointerId)) return;
   if(touches.has(e.pointerId)){
     touches.set(e.pointerId,[e.clientX,e.clientY]);
     if(pan){ if(touches.size>=2){ sketch().y=Math.max(0,pan.s-(fingersY()-pan.y)); paint(); } return; }
@@ -650,6 +689,8 @@ function move(e){
   const p=at(e); draft.b=draft.kind==="line"?snap(p,draft):[p[0],p[1]]; paint();
 }
 function up(e){
+  if(e.pointerType==="pen"){ pensDown=Math.max(0,pensDown-1); penUpAt=performance.now(); }
+  if(palms.delete(e.pointerId)) return;
   if(touches.delete(e.pointerId)&&pan){ if(!touches.size) pan=null; return; }
   if(slide&&e.pointerId===slide.id){ slide=null; canvas.style.cursor="grab"; return; }
   if(drag&&e.pointerId===drag.id){ drag=null; return paint(); }
@@ -842,7 +883,7 @@ function openFull({host,key:k,pages:n=1,page:p=0,question=null,submit=null,turne
   el.querySelector(".mx-board-back").focus({preventScroll:true,focusVisible:false});   // reachable by keyboard, without a ring on a tap
 }
 function closeFull(){
-  if(!full) return; if(editing) finishMath(true); if(naming) finishAngle(true); const f=full; full=null;
+  if(!full) return; leaveScreen(); if(editing) finishMath(true); if(naming) finishAngle(true); const f=full; full=null;
   el.classList.remove("full"); el.removeAttribute("role"); el.removeAttribute("aria-modal"); el.remove();
   restore(f.saved); f.done?.();
   if(layer?.isConnected&&desk()) again();
