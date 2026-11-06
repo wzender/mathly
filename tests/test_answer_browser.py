@@ -167,6 +167,7 @@ def test_expiry_renewal_reconnect_and_account_change(scan_server):
             playwright.expect(computer.locator('.mx-answer-image')).to_be_visible(timeout=10000)
             # Account change removes the photograph and all old-account continuations.
             computer.evaluate("localStorage.setItem('test.account','%s');window.testAuthEvent('SIGNED_IN',{access_token:'%s',user:{id:'%s'}})" % (OTHER, OTHER, OTHER))
+            computer.locator('.mx-nav [data-view="path"]').click()   # the new account starts on home
             playwright.expect(computer.locator('.mx-node[data-id="a_30_side"]')).to_be_visible()
             assert computer.locator('.mx-answer-image').count() == 0
             open_question(computer)

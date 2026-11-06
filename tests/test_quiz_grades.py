@@ -30,7 +30,7 @@ def test_a_photographed_answer_without_a_finished_check_leaves_the_grade_open():
                     attempt(state="failed", verdict=None)):
         view = sitting_view(sitting(attempt(100), waiting, attempt(100), attempt(100)))
         assert view["grade"] is None and view["open"] == 1
-        assert view["questions"][1] == {"points": 25, "earned": None, "state": "waiting"}
+        assert view["questions"][1] == {"points": 25, "earned": None, "state": "waiting", "skills": ["t_ext_eq"]}
 
 
 def test_an_unreadable_or_needs_review_check_has_no_score_and_stays_open():
@@ -72,3 +72,22 @@ def test_a_teacher_score_of_zero_is_a_score_and_a_comment_alone_changes_nothing(
 def test_a_missing_photo_stays_zero_whatever_the_teacher_says():
     assert question_result(25, {**attempt(photo=False, state=None, verdict=None), "teacher_score": 100}) == \
         {"points": 25, "earned": 0, "state": "missing"}
+
+
+def test_each_question_names_the_skills_it_tests():
+    view = sitting_view(sitting(attempt(100), attempt(40, verdict="partial"), attempt(100), attempt(100)))
+    assert [q["skills"] for q in view["questions"]] == [["t_ext", "t_simplify", "t_formulas"], ["t_ext_eq"],
+                                                       ["t_area", "t_ext_eq"], ["t_formulas"]]
+    assert view["questions"][1]["points"] - view["questions"][1]["earned"] == 15   # the points lost on t_ext_eq
+
+
+def test_a_final_sitting_is_hidden_from_the_student_until_released_but_not_from_the_teacher():
+    from app.quiz_modes import hide_results
+    teacher_view = sitting_view({**sitting(attempt(100), attempt(40, verdict="partial"), attempt(100), attempt(100)),
+                                 "mode": "final", "window_id": "w1"})
+    assert teacher_view["mode"] == "final" and teacher_view["grade"] == 85   # the teacher (class report) sees it all
+    student_view = hide_results(teacher_view)
+    assert student_view["grade"] is None and student_view["released"] is False
+    assert {q["state"] for q in student_view["questions"]} == {"unreleased"}
+    assert all(q["earned"] is None for q in student_view["questions"])
+    assert sitting_view(sitting(attempt(100)))["mode"] == "practice"   # a sitting from before is practice

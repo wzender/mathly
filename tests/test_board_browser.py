@@ -49,6 +49,7 @@ def open_skill(browser, server, width, height):
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(server)
+    page.locator('.mx-nav [data-view="path"]').click()   # the app opens on home; the trail is on the path tab
     playwright.expect(page.locator(".mx-trail")).to_be_visible()
     page.locator(".mx-star.st-next").click()
     playwright.expect(page.locator(".mx-sheet")).to_be_visible()
@@ -201,7 +202,8 @@ def test_lines_snap_circles_and_a_bigger_eraser(browser, server):
 def test_the_practice_exam_has_a_board_with_a_sketch_per_question(browser, server):
     page, errors = open_skill(browser, server, 1440, 900)
     page.locator(".mx-x").click()
-    page.locator(".mx-quiz-card").click()
+    page.evaluate("""() => { const b = document.createElement('button'); b.dataset.act = 'quiz';
+        document.getElementById('mathView').append(b); b.click(); b.remove(); }""")   # the mixed quiz, as an assignment opens it
     page.locator("[data-act=quiz-start]").click()
     playwright.expect(page.locator(".mx-quiz-sheet")).to_be_visible()
     board_on(page)

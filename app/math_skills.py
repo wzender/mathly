@@ -146,8 +146,12 @@ def skills_without_example(graph: dict) -> list[str]:
             if "example" not in s and all(q.get("type", "multiple-choice") == "multiple-choice" for q in questions(s))]
 
 
-def quiz_problems(unit: dict) -> list[str]:
-    """A unit's summarizing quiz: a time limit, and open-ended questions whose points add up to 100."""
+MAX_QUIZ_SKILLS = 3
+
+
+def quiz_problems(unit: dict, unit_skills: set[str] | None = None) -> list[str]:
+    """A unit's summarizing quiz: a time limit, and open-ended questions whose points add up to 100, each naming the
+    1 to 3 skills of its unit it tests (`unit_skills`: the unit's skill ids; None skips that check)."""
     quiz, where = unit["quiz"], f"{unit['id']} quiz"
     if not isinstance(quiz, dict):
         return [f"{where}: must be an object"]
@@ -168,6 +172,12 @@ def quiz_problems(unit: dict) -> list[str]:
             out.append(f"{at}: a quiz question is open-ended")
         if "figure" in q:
             out += figure_problems(at, q["figure"])
+        if unit_skills is not None:
+            tags = q.get("skills")
+            if not isinstance(tags, list) or not 1 <= len(tags) <= MAX_QUIZ_SKILLS or len(set(tags)) != len(tags):
+                out.append(f"{at}: skills must name 1 to {MAX_QUIZ_SKILLS} different skills")
+            else:
+                out += [f"{at}: skill {t} is not a skill of unit {unit['id']}" for t in tags if t not in unit_skills]
     if not out and sum(q["points"] for q in qs) != 100:
         out.append(f"{where}: points add up to {sum(q['points'] for q in qs)}, not 100")
     return out
@@ -175,7 +185,8 @@ def quiz_problems(unit: dict) -> list[str]:
 
 def quiz_snapshot(unit: dict, index: int) -> dict:
     """What an answer to quiz question `index` is graded against, and what its version is computed from."""
-    q = unit["quiz"]["questions"][index]
+    # the skill tags say what a question tests, not what it asks: changing them must not make open sittings stale
+    q = {k: v for k, v in unit["quiz"]["questions"][index].items() if k != "skills"}
     return {"name": f"בוחן מסכם: {unit['name']} · שאלה {index + 1}", **q, "type": "open-ended"}
 
 
@@ -186,7 +197,8 @@ def problems(graph: dict) -> list[str]:
     skills = {s["id"]: s for s in graph["skills"]}
     mistakes = graph["mistakes"]
     out = [f"{u['id']}: subject is required" for u in graph["units"] if not str(u.get("subject") or "").strip()]
-    out += [p for u in graph["units"] if "quiz" in u for p in quiz_problems(u)]
+    out += [p for u in graph["units"] if "quiz" in u
+            for p in quiz_problems(u, {s["id"] for s in graph["skills"] if s.get("unit") == u["id"]})]
     out += [f"{s['id']}: unknown unit {s['unit']}" for s in skills.values() if s["unit"] not in units]
     out += [f"{s['id']}: unknown prerequisite {p}" for s in skills.values() for p in s["prereqs"] if p not in skills]
     if out:

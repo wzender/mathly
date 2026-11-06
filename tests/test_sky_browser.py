@@ -58,7 +58,8 @@ def page_with(browser, server, progress=None, no_chance=False, now=None):
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(server)
-    playwright.expect(page.locator(".mx-trail")).to_be_visible()   # home is the path
+    page.locator('.mx-nav [data-view="path"]').click()   # the app opens on home; the trail is on the path tab
+    playwright.expect(page.locator(".mx-trail")).to_be_visible()
     return page, errors
 
 
@@ -151,7 +152,7 @@ def test_home_shows_the_tally_on_top_and_opens_at_the_next_skill(browser, server
     page, errors = page_with(browser, server, {"done": done, "solved": {"t_ext": list(range(10))}})
     playwright.expect(page.locator(".mx-hud .sky-chip.stars b")).to_have_text("1")
     playwright.expect(page.locator(".mx-hud .sky-chip.flame")).to_be_visible()
-    playwright.expect(page.locator(".mx-nav button")).to_have_count(2)
+    playwright.expect(page.locator(".mx-nav button")).to_have_count(3)   # home, path, collection
     nxt = page.locator(".mx-star.st-next")
     playwright.expect(nxt).to_be_in_viewport()
     page.evaluate("document.getElementById('mathView').scrollTo(0, 99999)")   # the tally stays on top while scrolling
@@ -263,7 +264,8 @@ def test_answers_saved_by_a_page_from_before_rounds_are_kept(browser, server):
 def test_a_practice_exam_mixes_the_taught_units_and_reports_at_the_end(browser, server):
     page, errors = page_with(browser, server, {"done": {"t_ext": "2026-10-01T00:00:00+00:00"}}, no_chance=True,
                              now=datetime(2026, 11, 3, 10))
-    page.locator(".mx-quiz-card").click()
+    page.evaluate("""() => { const b = document.createElement('button'); b.dataset.act = 'quiz';
+        document.getElementById('mathView').append(b); b.click(); b.remove(); }""")   # the mixed quiz, as an assignment opens it
     sheet = page.locator(".mx-quiz-sheet")
     on = sheet.locator('[data-quiz-unit][aria-pressed="true"]')
     playwright.expect(on).to_have_count(4)   # before November: algebra 1-2, the kite, the isosceles triangle
@@ -295,13 +297,13 @@ def test_a_practice_exam_mixes_the_taught_units_and_reports_at_the_end(browser, 
     assert (q["n"], q["right"], sorted(q["units"])) == (12, 10, ["i", "k", "t", "t2"]) and len(q["weak"]) == 2
     assert p["days"]["2026-11-03"] == 10                                  # right answers count toward today's goal
     page.locator(".mx-quiz-sheet .mx-x").click()
-    playwright.expect(page.locator(".mx-quiz-card")).to_contain_text("בפעם הקודמת: 10 מתוך 12")
     assert not errors
 
 
 def test_leaving_a_practice_exam_asks_first(browser, server):
     page, errors = page_with(browser, server, now=datetime(2026, 11, 3, 10))
-    page.locator(".mx-quiz-card").click()
+    page.evaluate("""() => { const b = document.createElement('button'); b.dataset.act = 'quiz';
+        document.getElementById('mathView').append(b); b.click(); b.remove(); }""")   # the mixed quiz, as an assignment opens it
     page.locator("[data-act=quiz-start]").click()
     page.locator(".mx-choices button").first.click()
     page.keyboard.press("Escape")
@@ -388,7 +390,8 @@ def test_a_wrong_review_answer_is_logged(browser, server):
 
 def test_a_practice_exam_logs_only_its_final_picks_when_handed_in(browser, server):
     page, errors = page_with(browser, server, now=datetime(2026, 11, 3, 10))
-    page.locator(".mx-quiz-card").click()
+    page.evaluate("""() => { const b = document.createElement('button'); b.dataset.act = 'quiz';
+        document.getElementById('mathView').append(b); b.click(); b.remove(); }""")   # the mixed quiz, as an assignment opens it
     sheet = page.locator(".mx-quiz-sheet")
     sheet.locator("[data-act=quiz-start]").click()
     sheet.locator(".mx-choices button:not([data-right])").first.click()   # wrong, then changed to right
@@ -405,7 +408,8 @@ def test_a_practice_exam_logs_only_its_final_picks_when_handed_in(browser, serve
 
 def test_a_left_practice_exam_logs_nothing(browser, server):
     page, errors = page_with(browser, server, now=datetime(2026, 11, 3, 10))
-    page.locator(".mx-quiz-card").click()
+    page.evaluate("""() => { const b = document.createElement('button'); b.dataset.act = 'quiz';
+        document.getElementById('mathView').append(b); b.click(); b.remove(); }""")   # the mixed quiz, as an assignment opens it
     page.locator("[data-act=quiz-start]").click()
     page.locator(".mx-choices button:not([data-right])").first.click()
     page.locator("[data-act=quiz-quit]").click()
@@ -562,6 +566,11 @@ def test_a_low_server_grade_needs_attention_but_the_devices_does_not(browser, se
     assert attention(page, {**base, "quiz_sittings": None}) == []
     assert attention(page, {**base, "progress": {**base["progress"], "uq": {"t": {"history": [{"score": 10}]}}}}) == []
     assert attention(page, {**base, "quiz_sittings": [sit(55, "2026-11-03T10:00:00Z")]}) == []   # 55 is not below 55
+    # the official grade (the latest final sitting) counts over a later practice sitting, and is named as final
+    final = lambda grade, at: {**sit(grade, at), "mode": "final"}
+    found = attention(page, {**base, "quiz_sittings": [final(40, "2026-10-01T10:00:00Z"), sit(90, "2026-11-03T10:00:00Z")]})
+    assert [x["kind"] for x in found] == ["grade"] and "בבוחן המסכם" in found[0]["text"] and "40" in found[0]["text"]
+    assert attention(page, {**base, "quiz_sittings": [final(80, "2026-10-01T10:00:00Z"), sit(30, "2026-11-03T10:00:00Z")]}) == []
     assert not errors
 
 
@@ -601,6 +610,7 @@ def page_with_examples(browser, server, progress=None):
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(server)
+    page.locator('.mx-nav [data-view="path"]').click()   # the app opens on home; the trail is on the path tab
     playwright.expect(page.locator(".mx-trail")).to_be_visible()
     return page, errors
 
@@ -764,4 +774,198 @@ def test_a_worksheet_is_done_when_handed_in_and_late_after_the_due_day(browser, 
     unknown = run({"sittings": [], "submissions": None})                       # could not be read
     assert (unknown["done"], unknown["known"]) == (False, False)
     assert run([])["known"] and not run([])["done"]                            # a bare array is the sittings
+    assert not errors
+
+
+def test_a_returned_worksheet_is_not_done_until_handed_in_again_by_its_new_date(browser, server):
+    page, errors = page_with(browser, server)
+    sheet = {**ASSIGNMENT, "items": [{"kind": "worksheet", "id": "w1"}]}
+    run = lambda sub, now: page.evaluate("([a, s, n]) => MathlySky.assignmentState(a, {}, s, new Date(n))",
+                                         [sheet, {"sittings": [], "submissions": [sub]}, now])
+    returned = {"worksheet_id": "w1", "submitted_at": "2026-11-10T09:00:00Z", "state": "returned", "return_due_on": "2026-11-16"}
+    got = run(returned, "2026-11-14T12:00:00")
+    assert not got["finished"] and got["items"][0]["returned"] and not got["overdue"]   # past the 12th, before the 16th
+    assert run(returned, "2026-11-17T12:00:00")["overdue"]
+    no_date = {**returned, "return_due_on": None}
+    assert run(no_date, "2026-11-14T12:00:00")["overdue"]                     # without a new date the first one stands
+    again = {"worksheet_id": "w1", "submitted_at": "2026-11-15T09:00:00Z", "state": "submitted", "version": 2,
+             "earlier": [returned]}
+    fixed = run(again, "2026-11-15T12:00:00")
+    assert fixed["finished"] and not fixed["late"]                            # by the new date: on time
+    assert not errors
+
+
+def test_each_owed_item_has_one_state_in_the_tasks_order(browser, server):
+    page, errors = page_with(browser, server)
+    order = page.evaluate("""() => [
+      {returned:true, overdue:true, waiting:true}, {overdue:true, waiting:true}, {waiting:true, checked:true},
+      {checked:true, handedIn:true}, {handedIn:true, started:true}, {started:true}, {}].map(f => MathlySky.taskState(f))""")
+    assert order == ["returned", "late", "waiting", "checked", "handed", "progress", "new"]
+    sheet = {**ASSIGNMENT, "items": [{"kind": "worksheet", "id": "w1"}]}
+    task = lambda sub, now="2026-11-04T12:00:00": page.evaluate(
+        "([a, s, n]) => MathlySky.assignmentTask(a, {}, s, new Date(n))", [sheet, {"sittings": [], "submissions": [sub] if sub else []}, now])
+    handed = {"worksheet_id": "w1", "submitted_at": "2026-11-03T09:00:00Z", "state": "submitted"}
+    assert task(None)["state"] == "new" and task(None, "2026-11-20T12:00:00")["label"] == "באיחור"
+    assert task(handed)["label"] == "ממתין לבדיקה"
+    assert task({**handed, "state": "checked", "checked_at": "2026-11-05T09:00:00Z"})["label"] == "נבדק"
+    assert task({**handed, "state": "returned"}, "2026-11-20T12:00:00")["label"] == "הוחזר לתיקון"   # even past the date
+    skills = {**ASSIGNMENT, "items": [{"kind": "skill", "id": "g_pyth"}, {"kind": "skill", "id": "t_ext"}]}
+    progress = lambda done: page.evaluate("([a, p]) => MathlySky.assignmentTask(a, p, [], new Date('2026-11-04T12:00:00')).state", [skills, {"done": done}])
+    assert progress({"g_pyth": "2026-11-02T09:00:00Z"}) == "progress"
+    assert progress({"g_pyth": "2026-11-02T09:00:00Z", "t_ext": "2026-11-03T09:00:00Z"}) == "handed"
+    final = lambda offer: page.evaluate("o => MathlySky.finalTask(o).label", offer)
+    assert final({"start": None}) == "עוד לא התחיל"
+    assert final({"start": {"id": "s"}}) == "בתהליך"
+    assert final({"start": {"id": "s", "sitting_id": "x"}}) == "הוגש · ממתין לתוצאות"
+    assert not errors
+
+
+# ---- focus areas (MathlySky.focus): where a student most needs work, with the evidence for each skill
+def test_lost_quiz_points_are_split_between_the_skills_of_a_question(browser, server):
+    page, errors = page_with(browser, server)
+    sit = {"submitted_at": "2026-11-03T09:00:00Z", "questions": [
+        {"points": 25, "earned": 10, "skills": ["t_ext", "t_ext_eq"]}, {"points": 25, "earned": None, "skills": ["t_area"]},
+        {"points": 25, "earned": 25, "skills": ["t_formulas"]}]}
+    lost = page.evaluate("s => MathlySky.quizLost(s, new Date('2026-11-04T12:00:00Z'))", [sit])
+    assert lost == {"t_ext": 7.5, "t_ext_eq": 7.5}   # an unchecked answer adds nothing, a full one neither
+    old = {**sit, "submitted_at": "2026-08-01T09:00:00Z"}
+    assert page.evaluate("s => MathlySky.quizLost(s, new Date('2026-11-04T12:00:00Z'))", [old]) == {}   # over 60 days
+    assert not errors
+
+
+def test_the_focus_score_ranks_skills_by_their_evidence(browser, server):
+    page, errors = page_with(browser, server)
+    P = {"done": {"t_area": "2026-09-01T09:00:00Z"}, "seen": {"t_area": "2026-09-01T09:00:00Z", "t_simplify": "2026-11-03T09:00:00Z"},
+         "slips": [{"at": "2026-11-02T09:00:00Z", "id": "t_ext", "m": "x"}] * 4, "tries": {"t_ext": 3}}
+    sit = [{"submitted_at": "2026-11-03T09:00:00Z", "questions": [{"points": 25, "earned": 13, "skills": ["t_ext"]}]}]
+    got = page.evaluate("([p, s]) => MathlySky.focus(p, s, ['t_ext','t_simplify','t_area','t_formulas'], new Date('2026-11-04T12:00:00Z'))", [P, sit])
+    assert [x["id"] for x in got] == ["t_ext", "t_simplify", "t_area"]   # t_formulas: nothing against it
+    first = got[0]
+    assert (first["lost"], first["wrong"], first["unfinished"], first["fading"]) == (12, 4, True, False)
+    assert got[2]["fading"] is True and got[2]["unfinished"] is False
+    assert page.evaluate("() => MathlySky.focus({}, [], ['t_ext'])") == []   # no evidence, no focus area
+    assert not errors
+
+
+# ---------- quiz and exam names ----------
+# A unit has a בוחן חיזוק (retaken) and a בוחן מסכם (once, the unit's grade); practice over several units is a מבחן
+# תרגול; a מבחן is the school's exam. These earlier names are gone from every screen (a whole word: "מבחני תרגול"
+# is fine, "בחני תרגול" on its own is not).
+import re as _re
+OLD_TERMS = ("בוחן סופי", "הבוחן הסופי", "בחנים סופיים", "בוחנים סופיים", "בוחן תרגול", "בחני תרגול", "בחני התרגול",
+             "בוחן מעורב", "בחנים מעורבים", "הבוחן המעורב", "מבחני יחידה", "בוחן כמו במבחן")
+
+
+def old_terms_in(text):
+    return [t for t in OLD_TERMS if _re.search(rf"(?<![\u05d0-\u05ea]){t}(?![\u05d0-\u05ea])", text)]
+
+
+def test_no_old_quiz_names_in_what_is_shipped():
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    files = [*root.glob("static/*.js"), *root.glob("static/*.html"), *root.glob("app/*.py")]
+    found = [f"{f.name}: {t}" for f in files for t in old_terms_in(f.read_text(encoding="utf-8"))]
+    assert not found
+
+
+def test_the_student_home_and_the_guide_show_no_old_quiz_names(browser, server):
+    page, errors = page_with(browser, server)
+    home = page.locator("#mathView").inner_text()
+    page.locator("#mathView [data-guide-open]").first.click()
+    playwright.expect(page.locator("#mgS")).to_be_visible()
+    text = home + page.get_by_role("dialog", name="איך משתמשים באפליקציה").text_content()   # both tabs, the hidden one too
+    assert not old_terms_in(text)
+    assert not errors
+
+
+# ---- quizzes chosen for each student (MathlySky.chance / pickQuiz)
+NOW = "2026-11-04T12:00:00Z"
+
+
+def chance(page, P, skill):
+    return page.evaluate("([p, id, now]) => MathlySky.chance(p, id, new Date(now))", [P, skill, NOW])
+
+
+def test_a_wrong_answer_is_counted_for_its_skill(browser, server):
+    page, errors = page_with(browser, server)
+    page.locator('.mx-star.st-next').click()
+    page.locator(".mx-choices button:not([data-right])").first.click()
+    assert progress_of(page)["wrongs"] == {"t_ext": 1}
+    assert not errors
+
+
+def test_the_chance_of_a_right_answer_follows_the_answers_and_the_stars(browser, server):
+    page, errors = page_with(browser, server)
+    recent, old = "2026-11-03T09:00:00Z", "2026-09-01T09:00:00Z"
+    assert chance(page, {"tries": {"a": 4}}, "a") is None                                   # under 5 answers: unknown
+    assert chance(page, {"tries": {"a": 8}, "wrongs": {"a": 2}}, "a") == pytest.approx(.7)   # (6 + 1) / (8 + 2)
+    slips = [{"at": recent, "id": "a", "m": "x"}] * 3
+    assert chance(page, {"tries": {"a": 8}, "wrongs": {"a": 1}, "slips": slips}, "a") == pytest.approx(.6)   # the slips' history counts
+    weak_done = {"tries": {"a": 10}, "wrongs": {"a": 8}, "done": {"a": recent}, "seen": {"a": recent}}
+    assert chance(page, weak_done, "a") == pytest.approx(.8)                                 # finished: at least 0.8
+    assert chance(page, {**weak_done, "gold": {"a": recent}}, "a") == pytest.approx(.9)      # gold: at least 0.9
+    assert chance(page, {**weak_done, "done": {"a": old}, "seen": {"a": old}}, "a") == pytest.approx(.7)   # fading: 0.1 less
+    assert not errors
+
+
+def pick(page, P, pool, **options):
+    return page.evaluate("([p, pool, o, now]) => MathlySky.pickQuiz(p, pool, {...o, now: new Date(now)})", [P, pool, options, NOW])
+
+
+def class_of_twelve():
+    """4 started and not finished (chance 0.65), 8 finished (0.8 and more), 2 never practised."""
+    recent = "2026-11-03T09:00:00Z"
+    P, pool = {"tries": {}, "wrongs": {}, "done": {}, "seen": {}}, []
+    for i in range(4):
+        P["tries"][f"c{i}"], P["wrongs"][f"c{i}"], P["seen"][f"c{i}"] = 18, 6, recent   # (12 + 1) / 20 = 0.65
+        pool.append({"id": f"c{i}", "qs": list(range(10)), "rank": i})
+    for i in range(8):
+        P["tries"][f"s{i}"], P["done"][f"s{i}"], P["seen"][f"s{i}"] = 12, recent, recent
+        pool.append({"id": f"s{i}", "qs": list(range(10)), "rank": 10 + i})
+    pool += [{"id": "n0", "qs": [0, 1], "rank": 99}, {"id": "n1", "qs": [0, 1], "rank": 98}]
+    return P, pool
+
+
+def test_quiz_one_aims_at_70_percent_mostly_from_near_mastered_topics(browser, server):
+    page, errors = page_with(browser, server)
+    P, pool = class_of_twelve()
+    one = pick(page, P, pool, target=.7)
+    two = pick(page, P, pool, target=.8)
+    near = lambda r: sum(x["id"].startswith("c") for x in r["items"])
+    assert len(one["items"]) == 12 and .65 <= one["expected"] <= .75
+    assert len(two["items"]) == 12 and .75 <= two["expected"] <= .85
+    assert near(one) > 6 and near(two) < near(one)                         # quiz 2 has more finished topics
+    for r in (one, two):
+        assert not [x for x in r["items"] if x["id"].startswith("n")]      # never practised: never asked
+        per = {}
+        for x in r["items"]:
+            per[x["id"]] = per.get(x["id"], 0) + 1
+        assert max(per.values()) <= 3                                      # at most 3 a topic
+    assert not errors
+
+
+def test_a_retake_draws_questions_not_seen_before(browser, server):
+    page, errors = page_with(browser, server)
+    P, pool = class_of_twelve()
+    first = pick(page, P, pool, target=.7)
+    seen = {f'{x["id"]}:{x["qi"]}': "2026-11-03T10:00:00Z" for x in first["items"]}
+    second = pick(page, P, pool, target=.7, seen=seen)
+    assert not {f'{x["id"]}:{x["qi"]}' for x in second["items"]} & set(seen)
+    # a topic whose questions were all seen: the one seen longest ago comes first
+    small = [{"id": "c0", "qs": [0, 1], "rank": 0}]
+    got = pick(page, P, small, target=.7, n=1, seen={"c0:0": "2026-11-03T10:00:00Z", "c0:1": "2026-11-01T10:00:00Z"})
+    assert got["items"] == [{"id": "c0", "qi": 1}]
+    assert not errors
+
+
+def test_a_student_with_few_answers_gets_the_most_recently_taught_topics(browser, server):
+    page, errors = page_with(browser, server)
+    P = {"tries": {"a": 2, "b": 2, "c": 2}, "seen": {"a": NOW, "b": NOW, "c": NOW}}
+    pool = [{"id": "a", "qs": list(range(10)), "rank": 1}, {"id": "b", "qs": list(range(10)), "rank": 3},
+            {"id": "c", "qs": list(range(10)), "rank": 2}, {"id": "z", "qs": list(range(10)), "rank": 9}]
+    got = pick(page, P, pool, target=.7, n=6)
+    assert [x["id"] for x in got["items"]][:3] == ["b", "c", "a"] and got["unknown"] == 6   # newest first, by turns
+    assert "z" not in {x["id"] for x in got["items"]}
+    # too few questions to fill the quiz: it is shorter
+    assert len(pick(page, P, [{"id": "a", "qs": [0, 1, 2, 3], "rank": 1}], target=.7)["items"]) == 4
     assert not errors

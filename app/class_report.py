@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 
 from .access import has_permission
 from .assignments import AssignmentsUnavailable, public as assignment_public
-from .worksheets import WorksheetsUnavailable, submission_public, worksheet_public
+from .worksheets import WorksheetsUnavailable, current, submission_public, worksheet_public
 from .answer_scans import ScanError
 from .auth import AuthUnavailable
 from .quiz_grades import sitting_view
@@ -104,7 +104,7 @@ def server_worksheets(app, class_id: int, ids: dict[str, str]):
         return None, None
     try:
         rows = store.of_class(class_id)
-        subs = store.submissions([r["id"] for r in rows])
+        subs = current(store.submissions([r["id"] for r in rows]))   # each with its earlier versions
     except WorksheetsUnavailable:
         return None, None
     email_of = {uid: email for email, uid in ids.items()}
@@ -112,7 +112,7 @@ def server_worksheets(app, class_id: int, ids: dict[str, str]):
     for sub in subs:
         email = email_of.get(sub.get("student_id"))
         if email is not None:
-            out[email].append(submission_public(sub))
+            out[email].append(submission_public(sub, teacher=True))
     return [worksheet_public(r) for r in rows], out
 
 
@@ -161,7 +161,118 @@ def install_class_report_routes(app, signed_in, units_of):
                         "quiz_sittings": None if sittings is None else sittings.get(email, []),
                         "review_requests": [] if requests is None else requests.get(email, []),
                         "worksheet_submissions": None if handed is None else handed.get(email, [])})
-        return JSONResponse({"class": {"id": row["id"], "name": row["name"], "lessons": units_of(row)},
+        return JSONResponse({"class": {"id": row["id"], "name": row["name"], "lessons": units_of(row),
+                                       "exams": [e for e in row.get("exams") or [] if isinstance(e, dict)]},
                              "students": out, "assignments": server_assignments(app, row["id"]),
                              "worksheets": worksheets},
                             headers={"Cache-Control": "no-store"})
+
+
+MAX_EXAM_NOTE = 300
+
+
+def install_exam_topic_routes(app, signed_in, units_of):
+    """The class teacher says what an exam on the class's board covers: its units (of the class) and a short note. The
+    students' preparation view and the class's readiness are built on them (static/math.js)."""
+
+    @app.put("/api/classes/{class_id}/exams/topics")
+    def exam_topics(class_id: int, body: dict, user=Depends(signed_in)):
+        try:
+            row = next((r for r in app.state.auth.classes() if r.get("id") == class_id), None)
+        except AuthUnavailable as exc:
+            raise HTTPException(503, str(exc)) from exc
+        if row is None:
+            raise HTTPException(404, "class not found")
+        email = str((user or {}).get("email", "")).lower()
+        if email not in row.get("teachers", ()) and not has_permission(user, "management.access"):
+            raise HTTPException(403, "only the class's teacher can say what an exam covers")
+        exams = [dict(e) for e in row.get("exams") or [] if isinstance(e, dict)]
+        found = next((e for e in exams if e.get("date") == body.get("date") and e.get("subject") == body.get("subject")), None)
+        if found is None:
+            raise HTTPException(404, "exam not found")
+        units = body.get("units") or []
+        mine = units_of(row)
+        if not isinstance(units, list) or len(set(units)) != len(units) or any(u not in mine for u in units):
+            raise HTTPException(400, "a unit is not one of this class's units")
+        note = " ".join(str(body.get("note") or "").split())
+        if len(note) > MAX_EXAM_NOTE:
+            raise HTTPException(400, f"the note is up to {MAX_EXAM_NOTE} characters")
+        found["units"] = [u for u in mine if u in units]   # in the class's order
+        found["note"] = note
+        for i, e in enumerate(exams):
+            if e.get("date") == found["date"] and e.get("subject") == found["subject"]:
+                exams[i] = found
+        try:
+            app.state.auth.save_class_exams(class_id, exams)
+        except AuthUnavailable as exc:
+            raise HTTPException(503, str(exc)) from exc
+        except KeyError as exc:
+            raise HTTPException(404, "class not found") from exc
+        actions = getattr(app.state, "actions", None)
+        if actions is not None:
+            actions.record(user, "exam_topics_saved", f"{row.get('name', '')}: {found['subject']} {found['date']}")
+        return JSONResponse(found, headers={"Cache-Control": "no-store"})
+
+    # ---- the class's exam table (what students see on the subjects screen): the class teacher adds and removes exams
+    MAX_SUBJECT = 40
+
+    def teacher_class(class_id: int, user) -> dict:
+        try:
+            row = next((r for r in app.state.auth.classes() if r.get("id") == class_id), None)
+        except AuthUnavailable as exc:
+            raise HTTPException(503, str(exc)) from exc
+        if row is None:
+            raise HTTPException(404, "class not found")
+        email = str((user or {}).get("email", "")).lower()
+        if email not in row.get("teachers", ()) and not has_permission(user, "management.access"):
+            raise HTTPException(403, "only the class's teacher can change its exams")
+        return row
+
+    def save(row: dict, exams: list[dict], user, label: str) -> None:
+        exams = sorted(exams, key=lambda e: (str(e.get("date")), str(e.get("subject"))))
+        try:
+            app.state.auth.save_class_exams(row["id"], exams)
+        except AuthUnavailable as exc:
+            raise HTTPException(503, str(exc)) from exc
+        except KeyError as exc:
+            raise HTTPException(404, "class not found") from exc
+        actions = getattr(app.state, "actions", None)
+        if actions is not None:
+            actions.record(user, "exam_saved", f"{row.get('name', '')}: {label}")
+
+    @app.post("/api/classes/{class_id}/exams")
+    def add_exam(class_id: int, body: dict, user=Depends(signed_in)):
+        """A new exam on the class's table: a subject, a date, and optionally the units it covers and a note."""
+        from datetime import date as _date
+        row = teacher_class(class_id, user)
+        subject = " ".join(str(body.get("subject") or "").split())
+        if not subject or len(subject) > MAX_SUBJECT:
+            raise HTTPException(400, f"the subject is required (up to {MAX_SUBJECT} characters)")
+        try:
+            when = _date.fromisoformat(str(body.get("date") or "")).isoformat()
+        except ValueError as exc:
+            raise HTTPException(400, "the date must be a date (YYYY-MM-DD)") from exc
+        units = body.get("units") or []
+        mine = units_of(row)
+        if not isinstance(units, list) or any(u not in mine for u in units):
+            raise HTTPException(400, "a unit is not one of this class's units")
+        note = " ".join(str(body.get("note") or "").split())
+        if len(note) > MAX_EXAM_NOTE:
+            raise HTTPException(400, f"the note is up to {MAX_EXAM_NOTE} characters")
+        exams = [dict(e) for e in row.get("exams") or [] if isinstance(e, dict)]
+        if any(e.get("date") == when and e.get("subject") == subject for e in exams):
+            raise HTTPException(409, "exam_exists")
+        exam = {"subject": subject, "date": when, **({"units": [u for u in mine if u in units]} if units else {}),
+                **({"note": note} if note else {})}
+        save(row, exams + [exam], user, f"{subject} {when}")
+        return JSONResponse(exam, status_code=201, headers={"Cache-Control": "no-store"})
+
+    @app.delete("/api/classes/{class_id}/exams")
+    def remove_exam(class_id: int, subject: str, date: str, user=Depends(signed_in)):
+        row = teacher_class(class_id, user)
+        exams = [dict(e) for e in row.get("exams") or [] if isinstance(e, dict)]
+        kept = [e for e in exams if not (e.get("date") == date and e.get("subject") == subject)]
+        if len(kept) == len(exams):
+            raise HTTPException(404, "exam not found")
+        save(row, kept, user, f"נמחק: {subject} {date}")
+        return JSONResponse({"ok": True}, headers={"Cache-Control": "no-store"})

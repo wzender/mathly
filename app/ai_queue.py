@@ -243,12 +243,20 @@ def install_ai_queue_routes(app, signed_in):
 
     @app.post("/api/ai-queue/{request_id}/send")
     def send(request_id: str, user=Depends(reviewer)):
-        reviewed(user, request_id)   # visibility first: another class's request is "not found"
+        found = reviewed(user, request_id)   # visibility first: another class's request is "not found"
         quota = getattr(app.state, "teacher_ai", None) or NO_LIMIT
-        try:   # each send is one of the teacher's 3 AI requests a day (app/teacher_ai.py); a failed one is given back
-            taken = quota.take(user)
+        # a student's answer is checked from their class's daily budget (app/ai_batches.py); a photographed problem,
+        # or an answer with no class budget, is one of the teacher's 3 AI requests a day (app/teacher_ai.py)
+        cls = app.state.class_take_one(found["email"]) if found["kind"] == "grading" and hasattr(app.state, "class_take_one") else None
+        try:
+            taken = quota.take(user) if cls is None else None
         except LimitReached as exc:
             raise ScanError(429, TEACHER_AI_LIMIT) from exc
+
+        def give_back():
+            quota.give_back(taken)
+            if cls is not None:
+                app.state.class_give_one(cls)
         try:
             row = queue().claim(uuid_text(request_id), user.get("email", ""))
             if row["kind"] == "photo":
@@ -256,10 +264,10 @@ def install_ai_queue_routes(app, signed_in):
             else:
                 row = send_answer(row)
         except Exception:
-            quota.give_back(taken)
+            give_back()
             raise
-        if row.get("state") != "done":
-            quota.give_back(taken)
+        if row.get("state") != "done" or (row.get("result") or {}).get("verdict") == "unreadable":
+            give_back()   # a failed check, or a photo the AI could not read, is not counted
         note(user, "ai_sent" if row.get("state") == "done" else "ai_failed", row)
         return reply(row)
 
@@ -286,6 +294,8 @@ def install_ai_queue_routes(app, signed_in):
             return queue().finish(row["id"], "done", result={"verdict": grading["result"].get("verdict"),
                                                             "score": grading["result"].get("score")})
         return queue().finish(row["id"], "failed", error=failure(grading.get("error") or "grading_failed"))
+
+    app.state.queue_send_answer = send_answer   # the class's batches send the same way (app/ai_batches.py)
 
     @app.post("/api/ai-queue/{request_id}/decline")
     def decline(request_id: str, body: dict | None = None, user=Depends(reviewer)):

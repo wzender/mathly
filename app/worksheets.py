@@ -8,8 +8,10 @@ goes at once, with its submissions.
 A PDF is rendered to page images here, so every phone shows it the same way; the PDF itself is kept to download.
 Photos, the teacher's and the students', go through `clean_image` (re-encoded, metadata dropped).
 
-A student hands in 1 to 10 photos (`math_worksheet_submissions`, one per student and worksheet) and may replace them
-until the teacher checks. The teacher's check is a time, an optional score (0-100) and an optional comment.
+A student hands in 1 to 10 photos with an optional note to the teacher (`math_worksheet_submissions`), and may replace
+them until the teacher checks. The teacher's check is a time, an optional score (0-100) and an optional comment. The
+teacher may instead return the submission for a fix, with a comment and maybe a new due date: the student's next
+hand-in is a new version, and the earlier ones stay to look back at. The current submission is the highest version.
 
 Files live in the private `mathly-worksheets` bucket. Only the server reads or writes rows and files, with the service
 key; the browser never sees a storage path.
@@ -24,7 +26,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, Response
@@ -50,7 +52,13 @@ PAGE_WIDTH = 1600           # a rendered PDF page, in pixels
 RENDER_BUDGET = 30.0        # seconds for all the pages of one PDF
 UNUSED_AGE = timedelta(hours=24)
 W_FIELDS = "id,class_id,title,source,pages,original_key,page_keys,byte_size,created_by_email,created_at"
-S_FIELDS = "id,worksheet_id,student_id,student_email,page_keys,submitted_at,checked_at,score,comment,checked_by_email"
+S_FIELDS = ("id,worksheet_id,student_id,student_email,page_keys,submitted_at,checked_at,score,comment,checked_by_email,"
+            "version,state,note,returned_at,return_comment,return_due_on,ai_score,ai_comment,ai_readable,ai_checked_at")
+OLD_S_FIELDS = "id,worksheet_id,student_id,student_email,page_keys,submitted_at,checked_at,score,comment,checked_by_email"
+NEW_COLUMNS = ("version", "state", "note", "returned_at", "return_comment", "return_due_on")
+AI_COLUMNS = ("ai_score", "ai_comment", "ai_readable", "ai_checked_at")   # the AI-batches migration
+AI_FIELDS = ",ai_score,ai_comment,ai_readable,ai_checked_at"
+MAX_NOTE = 300
 
 
 class WorksheetsUnavailable(RuntimeError):
@@ -59,6 +67,9 @@ class WorksheetsUnavailable(RuntimeError):
 
 class Worksheets:
     """Rows through the service key (auth._admin), files in the private bucket."""
+
+    legacy = False   # True once the versions migration was found missing
+    no_ai = False    # True once the AI-batches migration was found missing
 
     def __init__(self, auth):
         self.auth = auth
@@ -72,11 +83,26 @@ class Worksheets:
     def _rest(self, path: str, method: str = "GET", body=None, prefer: str = "return=representation"):
         if not self.configured:
             raise WorksheetsUnavailable("worksheets_unavailable")
+        if "math_worksheet_submissions" in path:
+            if self.legacy:   # before versions: the table as it was (no AI columns either)
+                path, body = legacy(path, body)
+            if self.no_ai or self.legacy:
+                path = path.replace(AI_FIELDS, "")
+                body = {k: v for k, v in body.items() if k not in AI_COLUMNS} if isinstance(body, dict) else body
         try:
             return self.auth._admin(path, method, body, prefer) or []
         except ClassConflict as exc:
             raise WorksheetsUnavailable("worksheets_unavailable") from exc
         except AuthUnavailable as exc:
+            if "math_worksheet_submissions" in path and any(c in str(exc) for c in AI_COLUMNS) and not self.no_ai:
+                log.warning("worksheet submissions have no AI suggestions yet; apply the AI-batches migration")
+                self.no_ai = True
+                return self._rest(path, method, body, prefer)
+            if "math_worksheet_submissions" in path and any(c in str(exc) for c in NEW_COLUMNS) and not self.legacy:
+                # the versions migration is not applied yet: hand-ins and checks work as before, returns do not
+                log.warning("worksheet submissions have no versions yet; apply %s", VERSIONS_MIGRATION)
+                self.legacy = True
+                return self._rest(path, method, body, prefer)
             if "answered 404" in str(exc) and not self._warned:
                 log.warning("the worksheet tables are missing; apply %s", MIGRATION)
                 self._warned = True
@@ -116,10 +142,9 @@ class Worksheets:
         rows = self._rest(f"/rest/v1/math_worksheet_submissions?select={S_FIELDS}&id=eq.{submission_id}")
         return rows[0] if rows else None
 
-    def save_submission(self, row: dict) -> dict:
-        """Creates the student's submission of a worksheet, or replaces it (one per student and worksheet)."""
-        return self._rest(f"/rest/v1/math_worksheet_submissions?on_conflict=worksheet_id,student_id&select={S_FIELDS}",
-                          "POST", row, "return=representation,resolution=merge-duplicates")[0]
+    def add_submission(self, row: dict) -> dict:
+        """A new version of the student's submission (the first, or the one after a return)."""
+        return self._rest(f"/rest/v1/math_worksheet_submissions?select={S_FIELDS}", "POST", row)[0]
 
     def check(self, submission_id: str, fields: dict) -> dict | None:
         rows = self._rest(f"/rest/v1/math_worksheet_submissions?id=eq.{submission_id}&select={S_FIELDS}", "PATCH", fields)
@@ -211,15 +236,49 @@ async def clean_photos(files: list[UploadFile]) -> list[bytes]:
 
 
 # ---- what the browser sees
+VERSIONS_MIGRATION = "supabase/migrations/20261106110000_math_worksheet_versions.sql"
+
+
+def legacy(path: str, body):
+    """A request for the table as it was before versions."""
+    path = path.replace(S_FIELDS, OLD_S_FIELDS)
+    if isinstance(body, dict):
+        body = {k: v for k, v in body.items() if k not in NEW_COLUMNS}
+    return path, body
+
+
+def current(rows: list[dict]) -> list[dict]:
+    """The current submission of each student and worksheet (its highest version), with the earlier ones under
+    `earlier`, newest first."""
+    groups: dict[tuple, list[dict]] = {}
+    for row in rows:
+        groups.setdefault((row.get("worksheet_id"), row.get("student_id")), []).append(row)
+    out = []
+    for versions in groups.values():
+        versions.sort(key=lambda r: r.get("version") or 1, reverse=True)
+        out.append({**versions[0], "earlier": versions[1:]})
+    return out
+
+
 def worksheet_public(row: dict) -> dict:
     return {k: row.get(k) for k in ("id", "class_id", "title", "source", "pages", "created_at")}
 
 
-def submission_public(row: dict) -> dict:
-    """A submission without its storage paths (the student's and the teacher's view)."""
-    return {"id": row.get("id"), "worksheet_id": row.get("worksheet_id"), "pages": len(row.get("page_keys") or []),
-            "submitted_at": row.get("submitted_at"), "checked_at": row.get("checked_at"), "score": row.get("score"),
-            "comment": row.get("comment") or ""}
+def submission_public(row: dict, teacher: bool = False) -> dict:
+    """A submission without its storage paths (the student's and the teacher's view), with its earlier versions. The
+    AI's suggestion is the teacher's only: the student sees the check the teacher saves."""
+    state = row.get("state") or ("checked" if row.get("checked_at") else "submitted")
+    out = {"id": row.get("id"), "worksheet_id": row.get("worksheet_id"), "pages": len(row.get("page_keys") or []),
+           "submitted_at": row.get("submitted_at"), "checked_at": row.get("checked_at"), "score": row.get("score"),
+           "comment": row.get("comment") or "", "version": row.get("version") or 1, "state": state,
+           "note": row.get("note") or "", "returned_at": row.get("returned_at"),
+           "return_comment": row.get("return_comment") or "", "return_due_on": row.get("return_due_on")}
+    if "earlier" in row:
+        out["earlier"] = [submission_public(e, teacher) for e in row["earlier"]]
+    if teacher and row.get("ai_checked_at"):
+        out["ai"] = {"score": row.get("ai_score"), "comment": row.get("ai_comment") or "", "readable": row.get("ai_readable"),
+                     "checked_at": row.get("ai_checked_at")}
+    return out
 
 
 def worksheet_ids(items) -> list[str]:
@@ -423,16 +482,73 @@ def install_worksheet_routes(app, signed_in):
             raise HTTPException(404, "submission not found")
         saved = await call(store().check, sub["id"], {
             "score": score, "comment": comment.strip(), "checked_by_email": str(user.get("email", "")).lower(),
-            "checked_at": sub.get("checked_at") or datetime.now(timezone.utc).isoformat()})
+            "checked_at": sub.get("checked_at") or datetime.now(timezone.utc).isoformat(), "state": "checked"})
         if not saved:
             raise HTTPException(404, "submission not found")
         record(user, "worksheet_checked", f"{row.get('name', '')}: {found['title']}")
-        return reply(submission_public(saved))
+        return reply(submission_public(saved, teacher=True))
+
+    @app.post("/api/classes/{class_id}/worksheets/{wid}/submissions/{sid}/return")
+    async def return_submission(class_id: int, wid: str, sid: str, body: dict, user=Depends(signed_in)):
+        """Sends the current submission back to the student for a fix, with a comment and maybe a new due date. It is
+        no longer waiting for a check; the student's next hand-in is the next version."""
+        row = class_row(class_id, user)
+        found = await worksheet_of(class_id, wid)
+        comment = body.get("comment")
+        if not isinstance(comment, str) or not comment.strip() or len(comment.strip()) > MAX_COMMENT:
+            raise HTTPException(400, f"the comment is required (up to {MAX_COMMENT} characters)")
+        due = body.get("due_on")
+        if due is not None:
+            try:
+                due = date.fromisoformat(str(due)).isoformat()
+            except ValueError as exc:
+                raise HTTPException(400, "the due date must be a date (YYYY-MM-DD)") from exc
+        sub = await call(store().submission, uuid_or_404(sid, "submission"))
+        if not sub or sub.get("worksheet_id") != found["id"]:
+            raise HTTPException(404, "submission not found")
+        if store().legacy:
+            raise HTTPException(503, "returns_unavailable")
+        latest = current(await call(store().submissions, [found["id"]], sub["student_id"]))
+        if not latest or latest[0]["id"] != sub["id"]:
+            raise HTTPException(409, "not_the_current_version")
+        saved = await call(store().check, sub["id"], {
+            "state": "returned", "returned_at": datetime.now(timezone.utc).isoformat(),
+            "return_comment": comment.strip(), "return_due_on": due,
+            "checked_by_email": str(user.get("email", "")).lower()})
+        if not saved:
+            raise HTTPException(404, "submission not found")
+        record(user, "worksheet_returned", f"{row.get('name', '')}: {found['title']}")
+        return reply(submission_public(saved, teacher=True))
+
+    def ai_suggest(sub: dict, found: dict | None = None) -> dict:
+        """The AI's check of a submission against its worksheet, kept on the submission as a suggestion for the
+        teacher's review form (nothing reaches the student until the teacher saves). PhotoUnavailable when the AI
+        could not answer. Used for one submission (below) and for a batch (app/ai_batches.py)."""
+        if open_ended_locked():
+            raise PhotoUnavailable("הבדיקה האוטומטית סגורה כרגע.", "open_ended_locked")
+        key = grading_key()
+        grader = getattr(app.state, "homework_grader", None)
+        if not key and grader is None:
+            raise PhotoUnavailable("הבדיקה האוטומטית אינה זמינה.", "missing_key")
+        found = found or store().get(sub["worksheet_id"])
+        sheet = [store().read(k) for k in found.get("page_keys") or []]
+        solution = [store().read(k) for k in sub.get("page_keys") or []]
+        result = (grader or HomeworkGrader(key)).grade(found["title"], sheet, solution)
+        ai_usage.record(app.state.auth, None, "grading", result.pop("usage", None))
+        try:
+            store().check(sub["id"], {"ai_score": result["score"], "ai_comment": result["comment"][:MAX_COMMENT],
+                                      "ai_readable": result["readable"], "ai_checked_at": datetime.now(timezone.utc).isoformat()})
+        except WorksheetsUnavailable:
+            log.warning("an AI suggestion was not kept on its submission")
+        return result
+
+    app.state.worksheet_ai_suggest = ai_suggest
 
     @app.post("/api/classes/{class_id}/worksheets/{wid}/submissions/{sid}/ai-check")
     async def ai_check(class_id: int, wid: str, sid: str, user=Depends(signed_in)):
-        """The AI's check of a submission, as a suggestion (score and comment) for the teacher; nothing is saved here.
-        One of the teacher's daily AI requests (app/teacher_ai.py); given back when the AI could not answer."""
+        """The AI's check of a submission, as a suggestion (score and comment) for the teacher, kept on the submission.
+        One check from the class's daily budget (app/ai_batches.py), or, without one, one of the teacher's daily AI
+        requests (app/teacher_ai.py); given back when the AI could not answer or read the photo."""
         row = class_row(class_id, user)
         found = await worksheet_of(class_id, wid)
         sub = await call(store().submission, uuid_or_404(sid, "submission"))
@@ -440,31 +556,42 @@ def install_worksheet_routes(app, signed_in):
             raise HTTPException(404, "submission not found")
         if open_ended_locked():
             raise HTTPException(403, "open_ended_locked")
-        key = grading_key()
-        grader = getattr(app.state, "homework_grader", None)
-        if not key and grader is None:
+        if not grading_key() and getattr(app.state, "homework_grader", None) is None:
             raise HTTPException(503, "grading_unavailable")
+        cls = None
+        if hasattr(app.state, "class_take_one"):
+            try:
+                cls = await run_in_threadpool(app.state.class_take_one, sub.get("student_email", ""))
+            except ScanError as exc:
+                raise HTTPException(exc.status, exc.code) from exc
+        quota = None
+        if cls is None:
+            try:
+                quota = app.state.teacher_ai.take(user)
+            except LimitReached as exc:
+                raise HTTPException(429, "teacher_ai_limit") from exc
+
+        def give_back():
+            if cls is not None:
+                app.state.class_give_one(cls)
+            else:
+                app.state.teacher_ai.give_back(quota)
         try:
-            quota = app.state.teacher_ai.take(user)
-        except LimitReached as exc:
-            raise HTTPException(429, "teacher_ai_limit") from exc
-        try:
-            sheet = [await call(store().read, k) for k in found.get("page_keys") or []]
-            solution = [await call(store().read, k) for k in sub.get("page_keys") or []]
-            grader = grader or HomeworkGrader(key)
-            result = await run_in_threadpool(grader.grade, found["title"], sheet, solution)
+            result = await run_in_threadpool(ai_suggest, sub, found)
         except PhotoUnavailable as exc:
-            app.state.teacher_ai.give_back(quota)
+            give_back()
             raise HTTPException(503, f"ai_check_failed|{exc.reason or 'provider_error'}") from exc
+        except WorksheetsUnavailable as exc:
+            give_back()
+            raise HTTPException(503, "worksheets_unavailable") from exc
         except Exception:
-            app.state.teacher_ai.give_back(quota)
+            give_back()
             raise
-        ai_usage.record(app.state.auth, user.get("id"), "grading", result.pop("usage", None))
         if not result["readable"]:
-            app.state.teacher_ai.give_back(quota)   # a photo the AI could not read is not one of the 3
+            give_back()   # a photo the AI could not read is not counted
         record(user, "worksheet_ai_checked", f"{row.get('name', '')}: {found['title']}")
         return reply({"score": result["score"], "comment": result["comment"], "readable": result["readable"],
-                      "left": app.state.teacher_ai.left(user)})
+                      "left": app.state.teacher_ai.left(user), "class_budget": cls is not None})
 
     # ---- the class: the worksheet itself
     @app.get("/api/math/worksheets/{wid}/pages/{n}")
@@ -498,14 +625,19 @@ def install_worksheet_routes(app, signed_in):
     app.state.member_worksheet = member_worksheet   # the answer routes' worksheet photos (app/answer_routes.py)
 
     async def own_submission(user: dict, wid: str) -> dict | None:
-        rows = await call(store().submissions, [wid], user["id"])
+        """The student's current submission (highest version), with the earlier ones under `earlier`."""
+        rows = current(await call(store().submissions, [wid], user["id"]))
         return rows[0] if rows else None
 
     @app.put("/api/math/worksheets/{wid}/submission")
-    async def hand_in(wid: str, files: list[UploadFile] = File(...), user=Depends(signed_in)):
+    async def hand_in(wid: str, files: list[UploadFile] = File(...), note: str = Form(""), user=Depends(signed_in)):
         found, row = await member_worksheet(user, wid)
+        note = " ".join(note.split()) if note else ""
+        if len(note) > MAX_NOTE:
+            raise HTTPException(400, "note_too_long")
         old = await own_submission(user, found["id"])
-        if old and old.get("checked_at"):
+        state = (old or {}).get("state") or ("checked" if (old or {}).get("checked_at") else "submitted")
+        if old and state == "checked":
             raise HTTPException(409, "already_checked")
         pages = await clean_photos(files)
         base = f"s/{found['id']}/{user['id']}/{uuid.uuid4().hex}"
@@ -515,27 +647,35 @@ def install_worksheet_routes(app, signed_in):
             for key, data in zip(keys, pages):
                 await call(store().put, key, data)
                 written.append(key)
-            saved = await call(store().save_submission, {
-                "worksheet_id": found["id"], "student_id": user["id"], "student_email": str(user.get("email", "")).lower(),
-                "page_keys": keys, "submitted_at": datetime.now(timezone.utc).isoformat()})
+            fields = {"page_keys": keys, "submitted_at": datetime.now(timezone.utc).isoformat(), "note": note}
+            if old and state == "submitted":   # not checked yet: the new photos replace this version
+                saved = await call(store().check, old["id"], fields)
+            else:   # the first hand-in, or the next version after a return
+                saved = await call(store().add_submission, {
+                    **fields, "worksheet_id": found["id"], "student_id": user["id"],
+                    "student_email": str(user.get("email", "")).lower(),
+                    "version": (old.get("version") or 1) + 1 if old else 1, "state": "submitted"})
         except HTTPException:
             try:
                 await run_in_threadpool(store().delete, written)
             except WorksheetsUnavailable:
                 pass
             raise
-        if old:
+        if old and state == "submitted":   # a returned version keeps its pages: the student and teacher look back at it
             try:
                 await run_in_threadpool(store().delete, [k for k in old.get("page_keys") or [] if k not in keys])
             except WorksheetsUnavailable:
                 log.warning("a replaced submission's images stayed in storage")
         record(user, "worksheet_submitted", f"{row.get('name', '')}: {found['title']}")
-        return reply(submission_public(saved))
+        mine = await own_submission(user, found["id"])
+        return reply(submission_public(mine or saved))
 
     @app.get("/api/math/worksheets/{wid}/submission/pages/{n}")
-    async def own_page(wid: str, n: int, user=Depends(signed_in)):
+    async def own_page(wid: str, n: int, version: int | None = None, user=Depends(signed_in)):
         found, _ = await readable(user, wid)
         sub = await own_submission(user, found["id"])
+        if sub and version is not None and version != (sub.get("version") or 1):
+            sub = next((e for e in sub.get("earlier") or [] if (e.get("version") or 1) == version), None)
         if not sub:
             raise HTTPException(404, "submission not found")
         keys = sub.get("page_keys") or []

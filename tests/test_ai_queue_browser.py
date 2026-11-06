@@ -54,7 +54,9 @@ def page_of(browser, url, owner, errors):
     page = session(browser, owner=owner).new_page()
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(url)
-    page.locator('.mx-nav [data-view="path"]').click()
+    page.locator('.mx-nav [data-view="home"]').wait_for()
+    tab = page.locator('.mx-nav [data-view="path"]')   # a student's trail; a class teacher has only home
+    (tab if tab.count() else page.locator('.mx-nav [data-view="home"]')).click()
     return page
 
 
@@ -73,7 +75,7 @@ def test_the_teacher_sends_a_students_quiz_answer_to_the_ai(queue_server, tmp_pa
             paper.locator("[data-act=uq-submit]").click()
             paper.locator("[data-act=uq-submit]").click()   # past the warning about unanswered questions
             sheet = student.locator(".mx-uq-sheet")
-            playwright.expect(sheet.locator(".mx-uq-verdict").first).to_have_text("מחכה למורה שיאשר את הבדיקה", timeout=15000)
+            playwright.expect(sheet.locator(".mx-uq-verdict").first).to_have_text("ממתין לאישור המורה לבדיקה", timeout=15000)
             assert not calls
 
             teacher = page_of(browser, url, OTHER, errors)
@@ -111,7 +113,7 @@ def test_a_failed_send_has_an_error_details_button(queue_server, tmp_path):
             paper = student.locator(".mx-uq-paper")
             paper.locator("[data-act=uq-submit]").click()
             paper.locator("[data-act=uq-submit]").click()
-            playwright.expect(student.locator(".mx-uq-verdict").first).to_have_text("מחכה למורה שיאשר את הבדיקה", timeout=15000)
+            playwright.expect(student.locator(".mx-uq-verdict").first).to_have_text("ממתין לאישור המורה לבדיקה", timeout=15000)
             calls.append("fail")   # the grader below fails while this is in the list
 
             teacher = page_of(browser, url, OTHER, errors)
@@ -127,3 +129,58 @@ def test_a_failed_send_has_an_error_details_button(queue_server, tmp_path):
             assert not errors, errors
         finally:
             browser.close()
+
+
+def test_the_teacher_sends_a_whole_practice_quiz_in_one_batch_from_the_class_budget(answer_store, tmp_path):
+    from test_ai_batches import BudgetAuth, MemoryBudget
+    auth = BudgetAuth()
+    app = create_app(auth=auth)
+    app.state.answers, app.state.ai_queue, app.state.class_budget = answer_store, MemoryQueue(), MemoryBudget()
+    calls = []
+
+    class Grader:
+        def grade(self, image, snapshot):
+            calls.append(snapshot["name"])
+            return validate_assessment(assessment(score=100))
+    app.state.answer_grader = Grader()
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        server = uvicorn.Server(uvicorn.Config(app, log_level="error"))
+        thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
+        thread.start()
+        while not server.started:
+            time.sleep(.01)
+        url = f"http://127.0.0.1:{sock.getsockname()[1]}"
+        try:
+            with playwright.sync_playwright() as p:
+                browser = p.chromium.launch()
+                errors = []
+                try:
+                    student = page_of(browser, url, OWNER, errors)
+                    student.locator('.mx-uquiz[data-uquiz="t"]').click()
+                    student.locator("[data-act=uq-start]").click()
+                    photograph(student, 0, tmp_path)
+                    photograph(student, 1, tmp_path)
+                    paper = student.locator(".mx-uq-paper")
+                    paper.locator("[data-act=uq-submit]").click()
+                    paper.locator("[data-act=uq-submit]").click()
+                    playwright.expect(student.locator(".mx-uq-verdict").first).to_have_text("ממתין לאישור המורה לבדיקה", timeout=15000)
+
+                    teacher = page_of(browser, url, OTHER, errors)
+                    teacher.on("dialog", lambda d: d.accept())
+                    teacher.locator('.mx-acts [data-act="ai-queue"]').first.click()
+                    panel = teacher.locator(".mx-aq-budget")
+                    playwright.expect(panel).to_contain_text("נוצלו 0 מתוך 150 היום")
+                    playwright.expect(panel.locator(".mx-aq-scopes li")).to_contain_text("בחני חיזוק: טכניקה אלגברית 1: 2 ממתינות")
+                    panel.locator("[data-batch]").click()
+                    playwright.expect(panel.locator("[role=status]").last).to_contain_text("נשלחו 2 בדיקות")
+                    teacher.locator('[data-aq-tab="done"]').click()
+                    playwright.expect(teacher.locator(".mx-aq-card.done")).to_have_count(2, timeout=10000)
+                    assert len(calls) == 2 and app.state.class_budget.used[1] == 2
+                    assert app.state.teacher_ai.left({"email": OTHER + "@test.invalid", "teacher": True}) == 3   # the teacher's own 3 untouched
+                    assert not errors, errors
+                finally:
+                    browser.close()
+        finally:
+            server.should_exit = True
+            thread.join(timeout=5)

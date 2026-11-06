@@ -25,7 +25,8 @@ class PushAuth(ScanAuth):
 
     def _admin(self, path, method="GET", body=None, prefer=""):
         table, _, query = path.partition("?")
-        assert table == "/rest/v1/math_push_subs"
+        if table != "/rest/v1/math_push_subs":
+            return super()._admin(path)   # no other tables here (a quiz answer looks for a final sitting)
         q = dict(urllib.parse.parse_qsl(query))
         match = lambda r: all(r[k] == v.removeprefix("eq.") for k, v in q.items() if k in ("endpoint", "user_id"))
         if method == "POST":

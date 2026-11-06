@@ -135,7 +135,7 @@ def answer_store(postgres_server, tmp_path):
             if migration.name.endswith('_math_answer_scans.sql'):
                 continue
             c.execute(migration.read_text())
-        for name in ('quiz_sittings', 'teacher_reviews'):   # in this order: the second rewrites a function of the first
+        for name in ('quiz_sittings', 'teacher_reviews', 'quiz_modes'):   # in this order: each rewrites a function of the one before
             for migration in sorted(Path('supabase/migrations').glob(f'*_math_{name}.sql')):
                 c.execute(migration.read_text())
         c.execute('insert into auth.users values(%s),(%s)', (OWNER, OTHER))

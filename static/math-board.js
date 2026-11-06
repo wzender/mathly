@@ -803,9 +803,9 @@ document.addEventListener("keydown",e=>{
    question(page) gives the element the question is shown in, for the board's copy of it; submit(page, picture)
    hands a page in and resolves to {error} or {}; turned(page) is told when the student picks another tab.
    On a phone nothing shows until the header's button opens the board full screen. */
-function mount(sheetLayer,sketchKey,{pages:n=1,question=null,submit=null,turned=null}={}){
+function mount(sheetLayer,sketchKey,{pages:n=1,question=null,submit=null,turned=null,sendLabel:label=""}={}){
   const was=full?full.saved:context(), same=sketchKey===was.base&&n===was.pages;
-  const next={layer:sheetLayer,source:question,hand:submit,onPage:turned,sendLabel:"",
+  const next={layer:sheetLayer,source:question,hand:submit,onPage:turned,sendLabel:label,
     base:sketchKey,pages:n,page:same?was.page:0};
   next.key=next.pages>1?`${next.base}:${next.page}`:next.base;
   if(full){ full.saved=next; return; }   // the sheet changed under the full-screen board: it is where the board goes back to
@@ -818,7 +818,7 @@ function mount(sheetLayer,sketchKey,{pages:n=1,question=null,submit=null,turned=
   if(!el) build();
   reset(); drawPages(); drawSend(); layer.append(el); fit();
 }
-const again=()=>mount(layer,base,{pages,question:source,submit:hand,turned:onPage});
+const again=()=>mount(layer,base,{pages,question:source,submit:hand,turned:onPage,sendLabel});
 const here=p=>({host:layer,key:base,pages,page:p,question:source,submit:hand,turned:onPage});
 function toggle(){
   if(!desk()) return layer&&openFull(here(page));   // a phone: the board over the exercise
@@ -850,5 +850,5 @@ function closeFull(){
 // the header's switch: beside the exercise on a desktop screen, full screen on a phone
 const button=()=>`<button class="mx-board-btn" data-board-toggle aria-pressed="${isOn()&&desk()}" title="לוח טיוטה">${ic("pen")}<span>לוח</span></button>`;
 
-window.MathlyBoard={button,mount,toggle,show,openFull,closeFull,isOn};
+window.MathlyBoard={button,mount,toggle,show,openFull,closeFull,isOn,desk};
 })();

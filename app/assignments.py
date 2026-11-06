@@ -5,7 +5,10 @@ An assignment (Supabase `math_assignments`) has a title, a note, a due date and 
   {"kind": "unit_quiz", "unit"}               hand in this unit's summarizing quiz,
   {"kind": "exam", "units": [...]}            take a practice exam over these units,
   {"kind": "worksheet", "id"}                 hand in a solution to this worksheet (app/worksheets.py).
-Every item must belong to the units open to the class, and a worksheet to the class itself. Whether an item is done is not stored: the page works it out from
+Every item must belong to the units open to the class, and a worksheet to the class itself.
+An assignment is for the whole class, or, as focus practice, for chosen students of it (`student_emails`): only they
+see it, and the report counts only them. A class teacher gives worksheets to the class, and 1 to 5 skills as focus
+practice; any item, to anyone, is for managers. Whether an item is done is not stored: the page works it out from
 the student's progress and the server's quiz sittings (`assignmentState` in static/math-sky.js), the same way for the
 student's home screen and for the teacher's report. The class's teacher (or a manager) writes them; the class reads them.
 """
@@ -23,13 +26,15 @@ from .access import has_permission
 from .answer_scans import ScanError
 from .auth import AuthUnavailable
 from .math_skills import algebra9
-from .worksheets import WorksheetsUnavailable, drop_ids, submission_public, worksheet_ids, worksheet_public
+from .worksheets import WorksheetsUnavailable, current, drop_ids, submission_public, worksheet_ids, worksheet_public
 
 log = logging.getLogger("mathly.assignments")
 MIGRATION = "supabase/migrations/20261104210000_math_assignments.sql"
 TABLE = "/rest/v1/math_assignments"
-FIELDS = "id,class_id,title,note,due_on,items,created_by_email,created_at,updated_at"
+FIELDS = "id,class_id,title,note,due_on,items,student_emails,created_by_email,created_at,updated_at"
+OLD_FIELDS = "id,class_id,title,note,due_on,items,created_by_email,created_at,updated_at"   # before the audience migration
 MAX_ITEMS, MAX_TITLE, MAX_NOTE, PER_CLASS = 20, 80, 500, 500
+MAX_FOCUS_SKILLS = 5
 JERUSALEM = ZoneInfo("Asia/Jerusalem")
 
 
@@ -54,6 +59,12 @@ class Assignments:
         try:
             return self.auth._admin(TABLE + query, method, body) or []
         except AuthUnavailable as exc:
+            if "student_emails" in str(exc) and "student_emails" in query + str(body or ""):
+                # the audience column is not there yet: class-wide assignments keep working
+                if isinstance(body, dict) and body.get("student_emails"):
+                    raise AssignmentsUnavailable("audience_unavailable") from exc
+                body = {k: v for k, v in body.items() if k != "student_emails"} if isinstance(body, dict) else body
+                return self.auth._admin(TABLE + query.replace(FIELDS, OLD_FIELDS), method, body) or []
             if "answered 404" in str(exc) and not self._warned:
                 log.warning("the math_assignments table is missing; apply %s", MIGRATION)
                 self._warned = True
@@ -83,9 +94,10 @@ class Assignments:
         self._rest(f"?id=eq.{urllib.parse.quote(assignment_id)}", "DELETE")
 
 
-def clean_assignment(body, class_units: list[str], worksheets: set[str] | None = None) -> dict:
-    """The fields of an assignment as sent, checked against the class's units and worksheets (their ids; None when they
-    cannot be read); HTTPException 400 when something is off."""
+def clean_assignment(body, class_units: list[str], worksheets: set[str] | None = None,
+                     class_students: set[str] | None = None) -> dict:
+    """The fields of an assignment as sent, checked against the class's units, worksheets (their ids; None when they
+    cannot be read) and students (emails, for an audience); HTTPException 400 when something is off."""
     if not isinstance(body, dict):
         raise HTTPException(400, "send the assignment as an object")
     title = " ".join(str(body.get("title") or "").split())
@@ -132,14 +144,34 @@ def clean_assignment(body, class_units: list[str], worksheets: set[str] | None =
         if key not in seen:   # the same item twice is one item
             seen.add(key)
             items.append(clean)
-    return {"title": title, "note": note, "due_on": due.isoformat(), "items": items}
+    audience = body.get("student_emails")
+    if audience is not None:
+        if not isinstance(audience, list) or not audience:
+            raise HTTPException(400, "choose at least one student, or none for the whole class")
+        audience = sorted({str(e).strip().lower() for e in audience})
+        if class_students is None or not set(audience) <= class_students:
+            raise HTTPException(400, "a chosen student is not in this class")
+    return {"title": title, "note": note, "due_on": due.isoformat(), "items": items, "student_emails": audience}
 
 
 def public(row: dict, teacher: bool = False) -> dict:
+    """The teacher sees who a focus assignment is for; a student only that it is personal (not their classmates)."""
     out = {k: row.get(k) for k in ("id", "class_id", "title", "note", "due_on", "items", "created_at", "updated_at")}
+    out["personal"] = bool(row.get("student_emails"))
     if teacher:
         out["created_by_email"] = row.get("created_by_email", "")
+        out["student_emails"] = row.get("student_emails")
     return out
+
+
+def for_student(row: dict, email: str) -> bool:
+    """Whether a student sees this assignment: a class-wide one, or focus practice given to them."""
+    audience = row.get("student_emails")
+    return not audience or str(email).lower() in audience
+
+
+def students_of_class(row: dict) -> set[str]:
+    return set(row.get("emails") or ()) - set(row.get("teachers") or ())
 
 
 def today_in_jerusalem() -> date:
@@ -168,7 +200,8 @@ def install_assignment_routes(app, signed_in, units_of):
         return row
 
     def unavailable(exc: AssignmentsUnavailable) -> HTTPException:
-        return HTTPException(503, "assignments_unavailable")
+        # focus practice before the audience migration: the class-wide rest works, an audience cannot be kept yet
+        return HTTPException(503, "audience_unavailable" if str(exc) == "audience_unavailable" else "assignments_unavailable")
 
     def reply(value, status=200):
         return JSONResponse(value, status_code=status, headers={"Cache-Control": "no-store"})
@@ -194,12 +227,17 @@ def install_assignment_routes(app, signed_in, units_of):
         except WorksheetsUnavailable:
             log.warning("worksheets dropped from an assignment stay until the hourly cleanup")
 
-    def worksheets_only(user, fields, old=None):
-        """A teacher gives worksheets only; skills, unit quizzes and practice exams are for managers (developers). Items
-        that were already in the assignment stay, so a teacher can still edit an older one."""
+    def allowed_items(user, fields, old=None):
+        """A class teacher gives worksheets to the class, and focus practice (1 to 5 skills) to chosen students; skills,
+        unit quizzes and practice exams for the whole class are for managers (developers). Items that were already in
+        a class-wide assignment stay, so a teacher can still edit an older one."""
         if has_permission(user, "management.access"):
             return
-        kept = [i for i in (old or {}).get("items") or [] if i.get("kind") != "worksheet"]
+        if fields.get("student_emails"):
+            if any(i["kind"] != "skill" for i in fields["items"]) or len(fields["items"]) > MAX_FOCUS_SKILLS:
+                raise HTTPException(400, "teachers_give_worksheets_only")
+            return
+        kept = [i for i in (old or {}).get("items") or [] if i.get("kind") != "worksheet"] if not (old or {}).get("student_emails") else []
         if any(i["kind"] != "worksheet" and i not in kept for i in fields["items"]):
             raise HTTPException(400, "teachers_give_worksheets_only")
 
@@ -220,8 +258,8 @@ def install_assignment_routes(app, signed_in, units_of):
     @app.post("/api/classes/{class_id}/assignments")
     def create_assignment(class_id: int, body: dict, user=Depends(signed_in)):
         row = class_row(class_id, user)
-        fields = clean_assignment(body, units_of(row), class_worksheets(class_id, body))
-        worksheets_only(user, fields)
+        fields = clean_assignment(body, units_of(row), class_worksheets(class_id, body), students_of_class(row))
+        allowed_items(user, fields)
         try:
             saved = store().add({**fields, "class_id": class_id, "created_by_email": str(user.get("email", "")).lower()})
         except AssignmentsUnavailable as exc:
@@ -242,8 +280,8 @@ def install_assignment_routes(app, signed_in, units_of):
     def update_assignment(class_id: int, assignment_id: str, body: dict, user=Depends(signed_in)):
         row = class_row(class_id, user)
         old = owned(class_id, assignment_id)
-        fields = clean_assignment(body, units_of(row), class_worksheets(class_id, body))
-        worksheets_only(user, fields, old)
+        fields = clean_assignment(body, units_of(row), class_worksheets(class_id, body), students_of_class(row))
+        allowed_items(user, fields, old)
         try:
             saved = store().update(assignment_id, {**fields, "updated_at": datetime.now(timezone.utc).isoformat()})
         except AssignmentsUnavailable as exc:
@@ -267,15 +305,15 @@ def install_assignment_routes(app, signed_in, units_of):
         return reply({"ok": True})
 
     # ---- the students: their classes' assignments, and when they handed in each unit quiz
-    @app.get("/api/math/assignments")
-    def my_assignments(user=Depends(signed_in)):
-        if not user or not user.get("id"):
-            raise HTTPException(401, "sign in required")
+    def assignments_for(user: dict) -> dict:
+        """What the student's page reads about their assignments: those of their classes (and focus practice given to
+        them), their unit-quiz hand-ins, and the worksheets with their current submissions."""
         classes = [c for c in user.get("classes") or [] if c.get("id") is not None]
         try:
             rows = store().for_classes([c["id"] for c in classes])
         except AssignmentsUnavailable as exc:
             raise unavailable(exc) from exc
+        rows = [r for r in rows if for_student(r, user.get("email", ""))]   # focus practice: only its own students
         names = {c["id"]: c.get("name", "") for c in classes}
         quiz_units = sorted({i["unit"] for r in rows for i in r["items"] if i.get("kind") == "unit_quiz"})
         sittings = []
@@ -294,9 +332,18 @@ def install_assignment_routes(app, signed_in, units_of):
                 if ws is None:
                     raise WorksheetsUnavailable("worksheets_unavailable")
                 worksheets = [worksheet_public(w) for w in ws.by_ids(wanted)]
-                submissions = [submission_public(s) for s in ws.submissions(wanted, user["id"])]
+                submissions = [submission_public(s) for s in current(ws.submissions(wanted, user["id"]))]
             except WorksheetsUnavailable:
                 worksheets = submissions = None   # worksheet items cannot be shown or told done
-        return reply({"assignments": [{**public(r), "class_name": names.get(r["class_id"], "")} for r in rows],
-                      "sittings": sittings, "worksheets": worksheets, "submissions": submissions,
-                      "today": today_in_jerusalem().isoformat()})
+        return {"assignments": [{**public(r), "class_name": names.get(r["class_id"], "")} for r in rows],
+                "sittings": sittings, "worksheets": worksheets, "submissions": submissions,
+                "today": today_in_jerusalem().isoformat()}
+
+    app.state.assignments_for = assignments_for
+
+    # ---- the students: their classes' assignments, and when they handed in each unit quiz
+    @app.get("/api/math/assignments")
+    def my_assignments(user=Depends(signed_in)):
+        if not user or not user.get("id"):
+            raise HTTPException(401, "sign in required")
+        return reply(assignments_for(user))

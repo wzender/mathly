@@ -115,6 +115,18 @@ class SupabaseAuth:
             raise KeyError(class_id)
         self._classes = None
 
+    def save_class_exams(self, class_id: int, exams: list[dict]) -> None:
+        """The class's exam board (each exam: subject, date, and the units and note it may name)."""
+        if not self._admin(f"/rest/v1/classes?id=eq.{int(class_id)}", "PATCH", {"exams": exams}):
+            raise KeyError(class_id)
+        self._classes = None
+
+    def save_class_settings(self, class_id: int, fields: dict) -> None:
+        """A class's AI settings (app/ai_batches.py): automatic practice checks, and its daily AI budget."""
+        if not self._admin(f"/rest/v1/classes?id=eq.{int(class_id)}", "PATCH", fields):
+            raise KeyError(class_id)
+        self._classes = None
+
     def delete_class(self, class_id: int) -> None:
         self._admin(f"/rest/v1/classes?id=eq.{int(class_id)}", "DELETE")
         self._classes = None

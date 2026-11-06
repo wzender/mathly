@@ -182,6 +182,7 @@ html.math-on, html.math-on body{overflow:hidden}
 }
 .mx-manage-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .mx-manage-head h3{font-size:30px;color:var(--mx-accent)}
+.mx-prompter-text{width:100%;box-sizing:border-box;min-height:220px;padding:12px;border:1px solid var(--mx-line,#ccc);border-radius:12px;font:inherit;font-size:17px;line-height:1.5;resize:vertical;background:var(--mx-card,#fff);color:inherit;margin-block:10px}
 .mx-manage-spacer{flex:1}
 .mx-manage-state{min-height:18px;margin:0;color:var(--muted);font-size:13px}
 .mx-manage-modes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;padding:4px;border-radius:14px;background:var(--line)}
@@ -548,7 +549,7 @@ button.sky-chip.flame{padding:6px 11px;color:var(--ink)}
 .mx-nav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);
   padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
 .mx-nav[hidden]{display:none}
-.mx-nav>div{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(2,1fr)}
+.mx-nav>div{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(var(--tabs,2),1fr)}
 .mx-nav button{border:0;background:none;padding:10px 4px 12px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font:500 12.5px/1 var(--f-body);cursor:pointer}
 .mx-nav svg{width:24px;height:24px;fill:currentColor}
 .mx-nav button[aria-current=page]{color:var(--gold)}
@@ -869,7 +870,9 @@ body{--keyboard-zindex:3000}
 .mx-report-week{color:var(--muted);font-size:14px}
 .mx-report-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
 .mx-report-views{display:flex;gap:6px;flex-wrap:wrap}
-.mx-report-views [aria-pressed="true"]{border-color:var(--mx-accent);color:var(--mx-accent)}
+/* the view shown now: filled, like the selected class above it, so it stands out among the tabs */
+.mx-report-views [aria-pressed="true"]{border-color:var(--mx-accent);background:var(--mx-accent);color:var(--mx-on-accent);font-weight:800;box-shadow:0 0 0 2px color-mix(in srgb,var(--mx-accent) 35%,transparent)}
+.mx-report-views [aria-pressed="true"] .mx-aq-badge{background:var(--mx-on-accent);color:var(--mx-accent)}
 .mx-report-bar select{font:inherit;color:inherit;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;max-width:100%}
 .mx-report,.mx-grid-wrap{min-width:0;max-width:100%}
 .mx-grid-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
@@ -1042,3 +1045,126 @@ body{--keyboard-zindex:3000}
 .mx-heat-gcol.hard .mx-heat-group{color:var(--sumac)}
 .mx-heat-gopen{border-bottom:2px solid var(--mx-accent)}
 .mx-heat-gopen .mx-heat-group{background:none;color:var(--mx-accent)}
+
+/* final unit quizzes, and the skills to practise before a retake (app/quiz_modes.py) */
+.mx-uq-final{border:1px solid color-mix(in srgb,var(--mx-accent) 55%,var(--line));border-radius:14px;padding:12px 14px;margin:10px 0;background:color-mix(in srgb,var(--mx-accent) 10%,var(--surface))}
+.mx-uq-final h4{margin:0 0 6px}
+.mx-uq-retake{border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin:12px 0;background:var(--surface)}
+.mx-uq-retake h4{margin:0 0 4px}
+.mx-uq-skills{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
+.mx-uq-skills small{color:var(--muted)}
+.mx-asg-personal{font:600 12px/1 var(--f-body);color:var(--mx-accent);margin-inline-start:6px}
+.mx-ws-returned{border:1px solid color-mix(in srgb,#F59E0B 55%,var(--line));border-radius:12px;padding:8px 12px;margin:6px 0;background:color-mix(in srgb,#F59E0B 10%,var(--surface))}
+.mx-ws-badge.back{color:#F59E0B}
+.mx-ws-note{display:grid;gap:4px;margin:8px 0}
+.mx-ws-note textarea{width:100%;box-sizing:border-box}
+.mx-ws-earlier{margin:6px 0}.mx-ws-earlier ul{margin:4px 0;padding-inline-start:18px}
+.mx-ws-return-box{margin-top:10px}
+
+/* the student's task list (המשימות שלי) */
+.mx-tasks-sum{display:flex;flex-direction:column;gap:2px;width:100%;text-align:start;padding:12px 14px;margin:8px 0;border:1px solid color-mix(in srgb,var(--mx-accent) 50%,var(--line));border-radius:14px;background:color-mix(in srgb,var(--mx-accent) 10%,var(--surface));color:var(--ink);cursor:pointer;font:inherit}
+.mx-tasks-sum.quiet{border-color:var(--line);background:var(--surface)}
+.mx-tasks-sum span{color:var(--muted);font-size:14px}
+.mx-tasks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.mx-task{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.mx-task p{margin:2px 0 0}
+.mx-task-chip{font:600 12px/1.2 var(--f-body);padding:4px 8px;border-radius:99px;background:var(--surface-2);white-space:nowrap}
+.mx-task-chip[data-task=returned],.mx-task-chip[data-task=late]{background:color-mix(in srgb,#F59E0B 25%,var(--surface));color:#FBBF24}
+.mx-task-chip[data-task=waiting]{background:color-mix(in srgb,var(--mx-accent) 22%,var(--surface))}
+.mx-task-chip[data-task=checked],.mx-task-chip[data-task=handed]{background:color-mix(in srgb,#22C55E 20%,var(--surface))}
+@media (max-width:480px){.mx-task{grid-template-columns:1fr auto}.mx-task .mx-btn{grid-column:1/-1}}
+
+/* the student's grades page (הציונים שלי) */
+.mx-grades-btn{display:inline-block;margin:0 0 8px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;cursor:pointer}
+.mx-grade-unit{border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin:10px 0;background:var(--surface)}
+.mx-grade-unit h4{margin:0 0 6px}
+.mx-grades{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.mx-grade-kind{display:inline-block;font:600 12px/1.2 var(--f-body);padding:3px 8px;border-radius:99px;background:var(--surface-2);color:var(--muted);margin-inline-end:6px}
+.mx-grade-kind.official{background:color-mix(in srgb,var(--mx-accent) 25%,var(--surface));color:var(--ink)}
+.mx-grade-new{border:1px solid color-mix(in srgb,var(--mx-accent) 55%,var(--line));border-radius:14px;padding:8px 14px;background:color-mix(in srgb,var(--mx-accent) 10%,var(--surface))}
+.mx-grade-new h4{margin:0 0 4px}.mx-grade-new ul{margin:0;padding-inline-start:18px}
+
+/* preparing for an exam */
+.mx-prep-open{border-color:color-mix(in srgb,var(--mx-accent) 55%,var(--line))}
+.mx-prep-ready,.mx-prep-plan{border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin:10px 0;background:var(--surface)}
+.mx-prep-ready h4,.mx-prep-plan h4{margin:0 0 6px}
+.mx-prep-unit{margin:8px 0}
+.mx-prep-skills,.mx-prep-steps,.mx-prep-mistakes{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:4px}
+.mx-prep-skills small{color:var(--muted)}
+.mx-prep-skills li[data-state=fading] small,.mx-prep-skills li[data-state=new] small{color:#FBBF24}
+.mx-prep-step{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:6px 8px;border-radius:10px;background:var(--surface-2)}
+.mx-prep-step.done{opacity:.65}
+.mx-prep-step.today{outline:1px solid color-mix(in srgb,var(--mx-accent) 60%,var(--line))}
+.mx-prep-today{color:var(--mx-accent);font-weight:700}
+
+/* the report's focus areas and final quizzes */
+.mx-focus{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:8px 0;background:var(--surface-2)}
+.mx-focus h5{margin:0 0 4px}
+.mx-focus-list{margin:4px 0;padding-inline-start:20px;display:grid;gap:4px}
+.mx-final-t,.mx-exam-t{border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin:10px 0;background:var(--surface)}
+.mx-final-t h4,.mx-exam-t h4{margin:0 0 4px}
+.mx-aq-budget{border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin:8px 0 12px;background:var(--surface)}
+.mx-aq-budget h4{margin:0 0 4px}
+.mx-aq-scopes{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
+.mx-ws-ai{border:1px dashed var(--line);border-radius:10px;padding:6px 10px}
+.mx-inbox{list-style:none;margin:6px 0;padding:0;display:grid;gap:6px}
+.mx-inbox-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.mx-inbox-row p{margin:2px 0 0}
+.mx-inbox-filters{flex-wrap:wrap;gap:8px}
+.mx-inbox-count{color:var(--mx-accent);font-weight:700}
+
+/* home: only what has a date or needs the student, then a way back to the path */
+.mx-home{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.mx-home>*{margin-top:0}
+.mx-home-exam b{font-size:16px}
+.mx-home-empty{margin:4px 0}
+.mx-continue{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:13px 16px;border:1px solid var(--line);border-inline-start:4px solid var(--gold);border-radius:18px;background:var(--surface);color:var(--ink);font:inherit;text-align:start;cursor:pointer}
+.mx-continue span{color:var(--muted);font-size:13px}
+.mx-continue:hover{border-color:var(--gold)}
+/* quizzes chosen for each student, on home */
+.mx-hq{display:flex;flex-direction:column;gap:8px}
+.mx-hq h2{font-size:17px;margin:4px 0 0}
+.mx-hq .mx-quiz-card{margin-top:0}
+.mx-hq-today{display:inline-block;margin-inline-start:6px;padding:1px 8px;border-radius:999px;background:var(--gold);color:var(--bg,#000);font-size:12px;font-weight:600}
+.mx-hq-best{color:var(--ink);font-size:13px}
+.mx-hq-card.blocked{cursor:default;opacity:.92}
+.mx-hq-card.blocked .mx-chips{display:flex;flex-wrap:wrap;gap:6px}
+.mx-quiz-fb:empty{display:none}
+.mx-quiz-fb{margin-top:10px}
+.mx-quiz-sure{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
+.mx-quiz-sure [aria-pressed=true]{border-color:var(--aurora);color:var(--aurora)}
+.mx-quiz-best{margin:6px 0 10px}
+.mx-quiz-surewrong{margin:12px 0}
+.mx-quiz-note{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin:12px 0}
+.mx-quiz-note label{display:flex;flex-direction:column;gap:4px;flex:1 1 220px}
+.mx-quiz-note input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink)}
+.mx-quiz-example{margin-top:8px}
+/* the button that sends the hand-in, after a page was added from the board */
+.mx-btn.mx-attn{box-shadow:0 0 0 3px color-mix(in srgb,var(--mx-accent) 60%,transparent);animation:mx-attn 1.2s ease-in-out 3}
+@keyframes mx-attn{50%{box-shadow:0 0 0 7px color-mix(in srgb,var(--mx-accent) 25%,transparent)}}
+@media (prefers-reduced-motion:reduce){.mx-btn.mx-attn{animation:none}}
+
+/* the grades: one plain list, a row per item (no cards) */
+.mx-glist{list-style:none;margin:8px 0;padding:0;border-top:1px solid var(--line)}
+.mx-glist-row{display:grid;grid-template-columns:3.2em 1fr auto auto;gap:6px 10px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line)}
+.mx-glist-row time{color:var(--muted);font-size:13px}
+.mx-glist-what{display:flex;flex-direction:column;min-width:0}
+.mx-glist-what small{color:var(--muted);font-size:12px}
+.mx-glist-res{text-align:end;white-space:nowrap}
+.mx-glist-row .mx-btn{padding:6px 10px;font-size:13px}
+.mx-glist-row.todo{background:color-mix(in srgb,var(--mx-accent) 8%,transparent)}
+.mx-glist-mark{font-size:11px;color:var(--gold);margin-inline-start:4px}
+.mx-glist-units,.mx-glist-new{margin:6px 0;font-size:14px}
+@media (max-width:480px){.mx-glist-row{grid-template-columns:3em 1fr auto}.mx-glist-row .mx-btn{grid-column:2/-1;justify-self:start}}
+
+/* home: the lessons of the next exam, the ones to finish highlighted */
+.mx-home-lessons{margin:8px 0}
+.mx-home-lessons h3{margin:0 0 6px;font-size:16px}
+.mx-home-lessons ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.mx-home-lessons button{display:grid;grid-template-columns:1fr auto;gap:2px 8px;width:100%;text-align:start;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;cursor:pointer}
+.mx-home-lessons button span{color:var(--muted);font-size:13px}
+.mx-home-lessons button>.mx-meter{grid-column:1/-1;display:block;height:5px;border-radius:99px;background:var(--line);overflow:hidden}
+.mx-home-lessons button>.mx-meter>i{display:block;height:100%;background:var(--mx-accent)}
+.mx-home-lessons li.todo button{border:2px solid #F59E0B;background:color-mix(in srgb,#F59E0B 12%,var(--surface))}
+.mx-home-lessons li.todo button span{color:#FBBF24;font-weight:700}
+.mx-home-lessons li.done button{opacity:.7}

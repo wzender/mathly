@@ -37,7 +37,7 @@ function correct(P,id,{first,n,finished,now=new Date()}){
   if(gold) P.gold[id]=t;
   return {gold,goal:P.days[k]===GOAL,revived};
 }
-function wrong(P,id){ ensure(P); P.run[id]=0; }
+function wrong(P,id){ ensure(P); P.run[id]=0; (P.wrongs||={})[id]=(P.wrongs[id]||0)+1; }   // wrongs: every wrong answer, per skill
 
 /* ---------- spaced review ---------- */
 const later=(days,now)=>dayKey(daysBack(-days,now));
@@ -129,10 +129,13 @@ function attention(student,{skills={},units=[],assignments=[]}={},now=new Date()
   if(w.lastWeek>=DROP_MIN_LAST_WEEK&&w.thisWeek<w.lastWeek*DROP_RATIO)
     out.push({kind:"drop",text:`התרגול ירד: ${w.thisWeek} תשובות נכונות השבוע, ${w.lastWeek} בשבוע שעבר`});
   for(const u of units){   // the server's grades only; without them (null) the signal is left out
-    const g=(student.quiz_sittings||[]).filter(x=>x.unit_id===u.id&&x.grade!=null).sort((a,b)=>String(a.submitted_at).localeCompare(String(b.submitted_at))).at(-1);
-    if(g&&g.grade<LOW_GRADE) out.push({kind:"grade",unit:u.id,text:`ציון נמוך בבוחן ${u.name}: ${g.grade}`});
+    // the official grade (the latest final sitting) when there is one, else the latest practice sitting
+    const graded=(student.quiz_sittings||[]).filter(x=>x.unit_id===u.id&&x.grade!=null).sort((a,b)=>String(a.submitted_at).localeCompare(String(b.submitted_at)));
+    const g=graded.filter(x=>x.mode==="final").at(-1)||graded.at(-1);
+    if(g&&g.grade<LOW_GRADE) out.push({kind:"grade",unit:u.id,final:g.mode==="final",text:`ציון נמוך ב${g.mode==="final"?"בוחן המסכם של":"בוחן החיזוק של"} ${u.name}: ${g.grade}`});
   }
   for(const a of assignments){   // an assignment past its due date and not finished (left out when a unit quiz cannot be told)
+    if(a.student_emails?.length&&!a.student_emails.includes(student.email)) continue;   // focus practice for others
     const st=assignmentState(a,P,{sittings:student.quiz_sittings,submissions:student.worksheet_submissions},now);
     if(st.overdue&&st.items.every(x=>x.known)) out.push({kind:"assignment",assignment:a.id,text:`משימה באיחור: ${a.title}`});
   }
@@ -153,7 +156,7 @@ function assignmentState(a,P,server,now=new Date()){
   const created=Date.parse(a.created_at)||0, due=String(a.due_on);
   const earliest=list=>list.filter(Boolean).sort()[0]||null;
   const items=(a.items||[]).map(item=>{
-    let at=null, known=true, submission=null;
+    let at=null, known=true, submission=null, itemDue=due;
     if(item.kind==="skill") at=P?.done?.[item.id]||null;
     else if(item.kind==="unit_quiz"){
       known=Array.isArray(sittings);
@@ -163,13 +166,118 @@ function assignmentState(a,P,server,now=new Date()){
     else if(item.kind==="worksheet"){
       known=Array.isArray(submissions);
       submission=(submissions||[]).find(x=>x.worksheet_id===item.id)||null;
-      at=submission?.submitted_at||null;
+      // returned for a fix: not done until the next version is handed in, by the new due date when the teacher gave one
+      at=submission&&submission.state!=="returned"?submission.submitted_at||null:null;
+      const back=submission?.state==="returned"?submission.return_due_on:(submission?.earlier||[]).find(e=>e.return_due_on)?.return_due_on;
+      if(back&&back>itemDue) itemDue=back;
     }
-    return {item,done:!!at,at,known,submission,late:!!at&&jerusalemDay(at)>due};
+    return {item,done:!!at,at,known,submission,due:itemDue,returned:submission?.state==="returned",late:!!at&&jerusalemDay(at)>itemDue};
   });
-  const doneCount=items.filter(x=>x.done).length, finished=items.length>0&&doneCount===items.length;
-  return {items,doneCount,total:items.length,finished,overdue:!finished&&jerusalemDay(now)>due,
+  const doneCount=items.filter(x=>x.done).length, finished=items.length>0&&doneCount===items.length, today=jerusalemDay(now);
+  return {items,doneCount,total:items.length,finished,overdue:!finished&&items.some(x=>!x.done&&today>x.due),
     late:finished&&items.some(x=>x.late),next:items.findIndex(x=>!x.done)};
+}
+
+/* Where a student most needs work, skill by skill (the teacher's focus profile and the student's exam preparation).
+   A skill's weakness score adds: unit-quiz points lost on it in the last 60 days (checked answers only; a question's
+   lost points are split between the skills it names), wrong answers in it in the last 14 days, being started but not
+   finished, and fading. The weights are here, in one place. */
+const FOCUS={QUIZ_DAYS:60,WRONG_DAYS:14,TOP:5,W:{lost:2/25,wrong:1,unfinished:2,fading:1}};
+function quizLost(sittings,now=new Date()){
+  const out={}, since=now-FOCUS.QUIZ_DAYS*DAY;
+  for(const v of sittings||[]){
+    const t=Date.parse(v?.submitted_at); if(isNaN(t)||t<since||t>now) continue;
+    for(const q of v.questions||[]){
+      if(q.earned==null||q.earned>=q.points||!q.skills?.length) continue;
+      const share=(q.points-q.earned)/q.skills.length;
+      for(const id of q.skills) out[id]=(out[id]||0)+share;
+    }
+  }
+  return out;
+}
+function focus(P,sittings,ids,now=new Date()){
+  P=P||{}; const lost=quizLost(sittings,now), since=now-FOCUS.WRONG_DAYS*DAY, wrong={};
+  for(const x of P.slips||[]){ const t=Date.parse(x?.at); if(x?.id&&!isNaN(t)&&t>=since&&t<=now) wrong[x.id]=(wrong[x.id]||0)+1; }
+  const out=[];
+  for(const id of ids){
+    const started=!!(P.tries?.[id]||(P.missed?.[id]||[]).length||P.seen?.[id]);
+    const f={id,lost:Math.round((lost[id]||0)*10)/10,wrong:wrong[id]||0,unfinished:started&&!P.done?.[id],fading:fading(P,id,now)};
+    f.score=f.lost*FOCUS.W.lost+f.wrong*FOCUS.W.wrong+(f.unfinished?FOCUS.W.unfinished:0)+(f.fading?FOCUS.W.fading:0);
+    if(f.score>0) out.push(f);
+  }
+  return out.sort((a,b)=>b.score-a.score||b.lost-a.lost||b.wrong-a.wrong);
+}
+
+/* ---------- quizzes chosen for each student (openspec student-home-and-exam-quizzes) ----------
+   chance(): how likely the student is to answer a topic right, from their answers so far: (right + 1) / (answers + 2),
+   lifted for a finished or gold topic and lowered while it fades. Under MIN_ANSWERS answers it is unknown (null).
+   pickQuiz(): questions for a quiz that aims at an expected score (`target`): topics the student started and has not
+   mastered ("close") first, then finished ones until the expected score reaches the target, at most PER_SKILL questions
+   a topic; topics with too few answers fill what is left, the most recently taught first. Topics never practised are
+   never asked. Questions the student saw in earlier attempts come last, the ones seen longest ago first.
+   The numbers are here, in one place. */
+const CHANCE={MIN_ANSWERS:5,DONE:.8,GOLD:.9,FADING:.1,CLOSE:.75,UNKNOWN:.6,PER_SKILL:3};
+function wrongsOf(P,id){
+  let n=0; for(const s of P.slips||[]) if(s?.id===id) n++;
+  return Math.max(n,+(P.wrongs?.[id])||0);   // the slips keep the history from before P.wrongs, at most 500
+}
+const practised=(P,id)=>!!(P.tries?.[id]||P.seen?.[id]||(P.missed?.[id]||[]).length||P.done?.[id]);
+function chance(P,id,now=new Date()){
+  const tries=+(P.tries?.[id])||0; if(tries<CHANCE.MIN_ANSWERS) return null;
+  let p=(tries-Math.min(tries,wrongsOf(P,id))+1)/(tries+2);
+  if(P.done?.[id]) p=Math.max(p,CHANCE.DONE);
+  if(P.gold?.[id]) p=Math.max(p,CHANCE.GOLD);
+  if(fading(P,id,now)) p-=CHANCE.FADING;
+  return Math.min(.99,Math.max(.01,p));
+}
+/* `pool`: [{id, qs: [question indexes with choices], rank: higher = taught more recently}]; `seen`: {"id:qi": time
+   last asked in this quiz}. Returns {items: [{id, qi}], expected (0..1), unknown: how many came from unknown topics}. */
+function pickQuiz(P,pool,{target=.7,n=12,seen={},now=new Date(),random=Math.random}={}){
+  const topics=(pool||[]).filter(t=>t.qs?.length&&practised(P,t.id)).map(t=>({...t,c:chance(P,t.id,now),k:0,left:t.qs.slice()}));
+  const known=topics.filter(t=>t.c!=null), unknown=topics.filter(t=>t.c==null).sort((a,b)=>b.rank-a.rank);
+  const close=known.filter(t=>!P.done?.[t.id]||t.c<CHANCE.CLOSE).sort((a,b)=>b.c-a.c);
+  const solid=known.filter(t=>!close.includes(t)).sort((a,b)=>a.c-b.c);
+  const items=[]; let sum=0;
+  // one question of the topic: one not seen in this quiz before, else the one seen longest ago
+  const take=t=>{
+    const fresh=t.left.filter(qi=>!seen[`${t.id}:${qi}`]);
+    const qi=fresh.length?fresh[Math.floor(random()*fresh.length)]
+      :t.left.slice().sort((a,b)=>String(seen[`${t.id}:${a}`]).localeCompare(String(seen[`${t.id}:${b}`])))[0];
+    t.left.splice(t.left.indexOf(qi),1); t.k++;
+    items.push({id:t.id,qi}); sum+=t.c??CHANCE.UNKNOWN;
+  };
+  // the next topic of a list, taking turns, while it has room and questions
+  const turn=(list,cap)=>{ const t=list.filter(x=>x.k<cap&&x.left.length).sort((a,b)=>a.k-b.k)[0]; if(t) take(t); return !!t; };
+  while(items.length<n){
+    const low=!items.length||sum/items.length<target;
+    if(!(low?turn(solid,CHANCE.PER_SKILL)||turn(close,CHANCE.PER_SKILL):turn(close,CHANCE.PER_SKILL)||turn(solid,CHANCE.PER_SKILL))) break;
+  }
+  while(items.length<n&&turn(unknown,CHANCE.PER_SKILL));
+  while(items.length<n&&turn([...close,...solid,...unknown],Infinity));   // still short: more of the same topics
+  const fromUnknown=new Set(unknown.map(t=>t.id));
+  return {items,expected:items.length?sum/items.length:0,unknown:items.filter(x=>fromUnknown.has(x.id)).length};
+}
+
+/* One state for each thing a student owes, chosen in this order; the student's task list and the teacher's views use
+   the same, so both always say the same thing. */
+const TASK_LABELS={returned:"הוחזר לתיקון",late:"באיחור",waiting:"ממתין לבדיקה",checked:"נבדק",handed:"הוגש",progress:"בתהליך",new:"עוד לא התחיל"};
+function taskState(f){
+  return f.returned?"returned":f.overdue?"late":f.waiting?"waiting":f.checked?"checked":f.handedIn?"handed":f.started?"progress":"new";
+}
+const subState=x=>x?(x.state||(x.checked_at?"checked":"submitted")):null;
+// an assignment's state for one student (assignmentState's facts, read as one word)
+function assignmentTask(a,P,server,now=new Date()){
+  const st=assignmentState(a,P,server,now), sheets=st.items.filter(x=>x.item.kind==="worksheet");
+  const state=taskState({returned:st.items.some(x=>x.returned),overdue:st.overdue,
+    waiting:sheets.some(x=>subState(x.submission)==="submitted"),
+    checked:st.finished&&sheets.length>0&&sheets.every(x=>subState(x.submission)==="checked"),
+    handedIn:st.finished,started:st.doneCount>0});
+  return {st,state,label:TASK_LABELS[state]};
+}
+// a final quiz open to the student: started, handed in (waiting for its results) or not yet
+function finalTask(offer){
+  const state=taskState({waiting:!!offer.start?.sitting_id,started:!!offer.start});
+  return {state,label:state==="waiting"?"הוגש · ממתין לתוצאות":TASK_LABELS[state]};
 }
 
 /* a star's look: gold, lit, fading (finished), next, open, locked, off */
@@ -434,6 +542,6 @@ function comet(onCatch){
 }
 const cometCard=c=>`<div class="sky-card"><span class="sym">${esc(c.sym)}</span><b>${esc(c.name)}</b></div>`;
 
-window.MathlySky={GOAL,slip,patterns,assignmentState,jerusalemDay,attention,weekly,lastPractice,FADE_DAYS,MASTER_RUN,GOLD_RUN,masterNeed,goldNeed,mastered,reviewed,due,COMETS,SPARK,spark,FLAME,owl,praise,dayKey,ensure,correct,wrong,fading,star,today,streak,dayState,month,best,
+window.MathlySky={GOAL,chance,pickQuiz,CHANCE,practised,slip,patterns,assignmentState,focus,quizLost,FOCUS,assignmentTask,finalTask,taskState,TASK_LABELS,jerusalemDay,attention,weekly,lastPractice,FADE_DAYS,MASTER_RUN,GOLD_RUN,masterNeed,goldNeed,mastered,reviewed,due,COMETS,SPARK,spark,FLAME,owl,praise,dayKey,ensure,correct,wrong,fading,star,today,streak,dayState,month,best,
   cometDue,catchComet,shape,labels,mount,burst,burstAt,sound,buzz,soundOn,setSound,toast,celebrate,comet,cometCard};
 })();

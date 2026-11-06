@@ -382,10 +382,11 @@ def test_an_assignment_given_by_the_teacher_is_completed_by_the_student_and_show
                     errors = []
                     page.on("pageerror", lambda e: errors.append(str(e)))
                     page.goto(url)
-                    page.locator('.mx-nav [data-view="path"]').click()
+                    page.locator('.mx-nav [data-view="home"]').click()
                     card = page.locator(".mx-asgs .mx-asg")
                     playwright.expect(card).to_contain_text("חזרה על הפילוג")
                     playwright.expect(card).to_contain_text("0 מתוך 3 הושלמו")
+                    page.locator('.mx-nav [data-view="path"]').click()   # the markers are on the trail
                     playwright.expect(page.locator('.mx-star[data-id="t_ext"] .mx-asg-pin')).to_have_count(1)
                     for skill, count in (("t_ext", 1), ("t_simplify", 2)):          # the student finishes the skills
                         page.locator(f'.mx-star[data-id="{skill}"]').click()
@@ -393,8 +394,11 @@ def test_an_assignment_given_by_the_teacher_is_completed_by_the_student_and_show
                         while page.locator(".sky-cele [data-sky=go]").count():
                             page.locator(".sky-cele [data-sky=go]").first.click()
                         page.locator(".mx-x").last.click()
+                        page.locator('.mx-nav [data-view="home"]').click()               # the card is on home
                         playwright.expect(card).to_contain_text(f"{count} מתוך 3 הושלמו")
-                    playwright.expect(card.locator("[data-asg-go]")).to_contain_text("בוחן מסכם")    # what is left
+                        page.locator('.mx-nav [data-view="path"]').click()
+                    page.locator('.mx-nav [data-view="home"]').click()
+                    playwright.expect(card.locator("[data-asg-go]")).to_contain_text("בוחן חיזוק")    # what is left
                     # the unit quiz: photographed, checked and handed in
                     ids = [quiz_answer(answer_store, i) for i in range(4)]
                     for aid in ids:
@@ -403,7 +407,7 @@ def test_an_assignment_given_by_the_teacher_is_completed_by_the_student_and_show
                         "unit_id": "t", "attempts": ids, "client_key": str(uuid.uuid4())})
                     assert handed.status_code == 200 and handed.json()["grade"] == 100
                     page.reload()
-                    page.locator('.mx-nav [data-view="path"]').click()
+                    page.locator('.mx-nav [data-view="home"]').click()
                     playwright.expect(page.locator(".mx-asgs .mx-asg")).to_have_count(0)           # nothing open is left
                     playwright.expect(page.locator(".mx-asg-done summary")).to_have_text("הושלמו (1)")
                     assert page.locator(".mx-asg-pin").count() == 0                                # and no markers
@@ -425,3 +429,76 @@ def test_an_assignment_given_by_the_teacher_is_completed_by_the_student_and_show
         finally:
             server.should_exit = True
             thread.join(timeout=5)
+
+
+CLASSMATE = "c-id"
+
+
+class FocusAuth(ClassAuth):
+    """ClassAuth with a second student in class 3."""
+
+    def __init__(self):
+        super().__init__()
+        self.rows[0]["emails"].append("classmate@x.test")
+
+    def user(self, token):
+        return {"id": token, "email": "classmate@x.test"} if token == CLASSMATE else super().user(token)
+
+
+def test_a_class_teacher_gives_focus_practice_of_skills_to_chosen_students_only():
+    app = create_app(auth=FocusAuth())
+    app.state.assignments = store = MemoryAssignments()
+    app.state.answers = Sittings()
+    focus = {"title": "חיזוק פילוג", "due_on": "2026-11-15", "items": [{"kind": "skill", "id": "t_ext"},
+             {"kind": "skill", "id": "t_simplify"}], "student_emails": ["Student@x.test"]}
+
+    async def check():
+        async with client(app, TEACHER) as teacher, client(app, STUDENT) as student, client(app, CLASSMATE) as classmate:
+            made = await teacher.post("/api/classes/3/assignments", json=focus)
+            assert made.status_code == 201, made.text
+            assert made.json()["student_emails"] == ["student@x.test"] and made.json()["personal"] is True
+            for bad, why in ((["pupil4@x.test"], "not in this class"), (["teacher@x.test"], "not in this class"), ([], "at least one")):
+                r = await teacher.post("/api/classes/3/assignments", json={**focus, "student_emails": bad})
+                assert r.status_code == 400 and why in r.json()["detail"], bad
+            quiz = await teacher.post("/api/classes/3/assignments", json={**focus, "items": [{"kind": "unit_quiz", "unit": "k"}]})
+            assert (quiz.status_code, quiz.json()["detail"]) == (400, "teachers_give_worksheets_only")
+            six = [{"kind": "skill", "id": s["id"]} for s in algebra9()["skills"] if s["unit"] in ("t", "k")][:6]
+            assert len(six) == 6
+            assert (await teacher.post("/api/classes/3/assignments", json={**focus, "items": six})).json()["detail"] == "teachers_give_worksheets_only"
+            whole = await teacher.post("/api/classes/3/assignments", json={**focus, "student_emails": None})
+            assert (whole.status_code, whole.json()["detail"]) == (400, "teachers_give_worksheets_only")   # skills to all: managers
+            mine = (await student.get("/api/math/assignments")).json()["assignments"]
+            assert [(a["title"], a["personal"]) for a in mine] == [("חיזוק פילוג", True)]
+            assert "student_emails" not in mine[0]   # a student does not see whom else it was given to
+            assert (await classmate.get("/api/math/assignments")).json()["assignments"] == []
+            # the teacher moves it to the classmate
+            moved = await teacher.put(f"/api/classes/3/assignments/{made.json()['id']}",
+                                      json={**focus, "student_emails": ["classmate@x.test"]})
+            assert moved.status_code == 200
+            assert (await student.get("/api/math/assignments")).json()["assignments"] == []
+            assert len((await classmate.get("/api/math/assignments")).json()["assignments"]) == 1
+            listed = (await teacher.get("/api/classes/3/assignments")).json()["assignments"]
+            assert listed[0]["student_emails"] == ["classmate@x.test"]
+    asyncio.run(check())
+
+
+def test_the_audience_migration_keeps_old_assignments_class_wide(postgres_server):
+    psycopg = pytest.importorskip("psycopg")
+    database = "aud_" + uuid.uuid4().hex
+    with psycopg.connect(postgres_server.get_uri(), autocommit=True) as c:
+        c.execute("create database " + database)
+    try:
+        with psycopg.connect(postgres_server.get_uri(database=database), autocommit=True) as c:
+            c.execute(BOOTSTRAP)
+            c.execute(Path("supabase/migrations/20261104210000_math_assignments.sql").read_text())
+            c.execute("insert into math_assignments(class_id,title,due_on,items) values(1,'old','2026-11-12','[{\"kind\":\"skill\",\"id\":\"t_ext\"}]')")
+            c.execute(Path("supabase/migrations/20261106100000_math_assignment_audience.sql").read_text())
+            assert c.execute("select student_emails from math_assignments").fetchone()[0] is None
+            c.execute("insert into math_assignments(class_id,title,due_on,items,student_emails) "
+                      "values(1,'focus','2026-11-12','[{\"kind\":\"skill\",\"id\":\"t_ext\"}]',array['a@x.test'])")
+            with pytest.raises(psycopg.errors.CheckViolation):
+                c.execute("insert into math_assignments(class_id,title,due_on,items,student_emails) "
+                          "values(1,'none','2026-11-12','[{\"kind\":\"skill\",\"id\":\"t_ext\"}]','{}')")
+    finally:
+        with psycopg.connect(postgres_server.get_uri(), autocommit=True) as c:
+            c.execute("drop database " + database + " with (force)")

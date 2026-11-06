@@ -162,7 +162,7 @@ def test_a_unit_quiz_is_written_photographed_handed_in_and_then_checked(quiz_ser
         browser, page, errors = signed_in(p, url)
         try:
             page.locator('.mx-uquiz[data-uquiz="t"]').click()
-            playwright.expect(page.locator(".mx-uq-sheet h3")).to_have_text("בוחן מסכם")
+            playwright.expect(page.locator(".mx-uq-sheet h3")).to_have_text("בחני היחידה")
             page.locator("[data-act=uq-start]").click()
             paper = page.locator(".mx-uq-paper")
             playwright.expect(paper.locator(".mx-uq-q")).to_have_count(4)
@@ -175,17 +175,21 @@ def test_a_unit_quiz_is_written_photographed_handed_in_and_then_checked(quiz_ser
             playwright.expect(paper.locator(".mx-quiz-warn")).to_contain_text("0 נקודות")
             paper.locator("[data-act=uq-submit]").click()
             sheet = page.locator(".mx-uq-sheet")
-            playwright.expect(sheet.locator("h3")).to_have_text("בוחן מסכם: 65/100", timeout=20000)   # 25 + 15 + 25 + 0
+            playwright.expect(sheet.locator("h3")).to_have_text("בוחן חיזוק: 65/100", timeout=20000)   # 25 + 15 + 25 + 0
             playwright.expect(sheet.locator(".mx-uq-verdict")).to_have_text(["נכון ומלא", "נכון בחלקו", "נכון ומלא", "לא צולמה תשובה"])
             playwright.expect(sheet.locator(".mx-uq-qhead span")).to_have_text(["25/25 נק׳", "15/25 נק׳", "25/25 נק׳", "0/25 נק׳"])
             assert len(calls) == 3
+            # before a retake: the skills of the questions that lost points (question 2 and the missing question 4)
+            playwright.expect(sheet.locator(".mx-uq-retake .mx-chip")).to_have_count(2)
+            assert sorted(sheet.locator(".mx-uq-retake .mx-chip").evaluate_all("b=>b.map(x=>x.dataset.id)")) == ["t_ext_eq", "t_formulas"]
+            playwright.expect(sheet.locator('.mx-quiz-nav [data-uquiz="t"]')).to_have_text("ניסיון נוסף")
             page.locator(".mx-uq-sheet .mx-x").click()
-            playwright.expect(page.locator('.mx-uquiz[data-uquiz="t"]')).to_have_attribute("aria-label", "בוחן מסכם: טכניקה אלגברית 1, 65/100")
+            playwright.expect(page.locator('.mx-uquiz[data-uquiz="t"]')).to_have_attribute("aria-label", "בחני היחידה: טכניקה אלגברית 1, 65/100")
             page.reload()   # the result stays, and opening it again does not check again
             page.locator('.mx-nav [data-view="path"]').click()
             page.locator('.mx-uquiz[data-uquiz="t"]').click()
             page.locator("[data-uq-result]").first.click()
-            playwright.expect(page.locator(".mx-uq-sheet h3")).to_have_text("בוחן מסכם: 65/100", timeout=10000)
+            playwright.expect(page.locator(".mx-uq-sheet h3")).to_have_text("בוחן חיזוק: 65/100", timeout=10000)
             assert len(calls) == 3 and not errors
             # a score written into this device's progress does not change what the result screen shows
             page.evaluate("""() => { for (const k of Object.keys(localStorage)) if (k.startsWith('mathly.progress.v1:')) {
@@ -195,7 +199,7 @@ def test_a_unit_quiz_is_written_photographed_handed_in_and_then_checked(quiz_ser
             page.locator('.mx-nav [data-view="path"]').click()
             page.locator('.mx-uquiz[data-uquiz="t"]').click()
             page.locator("[data-uq-result]").first.click()
-            playwright.expect(page.locator(".mx-uq-sheet h3")).to_have_text("בוחן מסכם: 65/100", timeout=10000)
+            playwright.expect(page.locator(".mx-uq-sheet h3")).to_have_text("בוחן חיזוק: 65/100", timeout=10000)
             playwright.expect(page.locator(".mx-uq-qhead span")).to_have_text(["25/25 נק׳", "15/25 נק׳", "25/25 נק׳", "0/25 נק׳"])
             assert len(calls) == 3 and not errors
         finally:
@@ -211,7 +215,7 @@ def test_when_the_time_and_the_photo_minutes_are_over_the_quiz_is_handed_in(quiz
             page.locator("[data-act=uq-start]").click()
             photograph(page, 0, tmp_path)
             page.locator(".mx-uq-paper .mx-x").click()   # leaving does not stop the clock
-            playwright.expect(page.locator('.mx-uquiz[data-uquiz="k"]')).to_have_attribute("aria-label", "בוחן מסכם: דלתון, בתהליך")
+            playwright.expect(page.locator('.mx-uquiz[data-uquiz="k"]')).to_have_attribute("aria-label", "בחני היחידה: דלתון, בתהליך")
             page.evaluate("""()=>{ const k=Object.keys(localStorage).find(k=>k.startsWith('mathly.progress.v1:'));
               const P=JSON.parse(localStorage.getItem(k)); P.uq.k.sitting.started-=50*60000; localStorage.setItem(k,JSON.stringify(P)); }""")
             page.reload()
@@ -224,7 +228,7 @@ def test_when_the_time_and_the_photo_minutes_are_over_the_quiz_is_handed_in(quiz
             page.reload()
             page.locator('.mx-nav [data-view="path"]').click()
             page.locator('.mx-uquiz[data-uquiz="k"]').click()   # over: handed in as it is, and checked
-            playwright.expect(page.locator(".mx-uq-sheet h3")).to_have_text("בוחן מסכם: 20/100", timeout=20000)
+            playwright.expect(page.locator(".mx-uq-sheet h3")).to_have_text("בוחן חיזוק: 20/100", timeout=20000)
             playwright.expect(page.locator(".mx-uq-sheet .mx-src")).to_contain_text("הוגש כשהזמן נגמר")
             assert len(calls) == 1 and not errors
         finally:
@@ -455,13 +459,13 @@ def test_a_quiz_result_shows_the_teachers_words_and_the_home_screen_tells_about_
             page = context.new_page(); errors = []
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.goto(url)
-            page.locator('.mx-nav [data-view="path"]').click()
+            page.locator('.mx-nav [data-view="home"]').click()
             notice = page.locator(".mx-teacher-comment")
             playwright.expect(notice).to_contain_text("המורה הגיב על תשובה שלכם")
             playwright.expect(notice).to_contain_text("90/100")
             notice.click()
             sheet = page.locator(".mx-uq-sheet")
-            playwright.expect(sheet.locator("h3")).to_have_text("בוחן מסכם: 83/100", timeout=15000)   # 25 + 23 + 25 + 10
+            playwright.expect(sheet.locator("h3")).to_have_text("בוחן חיזוק: 83/100", timeout=15000)   # 25 + 23 + 25 + 10
             second = sheet.locator(".mx-uq-q").nth(1)
             playwright.expect(second.locator(".mx-teacher-note")).to_contain_text("הערת המורה")
             playwright.expect(second.locator(".mx-teacher-note")).to_contain_text("90/100")
@@ -481,8 +485,8 @@ def test_a_quiz_result_shows_the_teachers_words_and_the_home_screen_tells_about_
             # the answer was opened: the notice is gone, and stays gone after a reload
             page.locator(".mx-uq-sheet .mx-x, .mx-uq-sheet [data-act=close]").first.click()
             playwright.expect(page.locator(".mx-teacher-comment")).to_have_count(0)
-            page.reload(); page.locator('.mx-nav [data-view="path"]').click()
-            playwright.expect(page.locator(".mx-trail")).to_be_visible()
+            page.reload(); page.locator('.mx-nav [data-view="home"]').click()
+            playwright.expect(page.locator(".mx-continue")).to_be_visible()
             playwright.expect(page.locator(".mx-teacher-comment")).to_have_count(0)
             assert not errors
         finally:

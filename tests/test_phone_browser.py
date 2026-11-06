@@ -189,11 +189,12 @@ def test_class_teacher_report(phone_server):
             # the practice data says it comes from the device; the quiz grades do not
             playwright.expect(dana.locator("section h5", has_text="התקדמות ביחידות")).to_contain_text("נתוני תרגול מהמכשיר")
             playwright.expect(dana.locator("section h5", has_text="מבחני תרגול")).to_contain_text("נתוני תרגול מהמכשיר")
-            playwright.expect(dana.locator("section h5", has_text="בוחן מסכם")).not_to_contain_text("מהמכשיר")
+            playwright.expect(dana.locator("section h5", has_text="בחני היחידה")).not_to_contain_text("מהמכשיר")
             noa, ben = sheet.locator(".mx-report-student").nth(2), sheet.locator(".mx-report-student").nth(3)
             noa.locator("summary").click(); ben.locator("summary").click()
-            playwright.expect(noa.locator(".mx-report-grade")).to_have_text("ממתין לבדיקה")
-            playwright.expect(ben.locator(".mx-report-grade")).to_have_text("לא מאומת")   # not "100"
+            # columns: the official (final) grade, then the latest practice sitting
+            playwright.expect(noa.locator(".mx-report-grade")).to_have_text(["–", "ממתין לבדיקה"])
+            playwright.expect(ben.locator(".mx-report-grade")).to_have_text(["–", "לא מאומת"])   # not "100"
             playwright.expect(ben.locator(".mx-report-student, summary").first).not_to_contain_text("בוחן 100")
             page.locator(".mx-report-sheet .mx-x").click()
             playwright.expect(sheet).to_be_hidden()
@@ -244,6 +245,7 @@ def test_a_class_teacher_sees_only_their_classes_until_they_view_as_a_student(ph
         try:
             sheet.locator('[data-act="preview-on"]').click()
             playwright.expect(page.locator(".mx-preview")).to_contain_text("מצב תצוגה כתלמיד")
+            page.locator('.mx-nav [data-view="path"]').click()
             playwright.expect(page.locator(".mx-pghead")).to_contain_text("המסלול שלי")   # the trail, as a student has it
             playwright.expect(page.locator('[data-act="class-report"]')).to_have_count(0)
             page.locator('[data-act="preview-off"]').click()
@@ -619,7 +621,7 @@ def open_student_app(p, server, assignments, sittings=(), progress=None, now=Non
     page.route("**/api/math/assignments", lambda route: route.fulfill(json={
         "assignments": assignments, "sittings": list(sittings), "today": "2026-11-04"}))
     page.goto(server)
-    page.locator('.mx-nav [data-view="path"]').click()
+    page.locator('.mx-nav [data-view="home"]').click()   # the assignments are on home
     return browser, page
 
 
@@ -651,9 +653,9 @@ def test_the_home_screen_lists_the_open_assignments_late_ones_and_the_recently_d
             playwright.expect(open_).to_contain_text("1 מתוך 3 הושלמו")
             items = open_.locator(".mx-asg-items li")
             assert [items.nth(i).get_attribute("class") for i in range(3)] == ["done", "", ""]
-            playwright.expect(items.nth(1)).to_contain_text("בוחן מסכם")
+            playwright.expect(items.nth(1)).to_contain_text("בוחן חיזוק")
             playwright.expect(items.nth(2)).to_contain_text("מבחן תרגול")
-            playwright.expect(open_.locator("[data-asg-go]")).to_contain_text("להמשיך: בוחן מסכם")   # the next one to do
+            playwright.expect(open_.locator("[data-asg-go]")).to_contain_text("להמשיך: בוחן חיזוק")   # the next one to do
             done = page.locator(".mx-asg-done")
             playwright.expect(done.locator("summary")).to_have_text("הושלמו (1)")
             done.locator("summary").click()
@@ -699,6 +701,7 @@ def test_a_finished_assignment_leaves_the_card_and_the_skills_of_open_ones_wear_
     with playwright.sync_playwright() as p:
         browser, page = open_student_app(p, phone_server, assignments)
         try:
+            page.locator('.mx-nav [data-view="path"]').click()   # the markers are on the trail
             star = page.locator('.mx-star[data-id="t_ext"]')
             playwright.expect(star.locator(".mx-asg-pin")).to_have_count(1)
             label = star.get_attribute("aria-label")
@@ -744,8 +747,11 @@ def test_the_home_screen_is_quiet_without_assignments(phone_server):
     with playwright.sync_playwright() as p:
         browser, page = open_student_app(p, phone_server, [])
         try:
+            playwright.expect(page.locator(".mx-continue")).to_be_visible()
+            assert page.locator(".mx-asgs").count() == 0
+            page.locator('.mx-nav [data-view="path"]').click()
             playwright.expect(page.locator(".mx-star").first).to_be_visible()
-            assert page.locator(".mx-asgs").count() == 0 and page.locator(".mx-asg-pin").count() == 0
+            assert page.locator(".mx-asg-pin").count() == 0
         finally:
             browser.close()
 
@@ -779,10 +785,14 @@ def test_the_assignments_tab_shows_how_many_finished_and_who_did_what(phone_serv
             playwright.expect(cards.nth(1)).to_contain_text("2 מתוך 3 תלמידים סיימו")      # the skill alone: dana and noa
             first = cards.nth(0)
             first.locator("summary").click()
-            row = lambda who: first.locator("tbody tr", has=page.locator(f"th:text-is('{who}')")).locator("td")
+            row = lambda who: first.locator("tbody tr", has=page.locator(f"th:text-is('{who}')")).locator("td.mx-asg-cell")
             playwright.expect(row("dana")).to_have_text(["✓", "✓", "✓"])
             playwright.expect(row("noa")).to_have_text(["✓", "–", "–"])
             playwright.expect(row("omer")).to_have_text(["–", "–", "–"])
+            state = lambda who: first.locator("tbody tr", has=page.locator(f"th:text-is('{who}')")).locator("td.mx-task-state")
+            playwright.expect(state("dana")).to_have_text("הוגש")          # the same state the student sees
+            playwright.expect(state("noa")).to_have_text("בתהליך")
+            playwright.expect(state("omer")).to_have_text("עוד לא התחיל")
         finally:
             browser.close()
 
@@ -985,5 +995,216 @@ def test_class_editor_takes_the_teacher_as_free_text(phone_server):
             playwright.expect(page.locator(".mx-manage-state")).not_to_have_text("שומרים…")
             assert writes[-1]["teachers"] == ["t@example.com"]
             assert writes[-1]["emails"] == ["a@example.com", "b@example.com", "c@example.com"]
+        finally:
+            browser.close()
+
+
+# ---- focus areas: where each student, and the class, most need work (Sky.focus), and giving practice from there
+def lost_on(skill, earned, at="2026-11-03T09:00:00Z"):
+    return {"id": "sit-" + skill, "unit_id": "t", "submitted_at": at, "grade": 50, "open": 0, "mode": "final",
+            "attempts": [], "questions": [{"points": 25, "earned": earned, "state": "checked", "skills": [skill]}]}
+
+
+def test_a_students_card_says_what_to_work_on_with_its_evidence(phone_server):
+    slips = [{"at": "2026-11-02T09:00:00Z", "id": "t_ext_eq", "q": 0, "m": "sign_mid"}] * 4
+    dana = {**pupil("dana@example.com", slips=slips, tries={"t_ext_eq": 3}), "quiz_sittings": [lost_on("t_ext_eq", 13)]}
+    with playwright.sync_playwright() as p:
+        browser, page, sheet = open_report(p, phone_server, [dana, pupil("noa@example.com")])
+        try:
+            card = sheet.locator(".mx-report-student").filter(has_text="dana")
+            card.locator("summary").first.click()
+            focus = card.locator(".mx-focus")
+            first = focus.locator(".mx-focus-list li").first
+            playwright.expect(first).to_contain_text("איבד 12 נק׳ בבחנים")              # the server's evidence, no device tag
+            playwright.expect(first).to_contain_text("4 טעויות ב־14 ימים · לא הושלם")
+            playwright.expect(first.locator(".mx-device")).to_have_text("· מהמכשיר")   # the device's evidence is labelled
+            first.locator("[data-focus-give]").click()
+            form = sheet.locator("[data-focus-form]")
+            playwright.expect(form.locator('[name=skill][value="t_ext_eq"]')).to_be_checked()
+            playwright.expect(form.locator('[name=student][value="dana@example.com"]')).to_be_checked()
+            playwright.expect(form.locator('[name=student][value="noa@example.com"]')).not_to_be_checked()
+            sheet.locator("[data-report-tab=list]").click()
+            noa = sheet.locator(".mx-report-student").filter(has_text="noa")
+            noa.locator("summary").first.click()
+            playwright.expect(noa.locator(".mx-focus")).to_contain_text("אין כרגע מיומנות שצריך לחזק")
+        finally:
+            browser.close()
+
+
+def test_the_class_view_lists_the_shared_weak_skills_and_gives_practice_to_those_students(phone_server):
+    weak = lambda email: {**pupil(email, tries={"t_area": 2}), "quiz_sittings": [lost_on("t_area", 5)]}
+    students = [weak("dana@example.com"), weak("noa@example.com"), pupil("omer@example.com")]
+    with playwright.sync_playwright() as p:
+        browser, page, sheet = open_report(p, phone_server, students)
+        try:
+            sheet.locator("[data-report-tab=focus]").click()
+            item = sheet.locator(".mx-focus-list li").first
+            playwright.expect(item).to_contain_text("2 תלמידים")
+            item.locator("details summary").click()
+            playwright.expect(item.locator("details")).to_contain_text("dana · noa")
+            item.locator("[data-focus-give]").click()
+            form = sheet.locator("[data-focus-form]")
+            playwright.expect(form.locator('[name=skill][value="t_area"]')).to_be_checked()
+            playwright.expect(form.locator("[name=student]:checked")).to_have_count(2)
+            playwright.expect(form.locator('[name=student][value="omer@example.com"]')).not_to_be_checked()
+        finally:
+            browser.close()
+
+
+# ---- the teacher's inbox: one list of what waits, opened one after another; and releasing a final's results
+def test_the_inbox_opens_each_waiting_item_in_turn(phone_server):
+    import json
+    sub = {"id": "s1", "worksheet_id": "w1", "pages": 1, "submitted_at": "2026-11-03T09:00:00Z", "checked_at": None, "score": None,
+           "comment": "", "version": 1, "state": "submitted", "note": "שאלה 3?"}
+    dana = {**pupil("dana@example.com"), "worksheet_submissions": [sub]}
+    entries = [{"kind": "quiz", "class_id": 4, "student_email": "dana@example.com", "title": "מבחן: טכניקה אלגברית 1 · שאלה 2",
+                "attempt_id": "a2", "unit_id": "t", "window_id": "win", "submitted_at": "2026-11-02T09:00:00Z", "state": "unreadable", "late": False},
+               {"kind": "worksheet", "class_id": 4, "student_email": "dana@example.com", "title": "דף פילוג", "assignment": "חזרה",
+                "assignment_id": "asg", "worksheet_id": "w1", "submission_id": "s1", "version": 1, "note": "שאלה 3?",
+                "submitted_at": "2026-11-03T09:00:00Z", "state": "submitted", "late": False}]
+    saved = []
+
+    def routes(page):
+        page.route("**/api/teacher/inbox**", lambda route: route.fulfill(json={"entries": entries, "count": 2, "unavailable": []}))
+        page.route("**/api/teacher/answers/a2", lambda route: route.fulfill(json=answer_of("a2")))
+        page.route("**/api/teacher/answers/a2/image", lambda route: route.fulfill(body=PNG, content_type="image/jpeg"))
+        page.route("**/api/teacher/answers/a2/review", lambda route: (saved.append(("a2", json.loads(route.request.post_data))),
+                   route.fulfill(json={"review": {"score": 70, "comment": "", "created_at": "2026-11-04T10:00:00Z"}, "request": None}))[1])
+        page.route("**/api/classes/4/worksheets/w1/submissions/s1/pages/1", lambda route: route.fulfill(body=PNG, content_type="image/jpeg"))
+        page.route("**/api/classes/4/worksheets/w1/submissions/s1", lambda route: (saved.append(("s1", json.loads(route.request.post_data))),
+                   route.fulfill(json={**sub, "checked_at": "2026-11-04T10:00:00Z", "score": 90, "state": "checked"}))[1])
+
+    with playwright.sync_playwright() as p:
+        browser, page, sheet = open_report(p, phone_server, [dana], routes=routes, assignments=[])
+        try:
+            sheet.locator("[data-report-tab=inbox]").click()
+            rows = sheet.locator(".mx-inbox-row")
+            playwright.expect(rows).to_have_count(2)
+            playwright.expect(rows.nth(0)).to_contain_text("ה־AI לא הצליח לקרוא")                # oldest first
+            playwright.expect(rows.nth(1)).to_contain_text('"שאלה 3?"')
+            sheet.locator('[data-inbox-filter="kind"]').select_option("worksheet")
+            playwright.expect(rows).to_have_count(1)
+            sheet.locator('[data-inbox-filter="kind"]').select_option("")
+            rows.nth(0).locator("[data-inbox-open]").click()
+            review = page.locator(".mx-tr-sheet")
+            playwright.expect(review.locator(".mx-tr-ai")).to_contain_text("40/100")
+            review.locator("[name=score]").fill("70")
+            review.locator("[data-review-form] [type=submit]").click()
+            # saved: the next one, Dana's worksheet, opens by itself
+            ws = page.locator(".mx-report-sheet .mx-ws-review")
+            playwright.expect(ws.locator(".mx-ws-note-shown")).to_contain_text("שאלה 3?")
+            ws.locator("[data-ws-check] [name=score]").fill("90")
+            ws.locator("[data-ws-check] [type=submit]").click()
+            playwright.expect(page.locator(".mx-report-sheet .mx-report")).to_contain_text("סיימתם את כל מה שממתין")
+            assert saved == [("a2", {"comment": "", "score": 70}), ("s1", {"score": 90, "comment": ""})]
+        finally:
+            browser.close()
+
+
+def test_releasing_a_finals_results_with_open_checks_asks_first(phone_server):
+    released = []
+    late = {**pupil("noa@example.com"), "quiz_sittings": [{"id": "f2", "unit_id": "t", "mode": "final", "window_id": "win", "grade": None, "open": 1,
+                                                         "submitted_at": "2026-11-03T09:00:00Z", "attempts": [], "questions": []}]}
+    done = {**pupil("dana@example.com"), "quiz_sittings": [{"id": "f1", "unit_id": "t", "mode": "final", "window_id": "win", "grade": 80, "open": 0,
+                                                          "submitted_at": "2026-11-03T09:00:00Z", "attempts": [], "questions": []}]}
+    windows = {"windows": [{"id": "win", "class_id": 4, "unit_id": "t", "opens_at": "2026-11-03T08:00:00+00:00",
+                            "closes_at": "2026-11-03T10:00:00+00:00", "released_at": None}], "grants": [], "starts": [], "now": "2026-11-04T12:00:00+00:00"}
+
+    def routes(page):
+        page.route("**/api/classes/4/quiz-windows", lambda route: route.fulfill(json=windows))
+        page.route("**/api/classes/4/quiz-windows/win/release", lambda route: (released.append(1), route.fulfill(json={**windows["windows"][0], "released_at": "x"}))[1])
+
+    with playwright.sync_playwright() as p:
+        browser, page, sheet = open_report(p, phone_server, [done, late], routes=routes, assignments=[])
+        try:
+            sheet.locator("[data-report-tab=finals]").click()
+            card = sheet.locator(".mx-final-t")
+            playwright.expect(card).to_contain_text("הגישו 2 מתוך 2 · נבדקו במלואם 1")
+            asked = []
+            page.on("dialog", lambda d: (asked.append(d.message), d.accept()))
+            card.locator("[data-final-release]").click()
+            page.wait_for_timeout(300)
+            assert asked and "בוחן אחד עוד לא נבדק" in asked[0] and released == [1]
+        finally:
+            browser.close()
+
+
+def test_the_teacher_opens_a_final_quiz_and_gives_one_student_another_sitting(phone_server):
+    import json
+    posted = []
+    windows = {"windows": [], "grants": [], "starts": [], "now": "2026-11-04T12:00:00+00:00"}
+
+    def windows_route(route):
+        if route.request.method == "POST":
+            body = json.loads(route.request.post_data)
+            posted.append(("open", body))
+            windows["windows"].append({"id": "win", "class_id": 4, "unit_id": body["unit_id"], "opens_at": body["opens_at"],
+                                       "closes_at": body["closes_at"], "released_at": None})
+            return route.fulfill(status=201, json=windows["windows"][-1])
+        route.fulfill(json=windows)
+
+    def grant_route(route):
+        posted.append(("grant", json.loads(route.request.post_data)))
+        route.fulfill(status=201, json={"id": "g", "window_id": "win"})
+
+    def routes(page):
+        page.route("**/api/classes/4/quiz-windows", windows_route)
+        page.route("**/api/classes/4/quiz-windows/win/grants", grant_route)
+
+    with playwright.sync_playwright() as p:
+        browser, page, sheet = open_report(p, phone_server, [pupil("dana@example.com")], routes=routes, assignments=[])
+        try:
+            sheet.locator("[data-report-tab=finals]").click()
+            form = sheet.locator("[data-final-open]")
+            form.locator("button[type=submit]").click()
+            card = sheet.locator(".mx-final-t")
+            playwright.expect(card).to_contain_text("טכניקה אלגברית 1")
+            kind, body = posted[0]
+            assert kind == "open" and body["unit_id"] == "t" and body["opens_at"] < body["closes_at"]
+            card.locator("details summary").click()
+            card.locator("[data-final-grant] [name=reason]").fill("נעדרה")
+            card.locator("[data-final-grant] button[type=submit]").click()
+            page.wait_for_timeout(300)
+            assert posted[1][0] == "grant" and posted[1][1]["student_email"] == "dana@example.com" and posted[1][1]["reason"] == "נעדרה"
+        finally:
+            browser.close()
+
+
+def test_prompter_from_management(phone_server):
+    with playwright.sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page()
+            page.route("https://cdn.jsdelivr.net/**", lambda route: route.abort())
+            page.add_init_script('''window.supabase={createClient:()=>({auth:{
+                getSession:async()=>({data:{session:{access_token:"test",user:{id:"test"}}}}),
+                onAuthStateChange:()=>{},signOut:async()=>{}
+            }})};''')
+
+            def index(route):
+                response = route.fetch()
+                route.fulfill(response=response, body=response.text().replace(
+                    'supabaseUrl:""', 'supabaseUrl:"https://auth.invalid"'))
+
+            page.route(phone_server + "/", index)
+            page.route("**/api/me", lambda route: route.fulfill(json={
+                "email": "dev@example.com", "user_id": "test", "answer_scans": False,
+                "permissions": ["management.access"], "classes": []}))
+            page.route("**/api/math/progress", lambda route: route.fulfill(json={"progress": {}}))
+            page.route("**/api/classes", lambda route: route.fulfill(json={"classes": []}))
+            page.goto(phone_server)
+            page.locator('[data-act="manage"]').click()
+            page.locator('[data-act="manage-prompter"]').click()
+            page.locator("#mxPrompterText").fill("שלום לכולם\nזה טקסט לפרומפטר")
+            page.locator('[data-act="prompter-go"]').click()
+            prompter = page.locator(".mxp")
+            playwright.expect(prompter.locator(".mxp-text")).to_have_text("שלום לכולם\nזה טקסט לפרומפטר")
+            page.keyboard.press("m")
+            playwright.expect(prompter).to_have_class("mxp mirror")
+            page.keyboard.press(" ")
+            playwright.expect(prompter).to_have_class("mxp mirror playing", timeout=5000)
+            page.keyboard.press("Escape")
+            playwright.expect(prompter).to_have_count(0)
+            playwright.expect(page.locator(".mx-manage-sheet")).to_be_visible()   # Esc closes only the prompter
         finally:
             browser.close()

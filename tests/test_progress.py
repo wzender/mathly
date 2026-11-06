@@ -116,3 +116,11 @@ def test_merge_keeps_the_most_worked_example_openings_and_the_latest_time():
     for out in (merge(phone, laptop), merge(laptop, phone)):
         assert out["examples"] == {"a": {"n": 3, "last": "2026-11-02T10:00:00Z"}, "b": {"n": 1, "last": "2026-11-01T11:00:00Z"}}
     assert merge({}, phone)["examples"] == phone["examples"]
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="needs node")
+def test_merge_keeps_the_most_wrong_answers_per_skill():
+    phone = {"updated": 200, "wrongs": {"a": 2, "b": 1}}
+    laptop = {"updated": 100, "wrongs": {"a": 5}}
+    for out in (merge(phone, laptop), merge(laptop, phone)):
+        assert out["wrongs"] == {"a": 5, "b": 1}

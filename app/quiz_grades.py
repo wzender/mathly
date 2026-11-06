@@ -35,10 +35,14 @@ def sitting_view(sitting: dict, units: list[dict] | None = None) -> dict | None:
     if not unit or "quiz" not in unit:
         return None
     attempts = sitting.get("attempts") or []
-    questions = [question_result(q["points"], attempts[i] if i < len(attempts) else None)
+    # each question also names the skills it tests, so lost points can be traced to skills (focus areas, retakes)
+    questions = [{**question_result(q["points"], attempts[i] if i < len(attempts) else None), "skills": list(q.get("skills") or [])}
                  for i, q in enumerate(unit["quiz"]["questions"])]
     open_count = sum(1 for q in questions if q["earned"] is None)
     return {"id": sitting["id"], "unit_id": unit["id"], "submitted_at": sitting.get("submitted_at"),
             "time_up": bool(sitting.get("time_up")), "attempts": [a.get("attempt_id") for a in attempts],
+            # practice (retake any time) or final (given once, the official grade): app/quiz_modes.py
+            "mode": sitting.get("mode") or "practice", "window_id": sitting.get("window_id"),
+            "started_at": sitting.get("started_at"),
             "questions": questions, "open": open_count,
             "grade": None if open_count else sum(q["earned"] for q in questions)}

@@ -267,3 +267,35 @@ def test_the_skills_still_missing_a_worked_example_are_listed():
     missing = skills_without_example(graph)
     assert graph["skills"][0]["id"] not in missing and graph["skills"][1]["id"] in missing
     assert set(missing) <= {s["id"] for s in graph["skills"]}
+
+
+def test_every_unit_quiz_question_names_skills_of_its_unit():
+    graph = algebra9()
+    for unit in (u for u in graph["units"] if "quiz" in u):
+        mine = {s["id"] for s in graph["skills"] if s["unit"] == unit["id"]}
+        for q in unit["quiz"]["questions"]:
+            assert 1 <= len(q["skills"]) <= 3 and set(q["skills"]) <= mine
+
+
+def test_a_quiz_question_without_skills_or_with_a_foreign_skill_is_named():
+    graph = copy.deepcopy(algebra9())
+    t = next(u for u in graph["units"] if u["id"] == "t")
+    t["quiz"]["questions"][0].pop("skills")
+    t["quiz"]["questions"][1]["skills"] = ["k_def"]
+    t["quiz"]["questions"][2]["skills"] = ["t_ext", "t_ext", "t_area"]
+    t["quiz"]["questions"][3]["skills"] = ["t_ext", "t_simplify", "t_area", "t_formulas"]
+    found = problems(graph)
+    assert "t quiz question 1: skills must name 1 to 3 different skills" in found
+    assert "t quiz question 2: skill k_def is not a skill of unit t" in found
+    assert "t quiz question 3: skills must name 1 to 3 different skills" in found
+    assert "t quiz question 4: skills must name 1 to 3 different skills" in found
+
+
+def test_skill_tags_do_not_change_a_quiz_questions_version():
+    from app.math_skills import quiz_snapshot
+    graph = copy.deepcopy(algebra9())
+    t = next(u for u in graph["units"] if u["id"] == "t")
+    before = question_version(quiz_snapshot(t, 0))
+    t["quiz"]["questions"][0]["skills"] = ["t_formulas"]
+    assert question_version(quiz_snapshot(t, 0)) == before
+    assert "skills" not in quiz_snapshot(t, 0)

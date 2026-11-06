@@ -47,6 +47,10 @@ def test_guide_opens_with_student_and_teacher_tabs(server):
             guide = page.get_by_role("dialog", name="איך משתמשים באפליקציה")
             playwright.expect(guide).to_be_visible()
             playwright.expect(page.locator("#mgS")).to_contain_text("בוחן מסכם")
+            playwright.expect(page.locator("#mgS")).to_contain_text("אפשר לעשות כמה פעמים שרוצים, והציון הכי טוב הוא שנשאר")   # בוחן
+            playwright.expect(page.locator("#mgS")).to_contain_text("מגישים פעם אחת")   # מבחן
+            playwright.expect(page.locator("#mgS")).to_contain_text("בית ומסלול")   # the two tabs
+            playwright.expect(page.locator("#mgS")).to_contain_text("מבחן תרגול כמו במבחן")   # the quizzes before an exam
             playwright.expect(page.locator("#mgT")).to_be_hidden()
             page.get_by_role("tab", name="למורים").click()
             playwright.expect(page.locator("#mgT")).to_contain_text("הכיתות שלי")

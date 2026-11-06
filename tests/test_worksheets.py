@@ -91,10 +91,13 @@ class MemoryWorksheets(Worksheets):
         self._check()
         return self.subs.get(sid)
 
-    def save_submission(self, row):
+    def add_submission(self, row):
         self._check()
-        old = next((s for s in self.subs.values() if s["worksheet_id"] == row["worksheet_id"] and s["student_id"] == row["student_id"]), None)
-        saved = {"checked_at": None, "score": None, "comment": "", **(old or {"id": str(uuid.uuid4())}), **row}
+        if any(s["worksheet_id"] == row["worksheet_id"] and s["student_id"] == row["student_id"]
+               and (s.get("version") or 1) == (row.get("version") or 1) for s in self.subs.values()):
+            raise WorksheetsUnavailable("worksheets_unavailable")   # the unique key
+        saved = {"checked_at": None, "score": None, "comment": "", "version": 1, "state": "submitted", "note": "",
+                 "returned_at": None, "return_comment": "", "return_due_on": None, "id": str(uuid.uuid4()), **row}
         self.subs[saved["id"]] = saved
         return saved
 
@@ -467,7 +470,8 @@ def test_the_ai_check_suggests_a_score_and_comment_and_counts_toward_the_three(m
         async with client(app, TEACHER) as teacher:
             r = await teacher.post(url)
             assert r.status_code == 200, r.text
-            assert r.json() == {"score": 80, "comment": "יפה מאוד. תרגיל 3 דורש תיקון.", "readable": True, "left": 2}
+            assert r.json() == {"score": 80, "comment": "יפה מאוד. תרגיל 3 דורש תיקון.", "readable": True, "left": 2,
+                             "class_budget": False}   # no class budget here: the teacher's own allowance
             assert grader.calls == [("דף עבודה – פיתגורס", 3, 2)]                          # 3 sheet pages, 2 solution pages
             assert app.state.worksheets.subs[sid]["checked_at"] is None                    # a suggestion: nothing is saved
             for _ in range(2):
@@ -498,7 +502,7 @@ def test_a_failed_or_unreadable_ai_check_is_given_back(monkeypatch):
             assert (r.status_code, r.json()["detail"]) == (503, "ai_check_failed|provider_error")
             app.state.homework_grader = Grader({"readable": False, "score": None, "comment": "צלמו שוב", "usage": None})
             r = await teacher.post(url)
-            assert r.json() == {"score": None, "comment": "צלמו שוב", "readable": False, "left": 3}
+            assert r.json() == {"score": None, "comment": "צלמו שוב", "readable": False, "left": 3, "class_budget": False}
             assert (await teacher.get("/api/me")).json()["ai_left"] == 3                   # none of the two counted
     asyncio.run(check())
 
@@ -567,3 +571,100 @@ def test_a_worksheet_page_can_be_photographed_like_an_answer():
         async with client(app, OUTSIDER) as outsider:
             assert (await outsider.post("/api/math/worksheet-attempts", json={"worksheet_id": wid})).status_code in (403, 404)
     asyncio.run(check())
+
+
+def test_a_note_comes_with_the_hand_in_and_a_returned_submission_is_handed_in_again_as_a_new_version():
+    store = MemoryWorksheets()
+    app = setup(store)
+
+    async def check():
+        async with client(app, TEACHER) as teacher:
+            wid = (await upload(teacher)).json()["id"]
+            await assign(teacher, wid)
+        async with client(app, STUDENT) as student:
+            long = await student.put(f"/api/math/worksheets/{wid}/submission", files=photos(1), data={"note": "א" * 301})
+            assert (long.status_code, long.json()["detail"]) == (400, "note_too_long") and not store.subs
+            first = (await student.put(f"/api/math/worksheets/{wid}/submission", files=photos(2),
+                                       data={"note": "לא הבנתי את שאלה 3"})).json()
+            assert (first["note"], first["version"], first["state"]) == ("לא הבנתי את שאלה 3", 1, "submitted")
+        sid = first["id"]
+        url = f"/api/classes/3/worksheets/{wid}/submissions/{sid}"
+        async with client(app, TEACHER) as teacher, client(app, STUDENT) as student:
+            subs = (await teacher.get("/api/classes/3/report")).json()["students"]
+            (mine,) = [s["worksheet_submissions"] for s in subs if s["email"] == EMAILS[STUDENT]]
+            assert mine[0]["note"] == "לא הבנתי את שאלה 3"   # the teacher sees the note
+            assert (await teacher.post(url + "/return", json={"comment": "  "})).status_code == 400
+            assert (await student.post(url + "/return", json={"comment": "x"})).status_code == 403
+            back = await teacher.post(url + "/return", json={"comment": "חסרה דרך פתרון בשאלה 2", "due_on": "2026-11-16"})
+            assert back.status_code == 200
+            assert (back.json()["state"], back.json()["return_comment"], back.json()["return_due_on"]) == (
+                "returned", "חסרה דרך פתרון בשאלה 2", "2026-11-16")
+            seen = (await student.get("/api/math/assignments")).json()["submissions"][0]
+            assert seen["state"] == "returned" and seen["return_comment"] == "חסרה דרך פתרון בשאלה 2"
+            fixed = await student.put(f"/api/math/worksheets/{wid}/submission", files=photos(3), data={"note": "תיקנתי"})
+            assert fixed.status_code == 200
+            got = fixed.json()
+            assert (got["version"], got["state"], got["pages"], got["note"]) == (2, "submitted", 3, "תיקנתי")
+            assert [(e["version"], e["state"], e["return_comment"]) for e in got["earlier"]] == [(1, "returned", "חסרה דרך פתרון בשאלה 2")]
+            assert len(store.subs) == 2
+            # the earlier version's pages stay to look back at
+            assert (await student.get(f"/api/math/worksheets/{wid}/submission/pages/2?version=1")).status_code == 200
+            assert (await student.get(f"/api/math/worksheets/{wid}/submission/pages/3?version=1")).status_code == 404
+            # only the current version can be returned
+            stale = await teacher.post(url + "/return", json={"comment": "שוב"})
+            assert (stale.status_code, stale.json()["detail"]) == (409, "not_the_current_version")
+            report = (await teacher.get("/api/classes/3/report")).json()["students"]
+            (mine,) = [s["worksheet_submissions"] for s in report if s["email"] == EMAILS[STUDENT]]
+            assert [(x["version"], x["state"]) for x in mine] == [(2, "submitted")] and mine[0]["earlier"][0]["version"] == 1
+            # checked: no more hand-ins
+            await teacher.put(f"/api/classes/3/worksheets/{wid}/submissions/{got['id']}", json={"score": 90})
+            refused = await student.put(f"/api/math/worksheets/{wid}/submission", files=photos(1))
+            assert (refused.status_code, refused.json()["detail"]) == (409, "already_checked")
+    asyncio.run(check())
+    kinds = [a["kind"] for a in app.state.actions.recent(50)]
+    assert kinds.count("worksheet_returned") == 1
+
+
+def test_the_versions_migration_keeps_old_submissions_as_version_one(postgres_server):  # noqa: F811
+    psycopg = pytest.importorskip("psycopg")
+    database = "wsv_" + uuid.uuid4().hex
+    with psycopg.connect(postgres_server.get_uri(), autocommit=True) as c:
+        c.execute("create database " + database)
+    try:
+        with psycopg.connect(postgres_server.get_uri(database=database), autocommit=True) as c:
+            c.execute(BOOTSTRAP)
+            c.execute(MIGRATION.read_text())
+            wid = c.execute("insert into math_worksheets(class_id,title,source,pages,page_keys,byte_size) "
+                            "values(1,'דף','images',1,array['a'],1) returning id").fetchone()[0]
+            sid = str(uuid.uuid4())
+            c.execute("insert into math_worksheet_submissions(worksheet_id,student_id,page_keys,checked_at) values(%s,%s,array['p'],now())", (wid, sid))
+            c.execute(Path("supabase/migrations/20261106110000_math_worksheet_versions.sql").read_text())
+            assert c.execute("select version, state from math_worksheet_submissions").fetchone() == (1, "checked")
+            c.execute("insert into math_worksheet_submissions(worksheet_id,student_id,page_keys,version) values(%s,%s,array['q'],2)", (wid, sid))
+            with pytest.raises(psycopg.errors.UniqueViolation):
+                c.execute("insert into math_worksheet_submissions(worksheet_id,student_id,page_keys,version) values(%s,%s,array['r'],2)", (wid, sid))
+            with pytest.raises(psycopg.errors.CheckViolation):
+                c.execute("insert into math_worksheet_submissions(worksheet_id,student_id,page_keys,version,note) values(%s,%s,array['r'],3,%s)", (wid, sid, "א" * 301))
+    finally:
+        with psycopg.connect(postgres_server.get_uri(), autocommit=True) as c:
+            c.execute("drop database " + database + " with (force)")
+
+
+def test_before_the_versions_migration_submissions_are_read_and_written_as_before():
+    from app.auth import AuthUnavailable
+    asked = []
+
+    class OldTable:
+        secret, url = "server-test", "https://test.invalid"
+
+        def _admin(self, path, method="GET", body=None, prefer=""):
+            asked.append((path, body))
+            if "version" in path or (isinstance(body, dict) and "note" in body):
+                raise AuthUnavailable("supabase answered 400: column math_worksheet_submissions.version does not exist")
+            return [{"id": "s1"}]
+
+    store = Worksheets(OldTable())
+    assert store.submissions(["11111111-1111-4111-8111-111111111111"]) == [{"id": "s1"}]
+    assert store.legacy and "version" not in asked[-1][0]
+    store.check("s1", {"page_keys": ["k"], "note": "x", "state": "submitted"})
+    assert asked[-1][1] == {"page_keys": ["k"]}   # the new columns are left out

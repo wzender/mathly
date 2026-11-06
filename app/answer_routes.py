@@ -5,6 +5,7 @@ import logging
 import os
 import secrets
 import uuid
+from datetime import timedelta
 
 from fastapi import BackgroundTasks, Depends, File, UploadFile
 from fastapi.responses import JSONResponse, Response
@@ -16,11 +17,13 @@ from .answer_scans import AnswerScans, MAX_IMAGE, ScanError, clean_image, public
 from .answer_grading import AnswerGrader
 from .math_photo import PhotoUnavailable
 from .quiz_grades import sitting_view
+from .quiz_modes import QuizModes, QuizModesUnavailable, hide_results, now_utc, parse_time
 from .teacher_ai import LIMIT_CODE as TEACHER_AI_LIMIT, LimitReached, NO_LIMIT
 from .teacher_review import MAX_MESSAGE, effective_score, for_student as review_for_student, request_for_student
 from .math_skills import algebra9, question_version, quiz_snapshot
 
 log = logging.getLogger("mathly.answer_routes")
+DEADLINE_SLACK = timedelta(seconds=30)
 VERDICTS = {"correct": "נכונה", "partial": "נכונה חלקית", "incorrect": "שגויה",
             "unreadable": "לא קריאה", "needs_review": "דורשת בדיקה"}
 
@@ -42,6 +45,10 @@ def install_answer_routes(app, signed_in):
         app.state.answers = AnswerScans(app.state.auth)
     if not hasattr(app.state, "ai_queue"):
         app.state.ai_queue = AiQueue(app.state.auth)
+    if not hasattr(app.state, "quiz_modes"):
+        app.state.quiz_modes = QuizModes(app.state.auth)
+    if not hasattr(app.state, "open_final"):
+        app.state.open_final = lambda _user, _unit: None   # replaced by app/quiz_modes.py
 
     @app.exception_handler(ScanError)
     async def scan_error(_request, exc):
@@ -118,7 +125,7 @@ def install_answer_routes(app, signed_in):
                           snapshot={"name": question["name"], **sample}, new=body.get("new") is True))
 
     @app.post("/api/math/quiz-attempts")
-    def quiz_attempt(body: dict, user=Depends(student)):
+    def quiz_attempt(body: dict, user=Depends(student), account=Depends(signed_in)):
         """An answer to a question of a unit's summarizing quiz: `new` starts the attempt of a new sitting."""
         if open_ended_locked():
             raise ScanError(403, "open_ended_locked")
@@ -130,22 +137,62 @@ def install_answer_routes(app, signed_in):
         version = question_version(snapshot)
         if body.get("question_version") != version:
             raise ScanError(409, "question_changed")
-        return reply(call(user, "resume", student_view=True, question_id=f"quiz:{unit['id']}:{index}",
-                          question_version=version, snapshot=snapshot, new=body.get("new") is True))
+        start = None
+        if body.get("start_id") is not None:   # an answer of a final sitting (app/quiz_modes.py)
+            start = final_start(user, body["start_id"], unit["id"])
+            if final_over(start):
+                raise ScanError(409, "quiz_time_over")
+        elif body.get("first") is True and account is not None and app.state.open_final(account, unit["id"]):
+            raise ScanError(409, "final_open")   # no practice of a unit while its final quiz waits for the student
+        result = call(user, "resume", student_view=True, question_id=f"quiz:{unit['id']}:{index}",
+                      question_version=version, snapshot=snapshot, new=body.get("new") is True)
+        if start is not None:
+            ids = list(start.get("attempt_ids") or [])
+            ids += [None] * (index + 1 - len(ids))
+            if ids[index] != result["attempt"]["id"]:
+                ids[index] = result["attempt"]["id"]
+                if None in ids:   # the array has no holes: an attempt not made yet is a placeholder until it is
+                    ids = [a or result["attempt"]["id"] for a in ids]
+                quiz_modes().update_start(start["id"], {"attempt_ids": ids})
+        return reply(result)
 
     @app.post("/api/math/quiz-sittings")
-    def submit_sitting(body: dict, user=Depends(student), account=Depends(signed_in)):
+    def submit_sitting(body: dict, background: BackgroundTasks, user=Depends(student), account=Depends(signed_in)):
         """Hands a unit quiz in: the sitting is kept on the server and its grade is worked out there from the checks
         (app/quiz_grades.py). Sending the same `client_key` again returns the same sitting. A student's answers all go
-        to their teacher's queue right here, so none depends on the page staying open to ask for each one."""
+        to their teacher's queue right here, so none depends on the page staying open to ask for each one.
+        With `start_id` it is a final sitting (app/quiz_modes.py): its answers are the start's, and it is the start's
+        one sitting."""
         if open_ended_locked():
             raise ScanError(403, "open_ended_locked")
         unit = next((u for u in algebra9()["units"] if u["id"] == body.get("unit_id") and "quiz" in u), None)
         attempts = body.get("attempts")
         if not unit or not isinstance(attempts, list) or len(attempts) != len(unit["quiz"]["questions"]):
             raise ScanError(404, "not_found")
-        sitting = app.state.answers.quiz(user, "submit", unit_id=unit["id"], attempt_ids=[uuid_text(a) for a in attempts],
-                                         time_up=body.get("time_up") is True, client_key=uuid_text(body.get("client_key")))
+        ids = [uuid_text(a) for a in attempts]
+        if body.get("start_id") is not None:
+            start = final_start(user, body["start_id"], unit["id"])
+            if ids != list(start.get("attempt_ids") or []):
+                raise ScanError(409, "invalid_sitting")
+            sitting = hand_in_final(user, account, unit, start, time_up=body.get("time_up") is True)
+        else:
+            sitting = hand_in(user, account, unit, ids, time_up=body.get("time_up") is True,
+                              client_key=uuid_text(body.get("client_key")))
+            # a practice sitting: sent to the AI now when the class turned that on (app/ai_batches.py); a final waits
+            auto = getattr(app.state, "ai_auto_send", None)
+            if auto is not None and account is not None and not may_send(account):
+                try:
+                    auto(account.get("email", ""), [a["attempt_id"] for a in sitting.get("attempts") or []], background)
+                except ScanError as exc:
+                    log.warning("practice answers not sent automatically: %s", exc.code)
+        return JSONResponse({**student_sitting(sitting), **({"code": sitting["code"]} if sitting.get("code") else {})},
+                            headers={"Cache-Control": "no-store"})
+
+    def hand_in(user, account, unit, ids, *, time_up, client_key, final=None):
+        """Stores the sitting, then puts each photographed answer in the teacher's queue (a student who may not call the
+        AI). `final`: the mode, start time and window of a final sitting."""
+        sitting = app.state.answers.quiz(user, "submit", unit_id=unit["id"], attempt_ids=ids, time_up=time_up,
+                                         client_key=client_key, **(final or {}))
         if account is not None and not may_send(account) and grading_key():
             aids = [a["attempt_id"] for a in sitting.get("attempts") or []]
             code = ""
@@ -163,18 +210,110 @@ def install_answer_routes(app, signed_in):
                         ask_teacher(user, account, aid, found, True, code)   # automatic: an answer the teacher declined stays declined
                 except ScanError as exc:   # one answer that cannot be queued now must not lose the hand-in
                     log.warning("quiz answer not queued for the teacher: %s", exc.code)
-        return JSONResponse({**sitting_view(sitting), **({"code": sitting["code"]} if sitting.get("code") else {})}, headers={"Cache-Control": "no-store"})
+        return sitting
+
+    def hand_in_final(user, account, unit, start, *, time_up):
+        """A final sitting's hand-in: its key is the start's id, so the page and the server's own hand-in after the
+        deadline are the same sitting."""
+        ids = list(start.get("attempt_ids") or [])
+        if len(ids) != len(unit["quiz"]["questions"]):
+            raise ScanError(409, "invalid_sitting")
+        sitting = hand_in(user, account, unit, ids, time_up=time_up, client_key=start["id"],
+                          final={"mode": "final", "started_at": start["started_at"], "window_id": start["window_id"]})
+        if not start.get("sitting_id"):
+            try:
+                quiz_modes().update_start(start["id"], {"sitting_id": sitting["id"]})
+            except QuizModesUnavailable:
+                log.warning("a final sitting was handed in but its start was not marked")
+        return sitting
+
+    def quiz_modes():
+        return app.state.quiz_modes
+
+    def final_start(user, start_id, unit_id=None) -> dict:
+        """The student's own final-sitting start; 404 otherwise."""
+        try:
+            start = quiz_modes().start(uuid_text(start_id))
+        except QuizModesUnavailable as exc:
+            raise ScanError(503, "quiz_modes_unavailable") from exc
+        if not start or start.get("user_id") != user or (unit_id and start.get("unit_id") != unit_id):
+            raise ScanError(404, "not_found")
+        return start
+
+    def final_over(start) -> bool:
+        """No more answers: handed in, or past the deadline (a few seconds' slack for the network)."""
+        deadline = parse_time(start.get("deadline"))
+        return bool(start.get("sitting_id")) or deadline is None or now_utc() > deadline + DEADLINE_SLACK
+
+    def final_guard(user, attempt):
+        """Refuses a photo for an answer of a final sitting that is over, and hands that sitting in if the page did
+        not (the answers it has are its answers). Only quiz answers can be of a final sitting."""
+        qm = getattr(app.state, "quiz_modes", None)
+        if qm is None or not qm.configured or not str((attempt or {}).get("question_id", "")).startswith("quiz:"):
+            return
+        try:
+            start = qm.start_with_attempt(attempt["id"])
+        except QuizModesUnavailable:
+            return   # no final quizzes without the tables
+        if not start or start.get("user_id") != user or not final_over(start):
+            return
+        if not start.get("sitting_id"):
+            unit = next((u for u in algebra9()["units"] if u["id"] == start["unit_id"] and "quiz" in u), None)
+            try:
+                if unit:
+                    hand_in_final(user, None, unit, start, time_up=True)
+            except ScanError as exc:
+                log.warning("a final sitting past its deadline was not handed in: %s", exc.code)
+        raise ScanError(409, "quiz_time_over")
+
+    def released_windows(views) -> set[str]:
+        ids = {v["window_id"] for v in views if v and v.get("mode") == "final" and v.get("window_id")}
+        if not ids:
+            return set()
+        try:
+            return {w["id"] for w in quiz_modes().windows_by_ids(ids) if w.get("released_at")}
+        except QuizModesUnavailable:
+            return set()
+
+    def student_sitting(sitting, released=None):
+        """A sitting as its student sees it: a final one without its grade until the teacher releases the results."""
+        view = sitting_view(sitting)
+        if view is None or view.get("mode") != "final":
+            return view
+        released = released_windows([view]) if released is None else released
+        return {**view, "released": True} if view.get("window_id") in released else hide_results(view)
+
+    def hide_unreleased(user, result):
+        """An answer of a final sitting whose results are not released: received, no check to see yet."""
+        if not isinstance(result, dict) or not str((result.get("attempt") or {}).get("question_id", "")).startswith("quiz:"):
+            return result
+        qm = getattr(app.state, "quiz_modes", None)
+        if qm is None or not qm.configured:
+            return result
+        try:
+            start = qm.start_with_attempt(result["attempt"]["id"])
+            window = qm.window(start["window_id"]) if start else None
+        except QuizModesUnavailable:
+            return result
+        if not start or (window and window.get("released_at")):
+            return result
+        ai = result.get("ai_request")
+        return {**result, "unreleased": True, "grading": {"state": "unreleased"} if result.get("grading") else None,
+                "teacher_review": None, "effective_score": None,
+                "ai_request": {**ai, "result": None} if isinstance(ai, dict) else ai}
 
     @app.get("/api/math/quiz-sittings")
     def my_sittings(unit_id: str | None = None, user=Depends(student)):
         """The student's own sittings (newest first), each with the grade the server worked out."""
         data = {"unit_id": unit_id} if unit_id else {}
-        views = [sitting_view(s) for s in app.state.answers.quiz(user, "list", **data)]
+        rows = app.state.answers.quiz(user, "list", **data)
+        released = released_windows([sitting_view(s) for s in rows])
+        views = [student_sitting(s, released) for s in rows]
         return JSONResponse({"sittings": [v for v in views if v]}, headers={"Cache-Control": "no-store"})
 
     @app.get("/api/math/answer-attempts/{attempt_id}")
     def get_attempt(attempt_id: str, user=Depends(student)):
-        return reply(call(user, "get", student_view=True, attempt_id=uuid_text(attempt_id)))
+        return reply(hide_unreleased(user, call(user, "get", student_view=True, attempt_id=uuid_text(attempt_id))))
 
     @app.post("/api/math/answer-attempts/{attempt_id}/review-request")
     def ask_review(attempt_id: str, body: dict | None = None, user=Depends(student)):
@@ -199,8 +338,11 @@ def install_answer_routes(app, signed_in):
 
     @app.post("/api/math/answer-attempts/{attempt_id}/grade")
     def grade_answer(attempt_id: str, body: dict | None = None, user=Depends(student), account=Depends(signed_in)):
-        return evaluate_answer(user, uuid_text(attempt_id), automatic=bool(body and body.get("automatic") is True),
-                               account=account)
+        result = evaluate_answer(user, uuid_text(attempt_id), automatic=bool(body and body.get("automatic") is True),
+                                 account=account)
+        if account is None or may_send(account):
+            return reply(result)   # a teacher's own check, or sign-in off: nothing to hold back
+        return reply(hide_unreleased(user, result))
 
     def evaluate_answer(user, aid, *, automatic=False, account=None):
         """Checks the answer with the AI. `account`: the signed-in student asking; one who may not call the AI
@@ -214,7 +356,7 @@ def install_answer_routes(app, signed_in):
             raise ScanError(409, "not_gradable")   # homework pages are checked by the teacher, from the hand-in
         existing = app.state.answers.grade(user, "get", attempt_id=aid)
         if existing and (automatic or existing["state"] in ("grading", "completed")):
-            return reply(call(user, "get", attempt_id=aid))
+            return call(user, "get", attempt_id=aid)
         key = grading_key()
         if not key:
             raise ScanError(503, "grading_unavailable", "missing_key", "ANTHROPIC_API_KEY is not set")
@@ -233,7 +375,7 @@ def install_answer_routes(app, signed_in):
             raise
         if grading["state"] != "grading" or grading["lease_id"] != lease:
             quota.give_back(taken)   # another check is already running
-            return reply(call(user, "get", attempt_id=aid))
+            return call(user, "get", attempt_id=aid)
         try:
             grader = getattr(app.state, "answer_grader", None) or AnswerGrader(key)
             assessment = grader.grade(app.state.answers.read(result["attachment"]["object_key"]),
@@ -256,7 +398,7 @@ def install_answer_routes(app, signed_in):
                 log.error("answer grader failed: %s", type(exc).__name__)
                 reason, detail = "server_error", f"{type(exc).__name__}: {' '.join(str(exc).split())[:200]}"
             raise ScanError(503, "grading_failed", reason, detail) from exc
-        return reply(call(user, "get", attempt_id=aid))
+        return call(user, "get", attempt_id=aid)
 
     def ask_teacher(user, account, aid, result, automatic, code=""):
         queue = app.state.ai_queue
@@ -276,7 +418,7 @@ def install_answer_routes(app, signed_in):
                        "attempt_id": aid, "label": str(snapshot.get("name", ""))[:300],
                        "question": str(snapshot.get("question", ""))[:4000], **({"code": code} if code else {})})
             note(user, "ai_request", result)
-        return reply(call(user, "get", attempt_id=aid))
+        return call(user, "get", attempt_id=aid)
 
     # the teacher's queue sends a student's answer: the same check, with no queue in front of it
     def grade_for_queue(user_id, aid):
@@ -306,6 +448,12 @@ def install_answer_routes(app, signed_in):
         if "question_id" in body:
             fields["question_id"] = str(body["question_id"])
         result = call(user, "create_scan", **fields)
+        try:
+            final_guard(user, result.get("attempt"))
+        except ScanError:   # a final sitting that is over: the request it just made goes too
+            if (result.get("scan") or {}).get("id"):
+                call(user, "decline", scan_id=result["scan"]["id"])
+            raise
         if body.get("direct") is True and (sid := (result.get("scan") or {}).get("id")):
             direct_scans[sid] = None
             while len(direct_scans) > 10_000:
@@ -336,6 +484,8 @@ def install_answer_routes(app, signed_in):
 
     @app.post("/api/math/answer-scans/{scan_id}/uploads")
     def begin(scan_id: str, body: dict, user=Depends(student)):
+        found = usable(call(user, "get", scan_id=uuid_text(scan_id)))
+        final_guard(user, found.get("attempt"))
         result = usable(call(user, "begin", scan_id=uuid_text(scan_id), key=uuid_text(body.get("key"))))
         response = public_result(result)
         # Only this authenticated upload operation returns the bounded lease.
@@ -356,6 +506,7 @@ def install_answer_routes(app, signed_in):
         result = usable(call(user, "get", scan_id=sid))
         if result.get("attachment"):
             return result  # an earlier response may have been lost
+        final_guard(user, result.get("attempt"))
         scan = result["scan"]
         if scan["state"] != "uploading" or scan.get("lease_id") != lease:
             raise ScanError(409, "invalid_upload")

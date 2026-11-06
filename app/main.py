@@ -24,7 +24,7 @@ from .auth import AuthUnavailable, ClassConflict, SupabaseAuth, load_auth
 from .math_photo import (DAILY_PHOTOS, MAX_PHOTO, MEDIA_TYPES as PHOTO_TYPES,
                          PhotoSolver, PhotoUnavailable, math_model, photo_client)
 from .math_skills import algebra9, practice_graph
-from .class_report import install_class_report_routes
+from .class_report import install_class_report_routes, install_exam_topic_routes
 from .teacher_review import install_teacher_review_routes
 from .assignments import install_assignment_routes
 from .progress import install_progress_routes
@@ -32,6 +32,10 @@ from .push import install_push_routes
 from .monitoring import ActionLog, RETURN_GAP, install_monitoring_routes
 from .unit_resources import install_resource_routes
 from .worksheets import install_worksheet_routes
+from .quiz_modes import install_quiz_mode_routes
+from .student_views import install_student_view_routes
+from .ai_batches import install_ai_batch_routes
+from .teacher_inbox import install_teacher_inbox_routes
 from .teacher_ai import MESSAGE as TEACHER_AI_MESSAGE, LimitReached, TeacherQuota
 from .science import install_science_routes
 
@@ -313,13 +317,18 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
 
     install_progress_routes(app, signed_in)
     install_class_report_routes(app, signed_in, units_of)
+    install_exam_topic_routes(app, signed_in, units_of)
     install_push_routes(app, signed_in)
     install_answer_routes(app, signed_in)
+    install_quiz_mode_routes(app, signed_in, units_of)
     install_ai_queue_routes(app, signed_in)
+    install_ai_batch_routes(app, signed_in)
+    install_teacher_inbox_routes(app, signed_in)
     install_teacher_review_routes(app, signed_in)
     install_assignment_routes(app, signed_in, units_of)
     install_worksheet_routes(app, signed_in)
     install_resource_routes(app, signed_in, units_of)
+    install_student_view_routes(app, signed_in, units_of)
     install_science_routes(app)
     install_monitoring_routes(app, manager)
     return app

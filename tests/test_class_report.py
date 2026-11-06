@@ -252,3 +252,97 @@ def test_the_report_carries_the_classs_assignments_for_its_teacher():
             r = await c.get("/api/classes/3/report")
             assert r.status_code == 200 and r.json()["assignments"] is None
     asyncio.run(check())
+
+
+def test_the_report_says_which_sittings_are_final_and_shows_their_grade_to_the_teacher():
+    """A final sitting's grade is the teacher's to see before release (the student's view waits for it)."""
+    app = create_app(auth=ReportAuth())
+    app.state.answers = Sittings([
+        {**sitting(STUDENT, attempt(100), attempt(100), attempt(100), attempt(40), sid="s-final"), "mode": "final",
+         "window_id": "w1", "started_at": "2026-11-04T08:00:00Z"},
+        sitting(STUDENT, attempt(100), attempt(100), attempt(100), attempt(100), sid="s-practice", at="2026-11-05T09:00:00Z")])
+
+    async def check():
+        async with client(app, TEACHER) as c:
+            students = {s["email"]: s for s in (await c.get("/api/classes/3/report")).json()["students"]}
+            mine = {x["id"]: x for x in students["student@x.test"]["quiz_sittings"]}
+            assert (mine["s-final"]["mode"], mine["s-final"]["grade"], mine["s-final"]["window_id"]) == ("final", 85, "w1")
+            assert (mine["s-practice"]["mode"], mine["s-practice"]["grade"]) == ("practice", 100)
+    asyncio.run(check())
+
+
+def test_the_class_teacher_says_which_units_an_exam_covers():
+    auth = ReportAuth()
+    auth.row = {**auth.row, "lessons": ["t", "k"], "exams": [{"subject": "מתמטיקה", "date": "2026-11-18"},
+                                                             {"subject": "מדעים", "date": "2026-11-20"}]}
+    saved = []
+    auth.save_class_exams = lambda class_id, exams: saved.append((class_id, exams))
+    app = create_app(auth=auth)
+    app.state.answers = Sittings()
+    url = "/api/classes/3/exams/topics"
+    body = {"subject": "מתמטיקה", "date": "2026-11-18", "units": ["k", "t"], "note": "פרק 3 עד עמוד 80"}
+
+    async def check():
+        async with client(app, TEACHER) as c, client(app, STUDENT) as student:
+            assert (await student.put(url, json=body)).status_code == 403
+            assert (await c.put(url, json={**body, "units": ["g"]})).status_code == 400            # not a class unit
+            assert (await c.put(url, json={**body, "note": "א" * 301})).status_code == 400
+            assert (await c.put(url, json={**body, "date": "2026-12-01"})).status_code == 404
+            r = await c.put(url, json=body)
+            assert r.status_code == 200 and r.json()["units"] == ["t", "k"] and r.json()["note"] == "פרק 3 עד עמוד 80"
+            (class_id, exams), = saved
+            assert class_id == 3 and exams[0]["units"] == ["t", "k"] and "units" not in exams[1]   # the other exam is as it was
+            cleared = await c.put(url, json={**body, "units": [], "note": ""})
+            assert cleared.json()["units"] == []   # an exam without units works as before
+    asyncio.run(check())
+
+
+def test_the_report_carries_the_classs_exams_for_readiness():
+    auth = ReportAuth()
+    auth.row = {**auth.row, "lessons": ["t"], "exams": [{"subject": "מתמטיקה", "date": "2026-11-18", "units": ["t"]}, "junk"]}
+    app = create_app(auth=auth)
+    app.state.answers = Sittings()
+
+    async def check():
+        async with client(app, TEACHER) as c:
+            data = (await c.get("/api/classes/3/report")).json()
+            assert data["class"]["exams"] == [{"subject": "מתמטיקה", "date": "2026-11-18", "units": ["t"]}]
+    asyncio.run(check())
+
+
+def test_each_quiz_question_in_the_report_names_its_skills_and_points():
+    app = create_app(auth=ReportAuth())
+    app.state.answers = Sittings([sitting(STUDENT, attempt(100), attempt(40), attempt(100), attempt(100))])
+
+    async def check():
+        async with client(app, TEACHER) as c:
+            students = {s["email"]: s for s in (await c.get("/api/classes/3/report")).json()["students"]}
+            q = students["student@x.test"]["quiz_sittings"][0]["questions"][1]
+            assert (q["points"], q["earned"], q["skills"]) == (25, 10, ["t_ext_eq"])   # 15 points lost on t_ext_eq
+    asyncio.run(check())
+
+
+def test_the_class_teacher_adds_and_removes_exams_on_the_classs_table():
+    auth = ReportAuth()
+    auth.row = {**auth.row, "lessons": ["t", "k"], "exams": [{"subject": "מתמטיקה", "date": "2026-11-18"}]}
+
+    def save(class_id, exams):
+        auth.row = {**auth.row, "exams": exams}
+    auth.save_class_exams = save
+    app = create_app(auth=auth)
+    app.state.answers = Sittings()
+
+    async def check():
+        async with client(app, TEACHER) as c, client(app, STUDENT) as student:
+            new = {"subject": "מתמטיקה", "date": "2026-12-02", "units": ["k"], "note": "דלתון"}
+            assert (await student.post("/api/classes/3/exams", json=new)).status_code == 403
+            for bad in ({**new, "date": "soon"}, {**new, "subject": ""}, {**new, "units": ["g"]}):
+                assert (await c.post("/api/classes/3/exams", json=bad)).status_code == 400, bad
+            made = await c.post("/api/classes/3/exams", json=new)
+            assert made.status_code == 201 and made.json() == new
+            assert (await c.post("/api/classes/3/exams", json=new)).status_code == 409   # the same exam twice
+            assert [e["date"] for e in auth.row["exams"]] == ["2026-11-18", "2026-12-02"]   # by date
+            gone = await c.delete("/api/classes/3/exams", params={"subject": "מתמטיקה", "date": "2026-11-18"})
+            assert gone.status_code == 200 and [e["date"] for e in auth.row["exams"]] == ["2026-12-02"]
+            assert (await c.delete("/api/classes/3/exams", params={"subject": "x", "date": "2026-01-01"})).status_code == 404
+    asyncio.run(check())
