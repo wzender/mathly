@@ -182,7 +182,10 @@ html.math-on, html.math-on body{overflow:hidden}
 }
 .mx-manage-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .mx-manage-head h3{font-size:30px;color:var(--mx-accent)}
-.mx-prompter-text{width:100%;box-sizing:border-box;min-height:220px;padding:12px;border:1px solid var(--mx-line,#ccc);border-radius:12px;font:inherit;font-size:17px;line-height:1.5;resize:vertical;background:var(--mx-card,#fff);color:inherit;margin-block:10px}
+.mx-prompter-title{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font:inherit;font-size:17px;background:var(--bg);color:inherit;margin-top:10px}
+.mx-prompter-acts,.mx-prompter-row{display:flex;flex-wrap:wrap;gap:8px}
+.mx-prompter-list article[aria-current="true"]{outline:2px solid var(--mx-accent)}
+.mx-prompter-text{width:100%;box-sizing:border-box;min-height:220px;padding:12px;border:1px solid var(--line);border-radius:12px;font:inherit;font-size:17px;line-height:1.5;resize:vertical;background:var(--bg);color:inherit;margin-block:10px}
 .mx-manage-spacer{flex:1}
 .mx-manage-state{min-height:18px;margin:0;color:var(--muted);font-size:13px}
 .mx-manage-modes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;padding:4px;border-radius:14px;background:var(--line)}

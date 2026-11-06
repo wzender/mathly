@@ -28,6 +28,7 @@ from .class_report import install_class_report_routes, install_exam_topic_routes
 from .teacher_review import install_teacher_review_routes
 from .assignments import install_assignment_routes
 from .progress import install_progress_routes
+from .prompter import install_prompter_routes
 from .push import install_push_routes
 from .monitoring import ActionLog, RETURN_GAP, install_monitoring_routes
 from .unit_resources import install_resource_routes
@@ -316,6 +317,7 @@ def create_app(auth: SupabaseAuth | None = None) -> FastAPI:
         return {**result, "left": DAILY_PHOTOS - photo_counts.get(counter, 0) if counter else None}
 
     install_progress_routes(app, signed_in)
+    install_prompter_routes(app, signed_in)
     install_class_report_routes(app, signed_in, units_of)
     install_exam_topic_routes(app, signed_in, units_of)
     install_push_routes(app, signed_in)

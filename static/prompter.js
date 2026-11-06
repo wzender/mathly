@@ -28,7 +28,7 @@ const CSS=`
 .mxp-progress{height:3px;background:#222}.mxp-progress i{display:block;height:100%;width:0;background:#f5c518}
 .mxp-count{position:absolute;inset:0;display:grid;place-items:center;font-size:30vh;font-weight:700;color:#f5c518;background:rgba(0,0,0,.6);pointer-events:none}
 `;
-let wheel=0,root,scroller,textEl,guide,bar,raf=0,last=0,playing=false,speed=40,size=64,mirror=false,acc=0,countTimer=0,back=null;
+let wheel=0,keepOpen=false,root,scroller,textEl,guide,bar,raf=0,last=0,playing=false,speed=40,size=64,mirror=false,acc=0,countTimer=0,back=null;
 
 function save(){try{localStorage.setItem("mathly.prompter",JSON.stringify({speed,size,mirror}))}catch{}}
 function load(){try{const s=JSON.parse(localStorage.getItem("mathly.prompter")||"{}");if(s.speed)speed=s.speed;if(s.size)size=s.size;mirror=!!s.mirror}catch{}}
@@ -70,6 +70,7 @@ function play(on){
 
 function countdown(){
   if(playing||root.querySelector(".mxp-count")) return play(false);   // a second press during 3-2-1 cancels it
+  if(scroller.scrollTop>0) return play(true);                         // 3-2-1 only from the start; after a pause it resumes at once
   let n=3; const el=document.createElement("div"); el.className="mxp-count"; el.textContent=n; root.querySelector(".mxp-view").appendChild(el);
   countTimer=setInterval(()=>{n--; if(n>0) el.textContent=n; else play(true);},700);
 }
@@ -84,7 +85,7 @@ function act(p){
     case "mirror": mirror=!mirror; break;
     case "top": scroller.scrollTop=0; acc=0; progress(); break;
     case "back": scroller.scrollTop-=size*1.45*3; acc=0; progress(); return;
-    case "full": if(document.fullscreenElement) document.exitFullscreen?.(); else root.requestFullscreen?.().catch(()=>{}); return;
+    case "full": if(document.fullscreenElement){keepOpen=true; document.exitFullscreen?.();} else root.requestFullscreen?.().catch(()=>{}); return;
     case "close": return close();
   }
   save(); sync();
@@ -96,6 +97,14 @@ function onKey(e){
   const p=map[e.key]; if(!p) return;
   if(e.target.closest?.("input")&&p!=="close") return;
   e.preventDefault(); e.stopImmediatePropagation(); act(p);
+}
+
+// in full screen the browser keeps Esc for itself (it leaves full screen and the page never sees the key), so leaving
+// full screen closes the prompter too, unless it was F or the ⛶ button
+function onFull(){
+  if(document.fullscreenElement||!root) return;
+  if(keepOpen){keepOpen=false; return;}
+  close();
 }
 
 function open(text){
@@ -135,12 +144,17 @@ function open(text){
   view.addEventListener("mouseup",e=>{const p=extra[e.button]; if(p){e.preventDefault(); act(p);}});
   document.body.appendChild(root);
   document.addEventListener("keydown",onKey,true);
+  document.addEventListener("fullscreenchange",onFull);
   sync(); bar.querySelector(".mxp-play").focus();
+  // it opens full screen; this runs inside the click that opened it, which the browser requires. Where the browser
+  // does not allow it (an iPhone), it simply stays as a full-page layer.
+  const full=root.requestFullscreen||root.webkitRequestFullscreen;
+  try{ const p=full?.call(root); p?.catch?.(()=>{}); }catch{}
 }
 
 function close(){
   if(!root) return;
-  play(false); document.removeEventListener("keydown",onKey,true);
+  play(false); document.removeEventListener("keydown",onKey,true); document.removeEventListener("fullscreenchange",onFull);
   if(document.fullscreenElement) document.exitFullscreen?.();
   root.remove(); root=null; back?.focus?.(); back=null;
 }

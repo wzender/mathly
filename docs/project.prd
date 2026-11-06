@@ -1,0 +1,87 @@
+Glossary:
+
+- skill (מיומנות): a specific topic like פירוק טרינום
+- exercise (תרגיל): a qustion on a certain topic, can be either open ended or multiple choice
+- lesson (שיעור): set of skills like טכניקה אלגברית 1
+- quiz (בוחן): a test on a single lesson, can be retaken, best grade wins. each retake draws new questions
+- exrcise test (מבחן תרגול): a timed test on a set of a lessons, can be retaken, best grade wins
+- simulation test (מבחן סימלוציה): a timed test on a set of a lessons, one time only
+- test: real life test, appears in app as a date + the lessons it covers. set by the teacher
+
+
+
+Goals:
+
+The app helps the student to:
+1. master the skills - done by the path
+2. get ready for the real life tests - done by the test countdown plan
+
+
+
+Goal 1: Mastering the skills (the path)
+
+Each skill goes through these stages:
+1. worked example: the student sees a full solution and is asked "why this step?"
+2. faded examples: steps are removed one at a time, the student fills them in
+3. practice: immediate feedback that names the specific mistake.
+   after a wrong answer, the student gets a similar question (not the same one)
+4. mastered: 3 correct answers in a row, without hints, across at least 2 different days
+
+Skill states:
+- not started
+- learning
+- mastered
+- needs review: a mastered skill becomes "needs review" after some days without practice
+
+Path rules:
+- the lesson's quiz (בוחן) unlocks the next lesson
+- daily review: a short mixed set of "needs review" skills from different lessons
+
+
+
+Goal 2: Getting ready for the real test
+
+The teacher sets the test date and the lessons it covers.
+The app plans backwards from the date:
+
+- 3+ weeks before: finish the path for all the covered lessons
+- 1-3 weeks before: exercise tests (מבחן תרגול) - timed, mixing all the covered lessons.
+  each result points back to the weak skills in the path
+- final week: simulation test (מבחן סימלוציה) - required. one attempt,
+  same length and timing as the real test
+- last days: targeted review of the skills that failed in the simulation,
+  light mixed review the day before
+
+Readiness meter (per test):
+- % of the covered skills that are mastered
+- recent exercise test grades
+- simulation test grade
+
+
+
+Student Screen:
+- home
+  - my assignments (המשימות שלי): homewords submitted by the teacher
+  - remider on the upcoming test: days left, readiness meter, today's task
+  -
+
+- path
+- grades
+- collection
+
+
+
+Teacher Screen:
+- assignments
+  - give an assignment. load it from:
+    - the computer (file upload)
+    - the board
+    - a picture (camera)
+  - check assignments: review each student's submitted answers and give feedback/grade
+- tests
+  - set a real life test: date + the lessons it covers
+  - see who took the required simulation test
+- class heat map
+  - rows: students, columns: skills
+  - each cell is colored by the skill state (not started / learning / mastered / needs review)
+  - period filter: sep-dec, dec-jun

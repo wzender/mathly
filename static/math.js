@@ -1751,6 +1751,9 @@ function onClick(e){
   if(t.dataset.comet) return showComet(t.dataset.comet);
   if(t.dataset.id) return open(t.dataset.id);
   if(t.dataset.manageMode) return showManageMode(t.dataset.manageMode);
+  if(t.dataset.prompterPlay) return window.MathlyPrompter?.open(PR.texts.find(x=>x.id===t.dataset.prompterPlay)?.body);
+  if(t.dataset.prompterOpen) return prEdit(t.dataset.prompterOpen);
+  if(t.dataset.prompterDel) return prDelete(t.dataset.prompterDel);
   if(t.dataset.classAction) return manageClassAction(t.dataset.classAction,t.dataset.classId);
   if(t.dataset.reportClass!=null) return classReport(t.dataset.reportClass);
   if(t.dataset.reportStudent!=null) return reportOpenStudent(t.dataset.reportStudent);
@@ -1768,6 +1771,9 @@ function onClick(e){
     case "manage-lab": return showManageMode("lab");
     case "manage-prompter": return showManageMode("prompter");
     case "prompter-go": return window.MathlyPrompter?.open(sheet.querySelector("#mxPrompterText")?.value);
+    case "prompter-save": return prSave(false);
+    case "prompter-save-new": return prSave(true);
+    case "prompter-new": return prNew();
     case "manage-practice": return closeSheet();
     case "preview-on": return setPreview(true);
     case "preview-off": return setPreview(false);
@@ -1900,19 +1906,88 @@ function showManageMode(mode){
     box.innerHTML=`<div class="mx-manage-title"><h4>הרשאות</h4><span>תפקידים וגישה</span></div><div class="mx-access-card"><small>התפקידים שלך</small><div class="mx-tag-row">${roles.length?roles.map(role=>`<span>${esc(role)}</span>`).join(""):'<span>מנהל/ת</span>'}</div><small>הרשאות פעילות</small><div class="mx-tag-row">${permissions.map(permission=>`<span dir="ltr">${esc(permission)}</span>`).join("")}</div></div>`;
     return;
   }
-  if(mode==="prompter"){
-    // a developer tool: the text is kept only in this browser, so it is still there the next time
-    let saved=""; try{saved=localStorage.getItem("mathly.prompterText")||"";}catch{}
-    box.innerHTML=`<div class="mx-manage-title"><h4>פרומפטר</h4><span>טקסט לקריאה מול המצלמה</span></div>
-      <textarea id="mxPrompterText" class="mx-prompter-text" dir="auto" rows="12" placeholder="הדביקו או כתבו כאן את הטקסט…" aria-label="טקסט לפרומפטר">${esc(saved)}</textarea>
-      <p class="mx-note">רווח: הפעלה/עצירה · ↑/↓: מהירות · +/−: גודל · M: מראה · F: מסך מלא · Esc: יציאה</p>
-      <p class="mx-note">עכבר: לחיצה – הפעלה/עצירה · גלגלת בזמן ריצה – מהירות · לחצן ימני – כמה שורות אחורה · לחצן אמצעי או "אחורה" – להתחלה. שלט מצגות (Page Down/Up) עובד גם הוא.</p>
-      <button class="mx-btn solid" data-act="prompter-go">הצגה בפרומפטר</button>`;
-    const area=box.querySelector("#mxPrompterText");
-    area.addEventListener("input",()=>{try{localStorage.setItem("mathly.prompterText",area.value);}catch{}});
-    area.focus(); return;
-  }
+  if(mode==="prompter") return drawPrompter(box);
   box.innerHTML='<div class="mx-manage-title"><h4>מעבדה</h4><span>כלים לבדיקה ופיתוח</span></div><p class="mx-note">כלי המעבדה למתמטיקה יתווספו כאן. אפשר לחזור לכל אזור ניהול מהכרטיסיות למעלה.</p>';
+}
+
+/* Prompter (פרומפטר): a developer writes or picks a text and shows it full screen (static/prompter.js).
+   Saved texts are kept with the account (app/prompter.py), so they are on every device; the text being edited is
+   also kept in this browser, so nothing is lost before it is saved. */
+let PR={texts:[],id:null,loaded:false};
+function prDraft(){ try{return JSON.parse(localStorage.getItem("mathly.prompterDraft")||"null")||{title:"",body:localStorage.getItem("mathly.prompterText")||"",id:null};}catch{return {title:"",body:"",id:null};} }
+function prKeep(){
+  const title=sheet.querySelector("#mxPrompterTitle"), body=sheet.querySelector("#mxPrompterText"); if(!title||!body) return;
+  try{localStorage.setItem("mathly.prompterDraft",JSON.stringify({title:title.value,body:body.value,id:PR.id}));}catch{}
+}
+function prSay(text){ const el=sheet.querySelector(".mx-prompter-state"); if(el) el.textContent=text; }
+function prDate(at){ try{return new Date(at).toLocaleString("he-IL",{day:"numeric",month:"numeric",year:"2-digit",hour:"2-digit",minute:"2-digit"});}catch{return "";} }
+function drawPrompter(box){
+  const draft=prDraft(); PR.id=draft.id||null;
+  box.innerHTML=`<div class="mx-manage-title"><h4>פרומפטר</h4><span>טקסט לקריאה מול המצלמה</span></div>
+    <input id="mxPrompterTitle" class="mx-prompter-title" dir="auto" maxlength="120" placeholder="שם הטקסט (לא חובה)" aria-label="שם הטקסט" value="${esc(draft.title||"")}">
+    <textarea id="mxPrompterText" class="mx-prompter-text" dir="auto" rows="12" placeholder="הדביקו או כתבו כאן את הטקסט…" aria-label="טקסט לפרומפטר">${esc(draft.body||"")}</textarea>
+    <div class="mx-prompter-acts">
+      <button class="mx-btn solid" data-act="prompter-go">הצגה בפרומפטר</button>
+      <button class="mx-btn" data-act="prompter-save">שמירה</button>
+      <button class="mx-btn" data-act="prompter-save-new">שמירה כטקסט חדש</button>
+      <button class="mx-btn" data-act="prompter-new">טקסט חדש</button></div>
+    <p class="mx-prompter-state mx-note" role="status" aria-live="polite"></p>
+    <p class="mx-note">רווח: הפעלה/עצירה · ↑/↓: מהירות · +/−: גודל · M: מראה · F: מסך מלא · Esc: יציאה</p>
+    <p class="mx-note">עכבר: לחיצה – הפעלה/עצירה · גלגלת בזמן ריצה – מהירות · לחצן ימני – כמה שורות אחורה · לחצן אמצעי או "אחורה" – להתחלה. שלט מצגות (Page Down/Up) עובד גם הוא.</p>
+    <div class="mx-manage-title"><h4>טקסטים שמורים</h4><span class="mx-prompter-count"></span></div>
+    <div class="mx-prompter-list mx-manage-list"><p class="mx-note">טוענים…</p></div>`;
+  box.querySelectorAll("#mxPrompterTitle,#mxPrompterText").forEach(el=>el.addEventListener("input",prKeep));
+  prMark(); box.querySelector("#mxPrompterText").focus();
+  prLoad();
+}
+function prMark(){ prSay(PR.id?`עורכים את „${PR.texts.find(t=>t.id===PR.id)?.title||"הטקסט השמור"}”. „שמירה” מעדכנת אותו.`:""); }
+function prList(){
+  const list=sheet.querySelector(".mx-prompter-list"); if(!list) return;
+  sheet.querySelector(".mx-prompter-count").textContent=PR.texts.length?`${PR.texts.length} טקסטים`:"";
+  list.innerHTML=PR.texts.length?PR.texts.map(t=>`<article${t.id===PR.id?' aria-current="true"':""}><b dir="auto">${esc(t.title)}</b><small>${esc(prDate(t.updated_at))} · ${t.body.length.toLocaleString("he-IL")} תווים</small>
+      <span class="mx-prompter-row"><button class="mx-btn solid" data-prompter-play="${t.id}">הצגה</button><button class="mx-btn" data-prompter-open="${t.id}">עריכה</button><button class="mx-btn" data-prompter-del="${t.id}">מחיקה</button></span></article>`).join("")
+    :'<p class="mx-note">עדיין אין טקסטים שמורים. כתבו טקסט ולחצו „שמירה”.</p>';
+}
+async function prLoad(){
+  try{
+    const r=await api("/api/prompter/texts"); if(!r.ok) throw new Error();
+    PR.texts=(await r.json()).texts||[]; PR.loaded=true;
+    if(PR.id&&!PR.texts.some(t=>t.id===PR.id)) PR.id=null;
+    prList(); prMark();
+  }catch{ const list=sheet.querySelector(".mx-prompter-list"); if(list) list.innerHTML='<p class="mx-note">לא הצלחנו לטעון את הטקסטים השמורים. הטקסט שכתבתם נשמר בדפדפן הזה.</p>'; }
+}
+async function prSave(asNew){
+  const title=sheet.querySelector("#mxPrompterTitle").value, body=sheet.querySelector("#mxPrompterText").value;
+  if(!body.trim()) return prSay("אין טקסט לשמור.");
+  const id=asNew?null:PR.id;
+  prSay("שומרים…");
+  try{
+    const r=await api(id?`/api/prompter/texts/${id}`:"/api/prompter/texts",{method:id?"PUT":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,body})});
+    if(r.status===409) return prSay("יש כבר 200 טקסטים שמורים. מחקו אחד כדי לשמור עוד.");
+    if(r.status===404&&id){ PR.id=null; return prSave(true); }     // deleted on another device: keep it as a new one
+    if(!r.ok) throw new Error();
+    const {text}=await r.json();
+    PR.texts=[text,...PR.texts.filter(t=>t.id!==text.id)]; PR.id=text.id;
+    sheet.querySelector("#mxPrompterTitle").value=text.title; prKeep(); prList();
+    prSay(`נשמר: „${text.title}”.`);
+  }catch{ prSay("השמירה נכשלה. הטקסט עדיין כאן ובדפדפן הזה; נסו שוב."); }
+}
+function prEdit(id){
+  const t=PR.texts.find(x=>x.id===id); if(!t) return;
+  PR.id=id; sheet.querySelector("#mxPrompterTitle").value=t.title; sheet.querySelector("#mxPrompterText").value=t.body;
+  prKeep(); prList(); prMark(); sheet.querySelector("#mxPrompterText").focus();
+}
+function prNew(){
+  PR.id=null; sheet.querySelector("#mxPrompterTitle").value=""; sheet.querySelector("#mxPrompterText").value="";
+  prKeep(); prList(); prSay(""); sheet.querySelector("#mxPrompterTitle").focus();
+}
+async function prDelete(id){
+  const t=PR.texts.find(x=>x.id===id); if(!t||!confirm(`למחוק את „${t.title}”?`)) return;
+  try{
+    const r=await api(`/api/prompter/texts/${id}`,{method:"DELETE"}); if(!r.ok) throw new Error();
+    PR.texts=PR.texts.filter(x=>x.id!==id); if(PR.id===id){PR.id=null; prKeep();}
+    prList(); prSay(`„${t.title}” נמחק.`);
+  }catch{ prSay("המחיקה נכשלה. נסו שוב."); }
 }
 
 /* Monitoring (ניטור): a snapshot of the system, open-answer activity, and the server's latest warnings.

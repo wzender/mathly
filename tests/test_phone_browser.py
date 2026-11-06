@@ -1171,6 +1171,8 @@ def test_the_teacher_opens_a_final_quiz_and_gives_one_student_another_sitting(ph
 
 
 def test_prompter_from_management(phone_server):
+    import json
+
     with playwright.sync_playwright() as p:
         browser = p.chromium.launch()
         try:
@@ -1192,30 +1194,58 @@ def test_prompter_from_management(phone_server):
                 "permissions": ["management.access"], "classes": []}))
             page.route("**/api/math/progress", lambda route: route.fulfill(json={"progress": {}}))
             page.route("**/api/classes", lambda route: route.fulfill(json={"classes": []}))
+            saved = []
+
+            def texts(route):                                          # app/prompter.py, in memory
+                req = route.request
+                if req.method == "GET":
+                    return route.fulfill(json={"texts": saved})
+                body = json.loads(req.post_data)
+                row = {"id": "aaaaaaaa-aaaa-4aaa-8aaa-%012d" % len(saved), "title": body["title"] or body["body"].split("\n")[0],
+                       "body": body["body"], "updated_at": "2026-11-06T10:00:00Z"}
+                saved.insert(0, row)
+                route.fulfill(json={"text": row})
+            page.route("**/api/prompter/texts", texts)
             page.goto(phone_server)
             page.locator('[data-act="manage"]').click()
             page.locator('[data-act="manage-prompter"]').click()
             text = "שלום לכולם\nזה טקסט לפרומפטר" + "\nעוד שורה" * 60      # long enough to still be scrolling
             page.locator("#mxPrompterText").fill(text)
-            page.locator('[data-act="prompter-go"]').click()
+            page.locator("#mxPrompterTitle").fill("פתיחה")
+            page.locator('[data-act="prompter-save"]').click()
+            playwright.expect(page.locator(".mx-prompter-state")).to_have_text("נשמר: „פתיחה”.")
+            assert saved[0]["title"] == "פתיחה" and saved[0]["body"] == text
+            playwright.expect(page.locator(".mx-prompter-list article")).to_contain_text("פתיחה")
+            page.locator("[data-prompter-play]").click()               # a saved text opens straight in the prompter
             prompter = page.locator(".mxp")
+            page.wait_for_function("document.fullscreenElement?.classList.contains('mxp')")   # it opens full screen
             playwright.expect(prompter.locator(".mxp-text")).to_have_text(text)
             page.keyboard.press("m")
             playwright.expect(prompter).to_have_class("mxp mirror")
             page.keyboard.press(" ")
             playwright.expect(prompter).to_have_class("mxp mirror playing", timeout=5000)
             speed = page.locator(".mxp-speed-v").inner_text()
-            page.locator(".mxp-text").hover()
+            page.locator(".mxp-view").hover()
             page.mouse.wheel(0, 120)                                   # while playing, the wheel is the speed
             playwright.expect(page.locator(".mxp-speed-v")).not_to_have_text(speed)
             page.locator(".mxp-view").click()                          # a click pauses
             playwright.expect(prompter).to_have_class("mxp mirror")
             page.keyboard.press("PageDown")                            # a presentation clicker plays
-            playwright.expect(prompter).to_have_class("mxp mirror playing", timeout=5000)
+            playwright.expect(prompter).to_have_class("mxp mirror playing", timeout=500)   # resumes with no 3-2-1
+            playwright.expect(page.locator(".mxp-count")).to_have_count(0)
             page.locator(".mxp-view").click()
             top = page.locator(".mxp-scroll").evaluate("e=>e.scrollTop")
             page.locator(".mxp-view").click(button="right")            # right-click goes back a few lines
             assert page.locator(".mxp-scroll").evaluate("e=>e.scrollTop") <= top
+            page.keyboard.press("f")                                   # F leaves full screen and keeps the prompter
+            page.wait_for_function("!document.fullscreenElement")
+            playwright.expect(prompter).to_have_count(1)
+            page.keyboard.press("f")
+            page.wait_for_function("!!document.fullscreenElement")
+            page.evaluate("document.exitFullscreen()")                 # what the browser does with Esc in full screen
+            playwright.expect(prompter).to_have_count(0)
+            playwright.expect(page.locator(".mx-manage-sheet")).to_be_visible()
+            page.locator('[data-act="prompter-go"]').click()
             page.keyboard.press("Escape")
             playwright.expect(prompter).to_have_count(0)
             playwright.expect(page.locator(".mx-manage-sheet")).to_be_visible()   # Esc closes only the prompter
