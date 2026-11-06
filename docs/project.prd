@@ -3,10 +3,12 @@ Glossary:
 - skill (מיומנות): a specific topic like פירוק טרינום
 - exercise (תרגיל): a qustion on a certain topic, can be either open ended or multiple choice
 - lesson (שיעור): set of skills like טכניקה אלגברית 1
-- quiz (בוחן): a test on a single lesson, can be retaken, best grade wins. each retake draws new questions
+- quiz (בוחן): a test on a single lesson, can be retaken, best grade wins. each retake draws new questions.
+  it is the only quiz type (no one-time summary quiz); its best grade is the lesson's grade
 - exrcise test (מבחן תרגול): a timed test on a set of a lessons, can be retaken, best grade wins
 - simulation test (מבחן סימלוציה): a timed test on a set of a lessons, one time only
-- test: real life test, appears in app as a date + the lessons it covers. set by the teacher
+- test: real life test, appears in app as a date + the lessons it covers + number of questions and time limit
+  (default 12 questions, 90 minutes). set by the teacher
 
 
 
@@ -47,7 +49,7 @@ The app plans backwards from the date:
 - 9-7 days before: exercise tests (מבחן תרגול) - timed, mixing all the covered lessons.
   each result points back to the weak skills in the path (see "Exercise tests" below)
 - final week: simulation test (מבחן סימלוציה) - required. one attempt, open until the test day,
-  same length and timing as the real test
+  same length and timing as the real test, feedback only at the end
 - last days: targeted review of the skills that failed in the simulation,
   light mixed review the day before
 
@@ -56,6 +58,7 @@ Exercise tests:
   and placed on the student's countdown
 - the teacher can also send one to the class as an assignment
 - the student can start or retake one at any time. each retake draws new questions, best grade wins
+- same length and timing as the simulation test, feedback only at the end
 - weak skill: a skill in "learning" state, or one failed in a previous exercise test
 - 2 exercise tests, then the simulation test:
 
@@ -78,7 +81,7 @@ Readiness meter (per test):
 Student Screen:
 - home
   - my assignments (המשימות שלי): homewords submitted by the teacher
-  - remider on the upcoming test: days left, readiness meter, today's task
+  - remider on the upcoming test: days left, readiness meter, today's task (from the closest test)
   -
 
 - path
@@ -91,7 +94,7 @@ Teacher Screen:
 - assignments
   - give an assignment. load it from:
     - the computer (file upload)
-    - the classroom smart board
+    - the app's drawing board (math-board.js)
     - a picture (camera)
   - check assignments: review each student's submitted answers and give feedback/grade
 - tests
@@ -103,5 +106,5 @@ Teacher Screen:
   - period tabs: sep-dec, jan-jun
 - student lesson coverage
   - rows: students, columns: lessons
-  - each cell shows how much of the lesson the student covered: % of its skills mastered + the quiz (בוחן) grade
+  - each cell shows how much of the lesson the student covered: % of its skills mastered + the best quiz (בוחן) grade
   - period tabs: sep-dec, jan-jun

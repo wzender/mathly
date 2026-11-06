@@ -287,6 +287,9 @@ function build(){
   canvas.addEventListener("pointerup",up);
   canvas.addEventListener("pointercancel",up);
   canvas.addEventListener("contextmenu",e=>e.preventDefault());
+  // Safari on an iPad: a pen or a finger held still on the paper would select the page's text and offer to copy it
+  canvas.addEventListener("touchstart",e=>e.preventDefault(),{passive:false});
+  el.addEventListener("selectstart",e=>{ if(!e.target.closest?.("input,math-field,[contenteditable]")) e.preventDefault(); });
   canvas.addEventListener("dblclick",e=>{ const m=hit(at(e)); if(m?.kind==="math") editMath(m,at(e)); else if(m?.kind==="angle") startAngle(at(e),0); });
   canvas.addEventListener("pointerleave",()=>{ if(hover){ hover=null; paint(); } });   // typed math is edited where it is   // the pen's side button: no browser menu over the board
   canvas.addEventListener("wheel",e=>{   // endless paper: scrolls down as far as needed, never above the top

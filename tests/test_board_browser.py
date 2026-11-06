@@ -687,3 +687,23 @@ def test_the_paper_scrolls_sideways_to_what_was_written_on_the_wide_board(browse
     assert alpha_near(page, 600, 300) == 0
     playwright.expect(page.locator(".mx-board-top")).to_be_hidden()
     assert errors == []
+
+
+def test_a_held_pen_does_not_select_the_page(browser, server):
+    page, errors = open_skill(browser, server, 390, 844)
+    page.locator("[data-board-toggle]").click()
+    playwright.expect(page.locator(".mx-board.full")).to_be_visible()
+    style = page.evaluate("""()=>{ const s=getComputedStyle(document.querySelector('.mx-board'));
+      return [s.userSelect||s.webkitUserSelect, s.webkitTouchCallout||'none']; }""")
+    assert style[0] == "none"
+    # nothing on the board starts a selection, and the paper's touches are its own
+    blocked = page.evaluate("""()=>{ const b=document.querySelector('.mx-board');
+      const sel=new Event('selectstart',{bubbles:true,cancelable:true}); b.querySelector('[data-title]').dispatchEvent(sel);
+      const t=new Event('touchstart',{bubbles:true,cancelable:true}); b.querySelector('canvas').dispatchEvent(t);
+      return [sel.defaultPrevented, t.defaultPrevented]; }""")
+    assert blocked == [True, True]
+    # a field to type in still selects
+    page.evaluate("""()=>{ const i=document.createElement('input'); i.id='probe'; document.querySelector('.mx-board-stage').append(i); }""")
+    assert not page.evaluate("""()=>{ const e=new Event('selectstart',{bubbles:true,cancelable:true});
+      document.getElementById('probe').dispatchEvent(e); return e.defaultPrevented; }""")
+    assert errors == []

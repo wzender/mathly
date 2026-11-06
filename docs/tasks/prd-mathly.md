@@ -92,12 +92,19 @@ Each skill takes the student through four stages, in this order.
 ### 4.2 Quizzes (בוחן)
 
 10. **[exists] Quiz per lesson.** Each lesson has a quiz. The student can retake it; the best grade counts; every retake draws new questions.
-11. **[exists] After a quiz,** the system must list the skills where the student lost points, so they can practice them before retaking.
+    The quiz's best grade is the lesson's grade.
+11. **[change] One quiz type only.** The retakeable quiz is the only quiz. The system must remove the end-of-lesson summary quiz (בוחן מסכם):
+    it is taken once, opened by the teacher, and is today the lesson's official grade.
+    *Today each lesson has two quizzes: a retakeable practice quiz (בוחן חיזוק, not graded) and the summary quiz.*
+12. **[exists] After a quiz,** the system must list the skills where the student lost points, so they can practice them before retaking.
 
 ### 4.3 Test countdown
 
-12. **[exists] Setting a test.** The teacher must be able to set a test: date + the lessons it covers (+ an optional note).
-13. **[change] The countdown plan.** From the moment a test is set, the system must show the student a plan that depends on the days left:
+13. **[change] Setting a test.** The teacher must be able to set a test: date + the lessons it covers (+ an optional note),
+    plus the real test's **number of questions** and **time limit**. These start with defaults
+    (12 questions, 90 minutes) that the teacher can change.
+    *Today date, lessons and note exist; number of questions and time limit are new.*
+14. **[change] The countdown plan.** From the moment a test is set, the system must show the student a plan that depends on the days left:
 
     | Days before the test | What the app asks the student to do |
     |---|---|
@@ -109,17 +116,21 @@ Each skill takes the student through four stages, in this order.
 
     The day numbers are **recommendations**: the student can start each step earlier or later.
     If the test is set less than 9 days ahead, the system must keep the same order and shorten the gaps evenly.
-14. **[change] Home screen reminder.** The home screen must show, for the nearest test:
+15. **[change] Home screen reminder.** The home screen must show, for the nearest test:
     days left, the readiness meter (see 4.6), and **one task for today** taken from the plan.
+    When several tests are coming up, "today's task" comes from the **closest** one.
 
 ### 4.4 Exercise tests (מבחן תרגול)
 
-15. **[change] Created by the app.** When the teacher sets a test, the system must create 2 exercise tests for every student in the class and place them on the student's countdown.
-16. **[change] Teacher can assign one.** The teacher must be able to send an exercise test to the whole class as an assignment.
+16. **[change] Created by the app.** When the teacher sets a test, the system must create 2 exercise tests for every student in the class and place them on the student's countdown.
+17. **[change] Teacher can assign one.** The teacher must be able to send an exercise test to the whole class as an assignment.
     *Today only admins can assign exercise tests to a class.*
-17. **[exists] Retakes.** The student can start or retake an exercise test at any time. Each retake draws new questions; the best grade counts.
-18. **[change] Timed.** Exercise tests must be timed, and mix questions from all covered lessons without showing the skill name.
-19. **[change] Question mix.** The system must pick questions in these proportions:
+18. **[exists] Retakes.** The student can start or retake an exercise test at any time. Each retake draws new questions; the best grade counts.
+19. **[change] Like the simulation.** Exercise tests must have the same number of questions and the same time limit as the simulation
+    (that is, as the real test, requirement 13), mix questions from all covered lessons, and not show the skill name.
+    Feedback comes **only at the end**, not after each question.
+    *Today exercise tests 1 and 2 give feedback after each question.*
+20. **[change] Question mix.** The system must pick questions in these proportions:
 
     | Exercise test | Weak skills | Other covered skills |
     |---|---|---|
@@ -129,20 +140,20 @@ Each skill takes the student through four stages, in this order.
     "Weak skill" = a skill in the "learning" state, or one the student answered wrong in a previous exercise test.
     Skills in the "not started" state must not appear; instead, the card must list them as "practice these first".
     If the student has fewer weak skills than needed, fill the rest from the other covered skills.
-20. **[exists] Result links back.** After an exercise test, the system must show the weak skills it found and link each one to its place in the path.
+21. **[exists] Result links back.** After an exercise test, the system must show the weak skills it found and link each one to its place in the path.
 
 ### 4.5 Simulation test (מבחן סימולציה)
 
-21. **[new] Required, one attempt.** Every student must take one simulation test per real test. It can be taken only once.
-22. **[new] Like the real test.** The simulation must cover all the lessons of the real test, with the same number of questions and the same time limit as the real test,
+22. **[new] Required, one attempt.** Every student must take one simulation test per real test. It can be taken only once.
+23. **[new] Like the real test.** The simulation must cover all the lessons of the real test, with the number of questions and the time limit the teacher set for the real test (requirement 13),
     no skill names, and no feedback until the end.
-23. **[new] Window.** The simulation becomes available ~5 days before the test and stays available until the test day.
+24. **[new] Window.** The simulation becomes available ~5 days before the test and stays available until the test day.
     It must be shown as **required** on the student's home screen until it is taken.
-24. **[new] After the simulation,** the system must list the skills that failed and turn them into the review tasks of the last days (requirement 13).
+25. **[new] After the simulation,** the system must list the skills that failed and turn them into the review tasks of the last days (requirement 14).
 
 ### 4.6 Readiness meter
 
-25. **[change] Readiness meter.** For each upcoming test, the system must show the student (and the teacher) a readiness meter made of:
+26. **[change] Readiness meter.** For each upcoming test, the system must show the student (and the teacher) a readiness meter made of:
     - % of the covered skills that are mastered;
     - the best grade of each exercise test;
     - the simulation test grade (once taken).
@@ -150,26 +161,28 @@ Each skill takes the student through four stages, in this order.
 
 ### 4.7 Student screens
 
-26. **[exists] Home:** my assignments (המשימות שלי) from the teacher; the upcoming-test reminder (requirement 14); continue the path.
-27. **[exists] Path:** all lessons and skills.
-28. **[exists] Grades:** all quiz, exercise test and homework grades.
-29. **[exists] Collection:** stars, constellations, and the class test calendar.
+27. **[exists] Home:** my assignments (המשימות שלי) from the teacher; the upcoming-test reminder (requirement 15); continue the path.
+28. **[exists] Path:** all lessons and skills.
+29. **[change] Grades:** all quiz (best grade), exercise test, simulation and homework grades.
+    *Today it also lists summary quizzes, marked ★; remove them.*
+30. **[exists] Collection:** stars, constellations, and the class test calendar.
 
 ### 4.8 Teacher screens
 
-30. **[change] Give an assignment.** The teacher must be able to create an assignment and load its content from:
+31. **[change] Give an assignment.** The teacher must be able to create an assignment and load its content from:
     - the computer (file upload: PDF or images) – **[exists]**;
     - a photo taken with the device camera – **[new]** for assignments (exists today only for lesson resources);
-    - the classroom smart board – **[new]**.
-31. **[exists] Check assignments.** The teacher must be able to open each student's submission, give a grade (0–100) and a note, or send it back for correction.
-32. **[change] Tests tab.** The teacher must be able to set a test (requirement 12) and see, for each test, which students have taken the simulation test and which have not.
-33. **[new] Class heat map.**
+    - the app's drawing board (static/math-board.js, the same board students solve on) – **[new]** for assignments:
+      the teacher draws or writes the assignment on the board, and it is saved as the assignment's page(s).
+32. **[exists] Check assignments.** The teacher must be able to open each student's submission, give a grade (0–100) and a note, or send it back for correction.
+33. **[change] Tests tab.** The teacher must be able to set a test (requirement 13) and see, for each test, which students have taken the simulation test and which have not.
+34. **[new] Class heat map.**
     - Rows: students. Columns: skills (grouped by lesson).
     - Each cell is colored by the skill state: not started / learning / mastered.
     - Tabs for the period: **Sep–Dec** and **Jan–Jun**. A period shows the skills of the lessons taught in it, and states as they were at the end of the period (or today, for the current period).
-34. **[new] Student lesson coverage.**
+35. **[new] Student lesson coverage.**
     - Rows: students. Columns: lessons.
-    - Each cell shows the % of the lesson's skills the student has mastered, and the student's quiz (בוחן) grade for that lesson.
+    - Each cell shows the % of the lesson's skills the student has mastered, and the student's best quiz (בוחן) grade for that lesson.
     - Same period tabs: **Sep–Dec** and **Jan–Jun**.
 
 ## 5. Non-Goals (Out of Scope)
@@ -195,6 +208,10 @@ Each skill takes the student through four stages, in this order.
 - Mastery (requirement 5) needs the date of each answer, so the server can check the "2 different days" rule.
 - "Similar question" (requirement 4) requires each skill to have enough questions, or question templates with changing numbers.
 - The simulation's timer must be kept on the server (like the end-of-lesson quiz today), so refreshing or closing the app does not reset it.
+- Removing the summary quiz (requirement 11) affects existing code: the "summary quizzes" tab in the class report,
+  opening/closing windows, extra attempts, publishing results, the AI-queue and "to review" entries for it, and the ★ grades.
+  Its server-kept timer and server-side grading should be reused for the simulation test (and for the retakeable quiz's grade) before the rest is removed.
+  Decide what happens to summary-quiz grades already stored (see Open Questions).
 - Removing star fading affects existing code: the fading logic, "mixed review", and any "fading" status in the class report and test prep.
 
 ## 8. Success Metrics
@@ -206,9 +223,5 @@ Each skill takes the student through four stages, in this order.
 
 ## 9. Open Questions
 
-1. **Real test length:** to make the simulation "the same length and time as the real test", the teacher must enter the number of questions and the time limit when setting a test. Is that OK, or should there be a default (e.g. 12 questions, 90 minutes)?
-2. **Which quiz grade** goes in the lesson coverage cell: the retakeable quiz's best grade, or the end-of-lesson summary quiz (בוחן מסכם) that exists today and is the lesson's official grade? Does the summary quiz stay in the product?
-3. **Feedback in exercise tests:** immediate feedback after each question (better for learning), or only at the end (closer to the real test)? Today exercise tests 1 and 2 give feedback after each question.
-4. **Smart board:** which board(s) does the school use, and how does content get from it into the app (export a file, share a link, screenshot)?
-5. **Exercise test length and time limit:** same as the simulation, or shorter?
-6. **Several tests at once:** if two tests overlap (e.g. a test in 5 days and another in 12), how should the home screen choose "today's task"?
+1. **Existing summary-quiz grades:** when the summary quiz is removed, should grades students already got stay visible (read-only), or be dropped?
+2. **Default time limit:** 90 minutes was chosen as the default for a real test. Is that right for most tests, or should it be 45?
