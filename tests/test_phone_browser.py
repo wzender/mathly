@@ -1228,6 +1228,10 @@ def test_prompter_from_management(phone_server):
             page.locator(".mxp-view").hover()
             page.mouse.wheel(0, 120)                                   # while playing, the wheel is the speed
             playwright.expect(page.locator(".mxp-speed-v")).not_to_have_text(speed)
+            hint = prompter.locator(".mxp-hint")                       # the effect is shown at the bottom, then fades
+            playwright.expect(hint).to_have_class("mxp-hint on")
+            playwright.expect(hint).to_contain_text("מהירות 45")
+            playwright.expect(hint).to_have_class("mxp-hint", timeout=3000)
             page.locator(".mxp-view").click()                          # a click pauses
             playwright.expect(prompter).to_have_class("mxp mirror")
             page.keyboard.press("PageDown")                            # a presentation clicker plays

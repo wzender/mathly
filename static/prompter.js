@@ -26,9 +26,13 @@ const CSS=`
 .mxp-fade{position:absolute;inset-inline:0;height:22%;pointer-events:none}
 .mxp-fade.top{top:0;background:linear-gradient(#000,transparent)}.mxp-fade.bot{bottom:0;background:linear-gradient(transparent,#000)}
 .mxp-progress{height:3px;background:#222}.mxp-progress i{display:block;height:100%;width:0;background:#f5c518}
+.mxp-hint{position:absolute;left:50%;bottom:8%;translate:-50% 0;z-index:2;display:flex;align-items:center;gap:10px;padding:12px 22px;border-radius:999px;background:rgba(20,20,20,.95);border:1px solid rgba(245,197,24,.6);color:#fff;font-size:22px;font-weight:600;white-space:nowrap;pointer-events:none;opacity:0;scale:.92;transition:opacity .25s ease,scale .25s ease}
+.mxp-hint.on{opacity:1;scale:1}
+.mxp-hint b{color:#f5c518;font-size:28px;line-height:1}
+@media (prefers-reduced-motion:reduce){.mxp-hint{transition:opacity .15s linear;scale:1}}
 .mxp-count{position:absolute;inset:0;display:grid;place-items:center;font-size:30vh;font-weight:700;color:#f5c518;background:rgba(0,0,0,.6);pointer-events:none}
 `;
-let wheel=0,keepOpen=false,root,scroller,textEl,guide,bar,raf=0,last=0,playing=false,speed=40,size=64,mirror=false,acc=0,countTimer=0,back=null;
+let hintTimer=0,wheel=0,keepOpen=false,root,scroller,textEl,guide,bar,raf=0,last=0,playing=false,speed=40,size=64,mirror=false,acc=0,countTimer=0,back=null;
 
 function save(){try{localStorage.setItem("mathly.prompter",JSON.stringify({speed,size,mirror}))}catch{}}
 function load(){try{const s=JSON.parse(localStorage.getItem("mathly.prompter")||"{}");if(s.speed)speed=s.speed;if(s.size)size=s.size;mirror=!!s.mirror}catch{}}
@@ -40,6 +44,7 @@ function style(){
 
 function sync(){
   textEl.style.fontSize=size+"px"; guide.style.height=(size*1.45)+"px";
+  textEl.style.paddingTop=guide.offsetTop+"px";   // the first line starts on the reading line
   root.classList.toggle("mirror",mirror); root.classList.toggle("playing",playing);
   bar.querySelector(".mxp-play").textContent=playing?"⏸ עצירה":"▶ הפעלה";
   bar.querySelector("[data-p=mirror]").setAttribute("aria-pressed",String(mirror));
@@ -75,7 +80,26 @@ function countdown(){
   countTimer=setInterval(()=>{n--; if(n>0) el.textContent=n; else play(true);},700);
 }
 
+// a short note at the bottom centre that fades in, stays a moment and fades out, so a mouse or clicker action is seen
+function hint(icon,text){
+  const el=root?.querySelector(".mxp-hint"); if(!el) return;
+  el.innerHTML=""; const b=document.createElement("b"); b.textContent=icon; const span=document.createElement("span"); span.textContent=text;
+  el.append(b,span); el.classList.add("on");
+  clearTimeout(hintTimer); hintTimer=setTimeout(()=>el.classList.remove("on"),1100);
+}
+const HINTS={
+  play:()=>playing||root.querySelector(".mxp-count")?["▶","הפעלה"]:["⏸","עצירה"],
+  faster:()=>["⏩",`מהירות ${speed}`+(speed>=300?" (מקסימום)":"")], slower:()=>["⏪",`מהירות ${speed}`+(speed<=5?" (מינימום)":"")],
+  bigger:()=>["A+",`גודל ${size}`], smaller:()=>["A−",`גודל ${size}`],
+  mirror:()=>["⇋",mirror?"מראה: מופעלת":"מראה: כבויה"], top:()=>["⏮","להתחלה"], back:()=>["↶","כמה שורות אחורה"],
+};
+
 function act(p){
+  actOnly(p);
+  if(root&&HINTS[p]) hint(...HINTS[p]());
+}
+
+function actOnly(p){
   switch(p){
     case "play": return countdown();
     case "slower": speed=Math.max(5,speed-5); break;
@@ -124,14 +148,15 @@ function open(text){
       <button data-p="close" title="סגירה (Esc)" aria-label="סגירה">✕</button></div>
     <div class="mxp-progress"><i></i></div>
     <div class="mxp-view"><div class="mxp-scroll"><div class="mxp-text" dir="auto"></div></div>
-      <div class="mxp-fade top"></div><div class="mxp-fade bot"></div><div class="mxp-guide"></div></div>`;
+      <div class="mxp-fade top"></div><div class="mxp-fade bot"></div><div class="mxp-guide"></div>
+      <div class="mxp-hint" role="status" aria-live="polite"></div></div>`;
   scroller=root.querySelector(".mxp-scroll"); textEl=root.querySelector(".mxp-text"); guide=root.querySelector(".mxp-guide"); bar=root.querySelector(".mxp-bar");
   textEl.textContent=text;
   bar.addEventListener("click",e=>{const b=e.target.closest("[data-p]"); if(b) act(b.dataset.p);});
   bar.querySelector(".mxp-speed").addEventListener("input",e=>{speed=+e.target.value; save(); sync();});
   scroller.addEventListener("scroll",progress,{passive:true});
   const view=root.querySelector(".mxp-view");
-  view.addEventListener("click",()=>countdown());
+  view.addEventListener("click",()=>act("play"));
   view.addEventListener("wheel",e=>{            // while playing the wheel is a speed knob: down faster, up slower
     if(!playing){acc=0; return;}
     e.preventDefault(); wheel+=e.deltaMode?e.deltaY*40:e.deltaY;
@@ -154,6 +179,7 @@ function open(text){
 
 function close(){
   if(!root) return;
+  clearTimeout(hintTimer);
   play(false); document.removeEventListener("keydown",onKey,true); document.removeEventListener("fullscreenchange",onFull);
   if(document.fullscreenElement) document.exitFullscreen?.();
   root.remove(); root=null; back?.focus?.(); back=null;

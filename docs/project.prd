@@ -75,7 +75,7 @@ Teacher Screen:
 - assignments
   - give an assignment. load it from:
     - the computer (file upload)
-    - the board
+    - the classroom smart board
     - a picture (camera)
   - check assignments: review each student's submitted answers and give feedback/grade
 - tests
@@ -84,4 +84,4 @@ Teacher Screen:
 - class heat map
   - rows: students, columns: skills
   - each cell is colored by the skill state (not started / learning / mastered / needs review)
-  - period filter: sep-dec, dec-jun
+  - period filter: sep-dec, jan-jun
