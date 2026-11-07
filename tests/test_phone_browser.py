@@ -1255,3 +1255,68 @@ def test_prompter_from_management(phone_server):
             playwright.expect(page.locator(".mx-manage-sheet")).to_be_visible()   # Esc closes only the prompter
         finally:
             browser.close()
+
+
+def test_prompter_outline_from_management(phone_server):
+    """ראשי פרקים: Claude writes a saved text's outline once (mocked here), then it opens at once and can be edited."""
+    import json
+
+    with playwright.sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page()
+            page.route("https://cdn.jsdelivr.net/**", lambda route: route.abort())
+            page.add_init_script('''window.supabase={createClient:()=>({auth:{
+                getSession:async()=>({data:{session:{access_token:"test",user:{id:"test"}}}}),
+                onAuthStateChange:()=>{},signOut:async()=>{}
+            }})};''')
+
+            def index(route):
+                response = route.fetch()
+                route.fulfill(response=response, body=response.text().replace(
+                    'supabaseUrl:""', 'supabaseUrl:"https://auth.invalid"'))
+
+            page.route(phone_server + "/", index)
+            page.route("**/api/me", lambda route: route.fulfill(json={
+                "email": "dev@example.com", "user_id": "test", "answer_scans": False,
+                "permissions": ["management.access"], "classes": []}))
+            page.route("**/api/math/progress", lambda route: route.fulfill(json={"progress": {}}))
+            page.route("**/api/classes", lambda route: route.fulfill(json={"classes": []}))
+            row = {"id": "aaaaaaaa-aaaa-4aaa-8aaa-000000000001", "title": "Zohar's lecture", "outline": None,
+                   "body": "Slide 1 — Hello\n35 seconds\nGood morning.\nSlide 2 — Bye\nThank you.",
+                   "updated_at": "2026-11-07T10:00:00Z"}
+            calls = []
+            outline = "Slide 1 — Hello\n35 seconds\n• Good morning\n\nSlide 2 — Bye\n• Thanks"
+
+            def make(route):
+                calls.append(route.request.method)
+                row["outline"] = outline
+                route.fulfill(json={"text": row})
+
+            def save(route):
+                row.update(json.loads(route.request.post_data))
+                route.fulfill(json={"text": row})
+            page.route("**/api/prompter/texts", lambda route: route.fulfill(json={"texts": [row]}))
+            page.route("**/api/prompter/texts/*/outline", make)
+            page.route("**/api/prompter/texts/aaaaaaaa-aaaa-4aaa-8aaa-000000000001", save)
+            page.goto(phone_server)
+            page.locator('[data-act="manage"]').click()
+            page.locator('[data-act="manage-prompter"]').click()
+            page.locator("[data-prompter-outline]").click()                # no outline yet: Claude writes it
+            playwright.expect(page.locator(".mxp")).to_have_count(1)
+            playwright.expect(page.locator(".mxp-sbody p.pt")).to_have_text(["Good morning"])
+            playwright.expect(page.locator(".mx-prompter-state")).to_contain_text("מוכנים ונשמרו")
+            page.keyboard.press("Escape")
+            page.locator("[data-prompter-outline]").click()                # now it opens with no second call
+            playwright.expect(page.locator(".mxp")).to_have_count(1)
+            assert calls == ["POST"]
+            page.keyboard.press("Escape")
+            page.locator("[data-prompter-open]").click()                   # editing shows the outline and saves it
+            area = page.locator("#mxPrompterOutline")
+            playwright.expect(area).to_have_value(outline)
+            area.fill(outline.replace("Thanks", "Thank you all"))
+            page.locator('[data-act="prompter-save"]').click()
+            playwright.expect(page.locator(".mx-prompter-state")).to_contain_text("נשמר")
+            assert "Thank you all" in row["outline"]
+        finally:
+            browser.close()

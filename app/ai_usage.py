@@ -17,7 +17,7 @@ from .auth import AuthUnavailable
 log = logging.getLogger("mathly.ai_usage")
 MIGRATION = "supabase/migrations/20261103220000_math_ai_usage.sql"
 TABLE = "/rest/v1/math_ai_usage"
-FEATURES = ("photo", "grading")
+FEATURES = ("photo", "grading", "prompter")
 
 # model prefix -> (input, output, cache read) in USD per million tokens. A cache write is 1.25 x input.
 PRICES = {

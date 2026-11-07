@@ -19,6 +19,7 @@ class PrompterAuth(ScanAuth):
     def __init__(self):
         self.rows: list[dict] = []
         self.missing = False
+        self.no_outline = False   # before the outline migration
 
     def user(self, token):
         return {'id': token, 'email': token + '@test.invalid'} if token in (OWNER, OTHER, DEV) else None
@@ -26,6 +27,8 @@ class PrompterAuth(ScanAuth):
     def _admin(self, path, method='GET', body=None, prefer=''):
         if self.missing:
             raise AuthUnavailable('supabase answered 404: relation does not exist')
+        if self.no_outline and ('outline' in path or 'outline' in (body or {})):
+            raise AuthUnavailable('supabase answered 400: column math_prompter_texts.outline does not exist')
         table, _, query = path.partition('?')
         assert table == '/rest/v1/math_prompter_texts'
         q = dict(urllib.parse.parse_qsl(query))
@@ -125,3 +128,81 @@ def test_migration_on_real_postgres(postgres_server):  # noqa: F811
     finally:
         with psycopg.connect(postgres_server.get_uri(), autocommit=True) as c:
             c.execute("drop database " + database + " with (force)")
+
+
+SECTIONS = [{"part": "Part 1 — Why", "heading": "Slide 1 — From Data to Decisions", "time": "Opening · 35 seconds",
+             "reminders": ["Good morning", "BI + AI in daily work"]},
+            {"part": "", "heading": "Slide 2 — Thank You", "time": "", "reminders": ["  Use the data  we have ", ""]},
+            {"part": "", "heading": "", "time": "", "reminders": ["dropped: no heading"]}]
+
+
+def test_outline_text_is_a_slide_script():
+    from app.prompter import outline_text
+    assert outline_text(SECTIONS) == ("Part 1 — Why\nSlide 1 — From Data to Decisions\nOpening · 35 seconds\n"
+                                      "• Good morning\n• BI + AI in daily work\n\nSlide 2 — Thank You\n• Use the data we have")
+
+
+def test_claude_writes_the_outline_and_it_is_kept(app, monkeypatch):
+    from app import ai_usage
+    from app.prompter import outline_text
+    seen, recorded = [], []
+    app.state.prompter_outliner = lambda body: (seen.append(body) or outline_text(SECTIONS), {"model": "m"})
+    monkeypatch.setattr(ai_usage, "record", lambda auth, user, feature, usage: recorded.append((user, feature)))
+    text = call(app, OWNER, 'POST', '/api/prompter/texts', json={'title': 't', 'body': 'Slide 1 — a\nhello'}).json()['text']
+    r = call(app, OWNER, 'POST', f"/api/prompter/texts/{text['id']}/outline")
+    assert r.status_code == 200 and r.json()['text']['outline'].startswith("Part 1 — Why\nSlide 1")
+    assert seen == ['Slide 1 — a\nhello'] and recorded == [(OWNER, "prompter")]
+    assert call(app, DEV, 'POST', f"/api/prompter/texts/{text['id']}/outline").status_code == 404   # not theirs
+    assert call(app, OTHER, 'POST', f"/api/prompter/texts/{text['id']}/outline").status_code == 403
+    url = f"/api/prompter/texts/{text['id']}"
+    # a new title keeps it; an edited outline is saved; a changed text without an outline drops it
+    assert call(app, OWNER, 'PUT', url, json={'title': 'new', 'body': 'Slide 1 — a\nhello'}).json()['text']['outline']
+    assert call(app, OWNER, 'PUT', url, json={'title': 'new', 'body': 'Slide 1 — a\nhello',
+                                             'outline': 'Slide 1 — a\n• mine'}).json()['text']['outline'] == 'Slide 1 — a\n• mine'
+    assert call(app, OWNER, 'PUT', url, json={'title': 'new', 'body': 'Slide 1 — b\nbye'}).json()['text']['outline'] is None
+    assert call(app, OWNER, 'PUT', url, json={'body': 'x', 'outline': 'y' * 20_001}).status_code == 413
+    assert call(app, OWNER, 'PUT', url, json={'body': 'x', 'outline': '  '}).json()['text']['outline'] is None
+
+
+def test_outline_without_claude_is_503(app, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDE_API_KEY", raising=False)
+    text = call(app, OWNER, 'POST', '/api/prompter/texts', json={'title': 't', 'body': 'x'}).json()['text']
+    assert call(app, OWNER, 'POST', f"/api/prompter/texts/{text['id']}/outline").status_code == 503
+
+
+def test_outline_migration_on_real_postgres(postgres_server):  # noqa: F811
+    psycopg = pytest.importorskip("psycopg")
+    from pathlib import Path
+    from scan_support import BOOTSTRAP
+    database = "pro_" + uuid.uuid4().hex
+    with psycopg.connect(postgres_server.get_uri(), autocommit=True) as c:
+        c.execute("create database " + database)
+    try:
+        with psycopg.connect(postgres_server.get_uri(database=database), autocommit=True) as c:
+            c.execute(BOOTSTRAP)
+            for name in ("20261103220000_math_ai_usage", "20261106130000_math_prompter_texts",
+                         "20261107130000_math_prompter_outline"):
+                c.execute(Path(f"supabase/migrations/{name}.sql").read_text())
+            c.execute("insert into auth.users values(%s)", (OWNER,))
+            c.execute("set role service_role")
+            c.execute("insert into math_prompter_texts(user_id,title,body) values(%s,'a','b')", (OWNER,))
+            c.execute("update math_prompter_texts set outline='• x'")
+            with pytest.raises(psycopg.errors.CheckViolation):
+                c.execute("update math_prompter_texts set outline=''")
+            c.execute("insert into math_ai_usage(feature,model) values('prompter','m')")
+            with pytest.raises(psycopg.errors.CheckViolation):
+                c.execute("insert into math_ai_usage(feature,model) values('other','m')")
+    finally:
+        with psycopg.connect(postgres_server.get_uri(), autocommit=True) as c:
+            c.execute("drop database " + database + " with (force)")
+
+
+def test_before_the_outline_migration_texts_still_work(app):
+    app.state.auth.no_outline = True
+    app.state.prompter_outliner = lambda body: ("Slide 1 — a\n• x", None)
+    text = call(app, OWNER, 'POST', '/api/prompter/texts', json={'title': 't', 'body': 'x'}).json()['text']
+    assert 'outline' not in text
+    assert [t['id'] for t in call(app, OWNER, 'GET', '/api/prompter/texts').json()['texts']] == [text['id']]
+    assert call(app, OWNER, 'PUT', f"/api/prompter/texts/{text['id']}", json={'body': 'y'}).json()['text']['body'] == 'y'
+    assert call(app, OWNER, 'POST', f"/api/prompter/texts/{text['id']}/outline").status_code == 503

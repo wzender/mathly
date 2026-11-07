@@ -90,3 +90,12 @@ def test_long_notes_shrink_to_fit():
         assert 25 <= size < 34
         assert page.locator(".mxp-sbody").evaluate("e=>e.scrollHeight<=e.clientHeight+4")
         playwright.expect(page.locator(".mxp-more")).to_be_hidden()
+
+
+def test_outline_reminders_are_a_list():
+    outline = "Part 1 — Why\nSlide 1 — From Data to Decisions\nOpening · 35 seconds\n• Good morning\n• BI + AI\n\n" \
+              "Slide 2 — Thank You\n• Use the data we have"
+    with playwright.sync_playwright() as p:
+        page = opened(p, outline)
+        playwright.expect(page.locator(".mxp-sbody p.pt")).to_have_text(["Good morning", "BI + AI"])
+        playwright.expect(page.locator(".mxp-timer")).to_have_text("0:00 / 0:35")

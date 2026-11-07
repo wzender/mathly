@@ -1752,6 +1752,7 @@ function onClick(e){
   if(t.dataset.id) return open(t.dataset.id);
   if(t.dataset.manageMode) return showManageMode(t.dataset.manageMode);
   if(t.dataset.prompterPlay) return window.MathlyPrompter?.open(PR.texts.find(x=>x.id===t.dataset.prompterPlay)?.body);
+  if(t.dataset.prompterOutline) return prOutline(t.dataset.prompterOutline,t);
   if(t.dataset.prompterOpen) return prEdit(t.dataset.prompterOpen);
   if(t.dataset.prompterDel) return prDelete(t.dataset.prompterDel);
   if(t.dataset.classAction) return manageClassAction(t.dataset.classAction,t.dataset.classId);
@@ -1771,6 +1772,7 @@ function onClick(e){
     case "manage-lab": return showManageMode("lab");
     case "manage-prompter": return showManageMode("prompter");
     case "prompter-go": return window.MathlyPrompter?.open(sheet.querySelector("#mxPrompterText")?.value);
+    case "prompter-outline-go": return window.MathlyPrompter?.open(sheet.querySelector("#mxPrompterOutline")?.value);
     case "prompter-save": return prSave(false);
     case "prompter-save-new": return prSave(true);
     case "prompter-new": return prNew();
@@ -1912,20 +1914,31 @@ function showManageMode(mode){
 
 /* Prompter (פרומפטר): a developer writes or picks a text and shows it full screen (static/prompter.js).
    Saved texts are kept with the account (app/prompter.py), so they are on every device; the text being edited is
-   also kept in this browser, so nothing is lost before it is saved. */
-let PR={texts:[],id:null,loaded:false};
+   also kept in this browser, so nothing is lost before it is saved.
+   ראשי פרקים: for talking from reminders rather than reading, Claude writes a saved text's outline once (2–4 short
+   topics per slide, app/prompter.py); it is kept with the text and can be edited here. Saving a changed text
+   without touching its outline drops the outline, since it was written from the old text. */
+let PR={texts:[],id:null,loaded:false,outlineEdited:false};
 function prDraft(){ try{return JSON.parse(localStorage.getItem("mathly.prompterDraft")||"null")||{title:"",body:localStorage.getItem("mathly.prompterText")||"",id:null};}catch{return {title:"",body:"",id:null};} }
 function prKeep(){
-  const title=sheet.querySelector("#mxPrompterTitle"), body=sheet.querySelector("#mxPrompterText"); if(!title||!body) return;
-  try{localStorage.setItem("mathly.prompterDraft",JSON.stringify({title:title.value,body:body.value,id:PR.id}));}catch{}
+  const title=sheet.querySelector("#mxPrompterTitle"), body=sheet.querySelector("#mxPrompterText"), outline=sheet.querySelector("#mxPrompterOutline"); if(!title||!body) return;
+  try{localStorage.setItem("mathly.prompterDraft",JSON.stringify({title:title.value,body:body.value,outline:outline?.value||"",outlineEdited:PR.outlineEdited,id:PR.id}));}catch{}
+}
+function prShowOutline(text){
+  const box=sheet.querySelector(".mx-prompter-outline"), area=sheet.querySelector("#mxPrompterOutline"); if(!box||!area) return;
+  area.value=text||""; box.open=!!text; PR.outlineEdited=false;
 }
 function prSay(text){ const el=sheet.querySelector(".mx-prompter-state"); if(el) el.textContent=text; }
 function prDate(at){ try{return new Date(at).toLocaleString("he-IL",{day:"numeric",month:"numeric",year:"2-digit",hour:"2-digit",minute:"2-digit"});}catch{return "";} }
 function drawPrompter(box){
-  const draft=prDraft(); PR.id=draft.id||null;
+  const draft=prDraft(); PR.id=draft.id||null; PR.outlineEdited=!!draft.outlineEdited;
   box.innerHTML=`<div class="mx-manage-title"><h4>פרומפטר</h4><span>טקסט לקריאה מול המצלמה</span></div>
     <input id="mxPrompterTitle" class="mx-prompter-title" dir="auto" maxlength="120" placeholder="שם הטקסט (לא חובה)" aria-label="שם הטקסט" value="${esc(draft.title||"")}">
     <textarea id="mxPrompterText" class="mx-prompter-text" dir="auto" rows="12" placeholder="הדביקו או כתבו כאן את הטקסט…" aria-label="טקסט לפרומפטר">${esc(draft.body||"")}</textarea>
+    <details class="mx-prompter-outline"${draft.outline?" open":""}><summary>ראשי פרקים</summary>
+      <p class="mx-note">תזכורות קצרות לכל שקף, במקום לקרוא את הטקסט. לחצו „ראשי פרקים” ליד טקסט שמור ו־Claude יכין אותן; אפשר לערוך כאן ולשמור. כותרת שקף בשורה משלה, ואחריה שורות שמתחילות ב־•</p>
+      <textarea id="mxPrompterOutline" class="mx-prompter-text" dir="auto" rows="10" aria-label="ראשי פרקים">${esc(draft.outline||"")}</textarea>
+      <div class="mx-prompter-acts"><button class="mx-btn" data-act="prompter-outline-go">הצגת ראשי הפרקים</button></div></details>
     <div class="mx-prompter-acts">
       <button class="mx-btn solid" data-act="prompter-go">הצגה בפרומפטר</button>
       <button class="mx-btn" data-act="prompter-save">שמירה</button>
@@ -1937,6 +1950,7 @@ function drawPrompter(box){
     <div class="mx-manage-title"><h4>טקסטים שמורים</h4><span class="mx-prompter-count"></span></div>
     <div class="mx-prompter-list mx-manage-list"><p class="mx-note">טוענים…</p></div>`;
   box.querySelectorAll("#mxPrompterTitle,#mxPrompterText").forEach(el=>el.addEventListener("input",prKeep));
+  box.querySelector("#mxPrompterOutline").addEventListener("input",()=>{PR.outlineEdited=true; prKeep();});
   prMark(); box.querySelector("#mxPrompterText").focus();
   prLoad();
 }
@@ -1945,7 +1959,7 @@ function prList(){
   const list=sheet.querySelector(".mx-prompter-list"); if(!list) return;
   sheet.querySelector(".mx-prompter-count").textContent=PR.texts.length?`${PR.texts.length} טקסטים`:"";
   list.innerHTML=PR.texts.length?PR.texts.map(t=>`<article${t.id===PR.id?' aria-current="true"':""}><b dir="auto">${esc(t.title)}</b><small>${esc(prDate(t.updated_at))} · ${t.body.length.toLocaleString("he-IL")} תווים</small>
-      <span class="mx-prompter-row"><button class="mx-btn solid" data-prompter-play="${t.id}">הצגה</button><button class="mx-btn" data-prompter-open="${t.id}">עריכה</button><button class="mx-btn" data-prompter-del="${t.id}">מחיקה</button></span></article>`).join("")
+      <span class="mx-prompter-row"><button class="mx-btn solid" data-prompter-play="${t.id}">הצגה</button><button class="mx-btn${t.outline?" solid":""}" data-prompter-outline="${t.id}" title="${t.outline?"תזכורות קצרות לכל שקף":"Claude יכין תזכורות קצרות לכל שקף (פעם אחת, כחצי דקה)"}">ראשי פרקים</button><button class="mx-btn" data-prompter-open="${t.id}">עריכה</button><button class="mx-btn" data-prompter-del="${t.id}">מחיקה</button></span></article>`).join("")
     :'<p class="mx-note">עדיין אין טקסטים שמורים. כתבו טקסט ולחצו „שמירה”.</p>';
 }
 async function prLoad(){
@@ -1960,26 +1974,44 @@ async function prSave(asNew){
   const title=sheet.querySelector("#mxPrompterTitle").value, body=sheet.querySelector("#mxPrompterText").value;
   if(!body.trim()) return prSay("אין טקסט לשמור.");
   const id=asNew?null:PR.id;
+  // the outline goes along only when it was edited here; otherwise the server keeps it, or drops it if the text changed
+  const send={title,body}; if(id&&PR.outlineEdited) send.outline=sheet.querySelector("#mxPrompterOutline").value;
   prSay("שומרים…");
   try{
-    const r=await api(id?`/api/prompter/texts/${id}`:"/api/prompter/texts",{method:id?"PUT":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,body})});
+    const r=await api(id?`/api/prompter/texts/${id}`:"/api/prompter/texts",{method:id?"PUT":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(send)});
     if(r.status===409) return prSay("יש כבר 200 טקסטים שמורים. מחקו אחד כדי לשמור עוד.");
     if(r.status===404&&id){ PR.id=null; return prSave(true); }     // deleted on another device: keep it as a new one
     if(!r.ok) throw new Error();
     const {text}=await r.json();
     PR.texts=[text,...PR.texts.filter(t=>t.id!==text.id)]; PR.id=text.id;
-    sheet.querySelector("#mxPrompterTitle").value=text.title; prKeep(); prList();
+    sheet.querySelector("#mxPrompterTitle").value=text.title; prShowOutline(text.outline); prKeep(); prList();
     prSay(`נשמר: „${text.title}”.`);
   }catch{ prSay("השמירה נכשלה. הטקסט עדיין כאן ובדפדפן הזה; נסו שוב."); }
 }
 function prEdit(id){
   const t=PR.texts.find(x=>x.id===id); if(!t) return;
   PR.id=id; sheet.querySelector("#mxPrompterTitle").value=t.title; sheet.querySelector("#mxPrompterText").value=t.body;
-  prKeep(); prList(); prMark(); sheet.querySelector("#mxPrompterText").focus();
+  prShowOutline(t.outline); prKeep(); prList(); prMark(); sheet.querySelector("#mxPrompterText").focus();
 }
 function prNew(){
   PR.id=null; sheet.querySelector("#mxPrompterTitle").value=""; sheet.querySelector("#mxPrompterText").value="";
-  prKeep(); prList(); prSay(""); sheet.querySelector("#mxPrompterTitle").focus();
+  prShowOutline(""); prKeep(); prList(); prSay(""); sheet.querySelector("#mxPrompterTitle").focus();
+}
+// ראשי פרקים of a saved text: shown at once if it has them, otherwise Claude writes them first (about half a minute)
+async function prOutline(id,btn){
+  const t=PR.texts.find(x=>x.id===id); if(!t) return;
+  if(t.outline) return window.MathlyPrompter?.open(t.outline);
+  btn.disabled=true; btn.textContent="מכינים…";
+  prSay(`Claude מכין ראשי פרקים ל„${t.title}”. זה לוקח כחצי דקה.`);
+  try{
+    const r=await api(`/api/prompter/texts/${id}/outline`,{method:"POST"});
+    if(!r.ok) throw new Error(String(r.status));
+    const {text}=await r.json();
+    PR.texts=PR.texts.map(x=>x.id===text.id?text:x);
+    if(PR.id===text.id){ prShowOutline(text.outline); prKeep(); }
+    prList(); prSay(`ראשי הפרקים של „${text.title}” מוכנים ונשמרו. אפשר לערוך אותם ב„עריכה”.`);
+    window.MathlyPrompter?.open(text.outline);
+  }catch{ prList(); prSay("לא הצלחנו להכין ראשי פרקים כרגע. נסו שוב בעוד דקה."); }
 }
 async function prDelete(id){
   const t=PR.texts.find(x=>x.id===id); if(!t||!confirm(`למחוק את „${t.title}”?`)) return;
@@ -2051,7 +2083,7 @@ function drawMonSummary(){
     tiles.push(tile(!ai?"…":t?usd(t.cost_usd):"–",`עלות Claude ב־${ai?.days||30} יום (הערכה)`,
       !ai?"טוען…":ai.error?esc(ai.error):ai.unavailable?esc(ai.unavailable):
       `${t.calls} קריאות · ${tok(t.input_tokens)} אסימוני קלט · ${tok(t.output_tokens)} פלט · היום ${usd(ai.today.cost_usd)}`+
-      ` · צילום ${usd(f.photo?.cost_usd)} · בדיקה ${usd(f.grading?.cost_usd)}`)); }
+      ` · צילום ${usd(f.photo?.cost_usd)} · בדיקה ${usd(f.grading?.cost_usd)}`+(f.prompter?` · פרומפטר ${usd(f.prompter.cost_usd)}`:""))); }
 
   // open answers: what is switched on, and how this period's photo checks came out
   const ans=sum?.answers, act=MON.activity, verdicts=act?.summary?.verdicts||{};

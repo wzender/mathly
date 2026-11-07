@@ -14,7 +14,8 @@
      next slide's title. The first tap starts the clock; then a tap or a swipe to the left is the next slide, a swipe
      to the right the one before. Keys and clickers: Space / Page Down / → / ↓ next · Page Up / ← / ↑ back ·
      Home first slide (and resets the clock) · S switches between slides and scrolling.
-     In the notes, [CLICK] marks a slide click, [PAUSE] or // a pause, and *word* a stressed word.
+     In the notes, [CLICK] marks a slide click, [PAUSE] or // a pause, and *word* a stressed word; "• " lines are
+     reminders (an outline, ראשי פרקים, app/prompter.py) and are shown as a large list.
    The screen is kept awake while the prompter is open (where the browser allows it), and the text size is kept
    separately for scrolling and for slides in portrait and in landscape (a mini iPad turned either way). */
 (()=>{
@@ -54,6 +55,8 @@ const CSS=`
 .mxp-sbody::-webkit-scrollbar{display:none}
 .mxp-sbody p{margin:0 0 .4em;max-width:1100px;unicode-bidi:plaintext;text-align:start}
 .mxp-sbody p.gap{height:.35em;margin:0}
+.mxp-sbody p.pt{position:relative;padding-inline-start:1.1em;margin-bottom:.7em;font-size:1.25em;line-height:1.25}
+.mxp-sbody p.pt::before{content:"";position:absolute;inset-inline-start:.15em;top:.45em;width:.38em;height:.38em;border-radius:50%;background:#f5c518}
 .mxp-sbody em{font-style:normal;color:#f5c518}
 .mxp-cue{display:inline-block;padding:0 .35em;margin:0 .15em;border-radius:.3em;font-size:.6em;vertical-align:.2em;background:#1565c0;color:#fff;font-weight:700}
 .mxp-cue.pause{background:#444}
@@ -107,6 +110,7 @@ function parse(text){
   if(pre.some(l=>l.trim())) slides.unshift({num:0,title:"פתיחה",part:"",secs:0,label:"",lines:pre});
   return {slides,kinds};
 }
+const BULLET=/^\s*[•\-–]\s+(.+)$/;
 function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function cues(line){
   return esc(line)
@@ -146,7 +150,11 @@ function drawSlide(){
   t.innerHTML=(s.part||s.label?`<small dir="auto">${esc([s.part,s.label].filter(Boolean).join(" · "))}</small>`:"")+`<span dir="auto">${esc(s.title)}</span>`;
   const body=el.querySelector(".mxp-sbody");
   const lines=s.lines.slice(); while(lines.length&&!lines[0].trim()) lines.shift(); while(lines.length&&!lines.at(-1).trim()) lines.pop();
-  body.innerHTML=lines.map(l=>l.trim()?`<p dir="auto">${cues(l)}</p>`:'<p class="gap"></p>').join("");
+  // "• " / "- " lines are reminders (an outline, ראשי פרקים): shown as a list, larger and with room between them
+  body.innerHTML=lines.map(l=>{
+    const b=l.match(BULLET);
+    return b?`<p class="pt" dir="auto">${cues(b[1])}</p>`:l.trim()?`<p dir="auto">${cues(l)}</p>`:'<p class="gap"></p>';
+  }).join("");
   body.scrollTop=0; body.style.animation="none"; void body.offsetWidth; body.style.animation="";
   fit();
   drawFoot(); drawClock(); progress();
