@@ -1,3 +1,9 @@
+The app is written from scratch. Kept from the current app:
+- the exercises (app/math_algebra9.json)
+- the drawing board (static/math-board.js, static/board-math.js, static/vendor/mathlive)
+
+
+
 Glossary:
 
 - skill (מיומנות): a specific topic like פירוק טרינום

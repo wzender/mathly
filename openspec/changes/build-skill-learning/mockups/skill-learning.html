@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mathly - skill learning mockup</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#1d2330;--mute:#667085;--line:#d9dde5;--accent:#2563eb;
+--ok:#15803d;--okbg:#dcfce7;--warn:#b45309;--warnbg:#fef3c7;--bad:#b91c1c;--badbg:#fee2e2;--none:#e5e7eb}
+@media (prefers-color-scheme:dark){:root{--bg:#10131a;--card:#1a1f2b;--ink:#e8ebf2;--mute:#9aa3b5;--line:#2c3446;
+--accent:#6ea0ff;--ok:#6ee7a0;--okbg:#10341f;--warn:#fbbf6a;--warnbg:#3a2a0e;--bad:#fca5a5;--badbg:#3d1616;--none:#2a3040}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
+header{padding:12px 16px;border-bottom:1px solid var(--line);background:var(--card)}
+header h1{margin:0;font-size:16px}
+header p{margin:2px 0 0;color:var(--mute);font-size:13px}
+nav{display:flex;gap:8px;padding:12px 16px;flex-wrap:wrap}
+nav button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
+nav button[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.phone{max-width:400px;margin:8px auto 40px;padding:0 16px}
+.screen{display:none;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
+.screen.on{display:block}
+h2{margin:0 0 4px;font-size:18px}
+.sub{color:var(--mute);font-size:14px;margin:0 0 12px}
+.goal{display:flex;gap:12px;justify-content:space-between;background:var(--bg);border-radius:12px;padding:10px 12px;margin-bottom:14px;font-size:14px}
+.bar{height:8px;background:var(--none);border-radius:4px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.lesson{margin:14px 0 6px;font-weight:600;font-size:14px;color:var(--mute)}
+.skill{display:flex;align-items:center;gap:10px;width:100%;text-align:start;border:1px solid var(--line);background:var(--card);color:var(--ink);
+border-radius:12px;padding:10px 12px;margin-bottom:6px;font:inherit;cursor:pointer}
+.tag{margin-inline-start:auto;font-size:12px;border-radius:999px;padding:2px 10px;white-space:nowrap}
+.mastered{background:var(--okbg);color:var(--ok);border-color:var(--ok)}
+.learning{background:var(--warnbg);color:var(--warn)}
+.none{background:var(--none);color:var(--mute)}
+.stages{display:flex;gap:6px;margin:8px 0 14px;font-size:12px;color:var(--mute)}
+.stages span{flex:1;text-align:center;padding:4px 0;border-bottom:3px solid var(--none)}
+.stages .done{border-color:var(--ok);color:var(--ok)}
+.stages .cur{border-color:var(--accent);color:var(--accent);font-weight:700}
+.q{font-size:20px;margin:10px 0 14px;direction:ltr;text-align:center}
+.choice{display:block;width:100%;text-align:center;direction:ltr;border:2px solid var(--line);background:var(--card);color:var(--ink);
+border-radius:12px;padding:12px;margin-bottom:8px;font:inherit;font-size:17px;cursor:pointer}
+.choice[aria-pressed=true]{border-color:var(--accent)}
+.row{display:flex;gap:8px;margin-top:12px}
+.btn{flex:1;border:0;border-radius:12px;padding:12px;font:inherit;font-weight:600;cursor:pointer;background:var(--accent);color:#fff}
+.btn.alt{background:var(--none);color:var(--ink)}
+.dots{margin-top:12px;font-size:14px;color:var(--mute)}
+.dot{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid var(--line);vertical-align:middle;margin-inline-end:4px}
+.dot.f{background:var(--ok);border-color:var(--ok)}
+.fb{border-radius:12px;padding:12px;margin-top:12px}
+.fb.bad{background:var(--badbg);color:var(--bad)}
+.fb.good{background:var(--okbg);color:var(--ok)}
+.fb b{display:block;margin-bottom:4px}
+.note{max-width:400px;margin:0 auto 24px;padding:0 16px;color:var(--mute);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Mathly - skill learning (static mockup)</h1>
+  <p>Illustrates the draft specs in openspec/changes/build-skill-learning. Not the real app: fixed sample data, no server.</p>
+</header>
+<nav id="tabs" aria-label="screens">
+  <button data-s="path" aria-pressed="true">Path</button>
+  <button data-s="example" aria-pressed="false">1 Worked example</button>
+  <button data-s="faded" aria-pressed="false">2 Faded example</button>
+  <button data-s="practice" aria-pressed="false">3 Practice</button>
+  <button data-s="collection" aria-pressed="false">Collection</button>
+</nav>
+
+<div class="phone">
+
+<!-- PATH -->
+<section class="screen on" id="path">
+  <h2>המסלול שלי</h2>
+  <p class="sub">כל השיעורים פתוחים, בכל סדר</p>
+  <div class="goal">
+    <div style="flex:1">יעד יומי: 3 מתוך 5<div class="bar"><i style="width:60%"></i></div></div>
+    <div>🔥 רצף: 4 ימים</div>
+  </div>
+  <div class="lesson">טכניקה אלגברית 1</div>
+  <button class="skill" data-go="practice">חוק הפילוג המורחב <span class="tag mastered">✓ נשלטה</span></button>
+  <button class="skill" data-go="example">פירוק טרינום <span class="tag learning">◐ בלמידה</span></button>
+  <button class="skill" data-go="example">נוסחאות הכפל המקוצר <span class="tag none">○ לא התחלת</span></button>
+  <div class="lesson">משוואות ריבועיות</div>
+  <button class="skill" data-go="example">משוואה ריבועית שלמה <span class="tag none">○ לא התחלת</span></button>
+  <p class="note" style="padding:0">Every skill shows state as text + symbol, not colour alone.</p>
+</section>
+
+<!-- WORKED EXAMPLE -->
+<section class="screen" id="example">
+  <h2>פירוק טרינום</h2>
+  <div class="stages"><span class="cur">1 דוגמה</span><span>2 השלמה</span><span>3 תרגול</span></div>
+  <div class="q">x² + 5x + 6 = ?</div>
+  <div class="fb good"><b>שלב 1</b><span style="direction:ltr;display:block">Find two numbers: product 6, sum 5 → 2 and 3</span></div>
+  <p style="margin:14px 0 6px"><b>למה עושים את השלב הזה?</b></p>
+  <button class="choice" data-why>כדי למצוא שני מספרים שמכפלתם היא המקדם החופשי וסכומם המקדם האמצעי</button>
+  <button class="choice" data-why>כדי לצמצם את השבר</button>
+  <button class="choice" data-why>כדי להעביר אגפים</button>
+  <div class="row"><button class="btn" id="nextStep" disabled>לשלב הבא</button></div>
+  <p class="sub" style="margin-top:12px">The next step appears only after "why this step?" is answered.</p>
+</section>
+
+<!-- FADED -->
+<section class="screen" id="faded">
+  <h2>פירוק טרינום</h2>
+  <div class="stages"><span class="done">1 דוגמה</span><span class="cur">2 השלמה</span><span>3 תרגול</span></div>
+  <p class="sub">דוגמה 2 מתוך 3 - חסרים 2 שלבים</p>
+  <div class="q">x² + 7x + 12</div>
+  <div class="fb good" style="direction:ltr">Step 1: product 12, sum 7 → 3 and 4 ✓</div>
+  <div class="fb" style="background:var(--bg);direction:ltr">Step 2: ( x + __ )( x + __ )
+    <div class="row"><input aria-label="blank 1" value="3" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);text-align:center"><input aria-label="blank 2" placeholder="?" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);text-align:center"></div>
+  </div>
+  <div class="fb" style="background:var(--bg);direction:ltr">Step 3: ____</div>
+  <div class="row"><button class="btn">בדיקה</button></div>
+  <p class="sub" style="margin-top:12px">Help fades: example 1 = 1 gap, example 2 = 2 gaps, ...</p>
+</section>
+
+<!-- PRACTICE -->
+<section class="screen" id="practice">
+  <h2>חוק הפילוג המורחב</h2>
+  <div class="stages"><span class="done">1 דוגמה</span><span class="done">2 השלמה</span><span class="cur">3 תרגול</span></div>
+  <div class="q">(x + 3)(x − 5) = ?</div>
+  <button class="choice" data-c="ok">x² − 2x − 15</button>
+  <button class="choice" data-c="b1">x² − 15</button>
+  <button class="choice" data-c="b2">x² + 2x − 15</button>
+  <button class="choice" data-c="b3">x² − 2x + 15</button>
+  <div id="result"></div>
+  <div class="row">
+    <button class="btn alt" id="help">עזרה</button>
+    <button class="btn" id="check">בדיקה</button>
+  </div>
+  <div class="dots" id="dots">נכונות ברצף: <span class="dot f"></span><span class="dot f"></span><span class="dot"></span> &nbsp;(ביום אחר יהפוך לנשלטה)</div>
+  <p class="sub" style="margin-top:12px">Wrong answers name the mistake (from the bank) and never reveal the correct one.</p>
+</section>
+
+<!-- COLLECTION -->
+<section class="screen" id="collection">
+  <h2>האוסף שלי</h2>
+  <p class="sub">מה השגתי</p>
+  <div class="lesson">מיומנויות שנשלטו (1)</div>
+  <div class="skill mastered">✓ חוק הפילוג המורחב</div>
+  <div class="lesson">שיעורים שהושלמו (0)</div>
+  <div class="skill none">עדיין אין - נשלוט בכל מיומנויות השיעור</div>
+</section>
+
+</div>
+
+<script>
+const tabs=document.querySelectorAll('#tabs button');
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
+  tabs.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.s===id)));
+}
+tabs.forEach(b=>b.onclick=()=>show(b.dataset.s));
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>show(b.dataset.go));
+
+// worked example: next step unlocks after a "why" answer
+document.querySelectorAll('[data-why]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-why]').forEach(x=>x.setAttribute('aria-pressed','false'));
+  b.setAttribute('aria-pressed','true');
+  document.getElementById('nextStep').disabled=false;
+});
+
+// practice: pick, check, show mistake feedback or success
+const mistakes={
+  b1:['טעות: כפל חלקי','כל איבר בסוגריים הראשונים כופל כל איבר בשניים: (a+b)(c+d) = ac+ad+bc+bd.'],
+  b2:['טעות סימן באיבר האמצעי','שימו לב לסימנים: 3 − 5 = −2, לא +2.'],
+  b3:['טעות סימן באיבר החופשי','פלוס כפול מינוס נותן מינוס.']
+};
+let pick=null;
+document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-c]').forEach(x=>x.setAttribute('aria-pressed','false'));
+  b.setAttribute('aria-pressed','true'); pick=b.dataset.c;
+});
+document.getElementById('check').onclick=()=>{
+  const r=document.getElementById('result');
+  if(!pick){r.innerHTML='';return}
+  if(pick==='ok'){
+    r.innerHTML='<div class="fb good"><b>נכון ✓</b>3 נכונות ברצף. נשלטה אחרי יום נוסף.</div>';
+  }else{
+    const m=mistakes[pick];
+    r.innerHTML='<div class="fb bad"><b>'+m[0]+'</b>'+m[1]+'<br><br><button class="btn" style="width:100%">שאלה דומה</button></div>';
+  }
+};
+document.getElementById('help').onclick=()=>{
+  document.getElementById('dots').textContent='נעזרת - התשובה הזו לא תיספר לשליטה';
+};
+</script>
+</body>
+</html>

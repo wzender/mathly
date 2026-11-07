@@ -1,0 +1,5 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+anyio>=4.10,<4.11  # Python 3.10: newer releases can hang Starlette's worker-thread bridge
+python-dotenv>=1.0
+tzdata>=2024.1

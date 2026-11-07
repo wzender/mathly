@@ -1,0 +1,55 @@
+/* Phone first: the base styles fit 360px; wider layouts are added with min-width queries. */
+:root {
+  --bg: #f7f8fb; --surface: #ffffff; --text: #1b2433; --muted: #5b6678;
+  --line: #d9dee8; --accent: #2557d6; --accent-text: #ffffff; --danger: #b3261e;
+  --gutter: 16px; --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151c; --surface: #1a212c; --text: #e8ecf3; --muted: #9aa5b8;
+    --line: #2d3748; --accent: #7aa2ff; --accent-text: #0b1220; --danger: #ff8a80;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151c; --surface: #1a212c; --text: #e8ecf3; --muted: #9aa5b8;
+  --line: #2d3748; --accent: #7aa2ff; --accent-text: #0b1220; --danger: #ff8a80;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 16px/1.5 system-ui, "Segoe UI", Arial, "Noto Sans Hebrew", sans-serif;
+  overflow-x: hidden;
+}
+.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px var(--gutter); background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.top h1 { margin: 0; font-size: 20px; }
+main { padding: var(--gutter); max-width: 960px; margin: 0 auto; }
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: var(--gutter); margin-block: 12px;
+}
+.card h2 { margin: 0 0 8px; font-size: 18px; }
+.muted { color: var(--muted); }
+.error { color: var(--danger); }
+button, .button {
+  font: inherit; min-height: 44px; padding: 8px 16px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text);
+}
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+input, textarea {
+  font: inherit; width: 100%; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--text);
+}
+textarea { min-height: 120px; }
+label { display: block; margin-block: 8px 4px; font-weight: 600; }
+ul.plain { list-style: none; margin: 0; padding: 0; }
+ul.plain li { padding: 10px 0; border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+ul.plain li:last-child { border-bottom: 0; }
+.formula { direction: ltr; unicode-bidi: isolate; }
+@media (min-width: 720px) { main { padding: 24px; } }
+.m { font-family: "STIX Two Math", "Cambria Math", serif; direction: ltr; unicode-bidi: isolate; white-space: nowrap; font-size: 1.05em; }
+.m.m-img { font-size: 1.12em; }
+.m-img svg { display: inline-block; overflow: visible; max-width: none; }
