@@ -4,6 +4,12 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+ENV_FILE = Path(__file__).parent / ".env"            # this app's own settings, if it has any
+ROOT_ENV_FILE = Path(__file__).parent.parent / ".env"   # the repository's .env, shared with mathly1 (same Supabase project)
 
 
 def _emails(name: str) -> frozenset[str]:
@@ -16,6 +22,8 @@ class Settings:
     supabase_key: str = ""         # publishable key, sent to the browser for Google sign-in
     supabase_secret: str = ""      # secret key, server only
     teachers: frozenset[str] = field(default_factory=frozenset)
+    developers: frozenset[str] = field(default_factory=frozenset)   # the developer role comes only from here
+    admins: frozenset[str] = field(default_factory=frozenset)       # the first admins; others are given the role by an admin
 
     @property
     def supabase_on(self) -> bool:
@@ -30,11 +38,17 @@ class Settings:
         return self
 
 
-def load_settings() -> Settings:
+def load_settings(env_file: Path | None = None) -> Settings:
+    """Settings from the environment. Files fill in what the environment does not set, in this order: mathly2/.env, then the
+    repository's .env. A real environment variable always wins, so deployments are unaffected. Passing `env_file` reads only that file."""
+    for path in ([env_file] if env_file else [ENV_FILE, ROOT_ENV_FILE]):
+        load_dotenv(path, override=False)
     env = lambda name: os.environ.get(name, "").strip()
     return Settings(
         supabase_url=env("SUPABASE_URL").rstrip("/"),
         supabase_key=env("SUPABASE_PUBLISHABLE_KEY"),
         supabase_secret=env("SUPABASE_SECRET_KEY"),
         teachers=_emails("TEACHER_EMAILS"),
+        developers=_emails("DEVELOPER_EMAILS"),
+        admins=_emails("ADMIN_EMAILS"),
     ).check()

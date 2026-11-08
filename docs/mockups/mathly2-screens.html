@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mathly 2 screens</title>
+<style>
+/* Static mockup of mathly2 for three roles. Sample data only; no server. Requirement ids refer to docs/tasks/prd-mathly.md. */
+:root{--bg:#eef1fb;--card:#ffffff;--ink:#16203a;--mute:#5a6585;--line:#cfd6ea;--accent:#4f6df5;--aurora:#0f9d8a;--gold:#b98000;--bad:#c2410c;--badbg:#fdecdf;--ok:#0f7a4a;--okbg:#dcf5e8;--night:#e6ebfa;--on-accent:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0b1024;--card:#151c38;--ink:#e9edfb;--mute:#9aa6cf;--line:#2a3560;--accent:#8ea6ff;--aurora:#46e0c8;--gold:#ffd166;--bad:#ffb08a;--badbg:#3a1f12;--ok:#7ff0b5;--okbg:#0f3324;--night:#10173a;--on-accent:#0b1024}}
+:root[data-theme=dark]{--bg:#0b1024;--card:#151c38;--ink:#e9edfb;--mute:#9aa6cf;--line:#2a3560;--accent:#8ea6ff;--aurora:#46e0c8;--gold:#ffd166;--bad:#ffb08a;--badbg:#3a1f12;--ok:#7ff0b5;--okbg:#0f3324;--night:#10173a;--on-accent:#0b1024}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,"Segoe UI",Arial,sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+.top{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.top h1{margin:0;font-size:17px;flex:1 1 auto}
+.top small{color:var(--mute);display:block;font-weight:400;font-size:12px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 14px;cursor:pointer;min-height:38px}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:700}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+.role{display:none}.role.on{display:block}
+.sub{margin-bottom:12px}
+.ids{color:var(--mute);font-size:12px;margin:0 0 10px}
+/* phone frame */
+.phone{width:min(390px,100%);margin:0 auto;border:10px solid var(--ink);border-radius:34px;background:var(--bg);overflow:hidden;position:relative;min-height:720px;display:flex;flex-direction:column}
+.screen{display:none;flex:1;flex-direction:column}.screen.on{display:flex}
+.scroll{flex:1;overflow:auto;padding:14px}
+.tabbar{display:flex;border-top:1px solid var(--line);background:var(--card)}
+.tabbar span{flex:1;text-align:center;padding:8px 0;font-size:12px;color:var(--mute)}
+.tabbar span.cur{color:var(--accent);font-weight:700}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+.card h3{margin:0 0 6px;font-size:15px}
+.mute{color:var(--mute)}
+.btn{display:inline-block;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px 14px;min-height:44px;cursor:pointer;text-align:center}
+.btn.solid{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700}
+.btn.wide{display:block;width:100%}
+.pill{border-radius:999px}
+.bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--aurora)}
+.parts{display:flex;gap:8px;font-size:12px;color:var(--mute);margin-top:6px}
+.tag{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 9px}
+.row{display:flex;gap:8px;align-items:center}.grow{flex:1}
+/* sign-in */
+.signin{flex:1;display:grid;place-content:center;text-align:center;gap:16px;padding:24px;background:linear-gradient(180deg,var(--night),var(--bg))}
+.logo{font-size:30px;font-weight:800;letter-spacing:.5px}
+.owl{font-size:64px;line-height:1}
+.google{background:var(--aurora);color:#05231b;border:0;border-radius:999px;padding:12px 22px;font-weight:700;min-height:44px}
+/* path */
+.trail{display:flex;flex-direction:column;align-items:center;gap:26px;position:relative}
+.trail>*{position:relative}
+.trail>*:not(:first-child)::before{content:"";position:absolute;bottom:100%;left:50%;width:6px;height:26px;margin-left:-3px;background:var(--line);border-radius:3px}
+.mark{text-align:center;color:var(--mute)}
+.orbit{position:relative;width:100%;height:300px}
+.hub{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:120px;text-align:center;background:var(--card);border:2px solid var(--accent);border-radius:16px;padding:7px 5px;z-index:1}
+.hub b{display:block;font-size:13px}.hub span{font-size:11px;color:var(--mute)}
+.star{position:absolute;left:calc(50% + var(--dx)*112px);top:calc(50% + var(--dy)*112px);transform:translate(-50%,-30px);width:96px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;background:none;border:0;padding:0}
+.node{position:relative;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:3px solid var(--line)}
+.node svg{width:24px;height:24px;fill:var(--line)}
+.num{position:absolute;top:-6px;inset-inline-end:-6px;min-width:19px;height:19px;border-radius:999px;background:var(--card);border:2px solid var(--line);font-size:10px;font-weight:700;display:grid;place-items:center}
+.lbl{font-size:11px;text-align:center;line-height:1.2}.lbl em{display:block;font-style:normal;color:var(--mute);font-size:10.5px}
+.s-learning .node{border-color:var(--accent);background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 30%,var(--card)) 50%,var(--card) 50%)}.s-learning .node svg{fill:var(--accent)}
+.s-mastered .node{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 22%,var(--card))}.s-mastered .node svg{fill:var(--gold);width:28px;height:28px}
+.s-faded .node{opacity:.55}
+.s-next .node{width:62px;height:62px;border-color:var(--aurora);box-shadow:0 0 0 5px color-mix(in srgb,var(--aurora) 25%,transparent)}
+.perch{position:absolute;top:-24px;inset-inline-start:-22px;font-size:24px}
+.boss{background:var(--card);border:2px dashed var(--gold);border-radius:14px;padding:8px 14px;text-align:center}
+/* exercise */
+.sheethead{display:flex;gap:8px;align-items:flex-start}
+.chip{font-size:11px;border-radius:999px;background:var(--night);padding:2px 9px}
+.iconbtn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);cursor:pointer}
+.q{font-size:20px;text-align:center;direction:ltr;margin:12px 0}
+.choice{display:block;width:100%;direction:ltr;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:11px;margin-bottom:8px;font-size:17px;cursor:pointer}
+.choice[aria-pressed=true]{border-color:var(--accent)}
+.fb{border-radius:12px;padding:10px;margin-top:8px}.fb.bad{background:var(--badbg);border:1px solid var(--bad)}.fb.good{background:var(--okbg);border:1px solid var(--ok)}
+.dots i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--line);margin-inline-end:3px}.dots i.f{background:var(--ok)}
+/* collection */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cell{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center;font-size:12px}
+.cell .sym{font-size:20px;display:block}
+/* desktop panels */
+.desk{display:grid;grid-template-columns:220px 1fr;gap:14px}
+.menu{display:flex;flex-direction:column;gap:6px}
+.menu button{text-align:start;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;min-height:44px;cursor:pointer}
+.menu button[aria-pressed=true]{border-color:var(--accent);box-shadow:inset -4px 0 0 var(--accent);font-weight:700}
+.panel{display:none}.panel.on{display:block}
+table{border-collapse:collapse;width:100%;background:var(--card);border-radius:12px;overflow:hidden}
+th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:start;font-size:13px}
+th{background:var(--night)}
+.hm td.c{text-align:center;width:34px;font-weight:700}
+.c-m{background:color-mix(in srgb,var(--gold) 30%,transparent)}.c-l{background:color-mix(in srgb,var(--accent) 22%,transparent)}.c-n{color:var(--mute)}
+.sticky{position:sticky;inset-inline-start:0;background:var(--card)}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:12px}
+label{display:block;font-weight:600;margin:10px 0 4px}
+input[type=text],input[type=number],textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px}
+textarea{min-height:90px;direction:ltr}
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px}
+.checks label{font-weight:400;margin:0;border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;gap:6px;align-items:center}
+.switch{display:inline-flex;align-items:center;gap:8px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.thumb{width:72px;height:56px;border-radius:8px;background:repeating-linear-gradient(45deg,var(--night),var(--night) 6px,var(--line) 6px,var(--line) 7px);flex:none}
+@media (max-width:760px){.desk{grid-template-columns:1fr}.menu{flex-direction:row;flex-wrap:wrap}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Mathly 2 · מסכים <small>מוקאפ סטטי עם נתונים לדוגמה · דרישות לפי docs/tasks/prd-mathly.md</small></h1>
+  <div class="seg" id="roles" role="tablist" aria-label="תפקיד">
+    <button data-role="student" aria-pressed="true">תלמיד</button>
+    <button data-role="teacher" aria-pressed="false">מורה</button>
+    <button data-role="manager" aria-pressed="false">מנהל כיתות</button>
+  </div>
+  <div class="seg" aria-label="ערכת צבעים"><button id="theme" aria-pressed="false">מצב כהה/בהיר</button></div>
+</header>
+
+<main class="wrap">
+
+<!-- ======================= STUDENT ======================= -->
+<section class="role on" id="student">
+  <div class="seg sub" id="stuNav">
+    <button data-s="signin" aria-pressed="true">כניסה</button>
+    <button data-s="home" aria-pressed="false">בית</button>
+    <button data-s="path" aria-pressed="false">מסלול</button>
+    <button data-s="ex" aria-pressed="false">תרגיל</button>
+    <button data-s="grades" aria-pressed="false">ציונים</button>
+    <button data-s="coll" aria-pressed="false">האוסף</button>
+  </div>
+  <p class="ids" id="stuIds">ACC-1 · דף הכניסה בסגנון mathly1</p>
+  <div class="phone">
+
+    <div class="screen on" id="s-signin">
+      <div class="signin">
+        <div class="logo">✦ Mathly</div>
+        <div class="owl" aria-hidden="true">🦉</div>
+        <p class="mute" style="margin:0">יש להיכנס כדי לפתוח את מסלול המתמטיקה.</p>
+        <button class="google">כניסה עם Google</button>
+      </div>
+    </div>
+
+    <div class="screen" id="s-home">
+      <div class="scroll">
+        <div class="card">
+          <div class="row"><h3 class="grow">מבחן במתמטיקה · 16.11</h3><span class="tag">עוד 9 ימים</span></div>
+          <div class="row" style="margin:6px 0 4px"><b style="font-size:22px">62</b><span class="tag">בדרך</span><span class="mute grow" style="font-size:12px">מוכנות (תקרה 80 עד הסימולציה)</span></div>
+          <div class="bar"><i style="width:62%"></i></div>
+          <div class="parts"><span>שליטה 70%</span><span>מבחני תרגול 54</span><span>סימולציה —</span></div>
+          <p style="margin:10px 0 6px"><b>המשימה של היום</b></p>
+          <button class="btn solid wide">מבחן תרגול 1 · 12 שאלות · 45 דק׳</button>
+        </div>
+        <div class="card"><h3>המשימות שלי</h3>
+          <div class="row" style="padding:6px 0;border-bottom:1px solid var(--line)"><span class="grow">דף עבודה: פירוק טרינום</span><span class="tag">עד 10.11</span></div>
+          <div class="row" style="padding:6px 0"><span class="grow">בוחן כתוב: טכניקה אלגברית 1</span><span class="tag">✓ 85</span></div>
+        </div>
+        <div class="card"><h3>תקועים על תרגיל? צלמו אותו</h3>
+          <p class="mute" style="margin:0 0 8px;font-size:13px">המורה רואה את התמונה קודם, ואז מגיעים רמזים אחד־אחד.</p>
+          <div class="row"><div class="thumb"></div><span class="grow" style="font-size:13px">תרגיל מצולם · <b>ממתין למורה</b></span><button class="btn">ביטול</button></div>
+          <button class="btn wide" style="margin-top:8px">📷 צילום תרגיל</button>
+        </div>
+        <button class="btn wide">ממשיכים במסלול: משוואה עם פילוג ‹</button>
+      </div>
+      <div class="tabbar"><span class="cur">בית</span><span>מסלול</span><span>ציונים</span><span>האוסף</span></div>
+    </div>
+
+    <div class="screen" id="s-path">
+      <div class="scroll">
+        <div class="card row" style="font-size:13px"><div class="grow">יעד יומי: 3 מתוך 5<div class="bar" style="margin-top:4px"><i style="width:60%"></i></div></div><span>🔥 4 ימים</span></div>
+        <div class="trail">
+          <div class="mark"><span style="font-size:32px">🦉</span><br><b style="color:var(--aurora)">התחלה</b></div>
+          <section class="orbit" aria-label="טכניקה אלגברית 1">
+            <div class="hub"><b>טכניקה אלגברית 1</b><span>2 מתוך 5 נשלטו</span></div>
+            <button class="star s-mastered" style="--dx:0;--dy:-1"><span class="node"><svg viewBox="0 0 24 24"><path d="M12 1.5C13.1 9 15 10.9 22.5 12C15 13.1 13.1 15 12 22.5C10.9 15 9 13.1 1.5 12C9 10.9 10.9 9 12 1.5Z"/></svg><span class="num">1</span></span><span class="lbl">פילוג מורחב<em>✓ נשלטה</em></span></button>
+            <button class="star s-mastered s-faded" style="--dx:.951;--dy:-.309"><span class="node"><svg viewBox="0 0 24 24"><path d="M12 1.5C13.1 9 15 10.9 22.5 12C15 13.1 13.1 15 12 22.5C10.9 15 9 13.1 1.5 12C9 10.9 10.9 9 12 1.5Z"/></svg><span class="num">2</span></span><span class="lbl">צמצום<em>✓ נשלטה · דועך</em></span></button>
+            <button class="star s-learning s-next" style="--dx:.588;--dy:.809"><span class="node"><svg viewBox="0 0 24 24"><path d="M12 1.5C13.1 9 15 10.9 22.5 12C15 13.1 13.1 15 12 22.5C10.9 15 9 13.1 1.5 12C9 10.9 10.9 9 12 1.5Z"/></svg><span class="num">3</span><span class="perch" aria-hidden="true">🦉</span></span><span class="lbl">משוואה עם פילוג<em>◐ בלמידה · ממשיכים כאן</em></span></button>
+            <button class="star" style="--dx:-.588;--dy:.809"><span class="node"><svg viewBox="0 0 24 24"><path d="M12 1.5C13.1 9 15 10.9 22.5 12C15 13.1 13.1 15 12 22.5C10.9 15 9 13.1 1.5 12C9 10.9 10.9 9 12 1.5Z"/></svg><span class="num">4</span></span><span class="lbl">שטח<em>○ לא התחלת</em></span></button>
+            <button class="star" style="--dx:-.951;--dy:-.309"><span class="node"><svg viewBox="0 0 24 24"><path d="M12 1.5C13.1 9 15 10.9 22.5 12C15 13.1 13.1 15 12 22.5C10.9 15 9 13.1 1.5 12C9 10.9 10.9 9 12 1.5Z"/></svg><span class="num">5</span></span><span class="lbl">נוסחאות<em>○ לא התחלת</em></span></button>
+          </section>
+          <div class="boss">🏆 <b>בוחן השיעור</b><br><span class="mute" style="font-size:12px">10 שאלות · 15 דק׳ · הציון הטוב: 85</span></div>
+          <section class="orbit" style="height:260px" aria-label="פירוק לגורמים">
+            <div class="hub"><b>פירוק לגורמים</b><span>0 מתוך 3 נשלטו</span></div>
+            <button class="star" style="--dx:0;--dy:-1"><span class="node"><svg viewBox="0 0 24 24"><path d="M12 1.5C13.1 9 15 10.9 22.5 12C15 13.1 13.1 15 12 22.5C10.9 15 9 13.1 1.5 12C9 10.9 10.9 9 12 1.5Z"/></svg><span class="num">1</span></span><span class="lbl">גורם משותף<em>○ לא התחלת</em></span></button>
+            <button class="star" style="--dx:.866;--dy:.5"><span class="node"><svg viewBox="0 0 24 24"><path d="M12 1.5C13.1 9 15 10.9 22.5 12C15 13.1 13.1 15 12 22.5C10.9 15 9 13.1 1.5 12C9 10.9 10.9 9 12 1.5Z"/></svg><span class="num">2</span></span><span class="lbl">הפרש ריבועים<em>○ לא התחלת</em></span></button>
+            <button class="star" style="--dx:-.866;--dy:.5"><span class="node"><svg viewBox="0 0 24 24"><path d="M12 1.5C13.1 9 15 10.9 22.5 12C15 13.1 13.1 15 12 22.5C10.9 15 9 13.1 1.5 12C9 10.9 10.9 9 12 1.5Z"/></svg><span class="num">3</span></span><span class="lbl">פירוק טרינום<em>○ לא התחלת</em></span></button>
+          </section>
+          <div class="mark">✦<br><b>סוף המסלול</b></div>
+        </div>
+      </div>
+      <div class="tabbar"><span>בית</span><span class="cur">מסלול</span><span>ציונים</span><span>האוסף</span></div>
+    </div>
+
+    <div class="screen" id="s-ex">
+      <div class="scroll">
+        <div class="sheethead"><div class="grow"><span class="chip">טכניקה אלגברית 1</span><h3 style="margin:4px 0 0">חוק הפילוג המורחב</h3></div>
+          <button class="iconbtn" title="לוח">✏️</button><button class="iconbtn" title="עזרה" id="helpBtn">?</button><button class="iconbtn" title="צילום תרגיל">📷</button><button class="iconbtn" title="סגירה">✕</button></div>
+        <p class="mute" style="font-size:13px">כל איבר בסוגריים הראשונים כופל כל איבר בסוגריים השניים.</p>
+        <div class="row" style="font-size:12px"><span class="grow">שאלה 3 מתוך 10</span><span class="dots"><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+        <div class="q">(x + 3)(x − 5) = ?</div>
+        <div id="choices">
+          <button class="choice" data-c="b2">x² + 2x − 15</button>
+          <button class="choice" data-c="ok">x² − 2x − 15</button>
+          <button class="choice" data-c="b1">x² − 15</button>
+          <button class="choice" data-c="b3">x² − 2x + 15</button>
+        </div>
+        <div id="help" class="card" hidden><b>הסבר</b><p style="margin:4px 0">כל איבר בסוגריים הראשונים כופל כל איבר בשניים.</p><p class="mute" style="margin:0;font-size:12px">פתחתם עזרה: התשובה לשאלה הזו לא תיספר לשליטה.</p><p style="margin:6px 0 0"><a href="#" onclick="return false">עדיין תקועים? צלמו 📷</a></p></div>
+        <div id="fb"></div>
+        <p class="mute" style="font-size:12px">נכונות ברצף: 2 מתוך 3 · נדרשים שני ימים שונים</p>
+        <p style="font-size:12px"><span class="mute">דורשת:</span> <span class="tag">כפל איברים</span> <span class="mute">פותחת:</span> <span class="tag">פירוק טרינום</span></p>
+      </div>
+    </div>
+
+    <div class="screen" id="s-grades">
+      <div class="scroll">
+        <h3>ציונים</h3>
+        <table><tr><th>מה</th><th>ציון</th></tr>
+          <tr><td>בוחן · טכניקה אלגברית 1 (הטוב מבין 2)</td><td>85</td></tr>
+          <tr><td>בוחן · משוואות</td><td>70</td></tr>
+          <tr><td>מבחן תרגול 1 · מבחן 16.11</td><td>54</td></tr>
+          <tr><td>משימה · בוחן כתוב</td><td>85</td></tr>
+        </table>
+      </div>
+      <div class="tabbar"><span>בית</span><span>מסלול</span><span class="cur">ציונים</span><span>האוסף</span></div>
+    </div>
+
+    <div class="screen" id="s-coll">
+      <div class="scroll">
+        <h3>האוסף שלי</h3>
+        <p class="mute" style="margin-top:0">כל מיומנות שנשלטה היא כוכב; שיעור שהושלם מצייר קבוצת כוכבים. שביט שלא נתפס מוצג כ־?.</p>
+        <div class="card"><b>⭐ 12 כוכבים · 1 קבוצת כוכבים</b><div class="grid" style="margin-top:8px"><div class="cell"><span class="sym">✦⋆✦</span>דלתון<br><span class="mute">הושלם</span></div></div></div>
+        <div class="card"><b>☄️ שביטים 3 מתוך 12</b><div class="grid" style="margin-top:8px"><div class="cell"><span class="sym">π</span>פאי</div><div class="cell"><span class="sym">φ</span>יחס הזהב</div><div class="cell"><span class="sym">0</span>אפס</div><div class="cell"><span class="sym">?</span>עוד לא נתפס</div><div class="cell"><span class="sym">?</span>עוד לא נתפס</div><div class="cell"><span class="sym">?</span>עוד לא נתפס</div></div></div>
+      </div>
+      <div class="tabbar"><span>בית</span><span>מסלול</span><span>ציונים</span><span class="cur">האוסף</span></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ======================= TEACHER ======================= -->
+<section class="role" id="teacher">
+  <div class="desk">
+    <nav class="menu" id="tMenu">
+      <button data-p="t-classes" aria-pressed="true">הכיתות שלי</button>
+      <button data-p="t-inbox" aria-pressed="false">תיבת הגשות <span class="tag">3</span></button>
+      <button data-p="t-ai" aria-pressed="false">תור ה־AI <span class="tag">2</span></button>
+      <button data-p="t-tests" aria-pressed="false">מבחנים</button>
+      <button data-p="t-heat" aria-pressed="false">מפת חום</button>
+    </nav>
+    <div>
+      <div class="panel on" id="t-classes">
+        <p class="ids">TCH-1, TCH-9 · המורה מוסיפה ומסירה תלמידים בכיתה שלה בלבד</p>
+        <div class="cards">
+          <div class="card"><div class="row"><h3 class="grow">ט׳3</h3><span class="tag">25 תלמידים</span></div>
+            <p class="mute" style="margin:0 0 6px;font-size:13px">שיעורים: טכניקה אלגברית 1, משוואות, פירוק לגורמים · AI: פועל</p>
+            <label for="add">הוספת תלמידים (כתובת בכל שורה)</label><textarea id="add">dana@school.org
+omer@school.org</textarea>
+            <button class="btn solid" style="margin-top:8px">הוספה</button>
+            <table style="margin-top:10px"><tr><th>תלמיד</th><th></th></tr><tr><td dir="ltr">noa@school.org</td><td><button class="btn">הסרה</button></td></tr><tr><td dir="ltr">yoav@school.org</td><td><button class="btn">הסרה</button></td></tr></table>
+          </div>
+          <div class="card"><div class="row"><h3 class="grow">ט׳4</h3><span class="tag">22 תלמידים</span></div><p class="mute" style="margin:0;font-size:13px">AI: כבוי (מנהל הכיתות מפעיל)</p></div>
+        </div>
+      </div>
+      <div class="panel" id="t-inbox">
+        <p class="ids">TCH-4, AI-4, AI-5 · הישן ראשון; הציון של המורה גובר על הצעת ה־AI</p>
+        <table><tr><th>מה</th><th>תלמיד</th><th>הוגש</th><th>הצעת AI</th><th></th></tr>
+          <tr><td>דף עבודה: פירוק טרינום</td><td dir="ltr">noa@</td><td>ב׳ 08:10</td><td>70 · "חסר נימוק בסעיף 2"</td><td><button class="btn solid">בדיקה</button></td></tr>
+          <tr><td>בקשה לבדוק שוב</td><td dir="ltr">yoav@</td><td>ב׳ 12:40</td><td>60</td><td><button class="btn">פתיחה</button></td></tr>
+          <tr><td>בוחן כתוב: טכניקה 1</td><td dir="ltr">dana@</td><td>ג׳ 09:05</td><td>—</td><td><button class="btn">פתיחה</button></td></tr>
+        </table>
+        <div class="card" style="margin-top:12px"><h3>בדיקה: noa · דף עבודה</h3><div class="row"><div class="thumb" style="width:140px;height:100px"></div><div class="grow"><label for="g">ציון (0–100)</label><input id="g" type="number" value="80"><label for="n">הערה</label><input id="n" type="text" value="יפה! שימו לב לסימן בסעיף 3"></div></div><div class="row" style="margin-top:8px"><button class="btn solid">שמירת ציון</button><button class="btn">החזרה לתיקון</button></div></div>
+      </div>
+      <div class="panel" id="t-ai">
+        <p class="ids">AI-1, AI-6, AI-7 · תלמידים לא פונים ל־AI בעצמם · תקציב יומי לכיתה</p>
+        <div class="card row"><span class="grow">ט׳3 · נשארו היום <b>112 מתוך 150</b> בדיקות · הבקשות האישיות שלי: 2 מתוך 3</span><button class="btn solid">שליחת כל הממתינים</button></div>
+        <div class="card row"><div class="thumb"></div><div class="grow"><b>📷 תרגיל לעזרה</b> · noa · <span class="tag">פירוק טרינום</span><br><span class="mute" style="font-size:12px">לפני 6 דקות</span></div><button class="btn solid">שליחה ל־AI</button><button class="btn">דחייה עם הערה</button></div>
+        <div class="card row"><div class="thumb"></div><div class="grow"><b>📝 בדיקת תשובה</b> · yoav · דף עבודה<br><span class="mute" style="font-size:12px">לפני 20 דקות</span></div><button class="btn solid">שליחה ל־AI</button><button class="btn">דחייה עם הערה</button></div>
+      </div>
+      <div class="panel" id="t-tests">
+        <p class="ids">TST-1, TCH-6, RDY-1</p>
+        <div class="card"><div class="row"><h3 class="grow">מבחן ט׳3 · 16.11</h3><button class="btn">עריכה</button></div>
+          <p style="margin:0">שיעורים: טכניקה אלגברית 1, משוואות · 12 שאלות · 45 דק׳ · מחשבון מותר</p>
+          <p style="margin:8px 0 4px"><b>סימולציה: 22 מתוך 25 עשו</b> · חסרים: יואב, עמית, ליה</p>
+          <table><tr><th>תלמיד</th><th>מוכנות</th><th>שליטה</th><th>תרגול</th><th>סימולציה</th></tr><tr><td>נועה</td><td>81 · כמעט שם</td><td>80%</td><td>70</td><td>90</td></tr><tr><td>יואב</td><td>62 · בדרך</td><td>70%</td><td>54</td><td>—</td></tr></table>
+        </div>
+        <button class="btn solid">+ מבחן חדש</button>
+      </div>
+      <div class="panel" id="t-heat">
+        <p class="ids">TCH-7 · צבע וגם סימן בכל תא</p>
+        <div class="seg sub"><button aria-pressed="true">ספט׳–דצמ׳</button><button aria-pressed="false">ינו׳–יוני</button></div>
+        <div class="tablewrap"><table class="hm">
+          <tr><th class="sticky">תלמיד</th><th colspan="3">טכניקה אלגברית 1</th><th colspan="2">משוואות</th></tr>
+          <tr><th class="sticky"></th><th>1</th><th>2</th><th>3</th><th>1</th><th>2</th></tr>
+          <tr><td class="sticky">נועה</td><td class="c c-m">✓</td><td class="c c-m">✓</td><td class="c c-l">◐</td><td class="c c-m">✓</td><td class="c c-n">○</td></tr>
+          <tr><td class="sticky">יואב</td><td class="c c-l">◐</td><td class="c c-n">○</td><td class="c c-n">○</td><td class="c c-l">◐</td><td class="c c-n">○</td></tr>
+          <tr><td class="sticky">דנה</td><td class="c c-m">✓</td><td class="c c-l">◐</td><td class="c c-l">◐</td><td class="c c-m">✓</td><td class="c c-m">✓</td></tr>
+        </table></div>
+        <p class="mute" style="font-size:12px">✓ נשלטה · ◐ בלמידה · ○ לא התחילו</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= MANAGER ======================= -->
+<section class="role" id="manager">
+  <div class="desk">
+    <nav class="menu" id="mMenu">
+      <button data-p="m-classes" aria-pressed="true">כיתות</button>
+      <button data-p="m-edit" aria-pressed="false">כיתה חדשה / עריכה</button>
+      <button data-p="m-students" aria-pressed="false">תלמידים</button>
+    </nav>
+    <div>
+      <div class="panel on" id="m-classes">
+        <p class="ids">CLS-7, MGR-1 · אין למנהל הכיתות גישה לנתוני למידה</p>
+        <div class="row" style="margin-bottom:10px"><button class="btn solid">+ כיתה חדשה</button><span class="mute">2 כיתות</span></div>
+        <div class="cards">
+          <div class="card"><div class="row"><h3 class="grow">ט׳3</h3><button class="btn">עריכה</button><button class="btn">מחיקה</button></div>
+            <p style="margin:0;font-size:13px">שיעורים: טכניקה אלגברית 1, משוואות, פירוק לגורמים<br>מורה: <span dir="ltr">rina@school.org</span><br>25 תלמידים · AI: <b>פועל</b> · 150 בדיקות ביום</p></div>
+          <div class="card"><div class="row"><h3 class="grow">ט׳4</h3><button class="btn">עריכה</button><button class="btn">מחיקה</button></div>
+            <p style="margin:0;font-size:13px">שיעורים: כל 24 השיעורים<br>מורה: <span dir="ltr">avi@school.org</span><br>22 תלמידים · AI: <b>כבוי</b></p></div>
+        </div>
+      </div>
+      <div class="panel" id="m-edit">
+        <p class="ids">CLS-2 – CLS-6 · ה־AI כבוי עד שבית הספר מאשר הסכמת הורים (AI-10)</p>
+        <div class="card">
+          <label for="cn">שם הכיתה</label><input id="cn" type="text" value="ט׳3">
+          <label>שיעורים שהכיתה לומדת</label>
+          <div class="checks"><label><input type="checkbox" checked> טכניקה אלגברית 1</label><label><input type="checkbox" checked> משוואות</label><label><input type="checkbox" checked> פירוק לגורמים</label><label><input type="checkbox"> דלתון</label><label><input type="checkbox"> משולש שווה שוקיים</label><label><input type="checkbox"> יחסי צלעות וזוויות</label></div>
+          <label for="ct">מורה הכיתה (כתובת אחת; לא אחד התלמידים)</label><input id="ct" type="text" dir="ltr" value="rina@school.org">
+          <label for="cs">תלמידים (כתובת בכל שורה; תלמיד יכול להיות בכמה כיתות)</label><textarea id="cs">noa@school.org
+yoav@school.org
+dana@school.org</textarea>
+          <div class="row" style="margin-top:12px;flex-wrap:wrap"><label class="switch" style="margin:0"><input type="checkbox"> AI לכיתה (כבוי)</label><label for="cb" style="margin:0">בדיקות AI ביום</label><input id="cb" type="number" value="150" style="width:100px"></div>
+          <div class="row" style="margin-top:12px"><button class="btn solid">שמירה</button><button class="btn">ביטול</button></div>
+        </div>
+      </div>
+      <div class="panel" id="m-students">
+        <p class="ids">MGR-2</p>
+        <table><tr><th>תלמיד</th><th>כיתות</th></tr><tr><td dir="ltr">noa@school.org</td><td>ט׳3</td></tr><tr><td dir="ltr">yoav@school.org</td><td>ט׳3 · ט׳4</td></tr><tr><td dir="ltr">dana@school.org</td><td>ט׳3</td></tr></table>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+const ids={signin:"ACC-1 · דף הכניסה בסגנון mathly1",home:"STU-1, TST-3, RDY-1, STU-5, STU-6 · משימה אחת להיום, מוכנות, המשימות שלי, עזרה בצילום",
+  path:"PTH-1 – PTH-8, MST-6, MST-8 · שיעורים כמרכזים עם טבעת כוכבים, הינשוף על המיומנות הבאה, בוחן אחרי כל שיעור",
+  ex:"EXR-1 – EXR-8 · לחצו על תשובה: טעות מציגה את שם הטעות והטיפ, בלי לחשוף את התשובה הנכונה",
+  grades:"GRD-1, STU-3 · ציונים 0–100",coll:"MST-7, CMT-3 · כוכבים, קבוצות כוכבים ושביטים"};
+const press=(group,btn)=>group.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b===btn)));
+document.querySelectorAll("#roles button").forEach(b=>b.onclick=()=>{press(b.parentElement,b);document.querySelectorAll(".role").forEach(r=>r.classList.toggle("on",r.id===b.dataset.role));});
+document.querySelectorAll("#stuNav button").forEach(b=>b.onclick=()=>{press(b.parentElement,b);document.querySelectorAll("#student .screen").forEach(s=>s.classList.toggle("on",s.id==="s-"+b.dataset.s));document.getElementById("stuIds").textContent=ids[b.dataset.s];});
+for(const menu of ["tMenu","mMenu"]) document.querySelectorAll(`#${menu} button`).forEach(b=>b.onclick=()=>{press(b.parentElement,b);b.closest(".desk").querySelectorAll(".panel").forEach(p=>p.classList.toggle("on",p.id===b.dataset.p));});
+document.getElementById("theme").onclick=()=>{const r=document.documentElement,dark=matchMedia("(prefers-color-scheme: dark)").matches,cur=r.dataset.theme||(dark?"dark":"light");r.dataset.theme=cur==="dark"?"light":"dark";};
+document.getElementById("helpBtn").onclick=()=>{document.getElementById("help").hidden=false;};
+const mistakes={b1:["כפל חלקי בפילוג המורחב","כל איבר בסוגריים הראשונים כופל כל איבר בשניים."],b2:["טעות סימן באיבר האמצעי","3 − 5 = −2, לא +2."],b3:["טעות סימן באיבר החופשי","פלוס כפול מינוס נותן מינוס."]};
+document.querySelectorAll("#choices .choice").forEach(c=>c.onclick=()=>{
+  document.querySelectorAll("#choices .choice").forEach(x=>x.setAttribute("aria-pressed",String(x===c)));
+  const fb=document.getElementById("fb");
+  if(c.dataset.c==="ok") fb.innerHTML='<div class="fb good"><b>נכון ✓ · 3 ברצף</b><br><span style="font-size:13px">השאלה הבאה בעוד 3… </span><button class="btn">לשאלה הבאה</button></div>';
+  else{const [n,t]=mistakes[c.dataset.c];fb.innerHTML=`<div class="fb bad"><b>${n}</b><br><span style="font-size:13px">${t}</span><br><button class="btn" style="margin-top:6px">שאלה אחרת</button></div>`;}
+});
+</script>
+</body>
+</html>

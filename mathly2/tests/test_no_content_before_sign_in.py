@@ -29,6 +29,13 @@ def test_there_are_routes_to_check(app):
     assert ('DELETE', '/api/classes/{class_id}/students/{email}') in set(api_routes(app))
 
 
+def test_the_skill_learning_routes_are_among_those_checked(app):
+    routes = set(api_routes(app))
+    for route in (("GET", "/api/skills/{skill_id}"), ("POST", "/api/skills/{skill_id}/help"), ("POST", "/api/skills/{skill_id}/answer"),
+                  ("GET", "/api/path"), ("GET", "/api/collection")):
+        assert route in routes
+
+
 @pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer "}, {"Authorization": "Bearer dev:nobody"}, {"Authorization": "Basic abc"}])
 def test_every_api_route_refuses_a_caller_without_a_valid_token(app, headers):
     client = TestClient(app)

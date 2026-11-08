@@ -26,3 +26,9 @@ def running(app):
     finally:
         server.should_exit = True
         thread.join(timeout=5)
+
+
+def offline_formulas(page):
+    """For tests that show no formulas: do not wait for the formula library from the network (a slow CDN made them time out)."""
+    page.route("**/mathjax@*/**", lambda route: route.abort())
+    return page

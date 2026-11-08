@@ -1,5 +1,5 @@
 """Who is calling. The browser signs in with Google through Supabase and sends its access token;
-the server asks Supabase who the token belongs to. Teachers are the emails in TEACHER_EMAILS; everyone else is a student."""
+the server asks Supabase who the token belongs to, then decides the person's roles (access.py)."""
 from __future__ import annotations
 
 import json
@@ -7,10 +7,11 @@ import re
 import threading
 import time
 import urllib.error
-import urllib.request
 import uuid
 
 from fastapi import Depends, HTTPException, Request
+
+from . import pooled
 
 TIMEOUT = 10
 CACHE_SECONDS = 300
@@ -33,11 +34,10 @@ class SupabaseAuthenticator:
             cached = self._cache.get(token)
         if cached and cached[0] > now:
             return cached[1]
-        request = urllib.request.Request(self.url + "/auth/v1/user",
-                                         headers={"Authorization": f"Bearer {token}", "apikey": self.key, "User-Agent": "mathly2/1.0"})
         try:
-            with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-                data = json.load(response)
+            _, raw = pooled.request("GET", self.url + "/auth/v1/user",
+                                    {"Authorization": f"Bearer {token}", "apikey": self.key, "User-Agent": "mathly2/1.0"}, None, TIMEOUT)
+            data = json.loads(raw)
         except urllib.error.HTTPError as exc:
             if exc.code in (400, 401, 403):
                 return None
@@ -67,6 +67,7 @@ class DevAuthenticator:
 
 
 def current_user(request: Request) -> dict:
+    """The signed-in person: id, email and roles (decided now, by the server: see access.RoleResolver)."""
     header = request.headers.get("authorization", "")
     token = header[7:].strip() if header.lower().startswith("bearer ") else ""
     if not token:
@@ -77,11 +78,5 @@ def current_user(request: Request) -> dict:
         raise HTTPException(503, "sign-in service unavailable, try again") from None
     if not user:
         raise HTTPException(401, "sign in required")
-    role = "teacher" if user["email"] in request.app.state.settings.teachers else "student"
-    return {**user, "role": role}
-
-
-def teacher_only(user: dict = Depends(current_user)) -> dict:
-    if user["role"] != "teacher":
-        raise HTTPException(403, "teachers only")
-    return user
+    from . import reads
+    return {**user, "roles": sorted(request.app.state.roles.resolve(user["email"], reads.of(request)))}

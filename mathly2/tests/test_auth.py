@@ -28,13 +28,27 @@ def test_no_token_is_refused(client):
     assert client.get("/api/me", headers={"Authorization": "Bearer dev:not-an-email"}).status_code == 401
 
 
+def me(client, email):
+    return client.get("/api/me", headers=sign(email)).json()
+
+
 def test_a_listed_teacher_is_a_teacher(client):
-    assert client.get("/api/me", headers=sign(TEACHER)).json() == {"email": TEACHER, "role": "teacher", "class": None}
-    assert client.get("/api/me", headers=sign("Teacher@School.test")).json()["role"] == "teacher"   # case does not matter
+    body = me(client, TEACHER)
+    assert body["email"] == TEACHER and body["roles"] == ["teacher"] and body["classes"] == [] and body["teaching"] == []
+    assert "class.teach" in body["permissions"] and "classes.manage" not in body["permissions"]
+    assert me(client, "Teacher@School.test")["roles"] == ["teacher"]            # case does not matter
 
 
 def test_everyone_else_is_a_student(client):
-    assert client.get("/api/me", headers=sign("kid@school.test")).json() == {"email": "kid@school.test", "role": "student", "class": None}
+    body = me(client, "kid@school.test")
+    assert body["roles"] == ["student"] and body["permissions"] == ["path.use"] and body["classes"] == []
+
+
+def test_developers_and_first_admins_come_from_the_settings():
+    app = create_app(Settings(developers=frozenset({"dev@school.test"}), admins=frozenset({"head@school.test"})))
+    client = TestClient(app)
+    assert me(client, "dev@school.test")["roles"] == ["developer"] and me(client, "dev@school.test")["permissions"] == ["*"]
+    assert me(client, "head@school.test")["roles"] == ["admin"] and me(client, "head@school.test")["permissions"] == ["roles.manage"]
 
 
 def test_page_carries_only_public_settings():
@@ -55,20 +69,16 @@ def test_dev_sign_in_is_off_when_supabase_is_on():
     assert TestClient(app).get("/api/me", headers=sign("kid@school.test")).status_code in (401, 503)
 
 
-class Reply(io.BytesIO):
-    def __enter__(self): return self
-    def __exit__(self, *a): return False
-
-
 def supabase_returns(monkeypatch, payload=None, error=None):
+    """Stand in for the HTTP call to Supabase's /auth/v1/user: the calls made are returned as (url, headers)."""
     calls = []
 
-    def fake(request, timeout=0):
-        calls.append(request)
+    def fake(method, url, headers=None, body=None, timeout=0):
+        calls.append((url, headers or {}))
         if error:
             raise error
-        return Reply(json.dumps(payload).encode())
-    monkeypatch.setattr(auth.urllib.request, "urlopen", fake)
+        return 200, json.dumps(payload).encode()
+    monkeypatch.setattr(auth.pooled, "request", fake)
     return calls
 
 
@@ -77,7 +87,7 @@ def test_supabase_user_is_checked_with_the_token_and_cached(monkeypatch):
     a = SupabaseAuthenticator("https://p.test", "pub")
     assert a.user("tok") == {"id": "u1", "email": "kid@school.test"}
     assert a.user("tok")["id"] == "u1"
-    assert len(calls) == 1 and calls[0].headers["Authorization"] == "Bearer tok"
+    assert len(calls) == 1 and calls[0][1]["Authorization"] == "Bearer tok" and calls[0][0].endswith("/auth/v1/user")
 
 
 def test_an_unconfirmed_email_is_not_trusted(monkeypatch):

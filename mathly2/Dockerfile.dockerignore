@@ -2,3 +2,5 @@
 !mathly2
 mathly2/tests
 mathly2/**/__pycache__
+mathly2/.env
+mathly2/.env.*
