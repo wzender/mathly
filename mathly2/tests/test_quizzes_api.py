@@ -44,7 +44,7 @@ def take(client, bank, lesson, rights, who=KID):
 
 # --- 2.1 starting ---
 
-def test_a_new_student_starts_a_quiz_of_fifteen_questions_due_in_twenty_minutes(world):
+def test_a_new_student_starts_a_quiz_of_fifteen_questions_due_in_forty_five_minutes(world):
     client, _, bank = world
     lesson = lesson_id(bank)
     got = start(client, lesson)
@@ -52,7 +52,7 @@ def test_a_new_student_starts_a_quiz_of_fifteen_questions_due_in_twenty_minutes(
     quiz = got.json()
     assert quiz["state"] == "open" and len(quiz["questions"]) == 15 and quiz["answers"] == {}
     from datetime import datetime
-    assert datetime.fromisoformat(quiz["due_at"]) - datetime.fromisoformat(quiz["now"]) == timedelta(minutes=20)
+    assert datetime.fromisoformat(quiz["due_at"]) - datetime.fromisoformat(quiz["now"]) == timedelta(minutes=45)
     assert quiz["lesson"]["id"] == lesson
 
 
@@ -74,7 +74,7 @@ def test_starting_again_resumes_the_same_open_attempt(world):
     assert again["id"] == first["id"] and [q["key"] for q in again["questions"]] == [q["key"] for q in first["questions"]]
     assert len(again["answers"]) == 1 and again["due_at"] == first["due_at"]
     facts = client.get(f"/api/lessons/{lesson}/quiz", headers=auth()).json()
-    assert facts["open"]["id"] == first["id"] and facts["best"] is None and facts["attempts"] == 0 and facts["size"] == 15 and facts["minutes"] == 20
+    assert facts["open"]["id"] == first["id"] and facts["best"] is None and facts["attempts"] == 0 and facts["size"] == 15 and facts["minutes"] == 45
 
 
 def test_a_student_in_no_class_is_refused_a_missing_lesson_is_404_and_a_manager_is_refused(world):
@@ -112,20 +112,20 @@ def test_an_answer_after_the_deadline_is_refused_and_settles_the_attempt(world):
     client, _, bank = world
     attempt = start(client, lesson_id(bank)).json()
     answer(client, attempt, bank, attempt["questions"][0]["key"])
-    client.set_time(MON + timedelta(minutes=21))
+    client.set_time(MON + timedelta(minutes=46))
     late = answer(client, attempt, bank, attempt["questions"][1]["key"])
     assert late.status_code == 409
     settled = client.get(f"/api/attempts/{attempt['id']}", headers=auth()).json()
     assert settled["state"] == "submitted" and settled["timed_out"] is True and settled["grade"] == 7 and settled["right"] == 1
 
 
-def test_closing_the_app_for_twenty_minutes_leaves_a_submitted_attempt_with_the_answers_given(world):
+def test_closing_the_app_for_forty_five_minutes_leaves_a_submitted_attempt_with_the_answers_given(world):
     client, _, bank = world
     attempt = start(client, lesson_id(bank)).json()
     for q in attempt["questions"][:6]:
         answer(client, attempt, bank, q["key"])
     client.set_time(MON + timedelta(minutes=5))                                            # five minutes in, the app is closed
-    client.set_time(MON + timedelta(minutes=25))                                           # it is opened again 20 minutes later
+    client.set_time(MON + timedelta(minutes=50))                                           # it is opened again 45 minutes later
     back = client.get(f"/api/attempts/{attempt['id']}", headers=auth()).json()
     assert back["state"] == "submitted" and back["timed_out"] is True and back["grade"] == 40 and back["right"] == 6
 
@@ -133,8 +133,8 @@ def test_closing_the_app_for_twenty_minutes_leaves_a_submitted_attempt_with_the_
 def test_the_deadline_is_the_servers_a_late_device_clock_changes_nothing(world):
     client, _, bank = world
     attempt = start(client, lesson_id(bank)).json()
-    # the server's time is what counts: at 14 minutes the attempt is still open, whatever the device says
-    client.set_time(MON + timedelta(minutes=14))
+    # the server's time is what counts: at 44 minutes the attempt is still open, whatever the device says
+    client.set_time(MON + timedelta(minutes=44))
     assert client.get(f"/api/attempts/{attempt['id']}", headers=auth()).json()["state"] == "open"
     assert answer(client, attempt, bank, attempt["questions"][0]["key"]).status_code == 200
 

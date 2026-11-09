@@ -4,10 +4,14 @@ An attempt is open until it is graded. The server settles an overdue attempt on 
 background job and the answer is right even if nothing ran at the deadline. Nothing here ever says which choice was right."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
+log = logging.getLogger("mathly2.attempts")
+
 QUIZ_SIZE = 15
-QUIZ_MINUTES = 20
+MINUTES_PER_QUESTION = 3
+QUIZ_MINUTES = MINUTES_PER_QUESTION * QUIZ_SIZE   # 45
 PASS_RIGHT = 13                    # right answers out of QUIZ_SIZE that pass a lesson quiz
 
 
@@ -31,6 +35,18 @@ def grade(bank, questions: list[dict], answers: dict) -> tuple[int, int]:
     return percent(right, len(questions)), right
 
 
+def add_wrong_to_review(store, bank, row: dict, at: datetime) -> None:
+    """Every question of a submitted attempt that was answered wrongly, or not answered, goes to the student's review list (חזרה). Recording it
+    never fails the submit: a problem here is logged and the grade stands."""
+    wrong = [(q["skill_id"], q["key"], row["kind"]) for q in row["questions"] if not _right(bank, q, row["answers"])]
+    if not wrong:
+        return
+    try:
+        store.add_review(row["user_id"], wrong, at)
+    except Exception as exc:
+        log.warning("could not add wrong answers to the review list: %s", type(exc).__name__)
+
+
 def is_open(row: dict) -> bool:
     return row["submitted_at"] is None
 
@@ -44,7 +60,9 @@ def settle(store, bank, row: dict, now: datetime) -> dict:
     if not is_overdue(row, now):
         return row
     value, _ = grade(bank, row["questions"], row["answers"])
-    return store.save_attempt(row["id"], submitted_at=row["due_at"], timed_out=True, grade=value)
+    saved = store.save_attempt(row["id"], submitted_at=row["due_at"], timed_out=True, grade=value)
+    add_wrong_to_review(store, bank, saved, row["due_at"])
+    return saved
 
 
 def submit(store, bank, row: dict, now: datetime) -> dict:
@@ -54,7 +72,9 @@ def submit(store, bank, row: dict, now: datetime) -> dict:
     if is_overdue(row, now):
         return settle(store, bank, row, now)
     value, _ = grade(bank, row["questions"], row["answers"])
-    return store.save_attempt(row["id"], submitted_at=now, timed_out=False, grade=value)
+    saved = store.save_attempt(row["id"], submitted_at=now, timed_out=False, grade=value)
+    add_wrong_to_review(store, bank, saved, now)
+    return saved
 
 
 def result(bank, row: dict) -> dict:

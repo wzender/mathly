@@ -272,7 +272,7 @@ The exercise screen is where a student practices one skill.
 
 - **QZ-1 Quiz per lesson.** Every lesson has one quiz: the lesson's "boss level", a node on the trail after the lesson's ring. It is always open (PTH-4). The student can retake it at any time;
   the best grade counts, and the quiz's best grade is the lesson's grade.
-- **QZ-2 Format.** A quiz is **15 multiple-choice questions** drawn from the bank questions of the lesson's skills, at least one per skill and the rest spread evenly across the skills, in **20 minutes**. It is **passed** with a grade of at least 87 (13 right out of 15); a pass stays whatever a later retake scores (QZ-7).
+- **QZ-2 Format.** A quiz is **15 multiple-choice questions** drawn from the bank questions of the lesson's skills, at least one per skill and the rest spread evenly across the skills, in **45 minutes** (3 minutes for each question). It is **passed** with a grade of at least 87 (13 right out of 15); a pass stays whatever a later retake scores (QZ-7).
   The timer runs on the server; when it ends the quiz is submitted as it stands and unanswered questions count as wrong. Skill names are not shown and there is no feedback until the end.
   The smart board and the calculator are available.
 - **QZ-3 Retakes draw new questions.** Each retake prefers questions the student has not had in earlier attempts at this lesson's quiz, the least-used first. While the lesson has enough unused questions (four skills of ten give two quizzes in a row without a repeat), none repeats; after that the least-used come first.
@@ -385,13 +385,16 @@ The exercise screen is where a student practices one skill.
 
 ### 4.16 Student screens (STU)
 
-A tab bar at the bottom of the screen leads between them: home, path, submissions (STU-7), grades and collection.
+A tab bar at the bottom of the screen leads between them: home, path, submissions (STU-7), grades, collection and review (STU-8).
 
 - **STU-1 Home** shows only what is critical: the nearest test's reminder with its readiness and today's task (TST-3), a required simulation, the **new** assignments (המשימות שלי: not handed in yet), and a button that continues the path at the next skill; my AI requests and their state (AI-1).
 - **STU-2 Path:** see 4.4.
 - **STU-3 Grades:** all quiz (best grade), exercise test, simulation and assignment grades.
 - **STU-4 Collection:** see MST-7.
 - **STU-5 Assignments.** The student opens an assignment, works on it (on the smart board, or by photographing paper; ANS-1) and hands it in; they see the teacher's grade and note, or that it was sent back for correction.
+- **STU-8 Review tab (חזרה).** Every wrong answer goes to the student's review list: in path practice, in a lesson quiz, in a practice test and in the simulation; a question left unanswered when a quiz or a test is submitted or times out also goes there. A question already in the list is not added again. Answers given before the tab existed are not added.
+  The tab says how many questions wait and shows one at a time, the oldest first, never the one just answered while others wait. A **right** answer removes the question. A **wrong** answer keeps it, names the mistake and its tip (as in EXR-5) and never shows the right choice; the right choice is not sent to the page before the answer.
+  Redoing a question here is **practice only**: it does not change a skill's mastery, a grade, the readiness meter or a practice round; each right answer counts toward the daily goal (MST-6). An empty list says there is nothing to review.
 - **STU-7 Submissions tab (הגשות).** Lists every assignment from the student's teachers, grouped by state: new, sent back for correction, handed in and waiting for a check, and checked (with the grade and note). Each opens its page; one past its due date and not handed in is marked "באיחור". The switch for phone notifications (PSH-1) is at the bottom of this tab, not on home.
 - **STU-6 Photo help.** A camera button lets the student photograph a problem (AI-3). Pressing it opens the device's camera or gallery. The picture is shrunk on the device and its metadata is dropped before it is sent
   (JPEG, PNG or WebP). A sheet then shows the student's picture and the request's state, and the hints once the teacher has sent it.

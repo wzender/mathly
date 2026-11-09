@@ -453,3 +453,32 @@ def test_the_server_role_keeps_ai_usage(db):
     assert as_role(db, "service_role", "select count(*) from public.m2_ai_usage") == [(1,)]
     with pytest.raises(psycopg.errors.CheckViolation):
         as_role(db, "service_role", "insert into public.m2_ai_usage(feature, model) values ('other', 'x')")
+
+
+# --- the review list ---
+
+@pytest.mark.parametrize("role", ["authenticated", "anon"])
+@pytest.mark.parametrize("table", ["m2_review", "m2_review_done"])
+def test_browser_roles_cannot_touch_the_review_tables(db, role, table):
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        as_role(db, role, f"select * from public.{table}")
+
+
+def test_a_question_is_in_the_review_list_once_and_the_source_is_checked(db):
+    u = "22222222-2222-2222-2222-222222222222"
+    as_role(db, "service_role", "insert into public.m2_review(user_id, question_key, skill_id, source) values (%s, 's:k', 's', 'quiz') on conflict do nothing", u)
+    as_role(db, "service_role", "insert into public.m2_review(user_id, question_key, skill_id, source) values (%s, 's:k', 's', 'practice') on conflict do nothing", u)
+    assert as_role(db, "service_role", "select source from public.m2_review where user_id = %s", u) == [("quiz",)]        # the first one stays
+    with pytest.raises(psycopg.errors.CheckViolation):
+        as_role(db, "service_role", "insert into public.m2_review(user_id, question_key, skill_id, source) values (%s, 's:j', 's', 'other')", u)
+    with pytest.raises(psycopg.errors.UniqueViolation):
+        as_role(db, "service_role", "insert into public.m2_review(user_id, question_key, skill_id, source) values (%s, 's:k', 's', 'quiz')", u)
+
+
+def test_the_daily_goal_view_counts_answers_and_review_answers_together(db):
+    u = "33333333-3333-3333-3333-333333333333"
+    as_role(db, "service_role", "insert into public.m2_answers(user_id, skill_id, question_key, correct, counted, day) values (%s, 's', 's:a', true, true, '2026-11-09')", u)
+    as_role(db, "service_role", "insert into public.m2_answers(user_id, skill_id, question_key, correct, counted, day) values (%s, 's', 's:b', false, true, '2026-11-09')", u)
+    as_role(db, "service_role", "insert into public.m2_review_done(user_id, day, question_key) values (%s, '2026-11-09', 's:b')", u)
+    as_role(db, "service_role", "insert into public.m2_review_done(user_id, day, question_key) values (%s, '2026-11-10', 's:c')", u)
+    assert as_role(db, "service_role", "select day::text, correct from public.m2_daily_correct where user_id = %s order by day", u) == [("2026-11-09", 2), ("2026-11-10", 1)]

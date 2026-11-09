@@ -50,8 +50,8 @@ def seed_attempt(store, bank, lesson, grade=None, minutes_left=None, answers=Non
     now = clock.now()
     drawn = quiz.draw(bank, lesson)[:n]
     if grade is None:
-        left = timedelta(seconds=seconds_left) if seconds_left is not None else timedelta(minutes=20 if minutes_left is None else minutes_left)
-        row = store.create_attempt(KID_ID, "quiz", lesson, now + left - timedelta(minutes=20), now + left, drawn)
+        left = timedelta(seconds=seconds_left) if seconds_left is not None else timedelta(minutes=45 if minutes_left is None else minutes_left)
+        row = store.create_attempt(KID_ID, "quiz", lesson, now + left - timedelta(minutes=45), now + left, drawn)
     else:
         row = store.create_attempt(KID_ID, "quiz", lesson, now - timedelta(hours=1), now - timedelta(minutes=45), drawn)
         store.save_attempt(row["id"], submitted_at=now - timedelta(minutes=50), grade=grade)
@@ -122,7 +122,7 @@ def test_the_quiz_opens_with_fifteen_questions_no_skill_names_and_a_countdown(br
         page.wait_for_selector("#qz-q")
         assert page.evaluate("location.hash").startswith(f"#/quiz/{lesson}/")             # the address names the attempt
         assert "מתוך 15" in page.inner_text("#qz-count") and page.locator(".qz-dot").count() == 15
-        assert page.inner_text("#qz-timer").startswith("19:") or page.inner_text("#qz-timer") == "20:00"
+        assert page.inner_text("#qz-timer").startswith("44:") or page.inner_text("#qz-timer") == "45:00"
         sheet = page.inner_text(".mx-sheet")
         assert not any(s["name"] in sheet for s in bank.skills if s["unit"] == lesson)
         assert page.locator(".qz-choice").count() >= 2 and page.locator(".qz-choice.right, .qz-choice.wrong").count() == 0
@@ -153,7 +153,7 @@ def test_a_choice_is_saved_on_the_server_survives_a_reload_and_shows_no_right_or
         assert store.attempts_of(KID_ID, "quiz", lesson)[-1]["id"] == before and len(store.attempts_of(KID_ID, "quiz", lesson)) == 1
         page.click(".qz-dot >> nth=0")
         assert page.locator(".qz-dot.done").count() == 1
-        assert page.inner_text("#qz-timer") < "20:01" and page.inner_text("#qz-timer") >= "19:00"
+        assert page.inner_text("#qz-timer") < "45:01" and page.inner_text("#qz-timer") >= "44:00"
 
 
 def test_the_board_and_calculator_are_available_in_a_quiz(browser, bank):

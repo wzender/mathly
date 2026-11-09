@@ -48,6 +48,9 @@ export async function show(me, view) {
       } else if (where.startsWith("/test/")) {
         exercise.close(); quiz.close();
         await (await import("./testcard.js")).show(view, decodeURIComponent(where.slice(6)));
+      } else if (where === "/review") {
+        exercise.close(); quiz.close();
+        await (await import("./review.js")).show(view);
       } else if (where === "/grades") {
         exercise.close(); quiz.close();
         await (await import("./grades.js")).show(view);

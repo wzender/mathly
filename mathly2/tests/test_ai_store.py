@@ -67,3 +67,31 @@ def test_supabase_requests_send_what_they_should():
     assert s4.save_ai_request("r1", state="declined", teacher_note="x")["state"] == "declined" and s4.calls[0][3] == {"state": "declined", "teacher_note": "x"}
     with pytest.raises(ValueError):
         Recorder([]).save_ai_request("r1", user_id="x")
+
+
+# --- the review list ---
+
+def test_in_memory_review_list_and_the_daily_goal():
+    s = InMemoryStore()
+    assert s.add_review(U, [("sk", "sk:1", "practice"), ("sk", "sk:2", "quiz")], NOW) == 2 and s.add_review(U, [("sk", "sk:1", "quiz")], NOW) == 0
+    with pytest.raises(ValueError):
+        s.add_review(U, [("sk", "sk:3", "other")])
+    assert [r["question_key"] for r in s.review_of(U)] == ["sk:1", "sk:2"] and s.review_of("nobody") == []
+    assert s.remove_review(U, "sk:1") is True and s.remove_review(U, "sk:1") is False
+    s.add_review_done(U, "sk:1", DAY)
+    s.add_answer(U, "sk", "sk:9", True, True, None, DAY)
+    assert s.daily_correct(U) == {DAY: 2}
+
+
+def test_supabase_review_sends_what_it_should():
+    s = Recorder([[{"question_key": "sk:1"}], [{"user_id": U, "question_key": "sk:1", "skill_id": "sk", "source": "quiz", "wrong_at": "2026-11-09T09:00:00+00:00"}],
+                  [{"question_key": "sk:1"}], [], None])
+    assert s.add_review(U, [("sk", "sk:1", "quiz")], NOW) == 1
+    method, table, params, body, returning, upsert = s.calls[0]
+    assert (method, table, params, returning, upsert) == ("POST", "m2_review", {"on_conflict": "user_id,question_key"}, True, "ignore")
+    assert body == [{"user_id": U, "question_key": "sk:1", "skill_id": "sk", "source": "quiz", "wrong_at": NOW.isoformat()}]
+    assert s.review_of(U)[0]["wrong_at"] == NOW and s.calls[1][2] == {"user_id": f"eq.{U}", "select": "*", "order": "wrong_at,question_key"}
+    assert s.remove_review(U, "sk:1") is True and s.calls[2][:3] == ("DELETE", "m2_review", {"user_id": f"eq.{U}", "question_key": "eq.sk:1"})
+    assert s.remove_review(U, "sk:1") is False and s.add_review(U, []) == 0
+    s.add_review_done(U, "sk:1", DAY)
+    assert s.calls[-1][:2] == ("POST", "m2_review_done") and s.calls[-1][3] == {"user_id": U, "question_key": "sk:1", "day": "2026-11-09"}

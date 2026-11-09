@@ -314,7 +314,7 @@ ul.grades .bar, ul.grades .muted { grid-column: 1 / -1; }
 /* The student's tab bar sits at the bottom of the screen, above the page and below the sheets */
 .tabs { position: fixed; inset-inline: 0; bottom: 0; z-index: 40; margin: 0; gap: 4px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
   background: var(--surface); border-top: 1px solid var(--line); }
-.tabs a { min-height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px; font-weight: 600; font-size: 15px; padding-inline: 2px; }
+.tabs a { min-height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px; font-weight: 600; font-size: 14px; padding-inline: 2px; min-width: 0; }
 body:has(.tabs) main { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
 
 /* Home */

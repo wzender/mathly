@@ -3,6 +3,8 @@ The server decides right and wrong, the day, and mastery; the browser never rece
 for a practice question."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
@@ -11,6 +13,7 @@ from .access import learner
 from .learning import (DAILY_GOAL, MASTERED, current_round, is_faded, is_mastered, last_counted, next_in_round, next_skill, skill_state, streak,
                        today_progress)
 
+log = logging.getLogger("mathly2.skills")
 router = APIRouter(prefix="/api")
 RECENT = 30   # how many recently answered skills the "next skill" looks at
 
@@ -119,6 +122,13 @@ def open_help(skill_id: str, request: Request, user: dict = Depends(learner)) ->
     return {"ok": True}
 
 
+def _to_review(store, user_id: str, skill_id: str, key: str) -> None:
+    try:
+        store.add_review(user_id, [(skill_id, key, "practice")], clock.now())
+    except Exception as exc:                                                         # bookkeeping never fails an answer
+        log.warning("could not add a wrong answer to the review list: %s", type(exc).__name__)
+
+
 @router.post("/skills/{skill_id}/answer")
 def answer(skill_id: str, body: Answer, request: Request, user: dict = Depends(learner)) -> dict:
     """Grade one practice answer. The waits: the reads together, the answer written, the progress written once."""
@@ -135,6 +145,7 @@ def answer(skill_id: str, body: Answer, request: Request, user: dict = Depends(l
 
     correct, counted = graded["correct"], not progress["current_helped"]
     mistake_id = graded["mistake"]["id"] if graded["mistake"] else None
+    review = None if correct else reads.POOL.submit(_to_review, store, uid, skill_id, body.question_key)         # a wrong answer goes to חזרה, in parallel
     store.add_answer(uid, skill_id, body.question_key, correct, counted, mistake_id, today)
     before = here.answers_of(uid, skill_id)
     rows = before + [{"question_key": body.question_key, "correct": correct, "counted": counted, "day": today, "mistake_id": mistake_id}]
@@ -151,6 +162,8 @@ def answer(skill_id: str, body: Answer, request: Request, user: dict = Depends(l
     if mastered_now:
         changes["mastered_at"] = now
     progress = store.save_progress(uid, skill_id, **changes)                           # one write, with everything this answer changed
+    if review:
+        review.result()
 
     mistake = graded["mistake"]
     if mistake and mistake["back"]:

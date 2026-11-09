@@ -19,7 +19,8 @@ export const tabs = active => `<nav class="tabs" aria-label="תפריט התלמ
   <a href="${PATH}" ${active === "path" ? 'aria-current="page"' : ""}>מסלול</a>
   <a href="#/submissions" ${active === "submissions" ? 'aria-current="page"' : ""}>הגשות</a>
   <a href="#/grades" ${active === "grades" ? 'aria-current="page"' : ""}>ציונים</a>
-  <a href="#/collection" ${active === "collection" ? 'aria-current="page"' : ""}>האוסף</a></nav>`;
+  <a href="#/collection" ${active === "collection" ? 'aria-current="page"' : ""}>האוסף</a>
+  <a href="#/review" ${active === "review" ? 'aria-current="page"' : ""}>חזרה</a></nav>`;
 
 export const shortDate = iso => { const [, m, d] = iso.split("-"); return `${Number(d)}.${Number(m)}`; };
 export const daysText = n => n === 0 ? "היום" : n === 1 ? "מחר" : `בעוד ${n} ימים`;

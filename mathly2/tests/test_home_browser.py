@@ -81,8 +81,8 @@ def test_the_card_opens_home_and_each_tab_opens_its_screen(browser, bank):
         page = sign_in(browser, url)
         to_home(page)
         assert page.evaluate("location.hash") == "#/subject/math" and page.locator(".tabs a[aria-current='page']").inner_text() == "בית"
-        assert page.locator(".tabs a").all_inner_texts() == ["בית", "מסלול", "הגשות", "ציונים", "האוסף"]
-        for href, marker in (("#/subject/math/path", ".orbit"), ("#/submissions", "#submissions"), ("#/grades", "#grades"), ("#/collection", "#collection"), ("#/subject/math", "#no-test")):
+        assert page.locator(".tabs a").all_inner_texts() == ["בית", "מסלול", "הגשות", "ציונים", "האוסף", "חזרה"]
+        for href, marker in (("#/subject/math/path", ".orbit"), ("#/submissions", "#submissions"), ("#/grades", "#grades"), ("#/collection", "#collection"), ("#/review", "#review"), ("#/subject/math", "#no-test")):
             page.click(f".tabs a[href='{href}']")
             page.wait_for_selector(marker)
         assert page.errors == []

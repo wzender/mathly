@@ -87,6 +87,7 @@ SUBMISSION_FIELDS = {"pictures", "state", "late", "handed_at", "grade", "teacher
 REQUEST_FIELDS = {"state", "picture_id"}
 AI_FIELDS = {"state", "picture_id", "skill_id", "snapshot", "result", "teacher_note", "failure", "budget", "sent_by", "sent_at", "done_at"}
 AI_STAMPS = ("created_at", "sent_at", "done_at")
+REVIEW_SOURCES = ("practice", "quiz", "exercise_test", "simulation")
 
 
 def _ai_row(row: dict) -> dict:
@@ -126,6 +127,8 @@ class InMemoryStore:
         self._submissions: dict[int, dict] = {}
         self._requests: dict[str, dict] = {}
         self._ai: dict[str, dict] = {}                      # AI requests by id
+        self._review: dict[tuple[str, str], dict] = {}      # (user_id, question_key) -> a wrong answer waiting in the review tab
+        self._review_done: list[dict] = []                  # right answers given in the review tab (the daily goal counts them)
         self._allowance: dict[tuple[str, date], int] = {}   # (scope, day) -> used
         self._ai_usage: list[dict] = []
         self._subs: dict[int, dict] = {}                    # push subscriptions
@@ -509,6 +512,34 @@ class InMemoryStore:
         with self._lock:
             return [dict(r, pictures=list(r["pictures"])) for r in self._submissions.values() if r["user_id"] == user_id]
 
+    # --- the review list (חזרה): wrong answers to redo ---
+
+    def add_review(self, user_id: str, items, at: datetime | None = None) -> int:
+        """Add wrong answers, each `(skill_id, question_key, source)`; one already in the list is not added again. Returns how many were added."""
+        added = 0
+        with self._lock:
+            for skill_id, key, source in items:
+                if source not in REVIEW_SOURCES:
+                    raise ValueError(f"unknown review source {source!r}")
+                if (user_id, key) not in self._review:
+                    self._review[(user_id, key)] = {"user_id": user_id, "question_key": key, "skill_id": skill_id, "source": source,
+                                                    "wrong_at": at or datetime.now(timezone.utc)}
+                    added += 1
+        return added
+
+    def review_of(self, user_id: str) -> list[dict]:
+        """The student's wrong answers waiting to be redone, the oldest first."""
+        with self._lock:
+            return [dict(r) for r in sorted((r for (u, _), r in self._review.items() if u == user_id), key=lambda r: (r["wrong_at"], r["question_key"]))]
+
+    def remove_review(self, user_id: str, question_key: str) -> bool:
+        with self._lock:
+            return self._review.pop((user_id, question_key), None) is not None
+
+    def add_review_done(self, user_id: str, question_key: str, day: date) -> None:
+        with self._lock:
+            self._review_done.append({"user_id": user_id, "question_key": question_key, "day": day})
+
     # --- AI help: requests, allowances (budgets) and usage ---
 
     def create_ai_request(self, kind: str, user_id: str, class_id: int | None, *, picture_id: str | None = None, assignment_id: int | None = None,
@@ -736,6 +767,9 @@ class InMemoryStore:
             for a in self._answers:
                 if a["user_id"] == user_id and a["correct"]:
                     counts[a["day"]] = counts.get(a["day"], 0) + 1
+            for r in self._review_done:                                  # a right answer in the review tab counts toward the daily goal too
+                if r["user_id"] == user_id:
+                    counts[r["day"]] = counts.get(r["day"], 0) + 1
             return counts
 
 
@@ -750,7 +784,7 @@ class SupabaseStore:
                    "Content-Type": "application/json"}
         prefer = []
         if upsert:
-            prefer.append("resolution=merge-duplicates")
+            prefer.append("resolution=ignore-duplicates" if upsert == "ignore" else "resolution=merge-duplicates")
         if returning:
             prefer.append("return=representation")
         if prefer:
@@ -1094,6 +1128,29 @@ class SupabaseStore:
 
     def submissions_of_user(self, user_id: str) -> list[dict]:
         return [_submission_row(r) for r in self._request("GET", "m2_submissions", {"user_id": self._eq(user_id), "select": "*"})]
+
+    # --- the review list (חזרה) ---
+
+    def add_review(self, user_id: str, items, at: datetime | None = None) -> int:
+        rows = []
+        for skill_id, key, source in items:
+            if source not in REVIEW_SOURCES:
+                raise ValueError(f"unknown review source {source!r}")
+            rows.append({"user_id": user_id, "question_key": key, "skill_id": skill_id, "source": source, **({"wrong_at": at.isoformat()} if at else {})})
+        if not rows:
+            return 0
+        got = self._request("POST", "m2_review", {"on_conflict": "user_id,question_key"}, rows, returning=True, upsert="ignore")   # a row already there is kept
+        return len(got or [])
+
+    def review_of(self, user_id: str) -> list[dict]:
+        rows = self._request("GET", "m2_review", {"user_id": self._eq(user_id), "select": "*", "order": "wrong_at,question_key"})
+        return [_stamped(r, "wrong_at") for r in rows]
+
+    def remove_review(self, user_id: str, question_key: str) -> bool:
+        return bool(self._request("DELETE", "m2_review", {"user_id": self._eq(user_id), "question_key": self._eq(question_key)}, returning=True))
+
+    def add_review_done(self, user_id: str, question_key: str, day: date) -> None:
+        self._request("POST", "m2_review_done", body={"user_id": user_id, "question_key": question_key, "day": day.isoformat()})
 
     # --- AI help: requests, allowances (budgets) and usage ---
 
