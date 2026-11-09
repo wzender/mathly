@@ -8,7 +8,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from . import clock, comets, quiz, reads
+from . import attempts, clock, comets, quiz, reads
 from .access import learner
 from .learning import (DAILY_GOAL, MASTERED, current_round, is_faded, is_mastered, last_counted, next_in_round, next_skill, skill_state, streak,
                        today_progress)
@@ -211,10 +211,11 @@ def _comet_due(request: Request, user_id: str, today_now: dict, state: dict | No
     return True
 
 
-@router.get("/path")
-def path(request: Request, user: dict = Depends(learner)) -> dict:
+def lesson_rows(request: Request, user: dict) -> tuple[list[dict], list[str], dict]:
+    """The student's lessons with their skills' states, whether each is completed (all skills mastered or its quiz passed) and behind the curriculum,
+    and its quiz state. Shared by the path and the home. Returns (lessons, the skills in the bank's order, the skill states)."""
     store, here, uid = request.app.state.store, reads.of(request), user["id"]
-    here.prefetch(("progress_of", uid), ("last_answered", uid), ("daily_correct", uid), ("recent_skills", uid, RECENT), ("attempts_of", uid, "quiz"), ("curriculum",))
+    here.prefetch(("progress_of", uid), ("last_answered", uid), ("attempts_of", uid, "quiz"), ("curriculum",))
     states = {p["skill_id"]: skill_state(p) for p in here.progress_of(uid)}
     last, today = here.last_answered(uid), clock.school_day()
     quizzes_facts = quiz.facts(store, request.app.state.bank, uid, clock.now(), here)
@@ -236,6 +237,29 @@ def path(request: Request, user: dict = Depends(learner)) -> dict:
                         "completed": completed, "passed": passed, "due_date": due.isoformat() if due else None,
                         "behind": bool(due and due < today and not completed),
                         "quiz": {"best": fact.get("best"), "open": bool(fact.get("open")), "due_at": fact["open"]["due_at"].isoformat() if fact.get("open") else None}})
+    return lessons, order, states
+
+
+def behind_lessons(request: Request, user: dict) -> list[dict]:
+    """The lessons behind the curriculum for the home, the earliest date first: how far the skills are and the next unmastered one, and the quiz."""
+    lessons, _, _ = lesson_rows(request, user)
+    rows = []
+    for l in lessons:
+        if not l["behind"]:
+            continue
+        nxt = next((s for s in l["skills"] if s["state"] != MASTERED), None)
+        rows.append({"id": l["id"], "name": l["name"], "due_date": l["due_date"], "mastered": l["mastered"], "total": len(l["skills"]),
+                     "next_skill": {"id": nxt["id"], "name": nxt["name"]} if nxt else None,
+                     "quiz": {"best": l["quiz"]["best"], "open": l["quiz"]["open"], "pass_right": attempts.PASS_RIGHT, "size": attempts.QUIZ_SIZE}})
+    return sorted(rows, key=lambda r: (r["due_date"], r["id"]))
+
+
+@router.get("/path")
+def path(request: Request, user: dict = Depends(learner)) -> dict:
+    here, uid = reads.of(request), user["id"]
+    here.prefetch(("progress_of", uid), ("last_answered", uid), ("daily_correct", uid), ("recent_skills", uid, RECENT), ("attempts_of", uid, "quiz"), ("curriculum",))
+    lessons, order, states = lesson_rows(request, user)
+    today = clock.school_day()
     daily = here.daily_correct(uid)
     return {"lessons": lessons, "behind": sum(1 for l in lessons if l["behind"]), "next": next_skill(order, states, here.recent_skills(uid, RECENT)),
             "today": today_progress(daily, today), "streak": streak(daily, today)}

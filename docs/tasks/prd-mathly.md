@@ -387,7 +387,7 @@ The exercise screen is where a student practices one skill.
 
 A tab bar at the bottom of the screen leads between them: home, path, submissions (STU-7), grades, collection and review (STU-8).
 
-- **STU-1 Home** shows only what is critical: the nearest test's reminder with its readiness and today's task (TST-3), a required simulation, the **new** assignments (המשימות שלי: not handed in yet), and a button that continues the path at the next skill; my AI requests and their state (AI-1).
+- **STU-1 Home** shows only what is critical: the nearest test's reminder with its readiness and today's task (TST-3), a required simulation, **every lesson behind the curriculum** (PTH-11; earliest date first, each with its two ways to finish it: all its skills mastered, shown as "N מתוך M מיומנויות" and opening the next skill, or its quiz passed with at least 13 of 15, PTH-10, opening the quiz with the best grade so far), the **new** assignments (המשימות שלי: not handed in yet), and a button that continues the path at the next skill; my AI requests and their state (AI-1).
 - **STU-2 Path:** see 4.4.
 - **STU-3 Grades:** all quiz (best grade), exercise test, simulation and assignment grades.
 - **STU-4 Collection:** see MST-7.

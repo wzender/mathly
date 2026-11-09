@@ -255,8 +255,8 @@ def home(request: Request, user: dict = Depends(learner)) -> dict:
     the required simulation, and the next skill of the path."""
     here, today, uid = reads.of(request), clock.school_day(), user["id"]
     class_ids = [c["id"] for c in here.classes_of_student(user["email"])]
-    from .skills import RECENT
-    here.prefetch(("tests_of_classes", class_ids), ("recent_skills", uid, RECENT), *_student_reads(uid))       # the tests and the student's facts: one wait
+    from .skills import RECENT, behind_lessons
+    here.prefetch(("tests_of_classes", class_ids), ("recent_skills", uid, RECENT), ("attempts_of", uid, "quiz"), ("curriculum",), *_student_reads(uid))       # the tests and the student's facts: one wait
     tests = [t for t in here.tests_of_classes(class_ids) if t["date"] >= today]
     cards = [card(request, user["id"], t, today) for t in tests]
     nearest = cards[0] if cards else None
@@ -264,7 +264,8 @@ def home(request: Request, user: dict = Depends(learner)) -> dict:
     next_skill_row = request.app.state.bank.skill(next_id) if next_id else None
     return {"tests": cards, "task": {"test_id": nearest["id"], **_with_skill_name(request, nearest["task"])} if nearest else None,
             "required_simulations": [{"test_id": c["id"], "date": c["date"], "days_left": c["days_left"]} for c in cards if c["simulation"]["required"]],
-            "next_skill": {"id": next_id, "name": next_skill_row["name"]} if next_skill_row else None}
+            "next_skill": {"id": next_id, "name": next_skill_row["name"]} if next_skill_row else None,
+            "behind": behind_lessons(request, user)}
 
 
 def _student_test(request: Request, user: dict, test_id: int) -> dict:

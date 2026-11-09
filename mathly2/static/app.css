@@ -478,3 +478,8 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .review-card.done { opacity: .75; border-color: var(--sky-gold); }
 .review-card .ex-text { margin: 4px 0 8px; }
 .review-group [hidden] { display: none; }        /* the heading's flex layout would otherwise show it */
+/* The lessons behind the curriculum, on the home */
+.behind-list li { border-top: 1px solid var(--line); padding: 8px 0; }
+.behind-list li:first-child { border-top: 0; }
+.behind-list .late { color: var(--sky-danger); font-weight: 600; }
+.behind-list .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }

@@ -66,6 +66,16 @@ function assignmentsCard(all) {
   }).join("")}</ul></section>`;
 }
 
+/** Every lesson behind the curriculum, with the two ways to finish it (PTH-10): all its skills, or its quiz with at least 13 of 15. */
+function behindCard(lessons) {
+  if (!lessons?.length) return "";
+  return `<section class="card" id="behind-card"><h2>שיעורים בפיגור</h2>
+    <ul class="plain behind-list">${lessons.map(l => `<li data-lesson="${esc(l.id)}"><p><b>${fmt(l.name)}</b><br><span class="late">⚠ היה אמור להסתיים ב־${shortDate(l.due_date)}</span></p>
+      <p class="actions">${l.next_skill ? `<a class="button" data-way="skills" href="#/skill/${encodeURIComponent(l.next_skill.id)}">לסיים את המיומנויות: ${l.mastered} מתוך ${l.total}</a>` : ""}
+        <a class="button" data-way="quiz" href="#/quiz/${encodeURIComponent(l.id)}">${l.quiz.open ? "להמשיך את הבוחן" : "בוחן"}: לפחות ${l.quiz.pass_right} מתוך ${l.quiz.size}</a></p>
+      <p class="muted" data-best>${l.quiz.best === null ? "עוד לא נעשה בוחן" : `הציון הטוב ביותר בבוחן: ${l.quiz.best}`}</p></li>`).join("")}</ul></section>`;
+}
+
 /** The photo help card (STU-6): only for a class with the AI on; it also lists the student's latest requests with their state. */
 function aiCard(ai) {
   if (!ai?.on) return "";
@@ -84,7 +94,7 @@ function draw(view, data, assignments, ai) {
   view(`${tabs("home")}${backToSubjects()}
     ${first ? nearest(first, data.task, data.next_skill) : `<section class="card" id="no-test"><h2>הבית</h2>
       <p class="muted">המורה עוד לא קבע מבחן. בינתיים אפשר להמשיך במסלול.</p></section>`}
-    ${assignmentsCard(assignments)}${aiCard(ai)}
+    ${behindCard(data.behind)}${assignmentsCard(assignments)}${aiCard(ai)}
     ${required.map(t => `<a class="required" href="#/sim/${t.id}" data-required="${t.id}"><b>חובה</b> מבחן סימולציה למבחן ב־${shortDate(t.date)}<span aria-hidden="true">‹</span></a>`).join("")}
     <p>${data.next_skill ? `<a class="primary-link" id="continue-path" href="#/skill/${encodeURIComponent(data.next_skill.id)}">להמשיך במסלול: ${fmt(data.next_skill.name)} <span aria-hidden="true">‹</span></a>`
       : `<a class="primary-link" id="continue-path" href="${PATH}">למסלול: כל הכוכבים פתוחים לתרגול <span aria-hidden="true">‹</span></a>`}</p>`);
