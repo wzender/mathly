@@ -122,6 +122,8 @@ def test_the_quiz_opens_with_fifteen_questions_no_skill_names_and_a_countdown(br
         page.wait_for_selector("#qz-q")
         assert page.evaluate("location.hash").startswith(f"#/quiz/{lesson}/")             # the address names the attempt
         assert "מתוך 15" in page.inner_text("#qz-count") and page.locator(".qz-dot").count() == 15
+        sizes = page.eval_on_selector_all(".qz-dot", "els => els.map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })")
+        assert all(w == h for w, h in sizes), sizes                                           # round, not tall ovals (the global button height once stretched them)
         assert page.inner_text("#qz-timer").startswith("44:") or page.inner_text("#qz-timer") == "45:00"
         sheet = page.inner_text(".mx-sheet")
         assert not any(s["name"] in sheet for s in bank.skills if s["unit"] == lesson)
