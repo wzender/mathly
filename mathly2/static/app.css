@@ -324,8 +324,6 @@ body:has(.tabs) main { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0
 .rd-num { font-size: 44px; line-height: 1; color: var(--sky-gold); }
 .rd-label { font-weight: 700; }
 .rd-bar { height: 12px; margin-block: 6px; }
-.rd-parts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: 14px; }
-.rd-part { white-space: nowrap; }
 .rd-note { margin: 6px 0 0; font-size: 14px; color: var(--sky-gold); }
 .today { display: grid; gap: 6px; margin-block: 10px; }
 .big-task, .primary-link { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 56px; padding: 12px 18px; border-radius: 16px;
@@ -499,3 +497,8 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .info-tip .tip[hidden] { display: none; }
 @media (hover: hover) { .info-tip:hover .tip[hidden] { display: grid; } }                 /* a mouse hovering shows it too (not on a touch screen, where hover sticks) */
 .info-tip .info:focus-visible + .tip[hidden] { display: grid; }                          /* so does keyboard focus */
+/* The readiness parts: a row each, in plain Hebrew */
+.rd-parts { display: grid; gap: 4px; margin: 8px 0 0; font-size: 14px; }
+.rd-parts .rd-part { display: flex; align-items: baseline; gap: 10px; }
+.rd-parts .grow { flex: 1; min-width: 0; }
+.rd-parts .rd-val { min-width: 42px; text-align: end; color: var(--sky-gold); }

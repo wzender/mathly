@@ -5,7 +5,8 @@ import * as aiSheet from "./ai_sheet.js";
 import { esc, fmt } from "./math.js";
 import { PATH, backToSubjects, daysText, shortDate, tabs } from "./ui.js";
 
-const part = (label, name, value) => `<span class="rd-part"><b>${label}</b> ${name} ${value === null ? "—" : value}</span>`;
+/** One part of the readiness number as a row in plain Hebrew: its name, what the number is, and its value ("—" when there is none yet). */
+const part = (id, name, what, value, unit = "") => `<li class="rd-part" data-part="${id}"><span class="grow"><b>${name}</b> <span class="muted">${what}</span></span><b class="rd-val">${value === null ? "—" : value + unit}</b></li>`;
 
 /** The readiness number as a level bar with its three parts under it; before the simulation it says the bar is capped. */
 const HOW = ["המדד מורכב משליטה (50%), מבחני תרגול (20%) וסימולציה (30%).", "חלק שעוד אין לו ציון לא נספר.", "בלי סימולציה המדד לא עובר 80."];
@@ -35,7 +36,7 @@ export function readinessBar(r) {
   return `<div class="readiness" data-readiness>
     <p class="rd-top"><b class="rd-num" aria-hidden="true">${r.number}</b><span class="rd-label">${esc(r.label)}</span>${howTip()}</p>
     <div class="bar rd-bar" role="progressbar" aria-label="מוכנות למבחן: ${r.number} מתוך 100, ${esc(r.label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${r.number}"><i style="width:${r.number}%"></i></div>
-    <p class="rd-parts muted">${part("M", "שליטה", r.parts.M)} ${part("E", "מבחני תרגול", r.parts.E)} ${part("S", "סימולציה", r.parts.S)}</p>
+    <ul class="plain rd-parts">${part("M", "שליטה", "אחוז המיומנויות שנשלטו", r.parts.M, "%")}${part("E", "מבחני תרגול", "ממוצע הציונים הטובים ביותר", r.parts.E)}${part("S", "סימולציה", "הציון במבחן הסימולציה", r.parts.S)}</ul>
     ${r.waiting_for_simulation ? `<p class="rd-note">עוד לא עשיתם מבחן סימולציה, ולכן המדד לא עובר את ${80}.</p>` : ""}</div>`;
 }
 

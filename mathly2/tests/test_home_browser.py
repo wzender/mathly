@@ -143,8 +143,11 @@ def test_nine_days_before_the_test_the_button_opens_exercise_test_1_with_the_rea
         assert page.get_attribute("#today-task", "href") == f"#/exam/{test['id']}/1" and "מבחן תרגול 1" in page.inner_text("#today-task")
         bar = page.locator("#nearest-test [role=progressbar]")
         assert bar.get_attribute("aria-valuenow") == "75" and "75" in bar.get_attribute("aria-label")
-        parts = page.inner_text(".rd-parts")
-        assert "M שליטה 75" in parts and "E מבחני תרגול —" in parts and "S סימולציה —" in parts
+        part = lambda p: page.locator(f".rd-part[data-part={p}]")
+        assert part("M").inner_text().split() == ["שליטה", "אחוז", "המיומנויות", "שנשלטו", "75%"]
+        assert "מבחני תרגול" in part("E").inner_text() and "ממוצע הציונים הטובים ביותר" in part("E").inner_text() and part("E").locator(".rd-val").inner_text() == "—"
+        assert "סימולציה" in part("S").inner_text() and "הציון במבחן הסימולציה" in part("S").inner_text() and part("S").locator(".rd-val").inner_text() == "—"
+        assert not any(f" {letter} " in f" {page.inner_text('.rd-parts')} " for letter in "MES")                 # no letters
         assert "עוד לא עשיתם מבחן סימולציה" in page.inner_text(".rd-note")
         no_sideways_scroll(page)
 
@@ -172,8 +175,8 @@ def test_the_readiness_bar_shows_every_part_and_loses_the_cap_after_the_simulati
     with running(app) as url:
         page = sign_in(browser, url)
         to_home(page)
-        parts = page.inner_text(".rd-parts")
-        assert "M שליטה 100" in parts and "E מבחני תרגול 70" in parts and "S סימולציה 90" in parts
+        vals = {p: page.locator(f".rd-part[data-part={p}] .rd-val").inner_text() for p in "MES"}
+        assert vals == {"M": "100%", "E": "70", "S": "90"}
         assert page.locator(".rd-note").count() == 0 and "מוכנים" in page.inner_text(".rd-label")
         assert page.locator(".required").count() == 0                                                     # the simulation is taken
 
@@ -501,8 +504,8 @@ def test_the_whole_countdown_from_setting_a_test_to_the_review(browser, bank, mo
         advance(4)                                                                                              # 5 days left: the simulation opens
         reload_home()
         assert task() == f"#/sim/{test['id']}" and student.locator(f".required[data-required='{test['id']}']").count() == 1
-        before = student.inner_text(".rd-parts")
-        assert "E מבחני תרגול 100" in before and "S סימולציה —" in before
+        vals = lambda: {p: student.locator(f".rd-part[data-part={p}] .rd-val").inner_text() for p in "MES"}
+        assert vals()["E"] == "100" and vals()["S"] == "—"
         student.click("#today-task")
         answer_in_browser(student, bank, store, "simulation", str(test["id"]), [True, True, True, True, False, False])
         assert student.inner_text("#qz-grade b") == "67"
@@ -511,7 +514,7 @@ def test_the_whole_countdown_from_setting_a_test_to_the_review(browser, bank, mo
         advance(2)                                                                                              # 3 days left: review what failed
         reload_home()
         assert task() in failed and student.locator(".required").count() == 0                                   # a failed skill is today's review
-        assert "S סימולציה 67" in student.inner_text(".rd-parts") and student.locator(".rd-note").count() == 0           # the cap is gone after the simulation
+        assert vals()["S"] == "67" and student.locator(".rd-note").count() == 0           # the cap is gone after the simulation
         teacher.reload()
         teacher.click("#teacher-tabs [data-tab='tests']")
         teacher.wait_for_selector(".test-row")
