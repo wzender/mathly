@@ -387,4 +387,6 @@ def teaching_counts(request: Request, user: dict = Depends(need("class.teach")))
     tests, assignments = here.tests_of_classes(ids), here.assignments_of_classes(ids)
     graded_by_student = [a["id"] for a in assignments if a["kind"] != "exercise_test"]
     waiting = sum(1 for s in store.submissions_of_assignments(graded_by_student) if s["state"] == "handed_in")
-    return {"classes": len(classes), "tests": len(tests), "assignments": len(assignments), "inbox": waiting}
+    here.prefetch(*[("members", i) for i in ids])
+    students = len({m["email"] for i in ids for m in here.members(i)})
+    return {"classes": len(classes), "tests": len(tests), "assignments": len(assignments), "inbox": waiting, "progress": students}

@@ -9,7 +9,8 @@ const tabs = active => `<div class="subtabs" id="teacher-tabs" role="group" aria
   <button type="button" data-tab="classes" aria-pressed="${active === "classes"}">הכיתות שלי <span class="tab-count" data-count="classes"></span></button>
   <button type="button" data-tab="tests" aria-pressed="${active === "tests"}">מבחנים <span class="tab-count" data-count="tests"></span></button>
   <button type="button" data-tab="assignments" aria-pressed="${active === "assignments"}">משימות <span class="tab-count" data-count="assignments"></span></button>
-  <button type="button" data-tab="inbox" aria-pressed="${active === "inbox"}">תיבת בדיקה <span class="tab-count" data-count="inbox"></span></button></div>`;
+  <button type="button" data-tab="inbox" aria-pressed="${active === "inbox"}">תיבת בדיקה <span class="tab-count" data-count="inbox"></span></button>
+  <button type="button" data-tab="progress" aria-pressed="${active === "progress"}">התקדמות <span class="tab-count" data-count="progress"></span></button></div>`;
 
 const work = () => import("./teacher_work.js");
 const context = { draw: html => draw(html), tabs: active => tabs(active), wire: () => wireTabs() };
@@ -24,7 +25,7 @@ async function fillCounts() {
 
 function wireTabs() {
   fillCounts();
-  const screens = { classes: showClasses, tests: showTests, assignments: () => work().then(m => m.showAssignments(context)), inbox: () => work().then(m => m.showInbox(context)) };
+  const screens = { classes: showClasses, tests: showTests, assignments: () => work().then(m => m.showAssignments(context)), inbox: () => work().then(m => m.showInbox(context)), progress: () => import("./teacher_progress.js").then(m => m.show(context)) };
   document.querySelectorAll("#teacher-tabs [data-tab]").forEach(b => b.addEventListener("click", () => screens[b.dataset.tab]()));
 }
 
@@ -42,7 +43,7 @@ const showClasses = (notes = {}) => swr("/api/teaching", classes => drawClasses(
 async function drawClasses(classes, notes) {
   draw(`${tabs("classes")}<section id="teaching"><h2>הכיתות שלי</h2>
     ${classes.length ? `<div class="cards">${classes.map(c => `<article class="card class-card" data-id="${c.id}">
-      <div class="hrow"><h3 class="grow">${esc(c.name)}</h3><span class="tag">${c.students.length} תלמידים</span></div>
+      <div class="hrow"><h3 class="grow">${esc(c.name)}</h3><span class="tag">${c.students.length} תלמידים</span><button type="button" data-progress="${c.id}">התקדמות</button></div>
       <p class="muted" style="margin:0 0 8px">${c.ai_enabled ? "AI פועל" : "AI כבוי: מנהל הכיתות מפעיל"}</p>
       ${c.students.length ? `<ul class="plain students">${c.students.map(s => `<li><span dir="ltr">${esc(s.email)}</span>
         <span class="muted">${s.signed_in ? "נכנס/ה" : "עוד לא נכנס/ה"}</span>
@@ -56,6 +57,7 @@ async function drawClasses(classes, notes) {
         <p><button class="primary" type="submit">הוספה</button></p></form></article>`).join("")}</div>`
       : `<section class="card"><p class="muted">עוד לא שייכו אותך ככיתה. מנהל הכיתות קובע מי מלמד/ת כל כיתה.</p></section>`}</section>`);
   wireTabs();
+  document.querySelectorAll("[data-progress]").forEach(b => b.addEventListener("click", () => import("./teacher_progress.js").then(m => m.show(context, Number(b.dataset.progress)))));
   document.querySelectorAll(".class-card").forEach(card => {
     const id = Number(card.dataset.id);
     card.querySelector("form").addEventListener("submit", async event => {

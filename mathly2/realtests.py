@@ -45,6 +45,24 @@ def _covered(bank, test: dict) -> list[str]:
     return [s["id"] for s in bank.skills if s["unit"] in test["lessons"] and bank.question_keys(s["id"])]
 
 
+def prime_students(request: Request, user_ids: list[str], kinds: tuple[str, ...] = ("exercise_test", "simulation")) -> None:
+    """Read what a class's students need (progress, last answers and attempts of each kind) with one call each for all of them, together,
+    and hand it to the request's reads, so asking for one student's later does not touch the database."""
+    ids = list(dict.fromkeys(user_ids))
+    if not ids:
+        return
+    store, here = request.app.state.store, reads.of(request)
+    jobs = {"progress_of": reads.POOL.submit(store.progress_of_users, ids), "last_answered": reads.POOL.submit(store.last_answered_users, ids)}
+    jobs.update({("attempts_of", kind): reads.POOL.submit(store.attempts_of_users, ids, kind) for kind in kinds})
+    for key, future in jobs.items():
+        found = future.result()
+        for uid in ids:
+            if isinstance(key, tuple):
+                here.prime(key[0], (uid, key[1]), found[uid])
+            else:
+                here.prime(key, (uid,), found[uid])
+
+
 def _student_reads(user_id: str) -> list[tuple]:
     return [("progress_of", user_id), ("last_answered", user_id), ("attempts_of", user_id, "exercise_test"), ("attempts_of", user_id, "simulation")]
 
@@ -155,7 +173,7 @@ def _checked_lessons(klass: dict, lessons: list[str]) -> list[str]:
 def teacher_view(request: Request, test: dict, klass: dict, today: date) -> dict:
     store, here = request.app.state.store, reads.of(request)
     members = store.members(klass["id"])
-    here.prefetch(*[call for m in members if m["user_id"] for call in _student_reads(m["user_id"])])      # every student's reads at once
+    prime_students(request, [m["user_id"] for m in members if m["user_id"]])                                  # every student's reads at once
     students = []
     for m in members:
         facts = facts_for(request, m["user_id"], test, today)

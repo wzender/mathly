@@ -40,6 +40,11 @@ class Reads:
             return lambda *args: self._read(name, *args)
         raise AttributeError(name)
 
+    def prime(self, name: str, args: tuple, value) -> None:
+        """Record an answer that was fetched another way (for many students at once), so a later `name(*args)` does not ask again."""
+        with self._lock:
+            self._done.setdefault(_key(name, args), value)
+
     def prefetch(self, *calls: tuple) -> None:
         """Start the reads (each `(name, *args)`) that are not done yet, together, and wait for all of them. The first error is raised."""
         missing = []

@@ -270,6 +270,36 @@ class InMemoryStore:
         with self._lock:
             return [dict(r) for (u, _), r in self._progress.items() if u == user_id]
 
+    # --- many students at once (a class's progress screen: one call each, not one per student) ---
+
+    def progress_of_users(self, user_ids) -> dict[str, list[dict]]:
+        wanted = set(user_ids)
+        with self._lock:
+            found: dict[str, list[dict]] = {u: [] for u in dict.fromkeys(user_ids)}
+            for (u, _), r in self._progress.items():
+                if u in wanted:
+                    found[u].append(dict(r))
+            return found
+
+    def last_answered_users(self, user_ids) -> dict[str, dict[str, date]]:
+        wanted = set(user_ids)
+        with self._lock:
+            found: dict[str, dict[str, date]] = {u: {} for u in dict.fromkeys(user_ids)}
+            for a in self._answers:
+                days = found.get(a["user_id"])
+                if days is not None and (a["skill_id"] not in days or a["day"] > days[a["skill_id"]]):
+                    days[a["skill_id"]] = a["day"]
+            return found
+
+    def attempts_of_users(self, user_ids, kind: str) -> dict[str, list[dict]]:
+        wanted = set(user_ids)
+        with self._lock:
+            found: dict[str, list[dict]] = {u: [] for u in dict.fromkeys(user_ids)}
+            for r in sorted(self._attempts.values(), key=lambda r: r["started_at"]):
+                if r["user_id"] in wanted and r["kind"] == kind:
+                    found[r["user_id"]].append(_copy_attempt(r))
+            return found
+
     def add_answer(self, user_id: str, skill_id: str, question_key: str, correct: bool, counted: bool,
                    mistake_id: str | None, day: date) -> None:
         with self._lock:
@@ -787,6 +817,36 @@ class SupabaseStore:
 
     def progress_of(self, user_id: str) -> list[dict]:
         return self._request("GET", "m2_skill_progress", {"user_id": self._eq(user_id), "select": "*"})
+
+    # --- many students at once ---
+
+    @staticmethod
+    def _in(ids) -> str:
+        return "in.(" + ",".join(dict.fromkeys(ids)) + ")"
+
+    def progress_of_users(self, user_ids) -> dict[str, list[dict]]:
+        ids = list(dict.fromkeys(user_ids))
+        found: dict[str, list[dict]] = {u: [] for u in ids}
+        if ids:
+            for r in self._request("GET", "m2_skill_progress", {"user_id": self._in(ids), "select": "*"}):
+                found[str(r["user_id"])].append(r)
+        return found
+
+    def last_answered_users(self, user_ids) -> dict[str, dict[str, date]]:
+        ids = list(dict.fromkeys(user_ids))
+        found: dict[str, dict[str, date]] = {u: {} for u in ids}
+        if ids:
+            for r in self._request("GET", "m2_last_answered", {"user_id": self._in(ids), "select": "user_id,skill_id,day"}):
+                found[str(r["user_id"])][r["skill_id"]] = date.fromisoformat(r["day"])
+        return found
+
+    def attempts_of_users(self, user_ids, kind: str) -> dict[str, list[dict]]:
+        ids = list(dict.fromkeys(user_ids))
+        found: dict[str, list[dict]] = {u: [] for u in ids}
+        if ids:
+            for r in self._request("GET", "m2_attempts", {"user_id": self._in(ids), "kind": self._eq(kind), "select": "*", "order": "started_at"}):
+                found[str(r["user_id"])].append(_attempt_row(r))
+        return found
 
     def add_answer(self, user_id: str, skill_id: str, question_key: str, correct: bool, counted: bool,
                    mistake_id: str | None, day: date) -> None:

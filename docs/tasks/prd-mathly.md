@@ -78,7 +78,7 @@ reused as files (see 7.1); everything else is rebuilt.
 - As a teacher, I want to add and remove the students of my own class, so a new student can start without waiting for a manager.
 - As a teacher, I want to set a test date and the lessons it covers, so the app prepares my students for it.
 - As a teacher, I want to see who has taken the simulation test.
-- As a teacher, I want a heat map of skills per student, so I can see at a glance which skills the class struggles with.
+- As a teacher, I want each student's progress per lesson, so I can see at a glance which lessons the class struggles with.
 - As a teacher, I want to see how much of each lesson each student has covered.
 
 **Manager**
@@ -246,14 +246,14 @@ The exercise screen is where a student practices one skill.
 - **MST-3 Help does not break the run.** An answer given after opening help is skipped for mastery: it neither counts toward the 3 nor breaks the run.
   A wrong answer restarts the run.
 - **MST-4 Mastery does not decay.** A mastered skill stays mastered. It does not need re-mastering over time, even after later wrong answers.
-  The readiness meter, the exercise tests, the heat map and the coverage view all use this state.
+  The readiness meter, the exercise tests and the teacher's progress by lesson all use this state.
 - **MST-5 The server decides.** The server stores the date of every answer (the calendar day in Israel, decided by the server, never by the device) and decides mastery from it.
 - **MST-6 Daily goal and streak.** 5 correct answers in a day make a streak day. The path shows today's count and the number of days in a row.
   A streak is kept through the morning of a new day and counted up to yesterday until the new day's 5 are reached.
 - **MST-7 Collection.** A collection screen shows what the student achieved: each mastered skill as a star, each completed lesson (all of its skills mastered)
   as a constellation drawn from its stars, and the comets caught (CMT-3).
 - **MST-8 Fading stars.** A mastered skill the student has not answered for 14 days has a **faded** star: it dims and says "דועך". One answer on the skill (correct or not) relights it.
-  Fading is only a review cue: the skill is still mastered (MST-4), so the readiness meter, heat map and exercise tests are unchanged.
+  Fading is only a review cue: the skill is still mastered (MST-4), so the readiness meter, the teacher's progress and exercise tests are unchanged.
 
 ### 4.8 Comets (CMT)
 
@@ -413,14 +413,14 @@ A tab bar at the bottom of the screen leads between them: home, path, submission
   and open requests to look again (AI-5). The teacher opens each, sees the AI's suggested score and comment (AI-4) if there is one, gives a grade (0–100) and a note, or sends it back for correction.
 - **TCH-5 AI queue.** The teacher sees their classes' AI requests (AI-1), with the picture, and sends or declines each, or sends a whole batch (AI-7).
 - **TCH-6 Tests tab.** The teacher sets a test (TST-1) and sees, for each test, which students have taken the simulation test and which have not.
-- **TCH-7 Class heat map.**
-  - Rows: students. Columns: skills (grouped by lesson).
-  - Each cell shows the skill state: not started / learning / mastered, by color **and** by a symbol or word.
-  - Tabs for the period: **Sep–Dec** and **Jan–Jun**. A period shows the skills of the lessons taught in it, and states as they were at the end of the period (or today, for the current period).
-- **TCH-8 Student lesson coverage.**
+- **TCH-7 Class progress, by lesson.** The teacher sees progress **per lesson, never per skill**.
   - Rows: students. Columns: lessons.
-  - Each cell shows the % of the lesson's skills the student has mastered, and the student's best quiz (בוחן) grade for that lesson.
-  - Same period tabs.
+  - Each cell is short and shows three things only: a **progress bar** with the percent of the lesson's skills mastered written on it; the student's best quiz (בוחן) grade as a **bare number** (a dash for none, without the word); and, in the current period, a **warning mark** (⚠) when the lesson is behind the curriculum (PTH-11) and not completed. The lesson's state in words (הושלם PTH-10, בלמידה, לא התחילו, בפיגור) is the cell's accessible name, and a completed lesson's bar is gold.
+  - Tabs for the period: **Sep–Dec** and **Jan–Jun**. A period shows the lessons of that period (by the lesson's date in the curriculum, PTH-11, else the last month of the bank's month for it), and states as they were at the end of the period (or today, for the current period). The current period opens first.
+  - Where: a "התקדמות" tab on the teacher's screen (with its number: the students of the teacher's classes), also reached from a shortcut on each class card; one class at a time, with a picker when the teacher has several. Only the class's teacher and a developer can read it (never a manager or an admin).
+  - The table scrolls inside its own frame with the student column fixed; the page does not scroll sideways. A student who has not signed in yet is all "not started".
+- **TCH-8 (merged into TCH-7).** The coverage view is the progress by lesson above; there is no separate per-skill heat map.
+- **TCH-10 Readiness per student.** For the class's nearest coming test: each student's readiness number and word (RDY), mastery percent, practice-test average and simulation grade, a dash for what is missing; a class with no coming test says so.
 - **TCH-9 Roster of my class.** For each class they teach, the teacher can paste email addresses to add students and can remove a student (CLS-3, CLS-5). They cannot change the class's name, lessons, teacher or AI budget,
   and a teacher cannot add themselves as a student. Removing a student does not delete their progress.
 
@@ -441,7 +441,7 @@ A tab bar at the bottom of the screen leads between them: home, path, submission
 
 *Reference: `app/prompter.py`, `static/prompter.js`, and the management sheet in `static/math.js`.*
 
-- **DEV-1 Every permission.** A developer can open any class's progress, heat map, coverage, tests, assignments, inbox and AI queue, as the class's teacher can, and everything managers and admins can do.
+- **DEV-1 Every permission.** A developer can open any class's progress, tests, assignments, inbox and AI queue, as the class's teacher can, and everything managers and admins can do.
 - **DEV-2 Prompter (פרומפטר).** A developer writes or pastes a text and shows it full screen as a scrolling teleprompter. Saved texts (a title up to 120 characters; up to 200 texts) belong to the account and are on every device; what is being edited is also kept in the browser, so nothing is lost before it is saved.
   Keys: space starts and stops, ↑/↓ change speed, +/− change size, M mirrors, F is full screen, Esc leaves; the mouse and a presentation remote work too.
   A saved text can have an **outline (ראשי פרקים)**: on request the AI rewrites the text as the same slides with two to four very short topic reminders each, once; it is kept with the text and can be edited. Changing the text without sending an outline drops the outline, so a stale one is never shown.
@@ -462,11 +462,11 @@ A tab bar at the bottom of the screen leads between them: home, path, submission
 
 ## 6. Design Considerations
 
-- Hebrew, right-to-left. Works on phones first; the teacher, manager, admin and developer views (heat map, coverage, classes, roles) must also work well on a computer.
+- Hebrew, right-to-left. Works on phones first; the teacher, manager, admin and developer views (progress by lesson, classes, roles) must also work well on a computer.
 - The look follows the path's "sky" theme: a dark-blue night with aurora and starlight accents, gold for mastery, and an owl mascot that perches on the next skill. The app is always dark, as mathly1 is: the page background is a dark night with two soft glows and small fixed stars; it does not move. There is no light mode.
 - A button whose action takes longer than about a third of a second shows it (a spinner, a second press ignored), everywhere in the app; with reduced motion it shows "…".
 - Math is written in `$…$` text in the exercise bank; the app must render it as formulas.
-- State and result never rely on color alone: every state has a symbol or a word (stars, heat map cells, feedback).
+- State and result never rely on color alone: every state has a symbol or a word (stars, progress cells, feedback).
 - Mastered skills must look clearly different from "learning" and "not started" ones.
 - Touch targets are at least 44px. Animations (stars, celebrations, comets) respect the device's reduced-motion setting.
 - The "one task for today" on home is a single, obvious button.
@@ -530,7 +530,7 @@ Rebuilt, not copied as a whole; read the places named in each requirement group.
 - ≥ 90% of students take the simulation test before each real test.
 - On test day, students have mastered on average ≥ 80% of the covered skills.
 - ≥ 75% of students take both exercise tests before each real test.
-- Teachers open the heat map or the coverage view at least once a week.
+- Teachers open the progress view at least once a week.
 - The AI's estimated cost stays within each class's daily budget on every day.
 
 ## 9. Open Questions

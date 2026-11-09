@@ -467,7 +467,7 @@ def counts(client, who=TEACHER):
 
 
 def test_the_counts_are_classes_tests_assignments_and_submissions_waiting(world):
-    assert counts(world) == {"classes": 1, "tests": 0, "assignments": 0, "inbox": 0}
+    assert counts(world) == {"classes": 1, "tests": 0, "assignments": 0, "inbox": 0, "progress": 2}
     for _ in range(3):
         world.store.create_test(world.a["id"], clock.school_day() + 10 * DAY, [world.quiz_lesson], TEACHER, created_at=clock.now())
     a = give(world, kind="quiz", quiz_lesson=world.quiz_lesson).json()
@@ -478,7 +478,7 @@ def test_the_counts_are_classes_tests_assignments_and_submissions_waiting(world)
     submit(world, a["id"], KID)
     submit(world, a["id"], KID2)
     submit(world, b["id"], KID)
-    assert counts(world) == {"classes": 1, "tests": 4, "assignments": 4, "inbox": 3}
+    assert counts(world) == {"classes": 1, "tests": 4, "assignments": 4, "inbox": 3, "progress": 2}
 
 
 def test_checking_a_submission_lowers_the_inbox_and_removed_items_are_not_counted(world):
@@ -490,13 +490,13 @@ def test_checking_a_submission_lowers_the_inbox_and_removed_items_are_not_counte
     assert counts(world)["inbox"] == 0
     world.store.remove_test(test["id"])
     world.delete(f"/api/assignments/{a['id']}", headers=auth(TEACHER))
-    assert counts(world) == {"classes": 1, "tests": 0, "assignments": 0, "inbox": 0}
+    assert counts(world) == {"classes": 1, "tests": 0, "assignments": 0, "inbox": 0, "progress": 2}
 
 
 def test_another_teachers_items_are_not_counted_and_a_developer_counts_everything(world):
     give(world, kind="quiz", quiz_lesson=world.quiz_lesson)
     world.store.create_test(world.b["id"], clock.school_day() + 10 * DAY, [world.other_quiz], OTHER_TEACHER, created_at=clock.now())
-    assert counts(world, OTHER_TEACHER) == {"classes": 1, "tests": 1, "assignments": 0, "inbox": 0}
-    assert counts(world) == {"classes": 1, "tests": 0, "assignments": 1, "inbox": 0}
-    assert counts(world, DEV) == {"classes": 2, "tests": 1, "assignments": 1, "inbox": 0}
+    assert counts(world, OTHER_TEACHER) == {"classes": 1, "tests": 1, "assignments": 0, "inbox": 0, "progress": 1}
+    assert counts(world) == {"classes": 1, "tests": 0, "assignments": 1, "inbox": 0, "progress": 2}
+    assert counts(world, DEV) == {"classes": 2, "tests": 1, "assignments": 1, "inbox": 0, "progress": 3}
     assert world.get("/api/teaching/counts", headers=auth(KID)).status_code == 403
