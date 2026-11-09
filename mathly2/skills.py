@@ -241,15 +241,13 @@ def lesson_rows(request: Request, user: dict) -> tuple[list[dict], list[str], di
 
 
 def behind_lessons(request: Request, user: dict) -> list[dict]:
-    """The lessons behind the curriculum for the home, the earliest date first: how far the skills are and the next unmastered one, and the quiz."""
+    """The lessons behind the curriculum for the home, the earliest date first: each with its quiz (the best grade so far and what passes it)."""
     lessons, _, _ = lesson_rows(request, user)
     rows = []
     for l in lessons:
         if not l["behind"]:
             continue
-        nxt = next((s for s in l["skills"] if s["state"] != MASTERED), None)
-        rows.append({"id": l["id"], "name": l["name"], "due_date": l["due_date"], "mastered": l["mastered"], "total": len(l["skills"]),
-                     "next_skill": {"id": nxt["id"], "name": nxt["name"]} if nxt else None,
+        rows.append({"id": l["id"], "name": l["name"], "due_date": l["due_date"],
                      "quiz": {"best": l["quiz"]["best"], "open": l["quiz"]["open"], "pass_right": attempts.PASS_RIGHT, "size": attempts.QUIZ_SIZE}})
     return sorted(rows, key=lambda r: (r["due_date"], r["id"]))
 

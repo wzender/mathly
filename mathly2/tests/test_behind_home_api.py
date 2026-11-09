@@ -35,16 +35,11 @@ def test_a_lesson_without_a_date_is_never_listed_and_none_behind_means_an_empty_
     assert behind(client) == []
 
 
-def test_the_skills_option_says_how_far_and_opens_the_next_unmastered_skill(world):
+def test_a_behind_lesson_has_only_the_quiz_and_no_skills_option(world):
     client, store, bank = world
     store.set_lesson_dates({"t": clock.school_day() - timedelta(days=1)})
-    skills = skills_of(bank, "t")
-    for s in skills[:3]:
-        store.save_progress(KID_ID, s, started_at=STAMP, mastered_at=STAMP)
     row = behind(client)[0]
-    assert (row["mastered"], row["total"]) == (3, len(skills)) and row["next_skill"]["id"] == skills[3] and row["next_skill"]["name"]
-    store.save_progress(KID_ID, skills[1], mastered_at=None)                                                    # a skill not mastered in the middle comes first
-    assert behind(client)[0]["next_skill"]["id"] == skills[1]
+    assert set(row) == {"id", "name", "due_date", "quiz"} and "next_skill" not in row and "mastered" not in row          # nothing about finishing the skills
 
 
 def test_the_quiz_option_shows_the_best_grade_and_what_is_needed_and_a_pass_catches_the_lesson_up(world):
@@ -64,3 +59,34 @@ def test_the_path_and_the_home_agree_on_what_is_behind(world):
     store.set_lesson_dates({"t": today - timedelta(days=4), "t2": today - timedelta(days=1)})
     path = client.get("/api/path", headers=auth()).json()
     assert {l["id"] for l in path["lessons"] if l["behind"]} == {r["id"] for r in behind(client)} == {"t", "t2"} and path["behind"] == 2
+
+
+def weak(client):
+    return client.get("/api/home", headers=auth()).json()["weak_tests"]
+
+
+def exercise(store, test, number, grade, when_offset=0):
+    row = store.create_attempt(KID_ID, "exercise_test", f"{test['id']}:{number}", MON, MON + timedelta(minutes=45), [])
+    store.save_attempt(row["id"], submitted_at=MON + timedelta(minutes=10 + when_offset), grade=grade)
+
+
+def test_practice_tests_below_87_are_listed_and_not_taken_or_good_ones_are_not(world):
+    client, store, bank = world
+    test = store.create_test(1, clock.school_day() + timedelta(days=10), ["t"], "t@x.test", created_at=clock.now() - timedelta(days=20))
+    assert weak(client) == []                                                                                    # none taken
+    exercise(store, test, 1, 25)
+    got = weak(client)
+    assert got == [{"test_id": test["id"], "date": test["date"].isoformat(), "days_left": 10, "number": 1, "best": 25, "open": False}]
+    exercise(store, test, 2, 87)                                                                                 # 13 of 15: good enough
+    assert [(w["number"], w["best"]) for w in weak(client)] == [(1, 25)]
+    exercise(store, test, 1, 86, 1)                                                                              # a retake still below: the best of the two
+    assert weak(client)[0]["best"] == 86
+    exercise(store, test, 1, 90, 2)
+    assert weak(client) == []                                                                                    # reached: no longer listed
+
+
+def test_a_past_test_is_not_listed(world):
+    client, store, bank = world
+    old = store.create_test(1, clock.school_day() - timedelta(days=3), ["t"], "t@x.test", created_at=clock.now() - timedelta(days=30))
+    exercise(store, old, 1, 10)
+    assert weak(client) == []

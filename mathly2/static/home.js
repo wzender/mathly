@@ -66,14 +66,22 @@ function assignmentsCard(all) {
   }).join("")}</ul></section>`;
 }
 
-/** Every lesson behind the curriculum, with the two ways to finish it (PTH-10): all its skills, or its quiz with at least 13 of 15. */
+/** Every lesson behind the curriculum, short: its name, its date and one link to its quiz (at least 13 of 15 completes the lesson, PTH-10). */
 function behindCard(lessons) {
   if (!lessons?.length) return "";
   return `<section class="card" id="behind-card"><h2>שיעורים בפיגור</h2>
-    <ul class="plain behind-list">${lessons.map(l => `<li data-lesson="${esc(l.id)}"><p><b>${fmt(l.name)}</b><br><span class="late">⚠ היה אמור להסתיים ב־${shortDate(l.due_date)}</span></p>
-      <p class="actions">${l.next_skill ? `<a class="button" data-way="skills" href="#/skill/${encodeURIComponent(l.next_skill.id)}">לסיים את המיומנויות: ${l.mastered} מתוך ${l.total}</a>` : ""}
-        <a class="button" data-way="quiz" href="#/quiz/${encodeURIComponent(l.id)}">${l.quiz.open ? "להמשיך את הבוחן" : "בוחן"}: לפחות ${l.quiz.pass_right} מתוך ${l.quiz.size}</a></p>
-      <p class="muted" data-best>${l.quiz.best === null ? "עוד לא נעשה בוחן" : `הציון הטוב ביותר בבוחן: ${l.quiz.best}`}</p></li>`).join("")}</ul></section>`;
+    <ul class="plain behind-list">${lessons.map(l => `<li data-lesson="${esc(l.id)}"><p><b>${fmt(l.name)}</b> <span class="late">⚠ עד ${shortDate(l.due_date)}</span></p>
+      <p class="actions"><a class="button" data-way="quiz" href="#/quiz/${encodeURIComponent(l.id)}">${l.quiz.open ? "להמשיך את הבוחן" : "לבוחן"}: לפחות ${l.quiz.pass_right} מתוך ${l.quiz.size}</a>
+        <span class="muted" data-best>${l.quiz.best === null ? "עוד לא נעשה" : `הציון הטוב ביותר: ${l.quiz.best}`}</span></p></li>`).join("")}</ul></section>`;
+}
+
+/** The practice tests of upcoming tests that were taken and are below 87 (13 of 15): to take again. */
+function weakTestsCard(tests) {
+  if (!tests?.length) return "";
+  return `<section class="card" id="weak-tests"><h2>מבחני תרגול להשלמה</h2>
+    <ul class="plain behind-list">${tests.map(t => `<li data-test="${t.test_id}" data-number="${t.number}"><p><b>מבחן תרגול ${t.number}</b> <span class="muted">למבחן ב־${shortDate(t.date)}</span></p>
+      <p class="actions"><a class="button" data-way="retake" href="#/exam/${t.test_id}/${t.number}">${t.open ? "להמשיך" : "לנסות שוב"}</a>
+        <span class="muted" data-best>הציון הטוב ביותר: ${t.best} · צריך 87 לפחות (13 מתוך 15)</span></p></li>`).join("")}</ul></section>`;
 }
 
 /** The photo help card (STU-6): only for a class with the AI on; it also lists the student's latest requests with their state. */
@@ -94,7 +102,7 @@ function draw(view, data, assignments, ai) {
   view(`${tabs("home")}${backToSubjects()}
     ${first ? nearest(first, data.task, data.next_skill) : `<section class="card" id="no-test"><h2>הבית</h2>
       <p class="muted">המורה עוד לא קבע מבחן. בינתיים אפשר להמשיך במסלול.</p></section>`}
-    ${behindCard(data.behind)}${assignmentsCard(assignments)}${aiCard(ai)}
+    ${behindCard(data.behind)}${weakTestsCard(data.weak_tests)}${assignmentsCard(assignments)}${aiCard(ai)}
     ${required.map(t => `<a class="required" href="#/sim/${t.id}" data-required="${t.id}"><b>חובה</b> מבחן סימולציה למבחן ב־${shortDate(t.date)}<span aria-hidden="true">‹</span></a>`).join("")}
     <p>${data.next_skill ? `<a class="primary-link" id="continue-path" href="#/skill/${encodeURIComponent(data.next_skill.id)}">להמשיך במסלול: ${fmt(data.next_skill.name)} <span aria-hidden="true">‹</span></a>`
       : `<a class="primary-link" id="continue-path" href="${PATH}">למסלול: כל הכוכבים פתוחים לתרגול <span aria-hidden="true">‹</span></a>`}</p>`);
