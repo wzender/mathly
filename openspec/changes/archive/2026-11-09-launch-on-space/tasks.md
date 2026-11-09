@@ -13,7 +13,7 @@
 
 ## 3. Switch
 
-- [ ] 3.1 Run the full suite; push the `mathly2` branch to the Space's `main` (a push that only adds); verify the Space builds and `/` answers
+- [x] 3.1 Run the full suite; push the `mathly2` branch to the Space's `main` (a push that only adds); verify the Space builds and `/` answers
 - [x] 3.2 Tell the Space's owner which secrets mathly2 reads (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `TEACHER_EMAILS`, `DEVELOPER_EMAILS`, `ADMIN_EMAILS`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`); verify the list against `config.py`
 
 ## 4. The fallback
