@@ -90,3 +90,13 @@ def test_a_past_test_is_not_listed(world):
     old = store.create_test(1, clock.school_day() - timedelta(days=3), ["t"], "t@x.test", created_at=clock.now() - timedelta(days=30))
     exercise(store, old, 1, 10)
     assert weak(client) == []
+
+
+def test_only_the_nearest_tests_weak_practice_tests_are_on_home(world):
+    client, store, bank = world
+    near = store.create_test(1, clock.school_day() + timedelta(days=4), ["t"], "t@x.test", created_at=clock.now() - timedelta(days=20))
+    far = store.create_test(1, clock.school_day() + timedelta(days=12), ["t2"], "t@x.test", created_at=clock.now() - timedelta(days=20))
+    exercise(store, far, 1, 10)
+    assert weak(client) == []                                                                                    # only the farther test has one
+    exercise(store, near, 2, 40)
+    assert [(w["test_id"], w["number"]) for w in weak(client)] == [(near["id"], 2)]

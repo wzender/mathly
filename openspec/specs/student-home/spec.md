@@ -38,10 +38,10 @@ The student's screens (home, path, submissions "הגשות", grades, collection)
 - **THEN** the submissions screen opens
 
 ### Requirement: Home shows only what is critical
-The home SHALL show only: the nearest test with its readiness and today's task, a required simulation, the lessons behind the curriculum, the practice tests below the pass line, the new assignments (not handed in yet), and the button that continues the path. Other tests, assignments that were handed in or checked, and settings such as notifications SHALL NOT be on home; the other tests are reached from the test's card.
+The home SHALL show only: the nearest test with its readiness, today's task and its practice tests below the pass line, a required simulation, the lessons behind the curriculum, the new assignments (not handed in yet), and the button that continues the path. Other tests, assignments that were handed in or checked, and settings such as notifications SHALL NOT be on home; the other tests are reached from the test's card.
 
 #### Scenario: Nothing critical
-- **WHEN** a student has no upcoming test, no new assignment, no lesson behind and no weak practice test
+- **WHEN** a student has no upcoming test, no new assignment and no lesson behind
 - **THEN** home shows only the button that continues the path
 
 #### Scenario: Two tests
@@ -49,7 +49,7 @@ The home SHALL show only: the nearest test with its readiness and today's task, 
 - **THEN** home shows the nearest one, and the other is listed on that test's card
 
 ### Requirement: Lessons behind on home
-Home SHALL list every lesson behind the curriculum, the earliest date first, kept short: its name, the date it should have been completed by, a link named only "בוחן", and the best בוחן grade as a bare number, or "-" when there is none. The row MUST NOT explain what passes the בוחן. A completed lesson, a lesson with no date and a lesson whose date is ahead SHALL NOT be listed, and with none behind there SHALL be no such card.
+Home SHALL list every lesson behind the curriculum, the earliest date first, kept short: its name, the date it should have been completed by, and one link named only "בוחן" with the best בוחן grade as a chip inside the link: a bare number, or "-" when there is none. The row MUST NOT explain what passes the בוחן. A completed lesson, a lesson with no date and a lesson whose date is ahead SHALL NOT be listed, and with none behind there SHALL be no such card.
 
 #### Scenario: Two lessons behind
 - **WHEN** two lessons have passed their dates and are not completed
@@ -61,11 +61,11 @@ Home SHALL list every lesson behind the curriculum, the earliest date first, kep
 
 #### Scenario: The grade
 - **WHEN** the student's best grade in that lesson's בוחן is 80
-- **THEN** the row shows 80 and no other text about the grade
+- **THEN** the link shows 80 as a chip inside it and no other text about the grade
 
 #### Scenario: No grade
 - **WHEN** the student has not taken that בוחן
-- **THEN** the row shows "-"
+- **THEN** the chip shows "-"
 
 #### Scenario: Caught up
 - **WHEN** a student passes the בוחן of a lesson that was behind
@@ -76,11 +76,11 @@ Home SHALL list every lesson behind the curriculum, the earliest date first, kep
 - **THEN** home has no behind card
 
 ### Requirement: Practice tests below the pass line
-Home SHALL list the practice tests of the student's upcoming tests that were taken and whose best grade is below 87 (13 right out of 15), kept short: which practice test, its test's date, the link to take it again and the best grade as a bare number. A practice test not taken yet, or with a best grade of 87 or more, SHALL NOT be listed, and with none there SHALL be no such card.
+The nearest test's card on home SHALL list its practice tests that were taken and whose best grade is below 87 (13 right out of 15), under the readiness and today's task: each as a button to take it again with the best grade as a chip inside it. A practice test not taken yet, or with a best grade of 87 or more, SHALL NOT be listed, the practice tests of other tests SHALL NOT be on home, and with none to list the card SHALL show none.
 
 #### Scenario: A weak one
-- **WHEN** a student's best grade in practice test 1 for a test on the 16th is 25
-- **THEN** home lists practice test 1 for that test with 25 and a link to take it again
+- **WHEN** a student's best grade in practice test 1 for the nearest test is 25
+- **THEN** that test's card lists practice test 1 with 25 in a chip inside its retake button
 
 #### Scenario: Good enough
 - **WHEN** the best grade is 87 or more
@@ -89,6 +89,10 @@ Home SHALL list the practice tests of the student's upcoming tests that were tak
 #### Scenario: Not taken
 - **WHEN** a practice test was not taken yet
 - **THEN** it is not listed
+
+#### Scenario: Another test
+- **WHEN** a test that is not the nearest has a weak practice test
+- **THEN** it is not on home
 
 #### Scenario: Retaken
 - **WHEN** the student retakes it and the best grade reaches 87

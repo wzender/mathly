@@ -267,7 +267,7 @@ def home(request: Request, user: dict = Depends(learner)) -> dict:
             "next_skill": {"id": next_id, "name": next_skill_row["name"]} if next_skill_row else None,
             "behind": behind_lessons(request, user),
             "weak_tests": [{"test_id": c["id"], "date": c["date"], "days_left": c["days_left"], "number": e["number"], "best": e["best"], "open": e["open"]}
-                           for c in cards for e in c["exercise_tests"] if e["best"] is not None and e["best"] < attempts.PASS_GRADE]}
+                           for c in cards[:1] for e in c["exercise_tests"] if e["best"] is not None and e["best"] < attempts.PASS_GRADE]}   # the nearest test's card only
 
 
 def _student_test(request: Request, user: dict, test_id: int) -> dict:

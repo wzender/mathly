@@ -478,8 +478,15 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .review-card.done { opacity: .75; border-color: var(--sky-gold); }
 .review-card .ex-text { margin: 4px 0 8px; }
 .review-group [hidden] { display: none; }        /* the heading's flex layout would otherwise show it */
-/* The lessons behind the curriculum, on the home */
+/* The lessons behind the curriculum and the weak practice tests, on the home: a row is a name and one link; the grade is a chip inside the link */
 .behind-list li { border-top: 1px solid var(--line); padding: 8px 0; }
 .behind-list li:first-child { border-top: 0; }
-.behind-list .late { color: var(--sky-danger); font-weight: 600; }
-.behind-list .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.behind-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.behind-row .grow { flex: 1 1 140px; min-width: 0; }
+.behind-row .late { color: var(--sky-danger); font-weight: 600; white-space: nowrap; }
+.button.with-chip { display: inline-flex; align-items: center; gap: 8px; padding-inline: 14px 8px; }
+.grade-chip { display: inline-grid; place-items: center; min-width: 30px; height: 26px; padding: 0 9px; border-radius: 999px; font-weight: 800; font-size: 14px;
+  background: color-mix(in srgb, var(--sky-gold) 24%, transparent); color: var(--sky-gold); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sky-gold) 55%, transparent); }
+.grade-chip.none { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); font-weight: 600; }
+.weak-tests { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; }
+.weak-tests > p { margin: 0 0 2px; }

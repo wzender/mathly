@@ -30,8 +30,11 @@ def test_the_card_lists_the_lessons_behind_in_date_order_each_with_only_the_quiz
         assert rows.count() == 2 and rows.nth(0).get_attribute("data-lesson") == lessons[1] and rows.nth(1).get_attribute("data-lesson") == lessons[0]     # the earlier date first
         assert page.locator("#behind-card [data-way=skills]").count() == 0 and page.locator("#behind-card a").count() == 2                                 # only the quiz links
         mine = page.locator(f"#behind-card li[data-lesson='{lessons[0]}']")
-        assert mine.locator("[data-way=quiz]").inner_text() == "בוחן" and mine.locator("[data-way=quiz]").get_attribute("href") == f"#/quiz/{lessons[0]}"
-        assert mine.locator("[data-best]").inner_text() == "80" and rows.nth(0).locator("[data-best]").inner_text() == "-"          # a bare grade, or a dash
+        link = mine.locator("[data-way=quiz]")
+        assert link.get_attribute("href") == f"#/quiz/{lessons[0]}" and link.inner_text().split() == ["בוחן", "80"]
+        assert link.locator(".grade-chip[data-best]").inner_text() == "80" and rows.nth(0).locator("[data-way=quiz] .grade-chip").inner_text() == "-"   # a chip inside the link
+        chip, button = link.locator(".grade-chip").bounding_box(), link.bounding_box()
+        assert button["x"] <= chip["x"] and chip["x"] + chip["width"] <= button["x"] + button["width"] and chip["y"] >= button["y"]   # attached, not floating beside it
         assert "13" not in page.inner_text("#behind-card") and "מתוך" not in page.inner_text("#behind-card")                       # nothing explains the pass line
         assert "⚠" in mine.inner_text() and "מיומנויות" not in page.inner_text("#behind-card")
         no_sideways_scroll(page)
@@ -50,7 +53,7 @@ def test_the_quiz_link_opens_the_quiz(browser, bank):
         assert page.evaluate("location.hash").startswith(f"#/quiz/{lessons[1]}/")
 
 
-def test_practice_tests_below_87_are_listed_with_a_retake_link_and_others_are_not(browser, bank):
+def test_practice_tests_below_87_are_inside_the_nearest_test_card_with_the_grade_in_the_button(browser, bank):
     app, store, klass, lessons = world(bank)
     test = store.create_test(klass["id"], clock.school_day() + timedelta(days=10), lessons[:1], "t@school.test", created_at=clock.now() - timedelta(days=20))
     for skill in [x["id"] for x in bank.skills if x["unit"] == lessons[0]][:2]:                                   # started skills, so a practice test can begin
@@ -61,11 +64,16 @@ def test_practice_tests_below_87_are_listed_with_a_retake_link_and_others_are_no
     with running(app) as url:
         page = sign_in(browser, url)
         to_home(page)
-        page.wait_for_selector("#weak-tests")
+        page.wait_for_selector("#nearest-test #weak-tests")
+        assert page.locator("#weak-tests").count() == 1 and page.locator("section#weak-tests").count() == 0           # inside the test's card, not a card of its own
+        top, weak = page.locator("#nearest-test").bounding_box(), page.locator("#weak-tests").bounding_box()
+        assert top["y"] <= weak["y"] and weak["y"] + weak["height"] <= top["y"] + top["height"]
+        assert page.locator("#nearest-test .today").bounding_box()["y"] < weak["y"]                                    # under today's task
         rows = page.locator("#weak-tests li")
         assert rows.count() == 1 and rows.first.get_attribute("data-number") == "1"                                  # 87 is good enough
-        assert rows.first.locator("[data-best]").inner_text() == "25" and "87" not in page.inner_text("#weak-tests") and "13" not in page.inner_text("#weak-tests")
-        assert rows.first.locator("[data-way=retake]").get_attribute("href") == f"#/exam/{test['id']}/1"
+        link = rows.first.locator("[data-way=retake]")
+        assert link.get_attribute("href") == f"#/exam/{test['id']}/1" and link.locator(".grade-chip").inner_text() == "25"
+        assert "87" not in page.inner_text("#weak-tests") and "13" not in page.inner_text("#weak-tests")
         no_sideways_scroll(page)
         page.click("#weak-tests [data-way=retake]")
         page.wait_for_selector("#qz-q")
