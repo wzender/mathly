@@ -17,6 +17,7 @@ export const PATH = "#/subject/math/path";
 export const tabs = active => `<nav class="tabs" aria-label="תפריט התלמיד">
   <a href="${HOME}" ${active === "home" ? 'aria-current="page"' : ""}>בית</a>
   <a href="${PATH}" ${active === "path" ? 'aria-current="page"' : ""}>מסלול</a>
+  <a href="#/submissions" ${active === "submissions" ? 'aria-current="page"' : ""}>הגשות</a>
   <a href="#/grades" ${active === "grades" ? 'aria-current="page"' : ""}>ציונים</a>
   <a href="#/collection" ${active === "collection" ? 'aria-current="page"' : ""}>האוסף</a></nav>`;
 

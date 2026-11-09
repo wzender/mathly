@@ -98,3 +98,59 @@ The app SHALL declare its icon (mathly1's, from `static/icons/`), so the browser
 #### Scenario: Opening the app
 - **WHEN** someone opens the app
 - **THEN** the tab shows the app's icon and no request for an icon fails
+
+### Requirement: A button that takes time shows it
+When an action started by a button or a form's submit takes longer than about a third of a second, the button SHALL show that it is working (a spinner) and SHALL ignore another press, until the action ends. This applies to every such button in the app. The indicator MUST NOT depend on motion: with reduced motion the button shows "…" instead of a turning spinner.
+
+#### Scenario: A slow save
+- **WHEN** a person presses a button and the server takes two seconds
+- **THEN** after about a third of a second the button shows a spinner and a second press does nothing, and it returns to normal when the answer arrives
+
+#### Scenario: A quick action
+- **WHEN** the server answers within a tenth of a second
+- **THEN** the button never shows the spinner
+
+#### Scenario: Reduced motion
+- **WHEN** the device asks for reduced motion and an action is slow
+- **THEN** the button shows "…" and nothing turns
+
+### Requirement: Few database round trips
+The server SHALL read the same fact once per request, make reads that do not depend on each other at the same time, and keep its connections to the database open for reuse. Opening a student's screen (home, path, skill, grades, collection) SHALL wait for the database at most 3 times in a row, and grading one practice answer at most 4 times in a row.
+
+#### Scenario: Opening a screen
+- **WHEN** a student opens the path, home, a skill, the grades or the collection and every database call takes 0.1 seconds
+- **THEN** the screen's data arrives in under 0.55 seconds
+
+#### Scenario: Answering
+- **WHEN** a student answers a practice question and every database call takes 0.1 seconds
+- **THEN** the answer is graded in under 0.75 seconds
+
+#### Scenario: Connections
+- **WHEN** the server makes several calls to the database in a row
+- **THEN** they reuse an open connection instead of opening a new one each time
+
+### Requirement: Slow-changing facts are remembered briefly
+The server SHALL remember the classes, their students, the roles, the tests and the assignments for at most 30 seconds, so a screen that needs them does not wait for the database again. Any change made through the app to one of them SHALL make the server forget the remembered copy at once. The time SHALL be a setting, and 0 SHALL turn it off.
+
+#### Scenario: Opened again
+- **WHEN** a teacher opens the assignments tab twice within 30 seconds and every database call takes 0.1 seconds
+- **THEN** the second time needs fewer waits in a row than the first
+
+#### Scenario: A change
+- **WHEN** a teacher gives an assignment and then opens the assignments tab
+- **THEN** the new assignment is there, not an old remembered list
+
+### Requirement: A screen shows what it last knew
+A screen opened again SHALL show the data it last had at once and refresh it in the background; the tab numbers of a teacher's screen SHALL show their last values at once. After a change the person made, nothing remembered SHALL be shown: the screen waits for fresh data. A refresh MUST NOT redraw the screen while the person is typing in it or has something open.
+
+#### Scenario: Back to a tab
+- **WHEN** a teacher goes to another tab and back, and the server takes two seconds to answer
+- **THEN** the tab shows its last content and numbers at once, and shows the new ones when they arrive
+
+#### Scenario: After grading
+- **WHEN** a teacher grades a submission and the inbox is shown again
+- **THEN** the graded submission is not in it, not even for a moment
+
+#### Scenario: Typing
+- **WHEN** fresh data arrives while a teacher is typing in a form on the screen
+- **THEN** what they typed is still there

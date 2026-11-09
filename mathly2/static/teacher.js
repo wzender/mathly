@@ -1,16 +1,31 @@
 // The teacher's home: the classes I teach, each with its students; I add (a pasted list) and remove students of my own classes.
-import { api } from "./api.js";
+import { api, lastAnswer, swr } from "./api.js";
 import { esc, fmt } from "./math.js";
 import { daysText, shortDate } from "./ui.js";
 
 let draw;   // the app's view() function
 
 const tabs = active => `<div class="subtabs" id="teacher-tabs" role="group" aria-label="המורה">
-  <button type="button" data-tab="classes" aria-pressed="${active === "classes"}">הכיתות שלי</button>
-  <button type="button" data-tab="tests" aria-pressed="${active === "tests"}">מבחנים</button></div>`;
+  <button type="button" data-tab="classes" aria-pressed="${active === "classes"}">הכיתות שלי <span class="tab-count" data-count="classes"></span></button>
+  <button type="button" data-tab="tests" aria-pressed="${active === "tests"}">מבחנים <span class="tab-count" data-count="tests"></span></button>
+  <button type="button" data-tab="assignments" aria-pressed="${active === "assignments"}">משימות <span class="tab-count" data-count="assignments"></span></button>
+  <button type="button" data-tab="inbox" aria-pressed="${active === "inbox"}">תיבת בדיקה <span class="tab-count" data-count="inbox"></span></button></div>`;
+
+const work = () => import("./teacher_work.js");
+const context = { draw: html => draw(html), tabs: active => tabs(active), wire: () => wireTabs() };
+
+/** The number of items in each tab, from the server, filled in after the screen is drawn (and so refreshed after every action). */
+async function fillCounts() {
+  const show = counts => document.querySelectorAll("#teacher-tabs [data-count]").forEach(el => { el.textContent = counts[el.dataset.count]; });
+  const known = lastAnswer("/api/teaching/counts");
+  if (known) show(known);                                     // the last numbers at once, the fresh ones when they arrive
+  try { show(await api("/api/teaching/counts")); } catch { /* the tabs work without the numbers */ }
+}
 
 function wireTabs() {
-  document.querySelectorAll("#teacher-tabs [data-tab]").forEach(b => b.addEventListener("click", () => (b.dataset.tab === "tests" ? showTests() : showClasses())));
+  fillCounts();
+  const screens = { classes: showClasses, tests: showTests, assignments: () => work().then(m => m.showAssignments(context)), inbox: () => work().then(m => m.showInbox(context)) };
+  document.querySelectorAll("#teacher-tabs [data-tab]").forEach(b => b.addEventListener("click", () => screens[b.dataset.tab]()));
 }
 
 function report(result) {
@@ -22,15 +37,17 @@ function report(result) {
   return lines;
 }
 
-async function showClasses(notes = {}) {
-  const classes = await api("/api/teaching");
+const showClasses = (notes = {}) => swr("/api/teaching", classes => drawClasses(classes, notes));
+
+async function drawClasses(classes, notes) {
   draw(`${tabs("classes")}<section id="teaching"><h2>הכיתות שלי</h2>
     ${classes.length ? `<div class="cards">${classes.map(c => `<article class="card class-card" data-id="${c.id}">
       <div class="hrow"><h3 class="grow">${esc(c.name)}</h3><span class="tag">${c.students.length} תלמידים</span></div>
       <p class="muted" style="margin:0 0 8px">${c.ai_enabled ? "AI פועל" : "AI כבוי: מנהל הכיתות מפעיל"}</p>
       ${c.students.length ? `<ul class="plain students">${c.students.map(s => `<li><span dir="ltr">${esc(s.email)}</span>
         <span class="muted">${s.signed_in ? "נכנס/ה" : "עוד לא נכנס/ה"}</span>
-        <button type="button" data-remove="${esc(s.email)}" aria-label="הסרת ${esc(s.email)}">הסרה</button></li>`).join("")}</ul>`
+        <button type="button" data-remove="${esc(s.email)}" aria-label="הסרת ${esc(s.email)}">הסרה</button>
+        <button type="button" data-wipe="${esc(s.email)}" aria-label="מחיקת התמונות של ${esc(s.email)}">מחיקת תמונות</button></li>`).join("")}</ul>`
         : `<p class="muted">עוד אין תלמידים בכיתה.</p>`}
       <form class="add-students"><label for="emails-${c.id}">הוספת תלמידים (כתובת בכל שורה)</label>
         <textarea id="emails-${c.id}" class="emails" dir="ltr" required></textarea>
@@ -49,6 +66,20 @@ async function showClasses(notes = {}) {
       } catch (e) { await showClasses({ [id]: { error: e.message } }); }
     });
     card.addEventListener("click", async event => {
+      const wipe = event.target.closest("[data-wipe]");
+      if (wipe) {                                                           // the student's answer pictures, on request: two steps (the grades stay)
+        wipe.outerHTML = `<span class="confirm"><button type="button" class="danger" data-confirm-wipe="${wipe.dataset.wipe}">אישור מחיקת התמונות</button> <button type="button" data-cancel-wipe>ביטול</button></span>`;
+        return;
+      }
+      if (event.target.closest("[data-cancel-wipe]")) { await showClasses(); return; }
+      const sure = event.target.closest("[data-confirm-wipe]")?.dataset.confirmWipe;
+      if (sure) {
+        try {
+          const done = await api(`/api/classes/${id}/pictures/${encodeURIComponent(sure)}`, { method: "DELETE" });
+          await showClasses({ [id]: { lines: [`נמחקו ${done.deleted} תמונות של ${esc(sure)}. הציונים וההערות נשארו.`] } });
+        } catch (e) { await showClasses({ [id]: { error: e.message } }); }
+        return;
+      }
       const email = event.target.closest("[data-remove]")?.dataset.remove;
       if (!email) return;
       try {
@@ -90,8 +121,9 @@ function testCard(c, t) {
     <div class="edit-slot" data-slot="${t.id}"></div></article>`;
 }
 
-async function showTests() {
-  const classes = await api("/api/teaching/tests");
+const showTests = () => swr("/api/teaching/tests", drawTests);
+
+async function drawTests(classes) {
   draw(`${tabs("tests")}<section id="tests"><h2>מבחנים</h2>
     ${classes.length ? classes.map(({ class: c, tests }) => `<section class="card class-tests" data-class="${c.id}"><h3>${esc(c.name)}</h3>
       ${tests.length ? tests.map(t => testCard(c, t)).join("") : `<p class="muted">עוד לא נקבע מבחן לכיתה.</p>`}

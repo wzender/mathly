@@ -158,8 +158,7 @@ def test_a_person_with_one_role_sees_no_chips_and_a_developer_sees_all_five(brow
 
 def fill_class(page, name, lessons, teacher, students):
     page.fill("#c-name", name)
-    for lesson in lessons:
-        page.check(f"#c-lessons input[value='{lesson}']")
+    assert page.locator("#c-lessons, input[name=lesson]").count() == 0            # a class has no chosen lessons
     page.fill("#c-teacher", teacher)
     page.fill("#c-students", students)
 
@@ -189,9 +188,8 @@ def test_a_manager_creates_edits_and_deletes_classes_without_scrolling_sideways(
             assert columns >= 2                                                 # the wide screen is used
         page.click("#classes article >> nth=0 >> [data-edit]")
         page.wait_for_selector("#class-form")
-        assert page.input_value("#c-name") == "ט'3" and page.is_checked("#c-lessons input[value='t2']")
+        assert page.input_value("#c-name") == "ט'3"
         page.fill("#c-name", "ט'3 חדשה")
-        page.uncheck("#c-lessons input[value='t2']")
         page.check("#c-ai")
         page.click("#c-save")
         page.wait_for_selector("#classes article")

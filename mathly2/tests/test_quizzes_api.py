@@ -44,15 +44,15 @@ def take(client, bank, lesson, rights, who=KID):
 
 # --- 2.1 starting ---
 
-def test_a_new_student_starts_a_quiz_of_ten_questions_due_in_fifteen_minutes(world):
+def test_a_new_student_starts_a_quiz_of_fifteen_questions_due_in_twenty_minutes(world):
     client, _, bank = world
     lesson = lesson_id(bank)
     got = start(client, lesson)
     assert got.status_code == 200
     quiz = got.json()
-    assert quiz["state"] == "open" and len(quiz["questions"]) == 10 and quiz["answers"] == {}
+    assert quiz["state"] == "open" and len(quiz["questions"]) == 15 and quiz["answers"] == {}
     from datetime import datetime
-    assert datetime.fromisoformat(quiz["due_at"]) - datetime.fromisoformat(quiz["now"]) == timedelta(minutes=15)
+    assert datetime.fromisoformat(quiz["due_at"]) - datetime.fromisoformat(quiz["now"]) == timedelta(minutes=20)
     assert quiz["lesson"]["id"] == lesson
 
 
@@ -74,15 +74,14 @@ def test_starting_again_resumes_the_same_open_attempt(world):
     assert again["id"] == first["id"] and [q["key"] for q in again["questions"]] == [q["key"] for q in first["questions"]]
     assert len(again["answers"]) == 1 and again["due_at"] == first["due_at"]
     facts = client.get(f"/api/lessons/{lesson}/quiz", headers=auth()).json()
-    assert facts["open"]["id"] == first["id"] and facts["best"] is None and facts["attempts"] == 0 and facts["size"] == 10 and facts["minutes"] == 15
+    assert facts["open"]["id"] == first["id"] and facts["best"] is None and facts["attempts"] == 0 and facts["size"] == 15 and facts["minutes"] == 20
 
 
-def test_a_lesson_the_students_classes_do_not_have_is_404_and_a_manager_is_refused(world):
+def test_a_student_in_no_class_is_refused_a_missing_lesson_is_404_and_a_manager_is_refused(world):
     client, store, bank = world
-    store.add_member(store.create_class("setup", "B", lessons=["t"])["id"], "solo@school.test")
     other_lesson = next(l["id"] for l in bank.lessons if l["id"] != "t")
-    assert start(client, other_lesson, "solo@school.test").status_code == 404
-    assert client.get(f"/api/lessons/{other_lesson}/quiz", headers=auth("solo@school.test")).status_code == 404
+    assert start(client, other_lesson, "nobody@school.test").status_code == 403                    # in no class: no lessons
+    assert client.get(f"/api/lessons/{other_lesson}/quiz", headers=auth("nobody@school.test")).status_code == 403
     assert start(client, "no-such-lesson").status_code == 404
     assert start(client, LESSON, MGR).status_code == 403
 
@@ -97,7 +96,7 @@ def test_an_answer_is_saved_can_be_changed_and_submitting_grades_it(world):
     answer(client, attempt, bank, key, right=True)                                         # changed their mind
     assert client.get(f"/api/attempts/{attempt['id']}", headers=auth()).json()["answers"] == {key: right_index(bank, skill_of(key), key)}
     result = client.post(f"/api/attempts/{attempt['id']}/submit", headers=auth()).json()
-    assert result["state"] == "submitted" and result["grade"] == 10 and result["right"] == 1 and result["total"] == 10 and result["timed_out"] is False
+    assert result["state"] == "submitted" and result["grade"] == 7 and result["right"] == 1 and result["total"] == 15 and result["timed_out"] is False
 
 
 def test_submitting_twice_returns_the_same_result(world):
@@ -113,11 +112,11 @@ def test_an_answer_after_the_deadline_is_refused_and_settles_the_attempt(world):
     client, _, bank = world
     attempt = start(client, lesson_id(bank)).json()
     answer(client, attempt, bank, attempt["questions"][0]["key"])
-    client.set_time(MON + timedelta(minutes=16))
+    client.set_time(MON + timedelta(minutes=21))
     late = answer(client, attempt, bank, attempt["questions"][1]["key"])
     assert late.status_code == 409
     settled = client.get(f"/api/attempts/{attempt['id']}", headers=auth()).json()
-    assert settled["state"] == "submitted" and settled["timed_out"] is True and settled["grade"] == 10 and settled["right"] == 1
+    assert settled["state"] == "submitted" and settled["timed_out"] is True and settled["grade"] == 7 and settled["right"] == 1
 
 
 def test_closing_the_app_for_twenty_minutes_leaves_a_submitted_attempt_with_the_answers_given(world):
@@ -128,7 +127,7 @@ def test_closing_the_app_for_twenty_minutes_leaves_a_submitted_attempt_with_the_
     client.set_time(MON + timedelta(minutes=5))                                            # five minutes in, the app is closed
     client.set_time(MON + timedelta(minutes=25))                                           # it is opened again 20 minutes later
     back = client.get(f"/api/attempts/{attempt['id']}", headers=auth()).json()
-    assert back["state"] == "submitted" and back["timed_out"] is True and back["grade"] == 60 and back["right"] == 6
+    assert back["state"] == "submitted" and back["timed_out"] is True and back["grade"] == 40 and back["right"] == 6
 
 
 def test_the_deadline_is_the_servers_a_late_device_clock_changes_nothing(world):
@@ -159,11 +158,11 @@ def test_another_student_gets_404_and_bad_answers_are_422(world):
 def test_the_best_grade_stays_and_a_better_retake_replaces_it(world):
     client, _, bank = world
     lesson = lesson_id(bank)
-    take(client, bank, lesson, [True] * 6 + [False] * 4)                                   # 60
+    take(client, bank, lesson, [True] * 9 + [False] * 6)                                   # 60
     assert client.get(f"/api/lessons/{lesson}/quiz", headers=auth()).json()["best"] == 60
-    take(client, bank, lesson, [True] * 8 + [False] * 2)                                   # 80
+    take(client, bank, lesson, [True] * 12 + [False] * 3)                                  # 80
     assert client.get(f"/api/lessons/{lesson}/quiz", headers=auth()).json()["best"] == 80
-    take(client, bank, lesson, [True] * 7 + [False] * 3)                                   # 70: worse
+    take(client, bank, lesson, [True] * 10 + [False] * 5)                                  # 67: worse
     facts = client.get(f"/api/lessons/{lesson}/quiz", headers=auth()).json()
     assert facts["best"] == 80 and facts["attempts"] == 3
 
@@ -171,15 +170,15 @@ def test_the_best_grade_stays_and_a_better_retake_replaces_it(world):
 def test_the_grades_screen_data_lists_only_lessons_with_a_quiz_and_settles_overdue_ones(world):
     client, _, bank = world
     lesson = lesson_id(bank)
-    assert client.get("/api/grades", headers=auth()).json() == {"quizzes": [], "exercise_tests": [], "simulations": []}
-    take(client, bank, lesson, [True] * 7 + [False] * 3)
+    assert client.get("/api/grades", headers=auth()).json() == {"quizzes": [], "exercise_tests": [], "simulations": [], "assignments": []}
+    take(client, bank, lesson, [True] * 10 + [False] * 5)
     other = lesson_id(bank, 3)
     abandoned = start(client, other).json()
     answer(client, abandoned, bank, abandoned["questions"][0]["key"])
     assert [q["lesson"]["id"] for q in client.get("/api/grades", headers=auth()).json()["quizzes"]] == [lesson]   # open: not listed yet
     client.set_time(MON + timedelta(hours=1))                                              # the overdue attempt is settled by the read
     grades = client.get("/api/grades", headers=auth()).json()["quizzes"]
-    assert {g["lesson"]["id"]: g["best"] for g in grades} == {lesson: 70, other: 10}
+    assert {g["lesson"]["id"]: g["best"] for g in grades} == {lesson: 67, other: 7}
     assert all(g["attempts"] == 1 and g["last"] for g in grades)
 
 
@@ -188,10 +187,10 @@ def test_the_path_gives_each_lesson_its_quiz_state(world):
     lesson, other = lesson_id(bank), lesson_id(bank, 3)
     quizzes = lambda: {l["id"]: l["quiz"] for l in client.get("/api/path", headers=auth()).json()["lessons"]}
     assert quizzes()[lesson] == {"best": None, "open": False, "due_at": None}
-    take(client, bank, lesson, [True] * 9 + [False])
+    take(client, bank, lesson, [True] * 14 + [False])
     start(client, other)
     state = quizzes()
-    assert state[lesson]["best"] == 90 and state[lesson]["open"] is False
+    assert state[lesson]["best"] == 93 and state[lesson]["open"] is False
     assert state[other]["best"] is None and state[other]["open"] is True and state[other]["due_at"]
 
 
@@ -202,7 +201,7 @@ def test_a_lesson_with_an_authored_written_quiz_still_gets_the_multiple_choice_q
     lesson = next(u["id"] for u in bank.data["units"] if u.get("quiz") and u["id"] == lesson_id(bank))
     assert bank.data["units"][[u["id"] for u in bank.data["units"]].index(lesson)]["quiz"]["questions"]
     quiz = start(client, lesson).json()
-    assert len(quiz["questions"]) == 10 and all(len(q["choices"]) >= 2 for q in quiz["questions"])
+    assert len(quiz["questions"]) == 15 and all(len(q["choices"]) >= 2 for q in quiz["questions"])
     keys = {k for s in bank.skills if s["unit"] == lesson for k in bank.question_keys(s["id"])}
     assert {q["key"] for q in quiz["questions"]} <= keys                                   # only bank questions of the lesson's skills
 
@@ -220,5 +219,20 @@ def test_a_retake_has_new_questions_through_the_api(world):
     first_keys = {q["key"] for q in first["questions"]}
     client.post(f"/api/attempts/{first['id']}/submit", headers=auth())
     second = start(client, lesson).json()
-    assert second["id"] != first["id"] and len(second["questions"]) == 10
+    assert second["id"] != first["id"] and len(second["questions"]) == 15
     assert not first_keys & {q["key"] for q in second["questions"]}                        # none of the first attempt's questions
+
+
+# --- passing: 13 of 15, and the lesson is completed ---
+
+def test_thirteen_of_fifteen_passes_twelve_does_not_and_a_pass_stays(world):
+    client, _, bank = world
+    lesson = lesson_id(bank)
+    lesson_row = lambda: next(l for l in client.get("/api/path", headers=auth()).json()["lessons"] if l["id"] == lesson)
+    take(client, bank, lesson, [True] * 12 + [False] * 3)                                  # 80
+    assert lesson_row()["passed"] is False and lesson_row()["completed"] is False
+    take(client, bank, lesson, [True] * 13 + [False] * 2)                                  # 87
+    assert lesson_row()["passed"] is True and lesson_row()["completed"] is True
+    take(client, bank, lesson, [True] * 6 + [False] * 9)                                   # 40: worse
+    assert lesson_row()["passed"] is True and lesson_row()["completed"] is True
+    assert all(s["state"] == "not_started" for s in lesson_row()["skills"])                # the skills themselves are untouched

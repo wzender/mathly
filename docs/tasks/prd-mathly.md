@@ -18,7 +18,7 @@ The app has five roles (see 4.1):
   Students can also get help with a photographed problem and have handwritten answers checked, always through their teacher.
 - **Teachers** give and check assignments, set tests, review the AI's checks of their students' work, and see the
   progress of the classes they teach, per skill and per lesson.
-- **Managers** create the classes: name, lessons, teacher and students.
+- **Managers** create the classes: name, teacher and students.
 - **Admins** give roles to accounts.
 - **Developers** (the app's operators) have every permission and the developer tools.
 
@@ -34,7 +34,7 @@ reused as files (see 7.1); everything else is rebuilt.
 | skill | מיומנות | A specific topic, e.g. פירוק טרינום. Shown on the path as a star |
 | exercise | תרגיל | A question on a certain topic. Can be either open-ended or multiple choice |
 | lesson | שיעור | A set of skills, e.g. טכניקה אלגברית 1. Shown on the path as a hub with its skills around it |
-| class | כיתה | A named group of students with one teacher and the lessons it studies |
+| class | כיתה | A named group of students with one teacher. Every class studies the whole course |
 | quiz | בוחן | A test on a single lesson. Can be retaken; best grade wins; each retake draws new questions. It is the only quiz type (no one-time summary quiz); its best grade is the lesson's grade |
 | exercise test | מבחן תרגול | A timed test on a set of lessons. Can be retaken; best grade wins |
 | simulation test | מבחן סימולציה | A timed test on a set of lessons. One time only |
@@ -82,7 +82,7 @@ reused as files (see 7.1); everything else is rebuilt.
 - As a teacher, I want to see how much of each lesson each student has covered.
 
 **Manager**
-- As a manager, I want to create a class with its lessons, its teacher and its students, so a new group can start practicing.
+- As a manager, I want to create a class with its teacher and its students, so a new group can start practicing.
 - As a manager, I want to edit or delete a class and set its daily AI budget, so I can keep rosters and costs right.
 
 **Admin**
@@ -135,15 +135,14 @@ Requirements are grouped; each id (for example `ACC-3`) is stable and is what Op
 
 - **CLS-1 Who manages classes.** Only a manager (and a developer) can create, edit and delete classes. They do it in the classes screen (MGR-1).
   A class's teacher can also add and remove the students of that class, and nothing else about it (TCH-9).
-- **CLS-2 A class** has: a **name** (1–80 characters, unique ignoring case), the **lessons** it studies (chosen from the exercise bank, at least one),
-  its **students** (email addresses), one **teacher** (an email address), an **AI switch** (off for a new class; see AI-10) and a **daily AI budget** (a number of AI checks a day, default 150, used only while the AI is on).
+- **CLS-2 A class** has: a **name** (1–80 characters, unique ignoring case), its **students** (email addresses), one **teacher** (an email address), an **AI switch** (off for a new class; see AI-10) and a **daily AI budget** (a number of AI checks a day, default 150, used only while the AI is on).
 - **CLS-3 Adding students.** The manager (or the class's teacher) pastes email addresses, one per line (commas and spaces also separate them). Repeated addresses are ignored and
   invalid ones are reported. A student may belong to more than one class.
 - **CLS-4 The teacher.** A class has at most one teacher, given by email. A teacher is never also a student of the same class. A teacher may teach several classes.
-- **CLS-5 Editing.** The manager can change a class's name, lessons, students, teacher and AI budget. Removing a student from a class does not delete that student's progress.
+- **CLS-5 Editing.** The manager can change a class's name, students, teacher and AI budget. Removing a student from a class does not delete that student's progress.
 - **CLS-6 Deleting.** The manager can delete a class after confirming. Deleting a class does not delete its students' progress.
-- **CLS-7 Class list.** The list shows, for each class, its name, lessons, number of students and their emails, and its teacher, with shortcuts to edit and delete.
-- **CLS-8 Lessons in the path.** A student's path shows the lessons of their classes (all of them, when the student is in several classes).
+- **CLS-7 Class list.** The list shows, for each class, its name, number of students and their emails, and its teacher, with shortcuts to edit and delete.
+- **CLS-8 Lessons in the path.** A class has no chosen lessons: every class studies every lesson of the bank, one course called "מתמטיקה כיתה ט - מצוינות". A student in at least one class sees every lesson in the path.
   Within those lessons everything is open (PTH-4).
 
 ### 4.3 The exercise bank (BNK)
@@ -179,8 +178,10 @@ The path is the student's main screen: a trail of stars.
 - **PTH-7 Accessibility.** Each star is a control whose accessible name is its number, the skill's name and its state in words. It can be reached and opened from the keyboard.
   Animations stop when the device asks for reduced motion. The path is dark, like the rest of the app.
 - **PTH-9 Choosing a subject.** After sign-in a student first sees the subjects of their classes as cards (as in mathly1), each with an icon, the subject's name
-  and a bar "N מתוך M מיומנויות" (skills mastered of all skills in the student's lessons). Today the only subject is math (מתמטיקה), so there is one card.
-  Tapping a card opens that subject's home (STU-1, as in mathly1), and the tab bar leads from there to the path, the grades and the collection; the subject's screens have a way back to the subjects. A reload or a link to a skill (`#/skill/…`) opens its path directly.
+  and a bar "N מתוך M מיומנויות" (skills mastered of all skills in the student's lessons). Today the only subject is math, named "מתמטיקה כיתה ט - מצוינות", so there is one card.
+  Tapping a card opens that subject's home (STU-1, as in mathly1), and the tab bar leads from there to the path, the submissions, the grades and the collection; the subject's screens have a way back to the subjects. A reload or a link to a skill (`#/skill/…`) opens its path directly.
+- **PTH-10 Completed lessons.** A lesson is **completed** when every one of its skills is mastered (about 50 exercises: five skills of ten questions), or when its quiz was passed (QZ-7). The hub says "הושלם".
+- **PTH-11 The curriculum.** Each lesson may have a **date** by which it should be completed, one curriculum for the whole school, set by a manager (MGR-3). The path marks every lesson that should be finished by now: its date has passed and it is not completed. The hub shows a marker and "היה אמור להסתיים ב־<date>", and the top of the path says how many lessons are behind. A lesson without a date, with a date ahead, or completed is not marked. Nothing is locked (PTH-4).
 - **PTH-8 Phone first.** The path fits a 360px-wide screen without sideways scrolling, including the lesson with the most skills.
 
 ### 4.5 The exercise screen (EXR)
@@ -271,10 +272,11 @@ The exercise screen is where a student practices one skill.
 
 - **QZ-1 Quiz per lesson.** Every lesson has one quiz: the lesson's "boss level", a node on the trail after the lesson's ring. It is always open (PTH-4). The student can retake it at any time;
   the best grade counts, and the quiz's best grade is the lesson's grade.
-- **QZ-2 Format.** A quiz is **10 multiple-choice questions** drawn from the bank questions of the lesson's skills, at least one per skill and the rest spread evenly across the skills, in **15 minutes**.
+- **QZ-2 Format.** A quiz is **15 multiple-choice questions** drawn from the bank questions of the lesson's skills, at least one per skill and the rest spread evenly across the skills, in **20 minutes**. It is **passed** with a grade of at least 87 (13 right out of 15); a pass stays whatever a later retake scores (QZ-7).
   The timer runs on the server; when it ends the quiz is submitted as it stands and unanswered questions count as wrong. Skill names are not shown and there is no feedback until the end.
   The smart board and the calculator are available.
-- **QZ-3 Retakes draw new questions.** Each retake prefers questions the student has not had in earlier attempts at this lesson's quiz, the least-used first. The bank has at least 10 questions per skill, so this is always possible.
+- **QZ-3 Retakes draw new questions.** Each retake prefers questions the student has not had in earlier attempts at this lesson's quiz, the least-used first. While the lesson has enough unused questions (four skills of ten give two quizzes in a row without a repeat), none repeats; after that the least-used come first.
+- **QZ-7 Passing.** A quiz is passed with a grade of at least 87 (13 of 15). Passing completes the lesson (PTH-10) and does not change any skill's mastery.
 - **QZ-4 After a quiz.** The student sees the grade, the skills where points were lost (each linked to its star, so they can practice before retaking) and, for each missed question, the name and tip of the mistake they made (as in EXR-5).
   The correct answers are never shown, so a retake tests understanding and not memory.
 - **QZ-5 Grades on the server.** Quiz grades and timers are computed and stored on the server.
@@ -382,13 +384,14 @@ The exercise screen is where a student practices one skill.
 
 ### 4.16 Student screens (STU)
 
-A tab bar at the bottom of the screen leads between them.
+A tab bar at the bottom of the screen leads between them: home, path, submissions (STU-7), grades and collection.
 
-- **STU-1 Home:** my assignments (המשימות שלי) from the teacher; the upcoming-test reminder (TST-3); a button that continues the path at the next skill; my AI requests and their state (AI-1).
+- **STU-1 Home** shows only what is critical: the nearest test's reminder with its readiness and today's task (TST-3), a required simulation, the **new** assignments (המשימות שלי: not handed in yet), and a button that continues the path at the next skill; my AI requests and their state (AI-1).
 - **STU-2 Path:** see 4.4.
 - **STU-3 Grades:** all quiz (best grade), exercise test, simulation and assignment grades.
 - **STU-4 Collection:** see MST-7.
 - **STU-5 Assignments.** The student opens an assignment, works on it (on the smart board, or by photographing paper; ANS-1) and hands it in; they see the teacher's grade and note, or that it was sent back for correction.
+- **STU-7 Submissions tab (הגשות).** Lists every assignment from the student's teachers, grouped by state: new, sent back for correction, handed in and waiting for a check, and checked (with the grade and note). Each opens its page; one past its due date and not handed in is marked "באיחור". The switch for phone notifications (PSH-1) is at the bottom of this tab, not on home.
 - **STU-6 Photo help.** A camera button lets the student photograph a problem (AI-3). Pressing it opens the device's camera or gallery. The picture is shrunk on the device and its metadata is dropped before it is sent
   (JPEG, PNG or WebP). A sheet then shows the student's picture and the request's state, and the hints once the teacher has sent it.
   The button appears in two places, and only for students of a class with the AI on (AI-10):
@@ -399,7 +402,7 @@ A tab bar at the bottom of the screen leads between them.
 
 ### 4.17 Teacher screens (TCH)
 
-- **TCH-1 Teacher home.** A teacher's home lists the classes they teach, each with its students and a shortcut to its progress. A teacher does not see the student path as their main screen. A teacher who teaches no class is told that a manager chooses who teaches each class.
+- **TCH-1 Teacher home.** A teacher's home lists the classes they teach, each with its students and a shortcut to its progress. A teacher does not see the student path as their main screen. A teacher who teaches no class is told that a manager chooses who teaches each class. Each tab of the teacher's screen shows how many items are in it: classes, tests, assignments, and submissions waiting in the inbox.
 - **TCH-2 Give an assignment.** The teacher creates an assignment (title, note, due date) and loads its content from:
   - the computer (file upload: PDF or images);
   - a photo taken with the device camera;
@@ -424,6 +427,7 @@ A tab bar at the bottom of the screen leads between them.
 ### 4.18 Manager screens (MGR)
 
 - **MGR-1 Classes.** The manager's home lists all classes (CLS-7) with a button for a new class, and an editor for creating and changing a class (CLS-2 – CLS-6). When a save is refused (for example the teacher is also one of the students), the editor says why right above the save button, in view, and keeps what was typed.
+- **MGR-3 Curriculum.** A tab "תכנית לימודים" lists every lesson in the bank's order, with the bank's month as a hint and a date the manager can set, change or clear (PTH-11).
 - **MGR-2 Students.** A list of all students with the classes each belongs to.
 
 ### 4.19 Admin screens (ADM)
@@ -460,6 +464,7 @@ A tab bar at the bottom of the screen leads between them.
 
 - Hebrew, right-to-left. Works on phones first; the teacher, manager, admin and developer views (heat map, coverage, classes, roles) must also work well on a computer.
 - The look follows the path's "sky" theme: a dark-blue night with aurora and starlight accents, gold for mastery, and an owl mascot that perches on the next skill. The app is always dark, as mathly1 is: the page background is a dark night with two soft glows and small fixed stars; it does not move. There is no light mode.
+- A button whose action takes longer than about a third of a second shows it (a spinner, a second press ignored), everywhere in the app; with reduced motion it shows "…".
 - Math is written in `$…$` text in the exercise bank; the app must render it as formulas.
 - State and result never rely on color alone: every state has a symbol or a word (stars, heat map cells, feedback).
 - Mastered skills must look clearly different from "learning" and "not started" ones.
@@ -502,6 +507,7 @@ Rebuilt, not copied as a whole; read the places named in each requirement group.
   Settings come from, in order, real environment variables, the app's own `.env` if it has one, and the repository's `.env` (the one mathly1 uses, with the same keys); earlier sources win. With Supabase unset, local development uses an in-memory store and a "dev only" email sign-in, and a half-configured server refuses to start.
   The app page and its styles and scripts are sent with `Cache-Control: no-cache`, so after an update every device gets the new version without clearing its cache (an unchanged file is still answered from the cache). The page declares mathly1's icon (`static/icons/`), shown in the browser tab.
   The server reads the same fact once per request, makes independent database reads at the same time, and reuses its connections: a student's screen waits for the database at most 3 times in a row and a practice answer at most 4 (each call to a remote database costs about 0.4 seconds).
+  The server remembers the classes, their students, the roles, the tests and the assignments for at most 30 seconds (`MATHLY_CACHE_SECONDS`, 0 turns it off) and forgets them at once when the app changes one; a screen opened again shows what it last knew and refreshes it, without redrawing over something being typed. One server process is assumed.
   Further settings: the AI key and model (`ANTHROPIC_API_KEY`, `MATH_MODEL`), the push keys (`VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`), the private bucket for answer pictures, and the teacher and developer email lists.
 - **Server decides.** Correctness of answers, the date of each answer, mastery, grades, the budgets, and the simulation and exercise-test timers are decided and stored on the server.
   Grades that matter cannot be changed from the device.

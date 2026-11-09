@@ -30,7 +30,12 @@ export function signInDev(email) {
   try { localStorage.setItem(DEV_KEY, email.trim().toLowerCase()); } catch { /* private window: stays signed out */ }
 }
 
+const outListeners = [];
+/** Calls `fn` when the person signs out (so nothing remembered about them is shown to the next one). */
+export const onSignOut = fn => outListeners.push(fn);
+
 export async function signOut() {
+  outListeners.forEach(fn => fn());
   if (client) await client.auth.signOut();
   try { localStorage.removeItem(DEV_KEY); } catch { /* nothing stored */ }
 }

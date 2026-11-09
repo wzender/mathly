@@ -31,6 +31,29 @@ NEEDS = {   # (method, path) -> permission
     ("PUT", "/api/attempts/{attempt_id}/answers"): "path.use",
     ("POST", "/api/attempts/{attempt_id}/submit"): "path.use",
     ("GET", "/api/grades"): "path.use",
+    ("DELETE", "/api/classes/{class_id}/pictures/{email}"): "class.roster",
+    ("GET", "/api/teaching/counts"): "class.teach",
+    ("GET", "/api/teaching/inbox"): "class.teach",
+    ("GET", "/api/submissions/{submission_id}"): "class.teach",
+    ("POST", "/api/submissions/{submission_id}/grade"): "class.teach",
+    ("POST", "/api/submissions/{submission_id}/return"): "class.teach",
+    ("GET", "/api/assignments"): "path.use",
+    ("GET", "/api/assignments/{assignment_id}"): "path.use",
+    ("POST", "/api/assignments/{assignment_id}/submission"): "path.use",
+    ("POST", "/api/assignments/pages"): "class.teach",
+    ("POST", "/api/classes/{class_id}/assignments"): "class.teach",
+    ("GET", "/api/teaching/assignments"): "class.teach",
+    ("DELETE", "/api/assignments/{assignment_id}"): "class.teach",
+    ("GET", "/api/push/key"): "path.use",
+    ("POST", "/api/push/subscribe"): "path.use",
+    ("POST", "/api/push/unsubscribe"): "path.use",
+    ("POST", "/api/photo-requests"): "path.use",
+    ("GET", "/api/photo-requests/open"): "path.use",
+    ("GET", "/api/photo-requests/{request_id}"): "path.use",
+    ("POST", "/api/photo-requests/{request_id}/start"): "path.use",
+    ("POST", "/api/photo-requests/{request_id}/picture"): "path.use",
+    ("POST", "/api/pictures"): "path.use",
+    ("GET", "/api/pictures/{picture_id}"): "path.use",
     ("GET", "/api/comets"): "path.use",
     ("POST", "/api/comets/catch"): "path.use",
     ("GET", "/api/skills/{skill_id}"): "path.use",
@@ -38,10 +61,11 @@ NEEDS = {   # (method, path) -> permission
     ("POST", "/api/skills/{skill_id}/answer"): "path.use",
     ("POST", "/api/skills/{skill_id}/round"): "path.use",
     ("GET", "/api/classes"): "classes.manage",
-    ("GET", "/api/classes/lessons"): "classes.manage",
     ("POST", "/api/classes"): "classes.manage",
     ("GET", "/api/classes/{class_id}"): "classes.manage",
     ("PUT", "/api/classes/{class_id}"): "classes.manage",
+    ("GET", "/api/curriculum"): "classes.manage",
+    ("PUT", "/api/curriculum"): "classes.manage",
     ("DELETE", "/api/classes/{class_id}"): "classes.manage",
     ("POST", "/api/classes/{class_id}/students"): "class.roster",
     ("DELETE", "/api/classes/{class_id}/students/{email}"): "class.roster",
@@ -73,7 +97,7 @@ def world():
 
 
 def call(client, method, path, email):
-    url = path.format(skill_id="t_ext", lesson_id="t", attempt_id="x", test_id="1", number="1", class_id="1", email="someone@school.test", role="teacher")
+    url = path.format(skill_id="t_ext", lesson_id="t", attempt_id="x", test_id="1", number="1", picture_id="x", assignment_id="1", submission_id="1", request_id="x", class_id="1", email="someone@school.test", role="teacher")
     sends = method in ("POST", "PUT", "PATCH")
     return client.request(method, url, headers={"Authorization": f"Bearer dev:{email}"}, json={} if sends else None)
 

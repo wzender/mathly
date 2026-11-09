@@ -36,11 +36,11 @@ A written quiz is not copied into the assignment: the row names the lesson and t
 
 ### 2. Pictures: the server is the only door
 
-`pictures.py` holds the logic and two stores of bytes behind one small interface (`put`, `get`, `delete`): `MemoryPictures` for tests and local development, and `SupabasePictures`, a **private** Storage bucket named by the setting `MATHLY_ANSWER_BUCKET` (default `m2-answers`, not mathly1's `mathly-answers`), read and written only with the secret key. The server creates the bucket on first use if it is missing (the Storage API, idempotent), so the migration needs no `storage` schema. *Alternative:* mathly1's Hugging Face bucket, chosen there to avoid Supabase egress. Rejected for now: a second token and library, and egress is not a problem at this size; the interface keeps it a later swap.
+`pictures.py` holds the logic and two stores of bytes behind one small interface (`put`, `get`, `delete`): `MemoryPictures` for tests and local development, and `SupabasePictures`, a **private** Storage bucket named by the setting `MATHLY_M2_ANSWER_BUCKET` (default `m2-answers`; not `MATHLY_ANSWER_BUCKET`, which mathly1 reads from the shared `.env` for its own Hugging Face bucket, nor its `mathly-answers`), read and written only with the secret key. The server creates the bucket on first use if it is missing (the Storage API, idempotent), so the migration needs no `storage` schema. *Alternative:* mathly1's Hugging Face bucket, chosen there to avoid Supabase egress. Rejected for now: a second token and library, and egress is not a problem at this size; the interface keeps it a later swap.
 
 - **`clean_image(bytes, content_type)`** (ported): only JPEG, PNG or WebP up to 5 MB and 20 million pixels; the orientation is applied, the metadata dropped, the image re-encoded as JPEG. Anything else is refused (415 or 413).
 - **`render_pdf(bytes)`** (ported, teacher assignments only): up to 10 MB, 1600 px wide, 30 seconds for all pages, at most 20 pages; each page becomes a `page` picture, and the PDF itself is not kept.
-- **Access:** `GET /api/pictures/{id}` streams the bytes, never a link into storage. Readable by: the uploader; a student of the class for a page of their class's assignment; the teacher of the class (or a developer, or a manager) for a picture an assignment or a submission of their class refers to. Anything else is 404. A deleted picture is 410.
+- **Access:** `GET /api/pictures/{id}` streams the bytes, never a link into storage. Readable by: the uploader; a student of the class for a page of their class's assignment; the teacher of the class (or a developer) for a picture an assignment or a submission of their class refers to. A manager or an admin sees no learning data, so no pictures. Anything else is 404. A deleted picture is 410.
 
 ### 3. Handing in
 
@@ -81,7 +81,7 @@ stateDiagram-v2
 
 - **Orphans:** a picture no assignment, submission or photo request refers to and older than 24 hours is deleted by the cleanup.
 - **The school year:** `retention.expires_on(day)` is 31 August of the school year the picture was created in (1 Sep to 31 Aug); `answer` pictures are deleted on the first cleanup after it. Deleting removes the bytes and sets `deleted_at`; the submission keeps its grade and note, and the screens say "התמונות נמחקו". Assignment pages stay until their assignment is removed.
-- **On request:** `DELETE /api/classes/{id}/students/{email}/pictures` by the class's teacher, a manager or a developer deletes that student's `answer` pictures for that class's assignments at once.
+- **On request:** `DELETE /api/classes/{id}/pictures/{email}` (not under `/students/`, whose `{email}` route would swallow it) by the class's teacher, a manager or a developer deletes that student's `answer` pictures for that class's assignments at once.
 - **The job:** `cleanup.run(store, pictures, now)` returns what it removed, `python -m mathly2.cleanup` runs it once, and the server starts it every hour in the background when Supabase is on (the real deployment).
 
 ## Risks / Trade-offs

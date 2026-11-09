@@ -12,7 +12,7 @@ from mathly2.bank import load_bank
 from mathly2.config import Settings
 from mathly2.main import create_app
 from mathly2.store import InMemoryStore
-from mathly2.tests.serve import offline_formulas, running
+from mathly2.tests.serve import offline_formulas, only, running
 
 KID, TEACHER = "kid@school.test", "t@school.test"
 KID_ID = str(uuid.uuid5(uuid.NAMESPACE_DNS, KID))
@@ -39,7 +39,7 @@ def world(bank):
     store = InMemoryStore()
     klass = store.create_class("setup", "A", lessons=lessons, teacher_email=TEACHER)
     store.add_member(klass["id"], KID)
-    return create_app(Settings(), bank=bank, store=store), store, klass, lessons
+    return create_app(Settings(), bank=only(bank, lessons), store=store), store, klass, lessons
 
 
 def add_test(store, klass, lessons, days_ahead, set_days_ago=20, **kw):
@@ -81,8 +81,8 @@ def test_the_card_opens_home_and_each_tab_opens_its_screen(browser, bank):
         page = sign_in(browser, url)
         to_home(page)
         assert page.evaluate("location.hash") == "#/subject/math" and page.locator(".tabs a[aria-current='page']").inner_text() == "בית"
-        assert page.locator(".tabs a").all_inner_texts() == ["בית", "מסלול", "ציונים", "האוסף"]
-        for href, marker in (("#/subject/math/path", ".orbit"), ("#/grades", "#grades"), ("#/collection", "#collection"), ("#/subject/math", "#no-test")):
+        assert page.locator(".tabs a").all_inner_texts() == ["בית", "מסלול", "הגשות", "ציונים", "האוסף"]
+        for href, marker in (("#/subject/math/path", ".orbit"), ("#/submissions", "#submissions"), ("#/grades", "#grades"), ("#/collection", "#collection"), ("#/subject/math", "#no-test")):
             page.click(f".tabs a[href='{href}']")
             page.wait_for_selector(marker)
         assert page.errors == []
@@ -178,15 +178,18 @@ def test_the_readiness_bar_shows_every_part_and_loses_the_cap_after_the_simulati
         assert page.locator(".required").count() == 0                                                     # the simulation is taken
 
 
-def test_other_tests_are_listed_small_and_the_closest_one_gives_the_task(browser, bank):
+def test_home_shows_only_the_closest_test_and_the_other_tests_are_on_its_card(browser, bank):
     app, store, klass, lessons = world(bank)
     far = add_test(store, klass, lessons, 20)
     near = add_test(store, klass, lessons, 9)
     with running(app) as url:
         page = sign_in(browser, url)
         to_home(page)
-        assert page.get_attribute("#nearest-test", "data-test") == str(near["id"])
-        assert page.locator("#other-tests li").count() == 1 and page.get_attribute("#other-tests a", "href") == f"#/test/{far['id']}"
+        assert page.get_attribute("#nearest-test", "data-test") == str(near["id"]) and page.get_attribute("#today-task", "href") == f"#/exam/{near['id']}/1"
+        assert page.locator("#other-tests").count() == 0 and page.locator("#notifications").count() == 0                       # only what is critical
+        page.click("#nearest-test a[href^='#/test/']")
+        page.wait_for_selector("#other-tests")
+        assert page.get_attribute("#other-tests a", "href") == f"#/test/{far['id']}"
 
 
 # --- 3.3 a test's card ---

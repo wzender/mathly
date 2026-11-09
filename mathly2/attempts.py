@@ -6,13 +6,17 @@ from __future__ import annotations
 
 from datetime import datetime
 
-QUIZ_SIZE = 10
-QUIZ_MINUTES = 15
+QUIZ_SIZE = 15
+QUIZ_MINUTES = 20
+PASS_RIGHT = 13                    # right answers out of QUIZ_SIZE that pass a lesson quiz
 
 
 def percent(right: int, total: int) -> int:
     """The grade: the share of right answers as a whole number 0-100, rounded half up (7/10 -> 70, 8/12 -> 67)."""
     return 0 if total <= 0 else (200 * right + total) // (2 * total)
+
+
+PASS_GRADE = percent(PASS_RIGHT, QUIZ_SIZE)    # 87: a quiz is passed with this grade or better
 
 
 def _right(bank, question: dict, answers: dict) -> bool:

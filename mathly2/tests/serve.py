@@ -32,3 +32,10 @@ def offline_formulas(page):
     """For tests that show no formulas: do not wait for the formula library from the network (a slow CDN made them time out)."""
     page.route("**/mathjax@*/**", lambda route: route.abort())
     return page
+
+
+def only(bank, lessons):
+    """A bank with just these lessons (and their skills), for tests that want a short path: every class now studies the whole bank."""
+    from mathly2.bank import Bank
+    keep = set(lessons)
+    return Bank({**bank.data, "units": [u for u in bank.lessons if u["id"] in keep], "skills": [s for s in bank.skills if s["unit"] in keep]})

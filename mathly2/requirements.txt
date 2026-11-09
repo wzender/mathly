@@ -3,3 +3,6 @@ uvicorn[standard]>=0.29
 anyio>=4.10,<4.11  # Python 3.10: newer releases can hang Starlette's worker-thread bridge
 python-dotenv>=1.0
 tzdata>=2024.1
+Pillow==12.3.0  # checks and cleans answer pictures (mathly2/pictures.py)
+pypdfium2>=4.30,<6  # a teacher's PDF to page images
+pywebpush>=2.0,<3  # notifications to a student's phone for a photo request

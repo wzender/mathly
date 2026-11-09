@@ -163,4 +163,5 @@ def grades(request: Request, user: dict = Depends(learner)) -> dict:
             simulations.append(item)
     exercise.sort(key=lambda g: (g["test"]["date"], g["test"]["id"], g["number"]))
     simulations.sort(key=lambda g: (g["test"]["date"], g["test"]["id"]))
-    return {"quizzes": lessons, "exercise_tests": exercise, "simulations": simulations}
+    from .assignments import grade_rows
+    return {"quizzes": lessons, "exercise_tests": exercise, "simulations": simulations, "assignments": grade_rows(request, user)}

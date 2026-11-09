@@ -248,21 +248,21 @@ def test_help_for_an_unknown_skill_is_404(world):
 
 # --- the path (spec: learning-path) ---
 
-def test_the_path_shows_the_lessons_of_the_students_classes_only(world):
+def test_the_path_shows_every_lesson_even_for_a_class_stored_with_some(world):
     client, store, bank = world
     path = client.get("/api/path", headers=auth()).json()
     assert len(path["lessons"]) == 24 and sum(len(l["skills"]) for l in path["lessons"]) == 96
     small = KID.replace("kid", "small")
     store.add_member(store.create_class("setup", "B", lessons=["t", "k"])["id"], small)
-    assert [l["id"] for l in client.get("/api/path", headers=auth(small)).json()["lessons"]] == ["t", "k"]
+    assert len(client.get("/api/path", headers=auth(small)).json()["lessons"]) == 24
 
 
-def test_a_student_of_two_classes_sees_the_union_in_the_banks_order(world):
-    client, store, _ = world
+def test_a_student_of_two_classes_sees_every_lesson_once_in_the_banks_order(world):
+    client, store, bank = world
     two = "two@school.test"
     store.add_member(store.create_class("setup", "B", lessons=["k", "t"])["id"], two)
     store.add_member(store.create_class("setup", "C", lessons=["t2", "k"])["id"], two)
-    assert [l["id"] for l in client.get("/api/path", headers=auth(two)).json()["lessons"]] == ["t", "t2", "k"]
+    assert [l["id"] for l in client.get("/api/path", headers=auth(two)).json()["lessons"]] == [l["id"] for l in bank.lessons_with_skills()]
 
 
 def test_a_teacher_sees_every_lesson_and_a_manager_is_refused(world):

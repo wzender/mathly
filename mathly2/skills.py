@@ -82,10 +82,12 @@ def _round_view(request: Request, skill_id: str, rows: list[dict], round_start: 
 
 
 def visible_lesson_ids(request: Request, user: dict) -> set[str] | None:
-    """The lessons the student can see: those of their classes. None means all (a teacher or a developer)."""
+    """The lessons the student can see: every lesson once they are in a class, none before. None means all (a teacher or a developer)."""
     if set(user["roles"]) - {"student"}:
         return None
-    return {lesson for c in reads.of(request).classes_of_student(user["email"]) for lesson in c["lessons"]}
+    if not reads.of(request).classes_of_student(user["email"]):
+        return set()
+    return {lesson["id"] for lesson in request.app.state.bank.lessons}
 
 
 @router.get("/skills/{skill_id}")
@@ -199,11 +201,11 @@ def _comet_due(request: Request, user_id: str, today_now: dict, state: dict | No
 @router.get("/path")
 def path(request: Request, user: dict = Depends(learner)) -> dict:
     store, here, uid = request.app.state.store, reads.of(request), user["id"]
-    here.prefetch(("progress_of", uid), ("last_answered", uid), ("daily_correct", uid), ("recent_skills", uid, RECENT), ("attempts_of", uid, "quiz"))
+    here.prefetch(("progress_of", uid), ("last_answered", uid), ("daily_correct", uid), ("recent_skills", uid, RECENT), ("attempts_of", uid, "quiz"), ("curriculum",))
     states = {p["skill_id"]: skill_state(p) for p in here.progress_of(uid)}
     last, today = here.last_answered(uid), clock.school_day()
     quizzes_facts = quiz.facts(store, request.app.state.bank, uid, clock.now(), here)
-    shown = visible_lesson_ids(request, user)
+    shown, dates = visible_lesson_ids(request, user), here.curriculum()
     lessons, order = [], []
     for lesson in request.app.state.bank.lessons_with_skills():
         if shown is not None and lesson["id"] not in shown:
@@ -214,11 +216,15 @@ def path(request: Request, user: dict = Depends(learner)) -> dict:
         order += [s["id"] for s in skills]
         mastered = sum(1 for s in skills if s["state"] == MASTERED)
         fact = quizzes_facts.get(lesson["id"], {})
+        passed = bool(fact.get("passed"))
+        completed = passed or (bool(skills) and mastered == len(skills))
+        due = dates.get(lesson["id"])
         lessons.append({"id": lesson["id"], "name": lesson["name"], "skills": skills, "mastered": mastered,
-                        "completed": bool(skills) and mastered == len(skills),
+                        "completed": completed, "passed": passed, "due_date": due.isoformat() if due else None,
+                        "behind": bool(due and due < today and not completed),
                         "quiz": {"best": fact.get("best"), "open": bool(fact.get("open")), "due_at": fact["open"]["due_at"].isoformat() if fact.get("open") else None}})
     daily = here.daily_correct(uid)
-    return {"lessons": lessons, "next": next_skill(order, states, here.recent_skills(uid, RECENT)),
+    return {"lessons": lessons, "behind": sum(1 for l in lessons if l["behind"]), "next": next_skill(order, states, here.recent_skills(uid, RECENT)),
             "today": today_progress(daily, today), "streak": streak(daily, today)}
 
 

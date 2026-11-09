@@ -1,8 +1,9 @@
-"""Drawing a lesson quiz: 10 multiple-choice questions from the lesson's skills, spread evenly, new questions first on a retake."""
+"""Drawing a lesson quiz: 15 multiple-choice questions from the lesson's skills, spread evenly, new questions first on a retake."""
 from __future__ import annotations
 
 import random
 
+from . import attempts
 from .attempts import QUIZ_SIZE
 
 
@@ -35,15 +36,15 @@ def draw(bank, lesson_id: str, used: dict[str, int] | None = None, rng: random.R
 def facts(store, bank, user_id: str, now, reads=None) -> dict[str, dict]:
     """Per lesson the student has attempted: {best, attempts, open, last}. Overdue open attempts are settled first, so a quiz abandoned
     past its deadline is graded from the answers given. `best` is None until an attempt is submitted."""
-    from . import attempts
     found: dict[str, dict] = {}
     for row in (reads or store).attempts_of(user_id, "quiz"):
         row = attempts.settle(store, bank, row, now)
-        item = found.setdefault(row["scope"], {"best": None, "attempts": 0, "open": None, "last": None})
+        item = found.setdefault(row["scope"], {"best": None, "attempts": 0, "open": None, "last": None, "passed": False})
         if attempts.is_open(row):
             item["open"] = {"id": row["id"], "due_at": row["due_at"]}
             continue
         item["attempts"] += 1
+        item["passed"] = item["passed"] or row["grade"] >= attempts.PASS_GRADE
         item["best"] = row["grade"] if item["best"] is None else max(item["best"], row["grade"])
         item["last"] = row["submitted_at"]
     return found

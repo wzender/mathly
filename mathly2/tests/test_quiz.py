@@ -22,15 +22,15 @@ def per_skill(drawn):
     return Counter(q["skill_id"] for q in drawn)
 
 
-def test_a_lesson_of_four_skills_gives_ten_questions_with_every_skill_at_least_two(bank):
+def test_a_lesson_of_four_skills_gives_fifteen_questions_with_every_skill_at_least_three(bank):
     drawn = quiz.draw(bank, lesson_with(bank, 4), rng=random.Random(1))
-    assert len(drawn) == 10 and len({q["key"] for q in drawn}) == 10
-    assert sorted(per_skill(drawn).values()) == [2, 2, 3, 3]
+    assert len(drawn) == 15 and len({q["key"] for q in drawn}) == 15
+    assert sorted(per_skill(drawn).values()) == [3, 4, 4, 4]
 
 
-def test_six_skills_give_quotas_2_2_2_2_1_1_and_two_skills_give_5_and_5(bank):
-    assert sorted(per_skill(quiz.draw(bank, lesson_with(bank, 6), rng=random.Random(2))).values()) == [1, 1, 2, 2, 2, 2]
-    assert sorted(per_skill(quiz.draw(bank, lesson_with(bank, 2), rng=random.Random(3))).values()) == [5, 5]
+def test_six_skills_give_quotas_2_2_2_3_3_3_and_two_skills_give_7_and_8(bank):
+    assert sorted(per_skill(quiz.draw(bank, lesson_with(bank, 6), rng=random.Random(2))).values()) == [2, 2, 2, 3, 3, 3]
+    assert sorted(per_skill(quiz.draw(bank, lesson_with(bank, 2), rng=random.Random(3))).values()) == [7, 8]
 
 
 def test_every_skill_is_in_the_quiz_whatever_the_rng(bank):
@@ -40,11 +40,11 @@ def test_every_skill_is_in_the_quiz_whatever_the_rng(bank):
             assert set(per_skill(quiz.draw(bank, lesson, rng=random.Random(seed)))) == skills
 
 
-def test_a_skill_without_questions_is_left_out_and_the_others_still_give_ten(bank):
+def test_a_skill_without_questions_is_left_out_and_the_others_still_give_fifteen(bank):
     lesson = next(s["unit"] for s in bank.skills if not bank.question_keys(s["id"]))
     drawn = quiz.draw(bank, lesson, rng=random.Random(4))
     empty = {s["id"] for s in bank.skills if not bank.question_keys(s["id"])}
-    assert len(drawn) == 10 and not empty & set(per_skill(drawn))
+    assert len(drawn) == 15 and not empty & set(per_skill(drawn))
 
 
 def test_a_retake_uses_new_questions_while_enough_remain_and_then_the_least_used(bank):
@@ -56,7 +56,8 @@ def test_a_retake_uses_new_questions_while_enough_remain_and_then_the_least_used
     used.update(q["key"] for q in second)
     assert not {q["key"] for q in first} & {q["key"] for q in second}                     # two in a row never repeat
     third = quiz.draw(bank, lesson, used, random.Random(7))
-    assert not {q["key"] for q in first + second} & {q["key"] for q in third} or all(used[q["key"]] == 1 for q in third)
+    unused = [q for q in third if used[q["key"]] == 0]
+    assert len(unused) == 10                                                               # the 10 questions never drawn come first (40 in the lesson, 30 used)
     assert max(used[q["key"]] for q in third) <= 1                                         # repeats come from the least-used ones
     for _ in range(12):                                                                    # many retakes: nothing is drawn far more than the rest
         batch = quiz.draw(bank, lesson, used, random.Random())

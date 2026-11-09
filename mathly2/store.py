@@ -2,6 +2,7 @@
 InMemoryStore (tests and local development, lost on restart) and SupabaseStore (PostgREST with the secret key)."""
 from __future__ import annotations
 
+import re
 import itertools
 import json
 import threading
@@ -50,7 +51,9 @@ def _copy_attempt(row: dict) -> dict:
 def _when(value):
     if value is None or isinstance(value, datetime):
         return value
-    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    # Python 3.10 reads a fraction of exactly 3 or 6 digits only, and Postgres drops trailing zeros ("...57.63003+00:00")
+    text = re.sub(r"\.(\d+)", lambda m: "." + m.group(1)[:6].ljust(6, "0"), str(value).replace("Z", "+00:00"), count=1)
+    return datetime.fromisoformat(text)
 
 
 def _attempt_row(row: dict) -> dict:
@@ -78,6 +81,25 @@ def _test_row(row: dict) -> dict:
     return {**row, "date": day, "lessons": list(row.get("lessons") or []), "created_at": _when(row["created_at"]), "removed_at": _when(row.get("removed_at"))}
 
 
+PICTURE_KINDS = ("page", "answer")
+SUBMISSION_FIELDS = {"pictures", "state", "late", "handed_at", "grade", "teacher_note", "checked_at", "checked_by"}
+REQUEST_FIELDS = {"state", "picture_id"}
+
+
+def _stamped(row: dict, *names: str) -> dict:
+    """A database row with the named timestamp columns as datetimes (the in-memory store keeps datetimes already)."""
+    return {**row, **{n: _when(row.get(n)) for n in names}}
+
+
+def _assignment_row(row: dict) -> dict:
+    day = row["due_date"] if isinstance(row["due_date"], date) else date.fromisoformat(str(row["due_date"])[:10])
+    return {**_stamped(row, "created_at", "removed_at"), "due_date": day, "pages": [str(x) for x in (row.get("pages") or [])]}
+
+
+def _submission_row(row: dict) -> dict:
+    return {**_stamped(row, "handed_at", "checked_at"), "pictures": [str(x) for x in (row.get("pictures") or [])]}
+
+
 class InMemoryStore:
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -91,6 +113,12 @@ class InMemoryStore:
         self._attempts: dict[str, dict] = {}                # attempt id -> row
         self._reward: dict[str, dict] = {}                 # user_id -> {last_comet_day, last_catch_day}
         self._tests: dict[int, dict] = {}                   # test id -> row
+        self._pictures: dict[str, dict] = {}
+        self._curriculum: dict[str, date] = {}              # lesson id -> the date it should be completed by
+        self._assignments: dict[int, dict] = {}
+        self._submissions: dict[int, dict] = {}
+        self._requests: dict[str, dict] = {}
+        self._subs: dict[int, dict] = {}                    # push subscriptions
 
     # --- classes ---
 
@@ -332,6 +360,177 @@ class InMemoryStore:
             rows = [r for r in self._tests.values() if r["class_id"] in wanted and (include_removed or not r["removed_at"])]
             return [dict(r, lessons=list(r["lessons"])) for r in sorted(rows, key=lambda r: (r["date"], r["id"]))]
 
+    # --- pictures, assignments and submissions (written work) ---
+
+    def create_picture(self, owner_id: str, kind: str, path: str, content_type: str, size: int, created_at: datetime | None = None) -> dict:
+        if kind not in PICTURE_KINDS:
+            raise ValueError(f"unknown picture kind {kind!r}")
+        row = {"id": str(uuid.uuid4()), "owner_id": owner_id, "kind": kind, "path": path, "content_type": content_type, "size": size,
+               "created_at": created_at or datetime.now(timezone.utc), "deleted_at": None}
+        with self._lock:
+            self._pictures[row["id"]] = row
+            return dict(row)
+
+    def get_picture(self, picture_id: str) -> dict | None:
+        with self._lock:
+            row = self._pictures.get(str(picture_id))
+            return dict(row) if row else None
+
+    def mark_picture_deleted(self, picture_id: str, at: datetime | None = None) -> bool:
+        with self._lock:
+            row = self._pictures.get(str(picture_id))
+            if row is None or row["deleted_at"]:
+                return False
+            row["deleted_at"] = at or datetime.now(timezone.utc)
+            return True
+
+    def pictures(self, kind: str | None = None, owner_id: str | None = None, include_deleted: bool = False) -> list[dict]:
+        with self._lock:
+            return [dict(r) for r in sorted(self._pictures.values(), key=lambda r: r["created_at"])
+                    if (kind is None or r["kind"] == kind) and (owner_id is None or r["owner_id"] == owner_id) and (include_deleted or not r["deleted_at"])]
+
+    def picture_refs(self, picture_id: str) -> dict:
+        """What refers to a picture: assignments (as a page), submissions (as an answer) and photo requests."""
+        pid = str(picture_id)
+        with self._lock:
+            return {"assignments": sorted(a["id"] for a in self._assignments.values() if pid in a["pages"]),
+                    "submissions": sorted(s["id"] for s in self._submissions.values() if pid in s["pictures"]),
+                    "requests": sorted(r["id"] for r in self._requests.values() if r["picture_id"] == pid)}
+
+    def create_assignment(self, class_id: int, title: str, due_date: date, created_by: str, kind: str, *, note: str = "", pages=(),
+                          quiz_lesson: str | None = None, test_id: int | None = None, exercise_number: int | None = None,
+                          created_at: datetime | None = None) -> dict:
+        ok = {"pages": bool(pages), "quiz": bool(quiz_lesson), "exercise_test": test_id is not None and exercise_number in (1, 2)}
+        if not ok.get(kind) or not 1 <= len(title) <= 200:
+            raise ValueError("an assignment needs a title and its content")
+        with self._lock:
+            row = {"id": next(self._ids), "class_id": class_id, "title": title, "note": note, "due_date": due_date, "kind": kind,
+                   "pages": [str(p) for p in pages], "quiz_lesson": quiz_lesson, "test_id": test_id, "exercise_number": exercise_number,
+                   "created_by": created_by, "created_at": created_at or datetime.now(timezone.utc), "removed_at": None}
+            self._assignments[row["id"]] = row
+            return dict(row, pages=list(row["pages"]))
+
+    def get_assignment(self, assignment_id: int) -> dict | None:
+        with self._lock:
+            row = self._assignments.get(assignment_id)
+            return dict(row, pages=list(row["pages"])) if row else None
+
+    def assignments_of_classes(self, class_ids, include_removed: bool = False) -> list[dict]:
+        """The assignments of these classes, the nearest due date first."""
+        wanted = set(class_ids)
+        with self._lock:
+            rows = [r for r in self._assignments.values() if r["class_id"] in wanted and (include_removed or not r["removed_at"])]
+            return [dict(r, pages=list(r["pages"])) for r in sorted(rows, key=lambda r: (r["due_date"], r["id"]))]
+
+    def remove_assignment(self, assignment_id: int, at: datetime | None = None) -> bool:
+        with self._lock:
+            row = self._assignments.get(assignment_id)
+            if row is None or row["removed_at"]:
+                return False
+            row["removed_at"] = at or datetime.now(timezone.utc)
+            return True
+
+    def get_submission(self, assignment_id: int, user_id: str) -> dict | None:
+        with self._lock:
+            row = next((r for r in self._submissions.values() if r["assignment_id"] == assignment_id and r["user_id"] == user_id), None)
+            return dict(row, pictures=list(row["pictures"])) if row else None
+
+    def get_submission_by_id(self, submission_id: int) -> dict | None:
+        with self._lock:
+            row = self._submissions.get(submission_id)
+            return dict(row, pictures=list(row["pictures"])) if row else None
+
+    def save_submission(self, assignment_id: int, user_id: str, **fields) -> dict:
+        """Create the student's submission or change the given fields of it."""
+        unknown = set(fields) - SUBMISSION_FIELDS
+        if unknown:
+            raise ValueError(f"unknown submission fields {sorted(unknown)}")
+        with self._lock:
+            row = next((r for r in self._submissions.values() if r["assignment_id"] == assignment_id and r["user_id"] == user_id), None)
+            candidate = dict(row) if row else {"id": next(self._ids), "assignment_id": assignment_id, "user_id": user_id, "pictures": [], "state": "handed_in",
+                                               "late": False, "handed_at": datetime.now(timezone.utc), "grade": None, "teacher_note": "", "checked_at": None,
+                                               "checked_by": None}
+            candidate.update({k: ([str(x) for x in v] if k == "pictures" else v) for k, v in fields.items()})
+            if candidate["state"] == "graded" and candidate["grade"] is None:
+                raise ValueError("a graded submission has a grade")                      # refused before anything is stored
+            if candidate["grade"] is not None and not 0 <= candidate["grade"] <= 100:
+                raise ValueError("a grade is 0 to 100")
+            self._submissions[candidate["id"]] = candidate
+            return dict(candidate, pictures=list(candidate["pictures"]))
+
+    def submissions_of_assignments(self, assignment_ids) -> list[dict]:
+        wanted = set(assignment_ids)
+        with self._lock:
+            return [dict(r, pictures=list(r["pictures"])) for r in sorted(self._submissions.values(), key=lambda r: (r["handed_at"], r["id"]))
+                    if r["assignment_id"] in wanted]
+
+    def submissions_of_user(self, user_id: str) -> list[dict]:
+        with self._lock:
+            return [dict(r, pictures=list(r["pictures"])) for r in self._submissions.values() if r["user_id"] == user_id]
+
+    # --- photo requests and push subscriptions ---
+
+    def create_photo_request(self, user_id: str, assignment_id: int, device: str, code: str, created_at: datetime, expires_at: datetime) -> dict:
+        """A new request; the student's earlier waiting request for the same assignment becomes superseded."""
+        with self._lock:
+            for r in self._requests.values():
+                if r["user_id"] == user_id and r["assignment_id"] == assignment_id and r["state"] == "waiting":
+                    r["state"] = "superseded"
+            row = {"id": str(uuid.uuid4()), "user_id": user_id, "assignment_id": assignment_id, "device": device, "code": code, "state": "waiting",
+                   "created_at": created_at, "expires_at": expires_at, "picture_id": None}
+            self._requests[row["id"]] = row
+            return dict(row)
+
+    def get_photo_request(self, request_id: str) -> dict | None:
+        with self._lock:
+            row = self._requests.get(str(request_id))
+            return dict(row) if row else None
+
+    def save_photo_request(self, request_id: str, **fields) -> dict:
+        unknown = set(fields) - REQUEST_FIELDS
+        if unknown:
+            raise ValueError(f"unknown photo request fields {sorted(unknown)}")
+        with self._lock:
+            row = self._requests.get(str(request_id))
+            if row is None:
+                raise KeyError(request_id)
+            row.update(fields)
+            return dict(row)
+
+    def open_photo_requests(self, user_id: str) -> list[dict]:
+        """The student's requests still waiting for or receiving a picture, the newest first (expiry is decided by the caller)."""
+        with self._lock:
+            return [dict(r) for r in sorted(self._requests.values(), key=lambda r: r["created_at"], reverse=True)
+                    if r["user_id"] == user_id and r["state"] in ("waiting", "uploading")]
+
+    def add_push_subscription(self, user_id: str, endpoint: str, p256dh: str, auth: str, key_id: str) -> dict:
+        with self._lock:
+            row = next((r for r in self._subs.values() if r["endpoint"] == endpoint), None)
+            if row is None:
+                row = {"id": next(self._ids), "endpoint": endpoint, "created_at": datetime.now(timezone.utc)}
+                self._subs[row["id"]] = row
+            row.update({"user_id": user_id, "p256dh": p256dh, "auth": auth, "key_id": key_id})
+            return dict(row)
+
+    def push_subscriptions_of(self, user_id: str) -> list[dict]:
+        with self._lock:
+            return [dict(r) for r in self._subs.values() if r["user_id"] == user_id]
+
+    def delete_push_subscription(self, endpoint: str) -> bool:
+        with self._lock:
+            found = [i for i, r in self._subs.items() if r["endpoint"] == endpoint]
+            for i in found:
+                del self._subs[i]
+            return bool(found)
+
+    def drop_push_subscriptions_not_of(self, key_id: str) -> int:
+        """The server's push key changed: subscriptions made under another key are dropped, and each phone turns notifications on again."""
+        with self._lock:
+            gone = [i for i, r in self._subs.items() if r["key_id"] != key_id]
+            for i in gone:
+                del self._subs[i]
+            return len(gone)
+
     # --- timed attempts (quizzes; later exercise tests and the simulation) ---
 
     def create_attempt(self, user_id: str, kind: str, scope: str, started_at: datetime, due_at: datetime, questions: list[dict]) -> dict:
@@ -383,6 +582,21 @@ class InMemoryStore:
             row = self._reward.setdefault(user_id, {"user_id": user_id, "last_comet_day": None, "last_catch_day": None})
             row.update(fields)
             return dict(row)
+
+    # --- the curriculum: the date by which each lesson should be completed ---
+
+    def curriculum(self) -> dict[str, date]:
+        with self._lock:
+            return dict(self._curriculum)
+
+    def set_lesson_dates(self, dates: dict[str, date | None]) -> None:
+        """Set each lesson's date; None clears it."""
+        with self._lock:
+            for lesson, day in dates.items():
+                if day is None:
+                    self._curriculum.pop(lesson, None)
+                else:
+                    self._curriculum[lesson] = day
 
     def last_answered(self, user_id: str) -> dict[str, date]:
         """The day of the student's newest answer on each skill (helped and wrong answers count): what fading reads."""
@@ -633,6 +847,146 @@ class SupabaseStore:
             params["removed_at"] = "is.null"
         return [_test_row(r) for r in self._request("GET", "m2_tests", params)]
 
+    # --- pictures, assignments and submissions (written work) ---
+
+    def create_picture(self, owner_id: str, kind: str, path: str, content_type: str, size: int, created_at: datetime | None = None) -> dict:
+        if kind not in PICTURE_KINDS:
+            raise ValueError(f"unknown picture kind {kind!r}")
+        body = {"owner_id": owner_id, "kind": kind, "path": path, "content_type": content_type, "size": size}
+        if created_at:
+            body["created_at"] = created_at.isoformat()
+        return _stamped(self._request("POST", "m2_pictures", body=body, returning=True)[0], "created_at", "deleted_at")
+
+    def get_picture(self, picture_id: str) -> dict | None:
+        try:
+            rows = self._request("GET", "m2_pictures", {"id": self._eq(picture_id), "select": "*"})
+        except urllib.error.HTTPError as exc:
+            if exc.code == 400:                                  # not a valid id
+                return None
+            raise
+        return _stamped(rows[0], "created_at", "deleted_at") if rows else None
+
+    def mark_picture_deleted(self, picture_id: str, at: datetime | None = None) -> bool:
+        stamp = (at or datetime.now(timezone.utc)).isoformat()
+        return bool(self._request("PATCH", "m2_pictures", {"id": self._eq(picture_id), "deleted_at": "is.null"}, {"deleted_at": stamp}, returning=True))
+
+    def pictures(self, kind: str | None = None, owner_id: str | None = None, include_deleted: bool = False) -> list[dict]:
+        params = {"select": "*", "order": "created_at"}
+        if kind:
+            params["kind"] = self._eq(kind)
+        if owner_id:
+            params["owner_id"] = self._eq(owner_id)
+        if not include_deleted:
+            params["deleted_at"] = "is.null"
+        return [_stamped(r, "created_at", "deleted_at") for r in self._request("GET", "m2_pictures", params)]
+
+    def picture_refs(self, picture_id: str) -> dict:
+        pid = str(picture_id)
+        return {"assignments": sorted(r["id"] for r in self._request("GET", "m2_assignments", {"pages": f"cs.{{{pid}}}", "select": "id"})),
+                "submissions": sorted(r["id"] for r in self._request("GET", "m2_submissions", {"pictures": f"cs.{{{pid}}}", "select": "id"})),
+                "requests": sorted(r["id"] for r in self._request("GET", "m2_photo_requests", {"picture_id": self._eq(pid), "select": "id"}))}
+
+    def create_assignment(self, class_id: int, title: str, due_date: date, created_by: str, kind: str, *, note: str = "", pages=(),
+                          quiz_lesson: str | None = None, test_id: int | None = None, exercise_number: int | None = None,
+                          created_at: datetime | None = None) -> dict:
+        ok = {"pages": bool(pages), "quiz": bool(quiz_lesson), "exercise_test": test_id is not None and exercise_number in (1, 2)}
+        if not ok.get(kind) or not 1 <= len(title) <= 200:
+            raise ValueError("an assignment needs a title and its content")
+        body = {"class_id": class_id, "title": title, "note": note, "due_date": due_date.isoformat(), "kind": kind, "pages": [str(p) for p in pages],
+                "quiz_lesson": quiz_lesson, "test_id": test_id, "exercise_number": exercise_number, "created_by": created_by}
+        if created_at:
+            body["created_at"] = created_at.isoformat()
+        return _assignment_row(self._request("POST", "m2_assignments", body=body, returning=True)[0])
+
+    def get_assignment(self, assignment_id: int) -> dict | None:
+        rows = self._request("GET", "m2_assignments", {"id": self._eq(assignment_id), "select": "*"})
+        return _assignment_row(rows[0]) if rows else None
+
+    def assignments_of_classes(self, class_ids, include_removed: bool = False) -> list[dict]:
+        ids = sorted(set(class_ids))
+        if not ids:
+            return []
+        params = {"class_id": f"in.({','.join(str(i) for i in ids)})", "select": "*", "order": "due_date,id"}
+        if not include_removed:
+            params["removed_at"] = "is.null"
+        return [_assignment_row(r) for r in self._request("GET", "m2_assignments", params)]
+
+    def remove_assignment(self, assignment_id: int, at: datetime | None = None) -> bool:
+        stamp = (at or datetime.now(timezone.utc)).isoformat()
+        return bool(self._request("PATCH", "m2_assignments", {"id": self._eq(assignment_id), "removed_at": "is.null"}, {"removed_at": stamp}, returning=True))
+
+    def get_submission(self, assignment_id: int, user_id: str) -> dict | None:
+        rows = self._request("GET", "m2_submissions", {"assignment_id": self._eq(assignment_id), "user_id": self._eq(user_id), "select": "*"})
+        return _submission_row(rows[0]) if rows else None
+
+    def get_submission_by_id(self, submission_id: int) -> dict | None:
+        rows = self._request("GET", "m2_submissions", {"id": self._eq(submission_id), "select": "*"})
+        return _submission_row(rows[0]) if rows else None
+
+    def save_submission(self, assignment_id: int, user_id: str, **fields) -> dict:
+        unknown = set(fields) - SUBMISSION_FIELDS
+        if unknown:
+            raise ValueError(f"unknown submission fields {sorted(unknown)}")
+        body = {k: (v.isoformat() if isinstance(v, datetime) else ([str(x) for x in v] if k == "pictures" else v)) for k, v in fields.items()}
+        rows = self._request("POST", "m2_submissions", {"on_conflict": "assignment_id,user_id"},
+                             {"assignment_id": assignment_id, "user_id": user_id, **body}, returning=True, upsert=True)
+        return _submission_row(rows[0])
+
+    def submissions_of_assignments(self, assignment_ids) -> list[dict]:
+        ids = sorted(set(assignment_ids))
+        if not ids:
+            return []
+        rows = self._request("GET", "m2_submissions", {"assignment_id": f"in.({','.join(str(i) for i in ids)})", "select": "*", "order": "handed_at,id"})
+        return [_submission_row(r) for r in rows]
+
+    def submissions_of_user(self, user_id: str) -> list[dict]:
+        return [_submission_row(r) for r in self._request("GET", "m2_submissions", {"user_id": self._eq(user_id), "select": "*"})]
+
+    # --- photo requests and push subscriptions ---
+
+    def create_photo_request(self, user_id: str, assignment_id: int, device: str, code: str, created_at: datetime, expires_at: datetime) -> dict:
+        self._request("PATCH", "m2_photo_requests", {"user_id": self._eq(user_id), "assignment_id": self._eq(assignment_id), "state": "eq.waiting"},
+                      {"state": "superseded"})
+        rows = self._request("POST", "m2_photo_requests", body={"user_id": user_id, "assignment_id": assignment_id, "device": device, "code": code,
+                                                                "created_at": created_at.isoformat(), "expires_at": expires_at.isoformat()}, returning=True)
+        return _stamped(rows[0], "created_at", "expires_at")
+
+    def get_photo_request(self, request_id: str) -> dict | None:
+        try:
+            rows = self._request("GET", "m2_photo_requests", {"id": self._eq(request_id), "select": "*"})
+        except urllib.error.HTTPError as exc:
+            if exc.code == 400:
+                return None
+            raise
+        return _stamped(rows[0], "created_at", "expires_at") if rows else None
+
+    def save_photo_request(self, request_id: str, **fields) -> dict:
+        unknown = set(fields) - REQUEST_FIELDS
+        if unknown:
+            raise ValueError(f"unknown photo request fields {sorted(unknown)}")
+        rows = self._request("PATCH", "m2_photo_requests", {"id": self._eq(request_id)}, fields, returning=True)
+        if not rows:
+            raise KeyError(request_id)
+        return _stamped(rows[0], "created_at", "expires_at")
+
+    def open_photo_requests(self, user_id: str) -> list[dict]:
+        rows = self._request("GET", "m2_photo_requests", {"user_id": self._eq(user_id), "state": "in.(waiting,uploading)", "select": "*", "order": "created_at.desc"})
+        return [_stamped(r, "created_at", "expires_at") for r in rows]
+
+    def add_push_subscription(self, user_id: str, endpoint: str, p256dh: str, auth: str, key_id: str) -> dict:
+        rows = self._request("POST", "m2_push_subscriptions", {"on_conflict": "endpoint"},
+                             {"user_id": user_id, "endpoint": endpoint, "p256dh": p256dh, "auth": auth, "key_id": key_id}, returning=True, upsert=True)
+        return _stamped(rows[0], "created_at")
+
+    def push_subscriptions_of(self, user_id: str) -> list[dict]:
+        return [_stamped(r, "created_at") for r in self._request("GET", "m2_push_subscriptions", {"user_id": self._eq(user_id), "select": "*"})]
+
+    def delete_push_subscription(self, endpoint: str) -> bool:
+        return bool(self._request("DELETE", "m2_push_subscriptions", {"endpoint": self._eq(endpoint)}, returning=True))
+
+    def drop_push_subscriptions_not_of(self, key_id: str) -> int:
+        return len(self._request("DELETE", "m2_push_subscriptions", {"key_id": f"neq.{key_id}"}, returning=True) or [])
+
     # --- timed attempts ---
 
     def create_attempt(self, user_id: str, kind: str, scope: str, started_at: datetime, due_at: datetime, questions: list[dict]) -> dict:
@@ -686,6 +1040,19 @@ class SupabaseStore:
     @staticmethod
     def reward_state_row(row: dict) -> dict:
         return {**row, **{k: date.fromisoformat(row[k]) if row.get(k) else None for k in ("last_comet_day", "last_catch_day")}}
+
+    # --- the curriculum ---
+
+    def curriculum(self) -> dict[str, date]:
+        return {r["lesson_id"]: date.fromisoformat(str(r["due_date"])[:10]) for r in self._request("GET", "m2_curriculum", {"select": "lesson_id,due_date"})}
+
+    def set_lesson_dates(self, dates: dict[str, date | None]) -> None:
+        cleared = [lesson for lesson, day in dates.items() if day is None]
+        if cleared:
+            self._request("DELETE", "m2_curriculum", {"lesson_id": "in.(" + ",".join(f'"{x}"' for x in cleared) + ")"})
+        rows = [{"lesson_id": lesson, "due_date": day.isoformat()} for lesson, day in dates.items() if day is not None]
+        if rows:
+            self._request("POST", "m2_curriculum", {"on_conflict": "lesson_id"}, rows, upsert=True)
 
     def last_answered(self, user_id: str) -> dict[str, date]:
         rows = self._request("GET", "m2_last_answered", {"user_id": self._eq(user_id), "select": "skill_id,day"})

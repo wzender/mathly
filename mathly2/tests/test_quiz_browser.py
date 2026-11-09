@@ -13,7 +13,7 @@ from mathly2.bank import load_bank
 from mathly2.config import Settings
 from mathly2.main import create_app
 from mathly2.store import InMemoryStore
-from mathly2.tests.serve import offline_formulas, running
+from mathly2.tests.serve import offline_formulas, only, running
 
 KID = "kid@school.test"
 KID_ID = str(uuid.uuid5(uuid.NAMESPACE_DNS, KID))
@@ -41,17 +41,17 @@ def lessons_of(bank, *sizes):
 def world(bank, lessons):
     store = InMemoryStore()
     store.add_member(store.create_class("setup", "A", lessons=list(lessons))["id"], KID)
-    return create_app(Settings(), bank=bank, store=store), store
+    return create_app(Settings(), bank=only(bank, lessons), store=store), store
 
 
-def seed_attempt(store, bank, lesson, grade=None, minutes_left=None, answers=None, n=10, seconds_left=None):
+def seed_attempt(store, bank, lesson, grade=None, minutes_left=None, answers=None, n=15, seconds_left=None):
     """An attempt in the store: submitted with `grade`, or open with `minutes_left` (or `seconds_left`) on its clock; negative: overdue."""
     from mathly2 import quiz
     now = clock.now()
     drawn = quiz.draw(bank, lesson)[:n]
     if grade is None:
-        left = timedelta(seconds=seconds_left) if seconds_left is not None else timedelta(minutes=15 if minutes_left is None else minutes_left)
-        row = store.create_attempt(KID_ID, "quiz", lesson, now + left - timedelta(minutes=15), now + left, drawn)
+        left = timedelta(seconds=seconds_left) if seconds_left is not None else timedelta(minutes=20 if minutes_left is None else minutes_left)
+        row = store.create_attempt(KID_ID, "quiz", lesson, now + left - timedelta(minutes=20), now + left, drawn)
     else:
         row = store.create_attempt(KID_ID, "quiz", lesson, now - timedelta(hours=1), now - timedelta(minutes=45), drawn)
         store.save_attempt(row["id"], submitted_at=now - timedelta(minutes=50), grade=grade)
@@ -113,7 +113,7 @@ def test_every_lesson_has_a_quiz_node_with_its_state_in_words_and_it_is_a_keyboa
 
 # --- 3.2 the sheet ---
 
-def test_the_quiz_opens_with_ten_questions_no_skill_names_and_a_countdown(browser, bank):
+def test_the_quiz_opens_with_fifteen_questions_no_skill_names_and_a_countdown(browser, bank):
     (lesson,) = lessons_of(bank, 4)
     app, store = world(bank, [lesson])
     with running(app) as url:
@@ -121,8 +121,8 @@ def test_the_quiz_opens_with_ten_questions_no_skill_names_and_a_countdown(browse
         page.click(f".quiz-node[data-quiz='{lesson}']")
         page.wait_for_selector("#qz-q")
         assert page.evaluate("location.hash").startswith(f"#/quiz/{lesson}/")             # the address names the attempt
-        assert "מתוך 10" in page.inner_text("#qz-count") and page.locator(".qz-dot").count() == 10
-        assert page.inner_text("#qz-timer").startswith("14:") or page.inner_text("#qz-timer") == "15:00"
+        assert "מתוך 15" in page.inner_text("#qz-count") and page.locator(".qz-dot").count() == 15
+        assert page.inner_text("#qz-timer").startswith("19:") or page.inner_text("#qz-timer") == "20:00"
         sheet = page.inner_text(".mx-sheet")
         assert not any(s["name"] in sheet for s in bank.skills if s["unit"] == lesson)
         assert page.locator(".qz-choice").count() >= 2 and page.locator(".qz-choice.right, .qz-choice.wrong").count() == 0
@@ -153,7 +153,7 @@ def test_a_choice_is_saved_on_the_server_survives_a_reload_and_shows_no_right_or
         assert store.attempts_of(KID_ID, "quiz", lesson)[-1]["id"] == before and len(store.attempts_of(KID_ID, "quiz", lesson)) == 1
         page.click(".qz-dot >> nth=0")
         assert page.locator(".qz-dot.done").count() == 1
-        assert page.inner_text("#qz-timer") < "15:01" and page.inner_text("#qz-timer") >= "14:00"
+        assert page.inner_text("#qz-timer") < "20:01" and page.inner_text("#qz-timer") >= "19:00"
 
 
 def test_the_board_and_calculator_are_available_in_a_quiz(browser, bank):
@@ -182,7 +182,7 @@ def test_submitting_with_unanswered_questions_warns_first(browser, bank):
         tap_choice(page, bank, ref)
         page.click("#qz-submit")
         page.wait_for_selector("#qz-warn .ex-note")
-        assert "9 שאלות בלי תשובה" in page.inner_text("#qz-warn")
+        assert "14 שאלות בלי תשובה" in page.inner_text("#qz-warn")
         page.click("#qz-back")                                                             # back to the quiz: nothing was submitted
         assert page.locator("#qz-warn .ex-note").count() == 0 and store.attempts_of(KID_ID, "quiz", lesson)[-1]["submitted_at"] is None
         page.click("#qz-submit")
@@ -212,8 +212,8 @@ def test_the_result_shows_the_grade_the_lost_skill_with_its_link_and_the_mistake
         page.wait_for_selector("#qz-q")
         page.click("#qz-submit")
         page.wait_for_selector("#qz-grade")
-        assert page.inner_text("#qz-grade b") == "80" and "8 תשובות נכונות מתוך 10" in page.inner_text(".qz-result")
-        page.wait_for_function("document.querySelector('#qz-best').innerText.includes('80')")        # the lesson's grade
+        assert page.inner_text("#qz-grade b") == "87" and "13 תשובות נכונות מתוך 15" in page.inner_text(".qz-result")
+        page.wait_for_function("document.querySelector('#qz-best').innerText.includes('87')")        # the lesson's grade
         link = page.locator("#qz-lost a")
         assert link.count() == 1 and link.get_attribute("href") == f"#/skill/{lost_skill}" and "2 שאלות שגויות" in page.inner_text("#qz-lost")
         assert page.locator("#qz-missed li").count() == 2
@@ -242,7 +242,7 @@ def test_an_attempt_that_ran_out_of_time_shows_its_result_after_the_server_settl
     with running(app) as url:
         page = path_page(browser, url, f"#/quiz/{lesson}/{row['id']}")
         page.wait_for_selector("#qz-grade")
-        assert page.inner_text("#qz-grade b") == "60" and "הזמן נגמר" in page.inner_text(".qz-result")
+        assert page.inner_text("#qz-grade b") == "40" and "הזמן נגמר" in page.inner_text(".qz-result")
 
 
 def test_when_the_countdown_reaches_zero_the_quiz_is_handed_in_as_it_stands(browser, bank):
@@ -254,7 +254,7 @@ def test_when_the_countdown_reaches_zero_the_quiz_is_handed_in_as_it_stands(brow
         page = path_page(browser, url, f"#/quiz/{lesson}/{row['id']}")
         page.wait_for_selector("#qz-q")
         page.wait_for_selector("#qz-grade", timeout=15000)
-        assert page.inner_text("#qz-grade b") == "30" and "הזמן נגמר" in page.inner_text(".qz-result")
+        assert page.inner_text("#qz-grade b") == "20" and "הזמן נגמר" in page.inner_text(".qz-result")
 
 
 def test_a_retake_draws_new_questions_and_a_second_quiz_does_not_replace_the_best_grade(browser, bank):
@@ -275,8 +275,8 @@ def test_a_retake_draws_new_questions_and_a_second_quiz_does_not_replace_the_bes
         page.wait_for_selector("#qz-q")
         third = store.attempts_of(KID_ID, "quiz", lesson)[-1]
         used = {q["key"] for a in (first, second) for q in a["questions"]}
-        assert third["id"] not in (first["id"], second["id"]) and len(third["questions"]) == 10
-        assert len({q["key"] for q in third["questions"]} & used) <= 4                              # mostly new questions
+        assert third["id"] not in (first["id"], second["id"]) and len(third["questions"]) == 15
+        assert len({q["key"] for q in third["questions"]} & used) <= 5                              # mostly new questions
 
 
 # --- 3.4 the grades screen ---
@@ -318,23 +318,23 @@ def test_a_whole_quiz_from_the_trail_to_the_grades_screen(browser, bank):
         by_skill = Counter(r["skill_id"] for r in refs)
         lost_skill = next(s for s, n in by_skill.items() if n >= 2)
         wrong = {r["key"] for r in [r for r in refs if r["skill_id"] == lost_skill][:2]}
-        for _ in range(10):                                                                           # answer all ten, moving with "next"
+        for _ in range(15):                                                                           # answer all fifteen, moving with "next"
             ref = next(r for r in refs if r["key"] == page.get_attribute("#qz-q", "data-key"))
             tap_choice(page, bank, ref, ok=ref["key"] not in wrong)
-            if page.locator("#qz-count").inner_text().startswith("שאלה 10"):
+            if page.locator("#qz-count").inner_text().startswith("שאלה 15"):
                 break
             page.click(".qz-nav button >> nth=1")
             page.wait_for_function("(k) => document.querySelector('#qz-q').dataset.key !== k", arg=ref["key"])
-        page.wait_for_function("document.querySelectorAll('.qz-dot.done').length === 10")
+        page.wait_for_function("document.querySelectorAll('.qz-dot.done').length === 15")
         page.click("#qz-submit")                                                                      # all answered: no warning
         page.wait_for_selector("#qz-grade")
-        assert page.inner_text("#qz-grade b") == "80"
+        assert page.inner_text("#qz-grade b") == "87"
         assert page.locator("#qz-lost a").get_attribute("href") == f"#/skill/{lost_skill}"
         page.click("#qz-lost a")                                                                      # practice the weak skill
         page.wait_for_selector("#ex-q")
         page.click(".mx-x")
         page.wait_for_selector(f".quiz-node[data-quiz='{lesson}'].graded")
-        assert "✓ הציון: 80" in page.inner_text(f".quiz-node[data-quiz='{lesson}']")                 # the node shows the grade
+        assert "✓ הציון: 87" in page.inner_text(f".quiz-node[data-quiz='{lesson}']")                 # the node shows the grade
         page.click(".tabs a[href='#/grades']")
         page.wait_for_selector("#quiz-grades")
-        assert page.locator(f"#quiz-grades li[data-lesson='{lesson}'] .gr-num").inner_text() == "80"
+        assert page.locator(f"#quiz-grades li[data-lesson='{lesson}'] .gr-num").inner_text() == "87"

@@ -1,6 +1,6 @@
 // The student's home for a subject: the nearest test with its readiness and one task for today, the required simulation,
 // the other tests, and a button that continues the path.
-import { api } from "./api.js";
+import { swr } from "./api.js";
 import { esc, fmt } from "./math.js";
 import { PATH, backToSubjects, daysText, shortDate, tabs } from "./ui.js";
 
@@ -40,16 +40,41 @@ function nearest(test, task, next) {
     <p><a href="#/test/${test.id}">כל התוכנית והמבחנים</a></p></section>`;
 }
 
-export async function show(view) {
-  const data = await api("/api/home");
-  const [first, ...others] = data.tests;
+/** An assignment's state in a symbol and a word (never colour alone). */
+export function assignmentState(a) {
+  if (a.kind === "exercise_test") return a.state === "done" ? { symbol: "✓", word: `ציון ${a.grade}` } : a.overdue ? { symbol: "⚠", word: "באיחור" } : { symbol: "○", word: "עוד לא נעשה" };
+  switch (a.state) {
+    case "handed_in": return { symbol: "◐", word: a.late ? "הוגש באיחור" : "הוגש" };
+    case "graded": return { symbol: "✓", word: `ציון ${a.grade}` };
+    case "returned": return { symbol: "↩", word: "הוחזר לתיקון" };
+    default: return a.overdue ? { symbol: "⚠", word: "באיחור" } : { symbol: "○", word: "לא הוגש" };
+  }
+}
+export const assignmentHref = a => a.kind === "exercise_test" ? `#/exam/${a.test.id}/${a.test.number}` : `#/assignment/${a.id}`;
+
+/** Home shows only the new assignments: those not handed in yet (or an exercise test not taken). The rest are in the "הגשות" tab. */
+const isNew = a => a.state === "not_handed" || a.state === "not_done";
+
+function assignmentsCard(all) {
+  const list = all.filter(isNew);
+  if (!list.length) return "";
+  return `<section class="card" id="assignments"><h3>המשימות שלי</h3><ul class="plain assignments">${list.map(a => {
+    const s = assignmentState(a);
+    return `<li data-assignment="${a.id}" data-state="${esc(a.state)}"><a href="${assignmentHref(a)}"><b>${fmt(a.title)}</b></a>
+      <span class="muted">עד ${shortDate(a.due_date)}</span><span class="tag st-${esc(a.state)}"><span aria-hidden="true">${s.symbol}</span> ${s.word}</span></li>`;
+  }).join("")}</ul></section>`;
+}
+
+export const show = view => swr(["/api/home", "/api/assignments"], ([data, assignments]) => draw(view, data, assignments));
+
+function draw(view, data, assignments) {
+  const [first] = data.tests;
   const required = data.tests.filter(t => t.simulation.required);
   view(`${tabs("home")}${backToSubjects()}
     ${first ? nearest(first, data.task, data.next_skill) : `<section class="card" id="no-test"><h2>הבית</h2>
       <p class="muted">המורה עוד לא קבע מבחן. בינתיים אפשר להמשיך במסלול.</p></section>`}
+    ${assignmentsCard(assignments)}
     ${required.map(t => `<a class="required" href="#/sim/${t.id}" data-required="${t.id}"><b>חובה</b> מבחן סימולציה למבחן ב־${shortDate(t.date)}<span aria-hidden="true">‹</span></a>`).join("")}
     <p>${data.next_skill ? `<a class="primary-link" id="continue-path" href="#/skill/${encodeURIComponent(data.next_skill.id)}">להמשיך במסלול: ${fmt(data.next_skill.name)} <span aria-hidden="true">‹</span></a>`
-      : `<a class="primary-link" id="continue-path" href="${PATH}">למסלול: כל הכוכבים פתוחים לתרגול <span aria-hidden="true">‹</span></a>`}</p>
-    ${others.length ? `<h3>מבחנים נוספים</h3><ul class="plain" id="other-tests">${others.map(t => `<li><a href="#/test/${t.id}">${shortDate(t.date)} · ${lessonsOf(t)}</a>
-      <span class="muted">${daysText(t.days_left)} · מוכנות ${t.readiness.number}</span></li>`).join("")}</ul>` : ""}`);
+      : `<a class="primary-link" id="continue-path" href="${PATH}">למסלול: כל הכוכבים פתוחים לתרגול <span aria-hidden="true">‹</span></a>`}</p>`);
 }

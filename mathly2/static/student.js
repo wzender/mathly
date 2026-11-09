@@ -2,6 +2,7 @@
 import { esc } from "./math.js";
 import * as exercise from "./exercise.js";
 import * as home from "./home.js";
+import * as phone from "./phone.js";
 import * as path from "./path.js";
 import * as quiz from "./quiz.js";
 import { route as onRoute } from "./router.js";
@@ -15,6 +16,7 @@ export async function show(me, view) {
   }
   let lastSkill = "";
   async function route() {
+    phone.stopComputer();                                      // a page that was waiting for the phone's photo is left
     const raw = location.hash.replace(/^#/, "");
     const where = raw.startsWith("/") ? raw : "/";          // no address, or the sign-in service's "#access_token=…": the first screen
     try {
@@ -28,6 +30,12 @@ export async function show(me, view) {
         const [lesson, attempt] = where.slice(6).split("/").map(decodeURIComponent);
         if (!document.getElementById("path")) await path.show(view);                  // a link or a reload: the path first, then the sheet
         if (attempt) await quiz.open(attempt); else await quiz.start(lesson);       // the node starts or resumes; the address then names the attempt
+      } else if (where === "/submissions") {
+        exercise.close(); quiz.close();
+        await (await import("./submissions.js")).show(view);
+      } else if (where.startsWith("/assignment/")) {
+        exercise.close(); quiz.close();
+        await (await import("./assignment.js")).show(view, decodeURIComponent(where.slice(12)));
       } else if (where.startsWith("/exam/") || where.startsWith("/sim/")) {
         exercise.close();
         const [kind, ...rest] = where.slice(1).split("/").map(decodeURIComponent);
@@ -65,5 +73,6 @@ export async function show(me, view) {
     if (!where.startsWith("/skill/") && !exercise.isOpen()) { /* the path scrolls itself */ }
   }
   onRoute(route);
+  phone.startWatching();                                       // a photo request from the student's computer shows here when this is the phone
   await route();
 }

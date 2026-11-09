@@ -3,10 +3,12 @@ removes its students; a teacher sees the classes they teach; a manager sees ever
 from __future__ import annotations
 
 import re
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from . import reads
 from .access import allowed, need
 from .auth import EMAIL
 from .store import ClassExists, MemberExists, TeacherIsStudent
@@ -19,7 +21,7 @@ teaching = APIRouter(prefix="/api")
 
 class ClassBody(BaseModel):
     name: str = Field(max_length=200)
-    lessons: list[str] = Field(default_factory=list, max_length=200)
+    lessons: list[str] = Field(default_factory=list, max_length=200)   # ignored: kept so older clients still work
     teacher_email: str | None = Field(default=None, max_length=300)
     students: str | None = Field(default=None, max_length=40000)   # pasted text: the whole roster of the class
     ai_enabled: bool = False
@@ -55,10 +57,7 @@ def checked(request: Request, body: ClassBody) -> dict:
     name = " ".join(body.name.split())
     if not 1 <= len(name) <= MAX_NAME:
         raise HTTPException(422, f"שם הכיתה צריך להיות בין תו אחד ל־{MAX_NAME} תווים")
-    known = [lesson["id"] for lesson in request.app.state.bank.lessons]
-    lessons = [lesson for lesson in dict.fromkeys(body.lessons) if lesson in known]
-    if len(lessons) != len(set(body.lessons)) or not lessons:
-        raise HTTPException(422, "יש לבחור לפחות שיעור אחד מהרשימה")
+    lessons = [lesson["id"] for lesson in request.app.state.bank.lessons]      # every class studies the whole course
     teacher = (body.teacher_email or "").strip().lower() or None
     if teacher and not EMAIL.match(teacher):
         raise HTTPException(422, "כתובת המורה לא נראית כמו מייל")
@@ -98,13 +97,6 @@ def own_class_for_roster(request: Request, class_id: int, user: dict) -> dict:
 @router.get("")
 def list_classes(request: Request, user: dict = Depends(need("classes.manage"))) -> list[dict]:
     return [shown(request, c) for c in request.app.state.store.classes()]
-
-
-@router.get("/lessons")
-def lessons_to_choose(request: Request, user: dict = Depends(need("classes.manage"))) -> list[dict]:
-    """The bank's lessons, for choosing what a class studies (a manager has no student path, so no /api/lessons)."""
-    return [{"id": lesson["id"], "name": lesson["name"], "skills": len(lesson["skills"])}
-            for lesson in request.app.state.bank.lessons_with_skills()]
 
 
 @router.post("", status_code=201)
@@ -199,3 +191,36 @@ def my_classes(request: Request, user: dict = Depends(need("class.teach"))) -> l
 @teaching.get("/students")
 def all_students(request: Request, user: dict = Depends(need("students.list"))) -> list[dict]:
     return request.app.state.store.all_students()
+
+
+# ---- the curriculum: the date by which each lesson should be completed (one for the whole school) ----
+
+curriculum = APIRouter(prefix="/api/curriculum")
+
+
+class Dates(BaseModel):
+    dates: dict[str, str | None] = Field(max_length=200)        # lesson id -> "YYYY-MM-DD", or null to clear
+
+
+@curriculum.get("")
+def read_curriculum(request: Request, user: dict = Depends(need("classes.manage"))) -> list[dict]:
+    """Every lesson in the bank's order with its date (or null) and the bank's month as a hint."""
+    dates = reads.of(request).curriculum()
+    return [{"id": lesson["id"], "name": lesson["name"], "month": lesson.get("when", ""), "due_date": dates[lesson["id"]].isoformat() if lesson["id"] in dates else None}
+            for lesson in request.app.state.bank.lessons]
+
+
+@curriculum.put("")
+def change_curriculum(body: Dates, request: Request, user: dict = Depends(need("classes.manage"))) -> list[dict]:
+    known = {lesson["id"] for lesson in request.app.state.bank.lessons}
+    parsed: dict[str, date | None] = {}
+    for lesson, text in body.dates.items():
+        if lesson not in known:
+            raise HTTPException(422, "שיעור לא מוכר")
+        try:
+            parsed[lesson] = date.fromisoformat(text) if text else None
+        except ValueError:
+            raise HTTPException(422, "תאריך לא תקין") from None
+    request.app.state.store.set_lesson_dates(parsed)
+    request.state.reads = None                                     # what this request read is out of date now
+    return read_curriculum(request, user)

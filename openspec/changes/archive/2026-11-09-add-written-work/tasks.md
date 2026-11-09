@@ -1,0 +1,44 @@
+# Tasks
+
+## 1. Data, pictures and retention
+
+- [x] 1.1 Add the migration `20261112090000_m2_written_work.sql` (decision 1) and the store methods for pictures, assignments and submissions (create, read, list, replace, check, soft-remove, references of a picture), in both stores; verify unit tests, request tests for the Supabase store, and migration tests on PostgreSQL (defaults, the state and grade checks, one submission per student and assignment, cascade with the class, the browser roles are refused)
+- [x] 1.2 Add the store methods for photo requests (create, supersede, read, list open, set state, expire) and push subscriptions (add, list, delete, drop other keys), in both stores; verify unit tests including supersede, expiry and that one student's rows never reach another
+- [x] 1.3 Add `pictures.py` (decision 2): `clean_image`, `render_pdf`, `MemoryPictures`, `SupabasePictures` that creates its private bucket on first use; verify unit tests: a JPEG with metadata comes back without it and upright, a non-image or oversized file is refused, an image over 20 million pixels is refused, a PDF gives one picture per page and too many pages are refused, and request tests for the Supabase storage calls
+- [x] 1.4 Add `retention.py` and `cleanup.py` (decision 8): the end of the school year, orphans older than 24 hours, `run`, and the CLI; verify unit tests: a picture from October expires on 1 September of the next year, one from May on 1 September of the same year, an unreferenced picture is removed after a day and a referenced one stays, a deleted picture's submission keeps its grade and note, and assignment pages are not removed by the year's end
+
+## 2. The API
+
+- [x] 2.1 Add `POST /api/pictures` and `GET /api/pictures/{id}` with the access rules (decisions 2 and 3); verify API tests: an upload is cleaned and stored, the uploader and the class's teacher read it, another student, another class's teacher and a signed-out request get 404, a deleted picture is 410, a page of an assignment is readable by the class's students, and the bytes are never reachable by a storage link
+- [x] 2.2 Add the teacher's assignment routes (decision 6): create from images or a PDF, a photo, the board's pages, a bank written quiz and an exercise test, list with counts, and remove; verify API tests: each of the five sources works and a bank quiz only for a lesson of the class that has one, a PDF becomes page pictures, a class the teacher does not teach is 404, an exercise test of another class is refused, removing an assignment hides it and keeps grades
+- [x] 2.3 Add the student's routes (decisions 3 and 7): `GET /api/assignments`, `GET /api/assignments/{id}`, and hand in or replace; verify API tests: only the student's classes' assignments, hand in 1 to 10 of their own pictures (none or 11 or someone else's refused), replace while handed in, refused once graded, hand in again after returned, a late hand-in is accepted and marked late, an exercise-test assignment is done after the student took it and shows the best grade, and a written quiz shows its questions with points
+- [x] 2.4 Add the inbox and checking (decision 6): `GET /api/teaching/inbox`, `POST /api/submissions/{id}/grade` and `/return`, and the assignments in `GET /api/grades`; verify API tests: Monday's submission before Tuesday's, a returned one is not listed, a grade is 0–100 whole, a return needs a note, a grade of 101 or -1 is refused, a stale `seen` gives 409, another class's teacher gets 404, the student then sees the grade and note or the request to correct, exercise-test assignments never reach the inbox, and the grades list shows graded assignments
+- [x] 2.5 Add the photo-request routes (decision 4); verify API tests: a request has a 4-digit code and expires after 10 minutes (the server's clock), a newer request for the same assignment supersedes the older, the phone's open list leaves out requests made by its own device, the states go waiting → uploading → received with the picture, a bad upload gives failed, and another student cannot read or answer a request
+- [x] 2.6 Add push (decision 5): `push.py`, `GET /api/push/key`, `POST /api/push/subscribe`, the notification on a new request, the service worker route and the manifest; verify API tests with a recording fake: a new request notifies the student's subscriptions with the request's address, a dead subscription (404 or 410) is deleted, changing the key drops every subscription, without a key push is off and says so, and everything else still works
+- [x] 2.7 Add early deletion `DELETE /api/classes/{id}/pictures/{email}` and start the cleanup every hour when Supabase is on; verify API tests: the class's teacher, a manager and a developer may, another class's teacher and a student may not, the student's submissions keep their grade and note, and a unit test that the hourly start is not used without Supabase
+
+## 3. Student screens
+
+- [x] 3.1 Add "המשימות שלי" to home: open ones first by due date, then done ones, each with its due date and state in words (and "באיחור", "ציון N", "הוחזר לתיקון"); verify a Playwright test of every state at 360px
+- [x] 3.2 Build the assignment page `#/assignment/<id>`: the note, pages (images inline) or the bank's questions or the exercise-test link, the student's pictures with removal, work on the board with a hand-in button, a camera input, an upload, and "הגשה"; after hand-in the state, and the grade and note or the request to correct; verify a Playwright test that a file upload and a board hand-in (a stroke drawn and the send button pressed) add pictures, hand-in shows "הוגש", a returned submission shows the note and can be handed in again, and a graded one cannot be changed
+- [x] 3.3 Add the photo request to the computer's screen (a "בקשת צילום מהטלפון" button, the code and the state in words, newer request marks the older replaced) and the phone's request window (the same code, a camera button, once per request, not on the device that asked); verify a Playwright test with two pages standing for the computer and the phone: the code matches, the phone uploads, the computer shows "התשובה התקבלה" and the picture joins the draft, and the computer never shows its own request window
+- [x] 3.4 Add notifications on the phone: the service worker and manifest linked, a toggle shown only on touch devices and only when the server has a key, and a tap that opens the request; verify a Playwright test that the toggle is absent without a key and on a desktop pointer, present with both, that subscribing sends the subscription to the server, and that a `notified` message from the worker makes the phone look for requests at once
+- [x] 3.5 Add assignments to the grades screen (graded assignments and done exercise-test assignments, with the teacher's note); verify a Playwright test
+
+## 4. Teacher screens
+
+- [x] 4.1 Add the assignments tab to the teacher's screen: create (class, title, note, due date, and one source: file, camera photo, board, bank written quiz or an exercise test of a test of the class), the list with "N הגישו, M נבדקו", and removal; verify a Playwright test of each source at 360px and on a computer
+- [x] 4.2 Add the inbox tab: oldest first, open a submission to see its pictures, grade with a note, or send back with a required note, then the student's screen shows the result; verify a Playwright test that two submissions come oldest first, a grade empties its item, a return needs a note and leaves the inbox, and a stale submission shows "ההגשה השתנתה"
+
+## 5. Wrap-up
+
+- [x] 5.1 Walk the whole flow in a browser with two students' devices: a teacher gives an assignment from a file and from the bank, a student hands in from the board and a second student by a phone request, the teacher's inbox shows both in order, one is graded and one is sent back, the second student hands in again and is graded, the grades screen shows both, and the teacher deletes a student's pictures while the grade stays; verify the test passes
+- [x] 5.2 Update `docs/mockups/mathly2-screens.html` where the home assignments or the teacher's inbox no longer match what was built; verify by opening it beside screenshots
+- [x] 5.3 Run `venv/bin/python -m pytest mathly2/tests` and `openspec validate add-written-work --strict`; verify both pass
+
+## Workflow follow-up
+
+- Apply the new migration after the seven earlier ones (on a test project first); set `VAPID_PRIVATE_KEY` to turn push on.
+- Add `Pillow`, `pypdfium2` and `pywebpush` to `mathly2/requirements.txt` (task 1.3 and 2.6 do it).
+- Check the camera, the pen on the board and a real push notification on a phone, including an iPhone from the home screen (a headless browser cannot).
+- Archive this change once it is reviewed; then propose `add-ai-help` (stage 7), which adds the AI queue, photo help and the recheck items in the inbox.

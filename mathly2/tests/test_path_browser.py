@@ -10,7 +10,7 @@ from mathly2.bank import load_bank
 from mathly2.config import Settings
 from mathly2.main import create_app
 from mathly2.store import InMemoryStore
-from mathly2.tests.serve import offline_formulas, running
+from mathly2.tests.serve import offline_formulas, only, running
 
 KID = "kid@school.test"
 KID_ID = str(uuid.uuid5(uuid.NAMESPACE_DNS, KID))
@@ -33,7 +33,7 @@ def bank():
 def world(bank, lessons):
     store = InMemoryStore()
     store.add_member(store.create_class("setup", "A", lessons=list(lessons))["id"], KID)
-    return create_app(Settings(), bank=bank, store=store), store
+    return create_app(Settings(), bank=only(bank, lessons), store=store), store
 
 
 @pytest.fixture
@@ -193,7 +193,7 @@ def test_after_sign_in_the_student_sees_the_math_card_then_the_path_and_can_go_b
         page.click("#dev button")
         page.wait_for_selector(".subject-card")
         assert page.locator(".orbit").count() == 0 and page.locator(".subject-card").count() == 1      # the subjects first, no path yet
-        assert "מתמטיקה" in page.inner_text(".subject-card") and f"1 מתוך {total} מיומנויות" in page.inner_text(".subject-card")
+        assert "מתמטיקה כיתה ט - מצוינות" in page.inner_text(".subject-card") and f"1 מתוך {total} מיומנויות" in page.inner_text(".subject-card")
         assert page.get_attribute(".subject-card [role=progressbar]", "aria-valuenow") == "1"
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
         page.click(".subject-card")

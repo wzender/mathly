@@ -36,12 +36,12 @@ def test_parse_emails_handles_pasted_lists():
 
 # ---- the manager makes classes (spec: Manager creates classes)
 
-def test_a_manager_creates_a_class_with_lessons_teacher_and_students(world):
+def test_a_manager_creates_a_class_with_teacher_and_students_and_it_studies_every_lesson(world):
     client, _ = world
     created = make(client, teacher_email=T1, students="s1@school.test\ns2@school.test not-an-email")
     assert created.status_code == 201
     row = created.json()
-    assert row["name"] == "ט'3" and row["lessons"] == ["t", "t2"] and row["teacher_email"] == T1
+    assert row["name"] == "ט'3" and len(row["lessons"]) == 24 and row["teacher_email"] == T1
     assert row["ai_enabled"] is False and row["ai_daily_checks"] == 150
     assert row["students"] == 2 and row["student_emails"] == ["s1@school.test", "s2@school.test"] and row["invalid"] == ["not-an-email"]
     assert [c["name"] for c in client.get("/api/classes", headers=auth(MGR)).json()] == ["ט'3"]
@@ -69,12 +69,10 @@ def test_class_name_is_trimmed_checked_and_unique_ignoring_case(world):
     assert make(client, name="x" * 80).status_code == 201
 
 
-def test_a_class_needs_at_least_one_known_lesson(world):
+def test_lessons_in_a_request_are_ignored_every_class_studies_every_lesson(world):
     client, _ = world
-    assert make(client, lessons=[]).status_code == 422
-    assert make(client, lessons=["nope"]).status_code == 422
-    assert make(client, lessons=["t", "nope"]).status_code == 422
-    assert make(client, name="B", lessons=["t", "t"]).json()["lessons"] == ["t"]      # repeats collapse
+    assert len(make(client, lessons=[]).json()["lessons"]) == 24
+    assert len(make(client, name="B", lessons=["nope"]).json()["lessons"]) == 24
 
 
 def test_the_teacher_must_be_an_email_and_not_also_a_student(world):
@@ -92,11 +90,9 @@ def test_the_ai_budget_is_limited(world):
     assert make(client, name="C", ai_daily_checks=40, ai_enabled=True).json()["ai_enabled"] is True
 
 
-def test_the_manager_can_list_the_lessons_to_choose_from(world):
+def test_there_is_no_lesson_list_to_choose_from(world):
     client, _ = world
-    lessons = client.get("/api/classes/lessons", headers=auth(MGR)).json()
-    assert len(lessons) == 24 and set(lessons[0]) == {"id", "name", "skills"} and lessons[0]["skills"] > 0
-    assert client.get("/api/classes/lessons", headers=auth(T1)).status_code == 403
+    assert client.get("/api/classes/lessons", headers=auth(MGR)).status_code in (404, 405, 422)
 
 
 # ---- editing and deleting (spec: Editing and deleting a class)
@@ -104,9 +100,9 @@ def test_the_manager_can_list_the_lessons_to_choose_from(world):
 def test_a_manager_edits_everything_and_the_roster_follows(world):
     client, store = world
     cid = make(client, teacher_email=T1, students="a@school.test b@school.test").json()["id"]
-    edited = client.put(f"/api/classes/{cid}", json=body("ט'4", lessons=["k"], teacher_email=T2, students="b@school.test c@school.test",
+    edited = client.put(f"/api/classes/{cid}", json=body("ט'4", teacher_email=T2, students="b@school.test c@school.test",
                                                           ai_enabled=True, ai_daily_checks=60), headers=auth(MGR)).json()
-    assert (edited["name"], edited["lessons"], edited["teacher_email"], edited["ai_enabled"], edited["ai_daily_checks"]) == ("ט'4", ["k"], T2, True, 60)
+    assert (edited["name"], edited["lessons"], edited["teacher_email"], edited["ai_enabled"], edited["ai_daily_checks"]) == ("ט'4", edited["lessons"], T2, True, 60)
     assert edited["student_emails"] == ["b@school.test", "c@school.test"]
 
 

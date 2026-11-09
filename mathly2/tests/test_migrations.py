@@ -296,3 +296,100 @@ def test_the_server_role_can_use_tests_and_rls_has_no_policies(db):
     with psycopg.connect(db, autocommit=True) as c:
         assert c.execute("select relrowsecurity from pg_class where relname = 'm2_tests'").fetchone() == (True,)
         assert c.execute("select count(*) from pg_policies where tablename = 'm2_tests'").fetchone() == (0,)
+
+
+# --- add-written-work 1.1 and 1.2 ---
+
+U1, U2 = "44444444-4444-4444-4444-444444444444", "55555555-5555-5555-5555-555555555555"
+
+
+def _assignment(c, class_id, **kw):
+    cols = {"title": "x", "due_date": "2026-11-20", "kind": "quiz", "quiz_lesson": "t", "created_by": "t@school.test", **kw}
+    names = ", ".join(["class_id"] + list(cols)); marks = ", ".join(["%s"] * (len(cols) + 1))
+    return c.execute(f"insert into public.m2_assignments({names}) values ({marks}) returning id", (class_id, *cols.values())).fetchone()[0]
+
+
+def test_written_work_rows_have_their_defaults_and_checks(db):
+    with psycopg.connect(db, autocommit=True) as c:
+        cid = _class(c, "כתיבה-1")
+        pic = c.execute("insert into public.m2_pictures(owner_id, kind, path, content_type, size) values (%s, 'answer', 'a/1.jpg', 'image/jpeg', 100) returning id, deleted_at", (U1,)).fetchone()
+        assert pic[1] is None
+        aid = _assignment(c, cid)
+        assert c.execute("select note, removed_at, cardinality(pages) from public.m2_assignments where id = %s", (aid,)).fetchone() == ("", None, 0)
+        sub = c.execute("insert into public.m2_submissions(assignment_id, user_id) values (%s, %s) returning state, late, grade, teacher_note", (aid, U1)).fetchone()
+        assert sub == ("handed_in", False, None, "")
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            c.execute("insert into public.m2_submissions(assignment_id, user_id) values (%s, %s)", (aid, U1))
+        req = c.execute("insert into public.m2_photo_requests(user_id, assignment_id, device, code, expires_at) values (%s, %s, 'd', '0042', now() + interval '10 minutes') returning state", (U1, aid)).fetchone()
+        assert req == ("waiting",)
+
+
+def test_written_work_checks_refuse_bad_values(db):
+    with psycopg.connect(db, autocommit=True) as c:
+        cid = _class(c, "כתיבה-2")
+        bad = [
+            "insert into public.m2_pictures(owner_id, kind, path, content_type, size) values ('%s', 'scan', 'b/1.jpg', 'image/jpeg', 5)" % U1,       # kind
+            "insert into public.m2_pictures(owner_id, kind, path, content_type, size) values ('%s', 'answer', 'b/2.jpg', 'image/jpeg', 0)" % U1,      # size
+        ]
+        for sql in bad:
+            with pytest.raises(psycopg.errors.CheckViolation):
+                c.execute(sql)
+        for kw in (dict(kind="pages"), dict(kind="quiz", quiz_lesson=None), dict(kind="exercise_test", quiz_lesson=None), dict(title="")):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                _assignment(c, cid, **kw)
+        aid = _assignment(c, cid)
+        for sql in ("insert into public.m2_submissions(assignment_id, user_id, grade) values (%s, '%s', 101)" % (aid, U2),
+                    "insert into public.m2_submissions(assignment_id, user_id, state) values (%s, '%s', 'graded')" % (aid, U2),          # graded without a grade
+                    "insert into public.m2_submissions(assignment_id, user_id, state) values (%s, '%s', 'lost')" % (aid, U2),
+                    "insert into public.m2_photo_requests(user_id, assignment_id, device, code, expires_at) values ('%s', %s, 'd', '12', now() + interval '1 minute')" % (U2, aid),
+                    "insert into public.m2_photo_requests(user_id, assignment_id, device, code, expires_at) values ('%s', %s, 'd', '1234', now() - interval '1 minute')" % (U2, aid)):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                c.execute(sql)
+
+
+def test_written_work_cascades_with_the_class_and_push_endpoints_are_unique(db):
+    with psycopg.connect(db, autocommit=True) as c:
+        cid = _class(c, "כתיבה-3")
+        aid = _assignment(c, cid)
+        c.execute("insert into public.m2_submissions(assignment_id, user_id) values (%s, %s)", (aid, U1))
+        c.execute("delete from public.m2_classes where id = %s", (cid,))
+        assert c.execute("select count(*) from public.m2_assignments where id = %s", (aid,)).fetchone() == (0,)
+        assert c.execute("select count(*) from public.m2_submissions where assignment_id = %s", (aid,)).fetchone() == (0,)
+        c.execute("insert into public.m2_push_subscriptions(user_id, endpoint, p256dh, auth, key_id) values (%s, 'https://push/x', 'p', 'a', 'k')", (U1,))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            c.execute("insert into public.m2_push_subscriptions(user_id, endpoint, p256dh, auth, key_id) values (%s, 'https://push/x', 'p', 'a', 'k')", (U2,))
+
+
+@pytest.mark.parametrize("role", ["authenticated", "anon"])
+@pytest.mark.parametrize("table", ["m2_pictures", "m2_assignments", "m2_submissions", "m2_photo_requests", "m2_push_subscriptions"])
+def test_browser_roles_cannot_touch_written_work(db, role, table):
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        as_role(db, role, f"select * from public.{table}")
+
+
+def test_the_server_role_uses_written_work_tables_and_rls_has_no_policies(db):
+    with psycopg.connect(db, autocommit=True) as c:
+        cid = _class(c, "כתיבה-4")
+    aid = as_role(db, "service_role", "insert into public.m2_assignments(class_id, title, due_date, kind, quiz_lesson, created_by) values (%s, 'x', '2026-11-20', 'quiz', 't', 'x') returning id", cid)
+    assert aid is not None
+    with psycopg.connect(db, autocommit=True) as c:
+        on = dict(c.execute("select relname, relrowsecurity from pg_class where relname in ('m2_pictures','m2_assignments','m2_submissions','m2_photo_requests','m2_push_subscriptions')").fetchall())
+        assert all(on.values()) and len(on) == 5
+        assert c.execute("select count(*) from pg_policies where tablename in ('m2_pictures','m2_assignments','m2_submissions','m2_photo_requests','m2_push_subscriptions')").fetchone() == (0,)
+
+
+@pytest.mark.parametrize("role", ["authenticated", "anon"])
+def test_browser_roles_cannot_touch_the_curriculum(db, role):
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        as_role(db, role, "select * from public.m2_curriculum")
+
+
+def test_the_server_role_keeps_one_date_per_lesson_and_rls_has_no_policies(db):
+    as_role(db, "service_role", "insert into public.m2_curriculum(lesson_id, due_date) values ('t', '2026-11-03') on conflict (lesson_id) do update set due_date = excluded.due_date")
+    as_role(db, "service_role", "insert into public.m2_curriculum(lesson_id, due_date) values ('t', '2026-11-10') on conflict (lesson_id) do update set due_date = excluded.due_date")
+    assert as_role(db, "service_role", "select count(*) from public.m2_curriculum where lesson_id = 't'") == [(1,)]
+    with pytest.raises(psycopg.errors.NotNullViolation):
+        as_role(db, "service_role", "insert into public.m2_curriculum(lesson_id) values ('x')")
+    with psycopg.connect(db, autocommit=True) as c:
+        assert c.execute("select relrowsecurity from pg_class where relname = 'm2_curriculum'").fetchone() == (True,)
+        assert c.execute("select count(*) from pg_policies where tablename = 'm2_curriculum'").fetchone() == (0,)

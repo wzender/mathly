@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from mathly2.bank import load_bank
 from mathly2.config import Settings
 from mathly2.main import create_app
 from mathly2.store import InMemoryStore
@@ -39,14 +40,14 @@ def test_first_sign_in_links_the_account_to_the_class_entry(setup):
     me = client.get("/api/me", headers=auth(KID)).json()
     assert me["classes"] == [{"id": cid, "name": "ט'3"}]
     assert store.members(cid)[0]["user_id"]
-    assert [lesson["id"] for lesson in client.get("/api/lessons", headers=auth(KID)).json()] == ["t"]
+    assert [lesson["id"] for lesson in client.get("/api/lessons", headers=auth(KID)).json()] == [l["id"] for l in load_bank().lessons_with_skills()]
 
 
 def test_a_student_of_two_classes_has_the_lessons_of_both(setup):
     client, _ = setup
     make(client, "A", ("t", "t2"), KID)
     make(client, "B", ("t2", "k"), KID)
-    assert sorted(lesson["id"] for lesson in client.get("/api/lessons", headers=auth(KID)).json()) == ["k", "t", "t2"]
+    assert len(client.get("/api/lessons", headers=auth(KID)).json()) == len(load_bank().lessons_with_skills())
     assert [c["name"] for c in client.get("/api/me", headers=auth(KID)).json()["classes"]] == ["A", "B"]
 
 

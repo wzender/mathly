@@ -32,7 +32,8 @@ function simulation(test) {
 }
 
 export async function show(view, id) {
-  const test = await api(`/api/tests/${encodeURIComponent(id)}`);
+  const [test, home] = await Promise.all([api(`/api/tests/${encodeURIComponent(id)}`), api("/api/home")]);
+  const others = home.tests.filter(t => t.id !== test.id);
   view(`${tabs("home")}<p><a class="back" href="${HOME}">‹ הבית</a></p>
     <section class="card" id="test-card" data-test="${test.id}"><h2>מבחן ב־${shortDate(test.date)} <span class="muted">(${daysText(test.days_left)})</span></h2>
       <p class="muted">${test.lessons.map(l => fmt(l.name)).join(", ")}${test.note ? ` · ${esc(test.note)}` : ""}<br>${test.questions} שאלות · ${test.minutes} דקות</p>
@@ -41,5 +42,7 @@ export async function show(view, id) {
     <section class="card"><h3>מבחני תרגול</h3>${exercises(test)}
       ${test.practice_first.length ? `<p id="practice-first"><b>כדאי לתרגל קודם:</b> ${test.practice_first.map(s => `<a class="ex-chip link" href="#/skill/${esc(s.id)}">${fmt(s.name)}</a>`).join(" ")}</p>
         <p class="muted">אלה מיומנויות שעוד לא התחלתם, ולכן אין להן שאלות במבחני התרגול.</p>` : ""}</section>
-    <section class="card"><h3>מבחן סימולציה</h3>${simulation(test)}</section>`);
+    <section class="card"><h3>מבחן סימולציה</h3>${simulation(test)}</section>
+    ${others.length ? `<section class="card"><h3>מבחנים נוספים</h3><ul class="plain" id="other-tests">${others.map(t => `<li><a href="#/test/${t.id}">${shortDate(t.date)} · ${t.lessons.map(l => fmt(l.name)).join(", ")}</a>
+      <span class="muted">${daysText(t.days_left)} · מוכנות ${t.readiness.number}</span></li>`).join("")}</ul></section>` : ""}`);
 }

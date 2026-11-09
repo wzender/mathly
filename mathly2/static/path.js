@@ -1,9 +1,9 @@
 // The path: a trail of lessons. Each lesson is a hub with its skills as numbered stars in a ring around it; the owl perches on the
 // suggested next skill. Every star is a link to its exercise screen (#/skill/<id>) and says its state in a symbol and a word.
-import { api } from "./api.js";
+import { api, swr } from "./api.js";
 import { esc, fmt } from "./math.js";
 import { owl, ringSvg, spark } from "./sky.js";
-import { HOME, backToSubjects, goalBar, tabs } from "./ui.js";
+import { HOME, backToSubjects, goalBar, shortDate, tabs } from "./ui.js";
 
 export const STATES = {
   not_started: { symbol: "○", word: "לא התחלת" },
@@ -32,18 +32,27 @@ function quizNode(l) {
       aria-label="בוחן ${esc(plain(l.name))}: ${state}"><span class="qz-icon" aria-hidden="true">${spark()}</span><span><b>בוחן</b><em>${state}</em></span></a>`;
 }
 
+/** "הושלם", or, for a lesson whose date has passed without it being completed, the marker with the date in words. */
+function lessonStatus(l) {
+  if (l.completed) return `<p class="lesson-status done" data-status="completed"><span aria-hidden="true">✓</span> הושלם${l.passed ? " (עברת את הבוחן)" : ""}</p>`;
+  if (l.behind) return `<p class="lesson-status late" data-status="behind"><span aria-hidden="true">⚠</span> היה אמור להסתיים ב־${shortDate(l.due_date)}</p>`;
+  return "";
+}
+
+const behindNote = n => n ? `<p class="behind-note" id="behind-note" role="status"><span aria-hidden="true">⚠</span> ${n === 1 ? "שיעור אחד בפיגור" : `${n} שיעורים בפיגור`} לפי התכנית</p>` : "";
+
 function lesson(l, next) {
   const n = l.skills.length;
-  return `<section class="orbit${l.completed ? " completed" : ""}" id="lesson-${esc(l.id)}" aria-label="${esc(plain(l.name))}">
+  return `<section class="orbit${l.completed ? " completed" : ""}${l.behind ? " behind" : ""}" id="lesson-${esc(l.id)}" aria-label="${esc(plain(l.name))}">
     <div class="stage">${ringSvg(l.skills.map(s => s.state))}
       <div class="hub"><h3>${fmt(l.name)}</h3><span class="count">${l.mastered} מתוך ${n} נשלטו${l.completed ? " ✓" : ""}</span></div>
-      ${l.skills.map((s, i) => star(s, i, n, s.id === next)).join("")}</div></section>${quizNode(l)}`;
+      ${l.skills.map((s, i) => star(s, i, n, s.id === next)).join("")}</div>${lessonStatus(l)}</section>${quizNode(l)}`;
 }
 
 export function pathHtml(path) {
   return `${tabs("path")}${backToSubjects()}
     <section class="card path-top" id="path"><h2>המסלול שלי</h2>
-    <p class="muted">כל השיעורים פתוחים, בכל סדר. הינשוף מציע איפה להמשיך, אבל אפשר ללחוץ על כל כוכב.</p>${goalBar(path.today, path.streak)}</section>
+    <p class="muted">כל השיעורים פתוחים, בכל סדר. הינשוף מציע איפה להמשיך, אבל אפשר ללחוץ על כל כוכב.</p>${goalBar(path.today, path.streak)}${behindNote(path.behind)}</section>
     <div class="trail">
       <div class="mark start">${owl(44)}<b>התחלה</b></div>
       ${path.lessons.map(l => lesson(l, path.next)).join("")}
@@ -51,8 +60,12 @@ export function pathHtml(path) {
 }
 
 /** Draw the path. `scroll`: bring the next skill to the middle of the screen (when the path opens); a refresh keeps the place. */
-export async function show(view, { scroll = true } = {}) {
-  const path = await api("/api/path");
+export const show = (view, { scroll = true } = {}) => {
+  let first = true;                                  // a refresh of the same screen keeps the place
+  return swr("/api/path", path => { const result = drawPath(view, path, scroll && first); first = false; return result; });
+};
+
+function drawPath(view, path, scroll) {
   const place = window.scrollY;
   view(pathHtml(path));
   if (scroll) document.querySelector(".star.next")?.scrollIntoView({ block: "center" });
@@ -67,7 +80,7 @@ export async function showSubjects(view) {
   view(`<section class="subjects" aria-label="מקצועות">
     <h2>במה נתרגל היום?</h2>
     <a class="subject-card" href="${HOME}" data-subject="מתמטיקה"><span class="subject-icon" aria-hidden="true">∑</span>
-      <span class="grow"><b>מתמטיקה</b>
+      <span class="grow"><b>מתמטיקה כיתה ט - מצוינות</b>
         <span class="bar" role="progressbar" aria-label="מיומנויות שהושלמו" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${lit}"><i style="width:${total ? Math.round(100 * lit / total) : 0}%"></i></span>
         <small>${lit} מתוך ${total} מיומנויות</small></span><i aria-hidden="true">‹</i></a></section>`);
   return path;

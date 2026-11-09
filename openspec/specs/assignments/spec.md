@@ -1,10 +1,9 @@
-# Spec Delta
+# assignments Specification
 
 ## Purpose
-
 Lets a teacher give work from any material to a class, and check what students hand in, from one inbox.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Giving an assignment
 A teacher SHALL create an assignment for a class they teach, with a title, a note and a due date, and its pages from: a file from the computer (PDF or images), a photo from the device camera, the board, or one of the written quizzes authored in the bank.
@@ -29,11 +28,22 @@ A teacher SHALL be able to send one of their real test's two exercise tests to t
 - **THEN** the assignment shows as done with the test's grade, and nothing is added to the teacher's inbox
 
 ### Requirement: My assignments
-A student SHALL see their assignments on home under "המשימות שלי" with the due date and state, open one, work on it on the board or on paper, and hand it in.
+Home SHALL show under "המשימות שלי" only the new assignments, those the student has not handed in (or, for an exercise test, not taken), with the due date. The student SHALL open one, work on it on the board or on paper, and hand it in.
 
 #### Scenario: Hand-in
 - **WHEN** a student hands in an assignment from the board
 - **THEN** it shows as handed in, and the teacher's inbox lists it
+
+### Requirement: Submissions tab
+A tab "הגשות" SHALL list every assignment from the student's teachers, grouped by state: new (not handed in), sent back for correction, handed in and waiting for a check, and checked (with the grade and the teacher's note). Each assignment SHALL show its due date and open its page; an assignment past its due date and not handed in SHALL be marked "באיחור".
+
+#### Scenario: Grouped by state
+- **WHEN** a student has one new, one sent-back, one waiting and one checked assignment
+- **THEN** the tab shows four groups, each with its assignment, and the sent-back one shows the teacher's note
+
+#### Scenario: All of them
+- **WHEN** a student has handed in everything
+- **THEN** home shows no assignments, and the tab shows all of them under "הוגשו" and "נבדקו"
 
 ### Requirement: Teacher inbox
 A teacher SHALL have one inbox of everything their students handed in that waits for them, oldest first: submissions not checked yet and requests to look again. A submission sent back waits for the student, not in the inbox.

@@ -11,7 +11,7 @@ from fastapi import Request
 POOL = ThreadPoolExecutor(max_workers=16, thread_name_prefix="db")
 
 READS = frozenset({"classes_of_student", "classes_taught", "progress_of", "last_answered", "daily_correct", "recent_skills", "attempts_of",
-                   "tests_of_classes", "get_progress", "answers_of", "reward_state", "comets_of", "members", "get_class", "get_test", "roles_of"})
+                   "tests_of_classes", "get_progress", "answers_of", "reward_state", "comets_of", "members", "get_class", "get_test", "roles_of", "assignments_of_classes", "submissions_of_user", "get_assignment", "get_submission", "curriculum"})
 
 
 def _key(name: str, args: tuple) -> tuple:
