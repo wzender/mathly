@@ -71,8 +71,7 @@ function behindCard(lessons) {
   if (!lessons?.length) return "";
   return `<section class="card" id="behind-card"><h2>שיעורים בפיגור</h2>
     <ul class="plain behind-list">${lessons.map(l => `<li data-lesson="${esc(l.id)}"><p><b>${fmt(l.name)}</b> <span class="late">⚠ עד ${shortDate(l.due_date)}</span></p>
-      <p class="actions"><a class="button" data-way="quiz" href="#/quiz/${encodeURIComponent(l.id)}">${l.quiz.open ? "להמשיך את הבוחן" : "לבוחן"}: לפחות ${l.quiz.pass_right} מתוך ${l.quiz.size}</a>
-        <span class="muted" data-best>${l.quiz.best === null ? "עוד לא נעשה" : `הציון הטוב ביותר: ${l.quiz.best}`}</span></p></li>`).join("")}</ul></section>`;
+      <p class="actions"><a class="button" data-way="quiz" href="#/quiz/${encodeURIComponent(l.id)}">בוחן</a> <b data-best>${l.quiz.best === null ? "-" : l.quiz.best}</b></p></li>`).join("")}</ul></section>`;
 }
 
 /** The practice tests of upcoming tests that were taken and are below 87 (13 of 15): to take again. */
@@ -80,8 +79,7 @@ function weakTestsCard(tests) {
   if (!tests?.length) return "";
   return `<section class="card" id="weak-tests"><h2>מבחני תרגול להשלמה</h2>
     <ul class="plain behind-list">${tests.map(t => `<li data-test="${t.test_id}" data-number="${t.number}"><p><b>מבחן תרגול ${t.number}</b> <span class="muted">למבחן ב־${shortDate(t.date)}</span></p>
-      <p class="actions"><a class="button" data-way="retake" href="#/exam/${t.test_id}/${t.number}">${t.open ? "להמשיך" : "לנסות שוב"}</a>
-        <span class="muted" data-best>הציון הטוב ביותר: ${t.best} · צריך 87 לפחות (13 מתוך 15)</span></p></li>`).join("")}</ul></section>`;
+      <p class="actions"><a class="button" data-way="retake" href="#/exam/${t.test_id}/${t.number}">${t.open ? "להמשיך" : "לנסות שוב"}</a> <b data-best>${t.best}</b></p></li>`).join("")}</ul></section>`;
 }
 
 /** The photo help card (STU-6): only for a class with the AI on; it also lists the student's latest requests with their state. */

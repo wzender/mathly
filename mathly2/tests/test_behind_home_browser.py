@@ -30,8 +30,9 @@ def test_the_card_lists_the_lessons_behind_in_date_order_each_with_only_the_quiz
         assert rows.count() == 2 and rows.nth(0).get_attribute("data-lesson") == lessons[1] and rows.nth(1).get_attribute("data-lesson") == lessons[0]     # the earlier date first
         assert page.locator("#behind-card [data-way=skills]").count() == 0 and page.locator("#behind-card a").count() == 2                                 # only the quiz links
         mine = page.locator(f"#behind-card li[data-lesson='{lessons[0]}']")
-        assert "לפחות 13 מתוך 15" in mine.locator("[data-way=quiz]").inner_text() and mine.locator("[data-way=quiz]").get_attribute("href") == f"#/quiz/{lessons[0]}"
-        assert "80" in mine.locator("[data-best]").inner_text() and "עוד לא נעשה" in rows.nth(0).locator("[data-best]").inner_text()
+        assert mine.locator("[data-way=quiz]").inner_text() == "בוחן" and mine.locator("[data-way=quiz]").get_attribute("href") == f"#/quiz/{lessons[0]}"
+        assert mine.locator("[data-best]").inner_text() == "80" and rows.nth(0).locator("[data-best]").inner_text() == "-"          # a bare grade, or a dash
+        assert "13" not in page.inner_text("#behind-card") and "מתוך" not in page.inner_text("#behind-card")                       # nothing explains the pass line
         assert "⚠" in mine.inner_text() and "מיומנויות" not in page.inner_text("#behind-card")
         no_sideways_scroll(page)
         assert not page.errors
@@ -63,7 +64,7 @@ def test_practice_tests_below_87_are_listed_with_a_retake_link_and_others_are_no
         page.wait_for_selector("#weak-tests")
         rows = page.locator("#weak-tests li")
         assert rows.count() == 1 and rows.first.get_attribute("data-number") == "1"                                  # 87 is good enough
-        assert "25" in rows.first.locator("[data-best]").inner_text() and "87" in rows.first.locator("[data-best]").inner_text()
+        assert rows.first.locator("[data-best]").inner_text() == "25" and "87" not in page.inner_text("#weak-tests") and "13" not in page.inner_text("#weak-tests")
         assert rows.first.locator("[data-way=retake]").get_attribute("href") == f"#/exam/{test['id']}/1"
         no_sideways_scroll(page)
         page.click("#weak-tests [data-way=retake]")

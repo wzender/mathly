@@ -49,7 +49,7 @@ The home SHALL show only: the nearest test with its readiness and today's task, 
 - **THEN** home shows the nearest one, and the other is listed on that test's card
 
 ### Requirement: Lessons behind on home
-Home SHALL list every lesson behind the curriculum, the earliest date first, with its name, the date it should have been completed by and one link to its בוחן, which shows the best grade so far and that 13 right out of 15 is needed. A completed lesson, a lesson with no date and a lesson whose date is ahead SHALL NOT be listed, and with none behind there SHALL be no such card.
+Home SHALL list every lesson behind the curriculum, the earliest date first, kept short: its name, the date it should have been completed by, a link named only "בוחן", and the best בוחן grade as a bare number, or "-" when there is none. The row MUST NOT explain what passes the בוחן. A completed lesson, a lesson with no date and a lesson whose date is ahead SHALL NOT be listed, and with none behind there SHALL be no such card.
 
 #### Scenario: Two lessons behind
 - **WHEN** two lessons have passed their dates and are not completed
@@ -61,7 +61,11 @@ Home SHALL list every lesson behind the curriculum, the earliest date first, wit
 
 #### Scenario: The grade
 - **WHEN** the student's best grade in that lesson's בוחן is 80
-- **THEN** the row shows 80 and says that 13 right out of 15 is needed
+- **THEN** the row shows 80 and no other text about the grade
+
+#### Scenario: No grade
+- **WHEN** the student has not taken that בוחן
+- **THEN** the row shows "-"
 
 #### Scenario: Caught up
 - **WHEN** a student passes the בוחן of a lesson that was behind
@@ -72,7 +76,7 @@ Home SHALL list every lesson behind the curriculum, the earliest date first, wit
 - **THEN** home has no behind card
 
 ### Requirement: Practice tests below the pass line
-Home SHALL list the practice tests of the student's upcoming tests that were taken and whose best grade is below 87 (13 right out of 15): the test's date, which practice test, the best grade and a link to take it again. A practice test not taken yet, or with a best grade of 87 or more, SHALL NOT be listed, and with none there SHALL be no such card.
+Home SHALL list the practice tests of the student's upcoming tests that were taken and whose best grade is below 87 (13 right out of 15), kept short: which practice test, its test's date, the link to take it again and the best grade as a bare number. A practice test not taken yet, or with a best grade of 87 or more, SHALL NOT be listed, and with none there SHALL be no such card.
 
 #### Scenario: A weak one
 - **WHEN** a student's best grade in practice test 1 for a test on the 16th is 25
