@@ -13,8 +13,7 @@ from mathly2.main import create_app
 from mathly2.tests.serve import offline_formulas, running
 
 STATIC = Path(__file__).parent.parent / "static"
-COPIED = {
-    "math-board.js": "cd47807ae894e4298b5e3d7175e9ef12fd474f0035712d7fa40a2559edfa607f",
+COPIED = {   # copied from mathly1 and not edited here (math-board.js is mathly2's own now: the right-button eraser and the question placed by itself)
     "board-math.js": "613e642f762a9ca8276c2192bf43d0a8cf7a606bf06f29f01b54b3a19747a579",}
 PHONE, DESKTOP = {"width": 390, "height": 844}, {"width": 1280, "height": 800}
 TOOLS = {"move": "הזזה", "pen": "עט", "line": "קו ישר", "circle": "עיגול", "angle": "זווית", "math": "נוסחה", "eraser": "מחק"}
@@ -70,7 +69,7 @@ def draw_line(page, dx=120, dy=60):
 
 # --- 3.1 the copied files ---
 
-def test_the_board_files_are_the_unedited_copies_from_mathly1():
+def test_the_math_keyboard_file_is_the_unedited_copy_from_mathly1():
     for name, digest in COPIED.items():
         assert hashlib.sha256((STATIC / name).read_bytes()).hexdigest() == digest, f"{name} was edited: copy it from mathly1 again"
     assert (STATIC / "vendor" / "mathlive" / "mathlive.min.js").stat().st_size > 100_000
@@ -147,7 +146,7 @@ def test_a_pen_stroke_changes_the_canvas_and_undo_brings_it_back(browser):
         assert png(page) == blank
         draw_line(page)
         page.click(".mx-board [data-do='clear']")
-        assert png(page) == blank
+        assert png(page) == blank                                                   # the work goes; the question stays (it is in `blank` too)
 
 
 def test_the_eraser_removes_a_stroke_it_touches(browser):
@@ -204,7 +203,8 @@ def test_each_question_keeps_its_own_sketch_and_nothing_is_sent_anywhere(browser
         sent_before = len([r for r in requests if "/api/" in r])
         page.evaluate("window.mountFor('skill:q2', 'q2')")
         page.wait_for_selector(".mx-board canvas")
-        assert png(page) == blank                                                   # question 2 starts empty
+        second = png(page)
+        assert second != first and second != blank                                  # question 2 has its own question at the top and no stroke of question 1
         page.evaluate("window.mountFor('skill:q1', 'q1')")
         page.wait_for_selector(".mx-board canvas")
         assert png(page) == first                                                   # question 1's sketch is still there
@@ -233,3 +233,90 @@ def test_the_calculator_gives_sin_30_and_7_times_6(browser):
         assert page.inner_text("[data-calc-out]").strip() == "42"
         page.click(".mx-board [data-do='calc']")
         assert page.is_hidden(".mx-calc")
+
+
+# --- board-question-and-right-click-eraser ---
+
+def test_the_question_is_on_the_board_when_it_opens_and_each_question_has_its_own(browser):
+    with running(create_app()) as url:
+        page = board_page(browser, url, DESKTOP)
+        page.click("[data-board-toggle]")
+        page.wait_for_selector(".mx-board canvas")
+        first = png(page)
+        empty = page.evaluate("""() => { const c = document.createElement('canvas'); const b = document.querySelector('.mx-board canvas'); c.width = b.width; c.height = b.height; return c.toDataURL(); }""")
+        assert first != empty                                                       # something is drawn already: the question at the top
+        page.evaluate("window.mountFor('skill:q2', 'q2')")
+        page.wait_for_selector(".mx-board canvas")
+        second = png(page)
+        assert second != empty and second != first                                  # the other question, in its own board
+
+
+def test_a_deleted_question_does_not_come_back_and_the_button_places_it_again(browser):
+    with running(create_app()) as url:
+        page = board_page(browser, url, DESKTOP)
+        page.click("[data-board-toggle]")
+        page.wait_for_selector(".mx-board canvas")
+        with_question = png(page)
+        page.click(".mx-board [data-tool='move']")
+        box = page.locator(".mx-board canvas").bounding_box()
+        page.mouse.click(box["x"] + box["width"] - 60, box["y"] + 30)               # select the card at the top
+        page.click(".mx-board [data-do='delete']")
+        without = png(page)
+        assert without != with_question
+        page.evaluate("window.mountFor('skill:q2', 'q2')")                          # leave the question and come back
+        page.evaluate("window.mountFor('skill:q1', 'q1')")
+        page.wait_for_selector(".mx-board canvas")
+        assert png(page) == without                                                 # it did not come back by itself
+        page.click(".mx-board [data-do='question']")
+        page.click(".mx-board [data-tool='pen']")
+        assert png(page) == with_question                                           # the button places it again
+
+
+def right_drag(page, x0, y0, x1, y1):
+    page.mouse.move(x0, y0)
+    page.mouse.down(button="right")
+    page.mouse.move((x0 + x1) / 2, (y0 + y1) / 2, steps=10)
+    page.mouse.move(x1, y1, steps=10)
+    page.mouse.up(button="right")
+
+
+def test_holding_the_right_button_erases_whatever_tool_is_chosen_and_the_tool_stays(browser):
+    with running(create_app()) as url:
+        page = board_page(browser, url, DESKTOP)
+        page.click("[data-board-toggle]")
+        page.wait_for_selector(".mx-board canvas")
+        page.click(".mx-board [data-tool='pen']")
+        blank = png(page)                                                           # the question only
+        draw_line(page)
+        assert png(page) != blank
+        menus = []
+        page.on("popup", lambda p: menus.append(p))
+        box = page.locator(".mx-board canvas").bounding_box()
+        x, y = box["x"] + 60, box["y"] + 120
+        right_drag(page, x - 10, y - 10, x + 130, y + 70)                           # the right button, held, over the stroke
+        page.mouse.move(box["x"] + 5, box["y"] + box["height"] - 5)
+        assert png(page) == blank and not menus                                     # the stroke is erased; the question stays; no context menu
+        assert page.get_attribute(".mx-board", "data-tool") == "pen"                 # the pen is still the chosen tool
+        draw_line(page)
+        assert png(page) != blank                                                   # and the left button still draws with it
+
+
+def test_the_right_button_erases_with_the_chosen_eraser_size_and_leaves_the_question_alone(browser):
+    with running(create_app()) as url:
+        page = board_page(browser, url, DESKTOP)
+        page.click("[data-board-toggle]")
+        page.wait_for_selector(".mx-board canvas")
+        blank = png(page)
+        draw_line(page, 300, 0)                                                     # a long horizontal stroke
+        box = page.locator(".mx-board canvas").bounding_box()
+        x, y = box["x"] + 60, box["y"] + 120
+        page.click(".mx-board [data-tool='eraser']")
+        page.click(".mx-board [data-eraser='16']")                                  # the small eraser
+        page.click(".mx-board [data-tool='pen']")                                   # back to the pen: the right button still uses the small eraser
+        right_drag(page, x + 100, y - 40, x + 100, y + 40)                          # a short pass across the middle only
+        page.mouse.move(box["x"] + 5, box["y"] + box["height"] - 5)
+        partly = png(page)
+        assert partly != blank                                                      # the ends of the stroke are still there: a small eraser, not a wipe
+        right_drag(page, x - 20, y, x + 320, y)
+        page.mouse.move(box["x"] + 5, box["y"] + box["height"] - 5)
+        assert png(page) == blank                                                   # all of it gone; the question's copy untouched

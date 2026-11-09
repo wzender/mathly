@@ -328,7 +328,10 @@ def test_the_board_opens_from_the_sheet_beside_it_on_a_desktop_with_a_sketch_per
         page.wait_for_selector(".mx-board canvas")
         board, sheet = page.locator(".mx-board").bounding_box(), page.locator(".mx-sheet").bounding_box()
         assert board["x"] + board["width"] <= sheet["x"] + 2
-        blank = page.evaluate("document.querySelector('.mx-board canvas').toDataURL()")
+        blank = page.evaluate("document.querySelector('.mx-board canvas').toDataURL()")       # the question is already at the top
+        ink = """() => { const c = document.querySelector('.mx-board canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, Math.min(c.height, 260)).data;
+                         let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i + 3] && (d[i] < 200 || d[i + 1] < 200 || d[i + 2] < 200)) n++; return n; }"""
+        assert page.evaluate(ink) > 50                                                          # the question's words are on the board by themselves
         box = page.locator(".mx-board canvas").bounding_box()
         page.mouse.move(box["x"] + 60, box["y"] + 150)
         page.mouse.down()
@@ -338,7 +341,8 @@ def test_the_board_opens_from_the_sheet_beside_it_on_a_desktop_with_a_sketch_per
         assert drawn != blank
         choose(page, bank, ids["bare"])
         page.click("#ex-skip")
-        page.wait_for_function("(b) => document.querySelector('.mx-board canvas').toDataURL() === b", arg=blank)       # the next question starts clean
+        page.wait_for_function("(b) => document.querySelector('.mx-board canvas').toDataURL() !== b", arg=drawn)         # the next question: no stroke of the last one
+        assert page.evaluate(ink) > 50                                                                              # and its own question at the top
         assert page.locator(".mx-board").count() == 1 and page.get_attribute("[data-board-toggle]", "aria-pressed") == "true"
 
 

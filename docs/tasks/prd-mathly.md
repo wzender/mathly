@@ -221,11 +221,11 @@ The exercise screen is where a student practices one skill.
 - **BRD-3 Tools.** Move; **pen** (three ink colors; follows pen pressure); straight **line**; **circle** (dragged from its center);
   **angle** (pointing at a corner where two lines meet shows the arc; a click adds it and asks for its words; a number gets a degree sign;
   one, two or three arcs or a right-angle square); typed **math** (a math keyboard set up for ninth grade: digits, x and y, fractions, powers, roots, brackets, absolute value,
-  ± ≤ ≥ ≠, π, degrees, angle and triangle signs, and a letters tab); **eraser** (three sizes); **undo**; and **clear**.
+  ± ≤ ≥ ≠, π, degrees, angle and triangle signs, and a letters tab); **eraser** (three sizes); **undo**; and **clear**. Holding the **right mouse button** (or a pen's barrel button) erases with the current eraser size whatever tool is chosen, and letting go returns to that tool; the context menu does not open on the board.
 - **BRD-4 Everything is an object.** Every pen stroke, line, circle, angle and formula on the board can be selected, moved and erased.
 - **BRD-5 Snapping.** Line ends and circle centers snap to ends and centers already drawn, so a triangle closes neatly; lines that meet that way move together.
   The eraser removes the lines and circles it touches and cuts pen strokes.
-- **BRD-6 The question on the board.** A copy of the question (its text and figures) can be placed on the board. The eraser leaves it alone; select it and delete it instead.
+- **BRD-6 The question on the board.** The question (its text and figures) appears at the top of the board by itself the first time a question's sketch is shown, and the "השאלה" button places a copy again. The eraser and "clear" leave it alone; select it and delete it instead, and a deleted copy does not come back by itself.
 - **BRD-7 Endless paper.** The paper grows downward and to the right. The mouse wheel scrolls it (sideways with Shift or a trackpad); two fingers scroll in any direction while one finger draws;
   dragging empty paper with the move tool scrolls too.
 - **BRD-8 Pen and palm.** Once a pen has touched the screen, a single finger is ignored. While the pen writes (and a moment after) every touch is ignored, and a wide contact is treated as a palm.

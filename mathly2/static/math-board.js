@@ -8,7 +8,8 @@
    a straight line, a circle (dragged from the center), an angle's arc with its words (the angle tool: pointing at a
    corner where two lines meet shows the arc; a click adds it and asks for its words, and a number gets a degree
    sign), typed math (the math keyboard, static/board-math.js), and a
-   copy of the question (its text and figures).
+   copy of the question (its text and figures), which is placed at the top by itself the first time a question's sketch is shown.
+   Holding the right mouse button (or a pen's barrel button) erases, whatever tool is chosen.
    Line ends and circle centers snap to the ends and centers already drawn, so a triangle closes neatly;
    lines that meet that way move together. The eraser removes the lines and circles it touches and cuts pen strokes;
    it leaves the question's copy alone (select it and delete it instead).
@@ -271,7 +272,7 @@ function build(){
     if(b.dataset.page){ turn(+b.dataset.page); onPage?.(page); }
     const act=b.dataset.do;
     if(act==="undo") undo();
-    if(act==="clear"&&marks().length){ remember(); marks().length=0; select([]); paint(); drawPages(); }
+    if(act==="clear"&&marks().some(m=>m.kind!=="card")){ remember(); const keep=marks().filter(m=>m.kind==="card"); marks().length=0; marks().push(...keep); select([]); paint(); drawPages(); }   // the student's work goes; the question stays
     if(act==="delete") removeSelection();
     if(act==="question") copyQuestion();
     if(act==="send") send();
@@ -338,12 +339,15 @@ function reset(){ draft=drag=rub=slide=null; hover=null; select([]); if(editing)
 function setTool(t){
   tool=t; if(hover){ hover=null; paint(); } el.querySelectorAll("[data-tool]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.tool===t));
   el.dataset.tool=t; if(t!=="move"&&selection.length){ select([]); paint(); }
-  // the eraser's cursor is a ring its own size, so the student sees what it will wipe
+  canvas.style.cursor=cursorFor(t);
+}
+// the eraser's cursor is a ring its own size, so the student sees what it will wipe
+function cursorFor(t){
   const r=eraser/2, svg=`<svg xmlns='http://www.w3.org/2000/svg' width='${eraser+2}' height='${eraser+2}'><circle cx='${r+1}' cy='${r+1}' r='${r}' fill='rgba(255,255,255,.35)' stroke='%231B2140' stroke-width='1.2'/></svg>`;
-  canvas.style.cursor=t==="eraser"?`url("data:image/svg+xml,${svg.replace(/</g,"%3C").replace(/>/g,"%3E")}") ${r+1} ${r+1}, cell`:t==="move"?"grab":"";
+  return t==="eraser"?`url("data:image/svg+xml,${svg.replace(/</g,"%3C").replace(/>/g,"%3E")}") ${r+1} ${r+1}, cell`:t==="move"?"grab":"";
 }
 function select(list){ selection=list; }
-function turn(p){ if(editing) finishMath(true); if(naming) finishAngle(true); page=p; key=`${base}:${page}`; reset(); drawPages(); drawSend(); paint(); }
+function turn(p){ if(editing) finishMath(true); if(naming) finishAngle(true); page=p; key=`${base}:${page}`; reset(); drawPages(); drawSend(); paint(); autoQuestion(); }
 function drawSend(){
   const b=el.querySelector(".mx-board-send"); b.hidden=!hand; el.querySelector(".mx-board-row").hidden=pages<2&&!hand; if(!hand) return;
   b.disabled=false; b.innerHTML=`${ic("send")}<span>${sendLabel||`הגשה לשאלה ${page+1}`}</span>`; b.title=sendLabel||`הגשת הלוח כתשובה לשאלה ${page+1}`;
@@ -673,8 +677,8 @@ function down(e){
     if(touches.size===2){ stopLive(); pan={at:fingers(),x:sketch().x,y:sketch().y}; return; }
     if(touches.size>2||pan||penSeen) return;   // a hand resting on the screen while a pen writes
   }
-  if(e.button!==0&&e.button!==5) return;   // 5: the pen's eraser end
-  const p=at(e), use=e.button===5||(e.buttons&32)>0?"eraser":tool;
+  if(e.button!==0&&e.button!==5&&e.button!==2) return;   // 5: the pen's eraser end; 2: the right button, held, erases (also a pen's barrel button)
+  const p=at(e), use=e.button===5||e.button===2||(e.buttons&(32|2))>0?"eraser":tool;
   if(editing){ e.preventDefault(); return finishMath(true); }   // a tap beside the formula being typed: it is done
   if(naming){ e.preventDefault(); return finishAngle(true); }   // the same for an angle's words
   if(use==="angle"){ e.preventDefault(); return startAngle(p,e.pointerType==="mouse"?CORNER:CORNER_TOUCH); }
@@ -686,7 +690,7 @@ function down(e){
     if(!selection.includes(m)) select(group(m));
     drag={id:e.pointerId,last:p,before:null}; return paint();
   }
-  if(use==="eraser"){ rub={id:e.pointerId,last:p,before:copy(marks()),changed:rubOut(p)}; return paint(); }
+  if(use==="eraser"){ rub={id:e.pointerId,last:p,before:copy(marks()),changed:rubOut(p)}; if(tool!=="eraser") canvas.style.cursor=cursorFor("eraser"); return paint(); }
   remember();
   draft=use==="pen"?{kind:"free",color:ink,pts:[p]}:{kind:use,color:ink,a:snap(p),b:null};
   if(draft.b===null) draft.b=[...draft.a];
@@ -730,7 +734,7 @@ function up(e){
   if(touches.delete(e.pointerId)&&pan){ if(!touches.size) pan=null; return; }
   if(slide&&e.pointerId===slide.id){ slide=null; canvas.style.cursor="grab"; return; }
   if(drag&&e.pointerId===drag.id){ drag=null; return paint(); }
-  if(rub&&e.pointerId===rub.id){ if(rub.changed) remember(rub.before); rub=null; paint(); return pages>1&&drawPages(); }
+  if(rub&&e.pointerId===rub.id){ if(rub.changed) remember(rub.before); rub=null; canvas.style.cursor=cursorFor(tool); paint(); return pages>1&&drawPages(); }   // back to the chosen tool's cursor
   if(!draft||e.pointerId!==draft.id) return;
   const m=draft; draft=null; delete m.id; delete m.drawn;
   if(m.kind!=="free"&&dist(m.a,m.b)<3){ marks().pop(); sketch().past.pop(); }   // a tap, not a shape
@@ -785,8 +789,8 @@ function paperFigure(svg){
   clone.removeAttribute("class"); clone.style.background="none";
   return {src:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(new XMLSerializer().serializeToString(clone)),w:r.width,h:r.height};
 }
-function copyQuestion(){
-  const q=source?.(page); if(!q||!shown()) return;
+function copyQuestion(auto=false){
+  const q=source?.(page); if(!q||!shown()) return false;
   const text=q.querySelector(".mx-uq-text")||q.querySelector(":scope > p");
   const W=Math.min(canvas.clientWidth-32,600), inner=W-2*CARD_PAD;
   const lines=text?wrap(words(text),inner):[];
@@ -798,10 +802,18 @@ function copyQuestion(){
     const s=Math.min(1,inner/f.w), w=f.w*s, h=f.h*s;
     figs.push({src:f.src,x:(W-w)/2,y,w,h}); y+=h+8;
   }
-  if(!lines.length&&!figs.length) return;
-  remember();
+  if(!lines.length&&!figs.length) return false;
   const m={kind:"card",x:sketch().x+canvas.clientWidth-16-W,y:sketch().y+16,w:W,h:y+CARD_PAD-(figs.length?8:0),lines,figs};
+  if(auto){ marks().push(m); paint(); if(pages>1) drawPages(); return true; }       // by itself: the tool stays, and undo does not take it away
+  remember();
   marks().push(m); setTool("move"); select([m]); paint(); if(pages>1) drawPages();
+  return true;
+}
+// the first time a question's sketch is shown, its question is put at the top, once: a copy the student deleted does not come back
+function autoQuestion(){
+  const s=sketch(); if(s.asked||!source||!shown()) return;
+  if(marks().some(m=>m.kind==="card")){ s.asked=true; return; }
+  if(copyQuestion(true)) s.asked=true;
 }
 
 /* ---------- typed math ---------- */
@@ -893,7 +905,7 @@ function mount(sheetLayer,sketchKey,{pages:n=1,question=null,submit=null,turned=
   if(on) sheet?.removeAttribute("aria-modal"); else sheet?.setAttribute("aria-modal","true");   // the board is outside the dialog: still reachable
   if(!on){ el?.remove(); return; }
   if(!el) build();
-  reset(); drawPages(); drawSend(); layer.append(el); fit();
+  reset(); drawPages(); drawSend(); layer.append(el); fit(); autoQuestion();
 }
 const again=()=>mount(layer,base,{pages,question:source,submit:hand,turned:onPage,sendLabel});
 const here=p=>({host:layer,key:base,pages,page:p,question:source,submit:hand,turned:onPage});
@@ -915,7 +927,7 @@ function openFull({host,key:k,pages:n=1,page:p=0,question=null,submit=null,turne
   restore({layer:host,base:k,pages:n,page:p,source:question,hand:submit,onPage:turned,sendLabel:label,key:n>1?`${k}:${p}`:k});
   el.querySelector("[data-title]").textContent=title;
   el.classList.add("full"); el.setAttribute("role","dialog"); el.setAttribute("aria-modal","true");
-  reset(); drawPages(); drawSend(); host.append(el); fit();
+  reset(); drawPages(); drawSend(); host.append(el); fit(); autoQuestion();
   el.querySelector(".mx-board-back").focus({preventScroll:true,focusVisible:false});   // reachable by keyboard, without a ring on a tap
 }
 function closeFull(){
