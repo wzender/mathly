@@ -343,6 +343,7 @@ The exercise screen is where a student practices one skill.
   - **S**: the simulation test grade (once taken).
 - **RDY-2 How the number is made.** It is the weighted average of the parts that exist, with weights M 50, E 20, S 30; a part that does not exist yet (no exercise test taken, no simulation) is left out and the others are scaled up.
 - **RDY-3 No false confidence.** Until the simulation is taken the number is capped at 80, and the bar says so. The bar's label by number is: 0–39 "מתחילים", 40–69 "בדרך", 70–84 "כמעט שם", 85–100 "מוכנים". "מוכנים" can only show after the simulation.
+- **RDY-4 The number explains itself.** An info button "ⓘ" beside the number opens a short tooltip (hover, focus or tap; closes on a second tap, a tap elsewhere or Escape): the number is made of mastery (50%), practice tests (20%) and the simulation (30%); a part with no grade yet is left out; without the simulation it cannot pass 80.
 
 ### 4.14 Handwritten answers and phone photos (ANS, PSH)
 

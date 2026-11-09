@@ -490,3 +490,12 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .grade-chip.none { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); font-weight: 600; }
 .weak-tests { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; }
 .weak-tests > p { margin: 0 0 2px; }
+/* The readiness number's info button and tooltip */
+.rd-top { position: relative; }
+.info-tip { display: inline-block; }                                                      /* the tooltip is placed against the row, so it spans the card and never leaves the screen */
+.info-tip .info { min-height: 28px; min-width: 28px; width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.info-tip .tip { position: absolute; z-index: 30; inset-inline: 0; top: calc(100% + 6px); display: grid; gap: 4px; padding: 10px 12px;
+  border-radius: 12px; background: var(--surface); border: 1px solid var(--sky-accent); box-shadow: 0 6px 20px rgb(0 0 0 / .45); font-size: 13px; line-height: 1.45; font-weight: 400; text-align: start; }
+.info-tip .tip[hidden] { display: none; }
+@media (hover: hover) { .info-tip:hover .tip[hidden] { display: grid; } }                 /* a mouse hovering shows it too (not on a touch screen, where hover sticks) */
+.info-tip .info:focus-visible + .tip[hidden] { display: grid; }                          /* so does keyboard focus */

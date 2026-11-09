@@ -516,3 +516,46 @@ def test_the_whole_countdown_from_setting_a_test_to_the_review(browser, bank, mo
         teacher.click("#teacher-tabs [data-tab='tests']")
         teacher.wait_for_selector(".test-row")
         assert "1 מתוך 1 עשו סימולציה" in teacher.inner_text(".sim-count")
+
+
+# --- readiness-tooltip: the number explains itself ---
+
+def test_the_readiness_tooltip_opens_on_tap_closes_three_ways_says_the_three_lines_and_fits_a_phone(browser, bank):
+    app, store, klass, lessons = world(bank)
+    add_test(store, klass, lessons, 7)
+    with running(app) as url:
+        page = sign_in(browser, url)
+        to_home(page)
+        page.wait_for_selector("#nearest-test [data-info]")
+        button, tip = page.locator("#nearest-test [data-info]"), page.locator("#nearest-test .tip")
+        assert button.get_attribute("aria-label") == "איך המדד מחושב" and tip.is_hidden()
+        button.click()
+        assert tip.is_visible() and button.get_attribute("aria-expanded") == "true"
+        text = tip.inner_text()
+        assert "שליטה (50%)" in text and "מבחני תרגול (20%)" in text and "סימולציה (30%)" in text and "לא נספר" in text and "לא עובר 80" in text
+        box = tip.bounding_box()
+        assert box["x"] >= 0 and box["x"] + box["width"] <= PHONE["width"]
+        no_sideways_scroll(page)
+        button.click()                                                                       # a second tap closes it (the mouse is moved away: hovering would show it)
+        page.mouse.move(5, 5)
+        assert tip.is_hidden() and button.get_attribute("aria-expanded") == "false"
+        button.click()
+        page.click("#nearest-test h2")                                                       # a tap elsewhere closes it
+        assert tip.is_hidden() and button.get_attribute("aria-expanded") == "false"
+        button.click()
+        page.mouse.move(5, 5)
+        page.keyboard.press("Escape")                                                        # so does Escape
+        assert tip.is_hidden() and button.get_attribute("aria-expanded") == "false"
+        assert not page.errors
+
+
+def test_the_tooltip_is_on_the_tests_card_too_and_opens_on_hover_with_a_mouse(browser, bank):
+    app, store, klass, lessons = world(bank)
+    test = add_test(store, klass, lessons, 7)
+    with running(app) as url:
+        page = sign_in(browser, url, f"#/test/{test['id']}")
+        to_home_card = page.wait_for_selector("[data-info]")
+        page.hover("[data-info]")
+        assert page.locator(".tip").first.is_visible() and "50%" in page.locator(".tip").first.inner_text()
+        page.mouse.move(5, 5)
+        assert page.locator(".tip").first.is_hidden()

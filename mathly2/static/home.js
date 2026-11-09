@@ -8,9 +8,32 @@ import { PATH, backToSubjects, daysText, shortDate, tabs } from "./ui.js";
 const part = (label, name, value) => `<span class="rd-part"><b>${label}</b> ${name} ${value === null ? "—" : value}</span>`;
 
 /** The readiness number as a level bar with its three parts under it; before the simulation it says the bar is capped. */
+const HOW = ["המדד מורכב משליטה (50%), מבחני תרגול (20%) וסימולציה (30%).", "חלק שעוד אין לו ציון לא נספר.", "בלי סימולציה המדד לא עובר 80."];
+
+/** The info button beside the readiness number and its tooltip: hover, focus or tap opens it; a second tap, a tap elsewhere or Escape closes it. */
+const howTip = () => `<span class="info-tip"><button type="button" class="info" data-info aria-label="איך המדד מחושב" aria-expanded="false">ⓘ</button>
+  <span class="tip" role="tooltip" hidden>${HOW.map(l => `<span>${l}</span>`).join("")}</span></span>`;
+
+const closeTips = except => document.querySelectorAll(".info-tip.open").forEach(t => {
+  if (t === except) return;
+  t.classList.remove("open");
+  t.querySelector("[data-info]").setAttribute("aria-expanded", "false");
+  t.querySelector(".tip").hidden = true;
+});
+document.addEventListener("click", event => {
+  const tip = event.target.closest(".info-tip");
+  closeTips(tip);
+  if (!tip || !event.target.closest("[data-info]")) return;
+  const open = !tip.classList.contains("open");
+  tip.classList.toggle("open", open);
+  tip.querySelector("[data-info]").setAttribute("aria-expanded", String(open));
+  tip.querySelector(".tip").hidden = !open;
+});
+document.addEventListener("keydown", event => { if (event.key === "Escape") { closeTips(null); document.activeElement?.closest?.(".info-tip") && document.activeElement.blur(); } });
+
 export function readinessBar(r) {
   return `<div class="readiness" data-readiness>
-    <p class="rd-top"><b class="rd-num" aria-hidden="true">${r.number}</b><span class="rd-label">${esc(r.label)}</span></p>
+    <p class="rd-top"><b class="rd-num" aria-hidden="true">${r.number}</b><span class="rd-label">${esc(r.label)}</span>${howTip()}</p>
     <div class="bar rd-bar" role="progressbar" aria-label="מוכנות למבחן: ${r.number} מתוך 100, ${esc(r.label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${r.number}"><i style="width:${r.number}%"></i></div>
     <p class="rd-parts muted">${part("M", "שליטה", r.parts.M)} ${part("E", "מבחני תרגול", r.parts.E)} ${part("S", "סימולציה", r.parts.S)}</p>
     ${r.waiting_for_simulation ? `<p class="rd-note">עוד לא עשיתם מבחן סימולציה, ולכן המדד לא עובר את ${80}.</p>` : ""}</div>`;
