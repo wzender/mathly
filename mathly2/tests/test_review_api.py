@@ -7,8 +7,12 @@ from mathly2.tests.test_quizzes_api import answer, lesson_id, right_index, skill
 from mathly2.tests.test_skills_api import KID, KID_ID, MON, OTHER, TEACHER, auth, raw, world  # noqa: F401
 
 
-def review(client, who=KID, after=None):
-    return client.get("/api/review" + (f"?after={after}" if after else ""), headers=auth(who)).json()
+def review(client, who=KID):
+    return client.get("/api/review", headers=auth(who)).json()
+
+
+def keys_of(data):
+    return [c["key"] for g in data["groups"] for c in g["cards"]]
 
 
 def redo(client, key, bank, right, who=KID):
@@ -26,10 +30,10 @@ def test_a_wrong_practice_answer_goes_to_review_and_a_right_one_does_not(world):
     client, store, bank = world
     skill = client.ids[0]
     right_key = practice(client, skill, bank, True)
-    assert review(client) == {"count": 0, "question": None}
+    assert review(client) == {"count": 0, "groups": []}
     wrong_key = practice(client, skill, bank, False)
     got = review(client)
-    assert got["count"] == 1 and got["question"]["key"] == wrong_key and got["question"]["skill"]["id"] == skill and got["question"]["source"] == "practice"
+    assert got["count"] == 1 and keys_of(got) == [wrong_key] and got["groups"][0]["skill"]["id"] == skill and got["groups"][0]["cards"][0]["source"] == "practice"
     assert right_key != wrong_key
 
 
@@ -80,25 +84,40 @@ def test_redoing_wrong_keeps_it_names_the_mistake_and_never_shows_the_right_choi
     client, store, bank = world
     skill = client.ids[0]
     key = practice(client, skill, bank, False)
-    served = review(client)["question"]
+    served = review(client)["groups"][0]["cards"][0]
     assert not any(k in str(served) for k in ("correct", "mistake")) and set(served["choices"][0]) == {"index", "text"}     # nothing reveals the answer
     got = redo(client, key, bank, False)
     assert got.status_code == 200
     body = got.json()
-    assert body["correct"] is False and body["count"] == 1 and body["mistake"] and body["mistake"]["name"] and body["mistake"]["tip"]
-    assert "right" not in str(body).lower() and "correct_index" not in body and body["next"]["key"] == key                # alone in the list: it comes again
+    assert body["correct"] is False and body["count"] == 1 and body["skill_count"] == 1 and body["mistake"] and body["mistake"]["name"] and body["mistake"]["tip"]
+    assert "right" not in str(body).lower() and "next" not in body
     assert [r["question_key"] for r in store.review_of(KID_ID)] == [key]
 
 
-def test_redoing_right_removes_it_and_goes_to_the_next_oldest_never_the_one_just_answered(world):
+def test_the_cards_are_grouped_by_skill_in_the_banks_order_each_skills_cards_oldest_first(world):
     client, store, bank = world
-    first, second, third = (store.add_review(KID_ID, [(client.ids[0], k, "practice")], MON + timedelta(minutes=i)) and k for i, k in enumerate(bank.question_keys(client.ids[0])[:3]))
-    assert review(client)["question"]["key"] == first and review(client, after=first)["question"]["key"] == second
-    got = redo(client, first, bank, True).json()
-    assert got["correct"] is True and got["mistake"] is None and got["count"] == 2 and got["next"]["key"] == second
-    wrong = redo(client, second, bank, False).json()
-    assert wrong["count"] == 2 and wrong["next"]["key"] == third                                  # others wait: not the one just answered
-    assert [r["question_key"] for r in store.review_of(KID_ID)] == [second, third]
+    skills = [s["id"] for s in bank.skills if len(bank.question_keys(s["id"])) >= 3][:2]
+    a_keys, b_keys = bank.question_keys(skills[0])[:3], bank.question_keys(skills[1])[:2]
+    store.add_review(KID_ID, [(skills[1], b_keys[0], "quiz")], MON)                                   # the later skill's mistake is the oldest of all
+    store.add_review(KID_ID, [(skills[0], a_keys[2], "practice")], MON + timedelta(minutes=1))
+    store.add_review(KID_ID, [(skills[0], a_keys[0], "practice")], MON + timedelta(minutes=2))
+    store.add_review(KID_ID, [(skills[1], b_keys[1], "quiz")], MON + timedelta(minutes=3))
+    got = review(client)
+    assert got["count"] == 4 and [g["skill"]["id"] for g in got["groups"]] == skills                   # the bank's order, not the order of the mistakes
+    assert [c["key"] for c in got["groups"][0]["cards"]] == [a_keys[2], a_keys[0]] and [c["key"] for c in got["groups"][1]["cards"]] == b_keys[:2]
+    assert got["groups"][0]["lesson"]["name"] and "question" not in got
+
+
+def test_a_skill_with_nothing_waiting_has_no_group_and_the_counts_follow_a_right_answer(world):
+    client, store, bank = world
+    skills = [s["id"] for s in bank.skills if len(bank.question_keys(s["id"])) >= 2][:2]
+    keys = [bank.question_keys(skills[0])[0], bank.question_keys(skills[1])[0], bank.question_keys(skills[1])[1]]
+    for i, (skill, key) in enumerate(zip([skills[0], skills[1], skills[1]], keys)):
+        store.add_review(KID_ID, [(skill, key, "practice")], MON + timedelta(minutes=i))
+    got = redo(client, keys[0], bank, True).json()
+    assert got["correct"] is True and got["count"] == 2 and got["skill_count"] == 0 and got["mistake"] is None
+    assert [g["skill"]["id"] for g in review(client)["groups"]] == [skills[1]]
+    assert redo(client, keys[1], bank, True).json()["skill_count"] == 1
 
 
 def test_redo_refuses_a_question_not_in_the_list_and_a_bad_choice(world):
@@ -133,5 +152,5 @@ def test_an_empty_list_and_each_students_own_list(world):
     client, store, bank = world
     store.add_review(KID_ID, [(client.ids[0], bank.question_keys(client.ids[0])[0], "practice")])
     assert review(client)["count"] == 1
-    assert review(client, TEACHER) == {"count": 0, "question": None}
+    assert review(client, TEACHER) == {"count": 0, "groups": []}
     assert client.get("/api/review", headers={}).status_code in (401, 403)

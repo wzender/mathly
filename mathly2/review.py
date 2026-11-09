@@ -17,16 +17,10 @@ class Redo(BaseModel):
     choice: int
 
 
-def _question(request: Request, item: dict) -> dict | None:
+def _card(request: Request, item: dict) -> dict | None:
     """A waiting question as the browser may see it (no right choice), with where it is from; None when the bank no longer has it."""
-    bank = request.app.state.bank
-    served = bank.practice_question(item["skill_id"], item["question_key"])
-    skill = bank.skill(item["skill_id"])
-    if served is None or skill is None:
-        return None
-    lesson = next((l for l in bank.lessons if l["id"] == skill["unit"]), None)
-    return {**served, "skill": {"id": skill["id"], "name": skill["name"]}, "lesson": {"id": skill["unit"], "name": lesson["name"] if lesson else ""},
-            "source": item["source"]}
+    served = request.app.state.bank.practice_question(item["skill_id"], item["question_key"])
+    return None if served is None else {**served, "source": item["source"]}
 
 
 def _waiting(request: Request, user: dict) -> list[dict]:
@@ -34,17 +28,25 @@ def _waiting(request: Request, user: dict) -> list[dict]:
     return [i for i in items if request.app.state.bank.practice_question(i["skill_id"], i["question_key"]) is not None]
 
 
-def _pick(request: Request, items: list[dict], avoid: str | None) -> dict | None:
-    """The oldest waiting question; never the one just answered while others wait."""
-    others = [i for i in items if i["question_key"] != avoid]
-    chosen = (others or items)[:1]
-    return _question(request, chosen[0]) if chosen else None
+def _groups(request: Request, items: list[dict]) -> list[dict]:
+    """The waiting questions as cards, grouped by skill: the skills in the bank's order, each skill's cards oldest first. A skill with none has no group."""
+    bank = request.app.state.bank
+    lessons = {l["id"]: l["name"] for l in bank.lessons}
+    by_skill: dict[str, list[dict]] = {}
+    for item in items:                                                        # `items` is oldest first
+        by_skill.setdefault(item["skill_id"], []).append(item)
+    groups = []
+    for skill in bank.skills:
+        if skill["id"] in by_skill:
+            cards = [c for c in (_card(request, i) for i in by_skill[skill["id"]]) if c]
+            groups.append({"skill": {"id": skill["id"], "name": skill["name"]}, "lesson": {"id": skill["unit"], "name": lessons.get(skill["unit"], "")}, "cards": cards})
+    return groups
 
 
 @router.get("")
-def review(request: Request, after: str | None = None, user: dict = Depends(learner)) -> dict:
+def review(request: Request, user: dict = Depends(learner)) -> dict:
     items = _waiting(request, user)
-    return {"count": len(items), "question": _pick(request, items, after)}
+    return {"count": len(items), "groups": _groups(request, items)}
 
 
 @router.post("/answer")
@@ -66,4 +68,4 @@ def redo(body: Redo, request: Request, user: dict = Depends(learner)) -> dict:
         found = graded["mistake"]
         back = bank.skill(found["back"]) if found["back"] else None
         mistake = {"name": found["name"], "tip": found["tip"], "back": found["back"], "back_name": back["name"] if back else None}
-    return {"correct": graded["correct"], "mistake": mistake, "count": len(items), "next": _pick(request, items, body.key)}
+    return {"correct": graded["correct"], "mistake": mistake, "count": len(items), "skill_count": sum(1 for i in items if i["skill_id"] == item["skill_id"])}

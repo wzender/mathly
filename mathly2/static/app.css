@@ -471,3 +471,10 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .ai-card { border: 2px dashed var(--sky-accent); border-radius: 14px; padding: 10px 14px; margin-top: 8px; display: grid; gap: 6px; }
 .ai-card ul { margin: 0; }
 .ai-check { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin-top: 6px; }
+/* The review tab: cards grouped by skill */
+.review-group { margin-top: 14px; }
+.review-group h3 { margin: 0 0 2px; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.review-card { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-top: 10px; background: var(--surface); }
+.review-card.done { opacity: .75; border-color: var(--sky-gold); }
+.review-card .ex-text { margin: 4px 0 8px; }
+.review-group [hidden] { display: none; }        /* the heading's flex layout would otherwise show it */
