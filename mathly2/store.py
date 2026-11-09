@@ -2,6 +2,7 @@
 InMemoryStore (tests and local development, lost on restart) and SupabaseStore (PostgREST with the secret key)."""
 from __future__ import annotations
 
+import copy
 import re
 import itertools
 import json
@@ -81,9 +82,15 @@ def _test_row(row: dict) -> dict:
     return {**row, "date": day, "lessons": list(row.get("lessons") or []), "created_at": _when(row["created_at"]), "removed_at": _when(row.get("removed_at"))}
 
 
-PICTURE_KINDS = ("page", "answer")
+PICTURE_KINDS = ("page", "answer", "help")
 SUBMISSION_FIELDS = {"pictures", "state", "late", "handed_at", "grade", "teacher_note", "checked_at", "checked_by"}
 REQUEST_FIELDS = {"state", "picture_id"}
+AI_FIELDS = {"state", "picture_id", "skill_id", "snapshot", "result", "teacher_note", "failure", "budget", "sent_by", "sent_at", "done_at"}
+AI_STAMPS = ("created_at", "sent_at", "done_at")
+
+
+def _ai_row(row: dict) -> dict:
+    return {**_stamped(row, *AI_STAMPS)}
 
 
 def _stamped(row: dict, *names: str) -> dict:
@@ -118,6 +125,9 @@ class InMemoryStore:
         self._assignments: dict[int, dict] = {}
         self._submissions: dict[int, dict] = {}
         self._requests: dict[str, dict] = {}
+        self._ai: dict[str, dict] = {}                      # AI requests by id
+        self._allowance: dict[tuple[str, date], int] = {}   # (scope, day) -> used
+        self._ai_usage: list[dict] = []
         self._subs: dict[int, dict] = {}                    # push subscriptions
 
     # --- classes ---
@@ -189,7 +199,7 @@ class InMemoryStore:
 
     def classes_of_student(self, email: str) -> list[dict]:
         with self._lock:
-            return [{"id": c["id"], "name": c["name"], "lessons": list(c["lessons"])}
+            return [{"id": c["id"], "name": c["name"], "lessons": list(c["lessons"]), "ai_enabled": c["ai_enabled"], "ai_daily_checks": c["ai_daily_checks"]}
                     for (cid, e), _ in self._members.items() if e == email for c in [self._classes[cid]]]
 
     def add_member(self, class_id: int, email: str) -> None:
@@ -425,7 +435,8 @@ class InMemoryStore:
         with self._lock:
             return {"assignments": sorted(a["id"] for a in self._assignments.values() if pid in a["pages"]),
                     "submissions": sorted(s["id"] for s in self._submissions.values() if pid in s["pictures"]),
-                    "requests": sorted(r["id"] for r in self._requests.values() if r["picture_id"] == pid)}
+                    "requests": sorted(r["id"] for r in self._requests.values() if r["picture_id"] == pid),
+                    "ai_requests": sorted(r["id"] for r in self._ai.values() if r["picture_id"] == pid)}
 
     def create_assignment(self, class_id: int, title: str, due_date: date, created_by: str, kind: str, *, note: str = "", pages=(),
                           quiz_lesson: str | None = None, test_id: int | None = None, exercise_number: int | None = None,
@@ -497,6 +508,87 @@ class InMemoryStore:
     def submissions_of_user(self, user_id: str) -> list[dict]:
         with self._lock:
             return [dict(r, pictures=list(r["pictures"])) for r in self._submissions.values() if r["user_id"] == user_id]
+
+    # --- AI help: requests, allowances (budgets) and usage ---
+
+    def create_ai_request(self, kind: str, user_id: str, class_id: int | None, *, picture_id: str | None = None, assignment_id: int | None = None,
+                          skill_id: str | None = None, snapshot: dict | None = None, created_at: datetime | None = None) -> dict:
+        if kind not in ("photo", "check", "again") or (kind == "photo" and not picture_id) or (kind != "photo" and assignment_id is None):
+            raise ValueError("an AI request needs its picture (a photo) or its assignment (a check, a look again)")
+        with self._lock:
+            row = {"id": str(uuid.uuid4()), "kind": kind, "user_id": user_id, "class_id": class_id, "state": "waiting", "picture_id": picture_id,
+                   "assignment_id": assignment_id, "skill_id": skill_id, "snapshot": copy.deepcopy(snapshot), "result": None, "teacher_note": "",
+                   "failure": None, "budget": None, "sent_by": None, "created_at": created_at or datetime.now(timezone.utc), "sent_at": None, "done_at": None}
+            self._ai[row["id"]] = row
+            return copy.deepcopy(row)
+
+    def get_ai_request(self, request_id: str) -> dict | None:
+        with self._lock:
+            row = self._ai.get(str(request_id))
+            return copy.deepcopy(row) if row else None
+
+    def save_ai_request(self, request_id: str, **fields) -> dict:
+        unknown = set(fields) - AI_FIELDS
+        if unknown:
+            raise ValueError(f"unknown AI request fields {sorted(unknown)}")
+        with self._lock:
+            row = self._ai.get(str(request_id))
+            if row is None:
+                raise KeyError(request_id)
+            row.update(copy.deepcopy(fields))
+            return copy.deepcopy(row)
+
+    def ai_requests(self, *, user_id: str | None = None, class_ids=None, states=None, kinds=None, assignment_id: int | None = None,
+                    picture_id: str | None = None) -> list[dict]:
+        """Requests, oldest first, narrowed by who asked, the classes, the states, the kinds and the assignment."""
+        with self._lock:
+            rows = [r for r in self._ai.values()
+                    if (user_id is None or r["user_id"] == user_id) and (class_ids is None or r["class_id"] in set(class_ids))
+                    and (states is None or r["state"] in set(states)) and (kinds is None or r["kind"] in set(kinds))
+                    and (assignment_id is None or r["assignment_id"] == assignment_id) and (picture_id is None or r["picture_id"] == str(picture_id))]
+            return [copy.deepcopy(r) for r in sorted(rows, key=lambda r: (r["created_at"], r["id"]))]
+
+    def start_ai_request(self, request_id: str, sent_by: str, at: datetime) -> dict | None:
+        """waiting (or failed, for a retry) -> processing in one step; None when it was neither (someone else sent or declined it first)."""
+        with self._lock:
+            row = self._ai.get(str(request_id))
+            if row is None or row["state"] not in ("waiting", "failed"):
+                return None
+            row.update(state="processing", failure=None, sent_by=sent_by, sent_at=at)
+            return copy.deepcopy(row)
+
+    def requeue_processing_ai_requests(self) -> int:
+        """After a restart: requests that were being processed go back to waiting."""
+        with self._lock:
+            rows = [r for r in self._ai.values() if r["state"] == "processing"]
+            for r in rows:
+                r["state"] = "waiting"
+            return len(rows)
+
+    def take_ai_allowance(self, scope: str, day: date, n: int, cap: int) -> bool:
+        """Take n of the day's allowance only if it stays within the cap, in one step."""
+        with self._lock:
+            used = self._allowance.get((scope, day), 0)
+            if used + n > cap:
+                return False
+            self._allowance[(scope, day)] = used + n
+            return True
+
+    def give_back_ai_allowance(self, scope: str, day: date, n: int) -> None:
+        with self._lock:
+            self._allowance[(scope, day)] = max(self._allowance.get((scope, day), 0) - n, 0)
+
+    def ai_allowance_used(self, scope: str, day: date) -> int:
+        with self._lock:
+            return self._allowance.get((scope, day), 0)
+
+    def add_ai_usage(self, row: dict) -> None:
+        with self._lock:
+            self._ai_usage.append({**row, "created_at": row.get("created_at") or datetime.now(timezone.utc)})
+
+    def ai_usage_rows(self) -> list[dict]:
+        with self._lock:
+            return [dict(r) for r in self._ai_usage]
 
     # --- photo requests and push subscriptions ---
 
@@ -750,7 +842,7 @@ class SupabaseStore:
                              "select": "email,user_id,added_at", "order": "added_at,email"})
 
     def classes_of_student(self, email: str) -> list[dict]:
-        rows = self._request("GET", "m2_class_members", {"email": self._eq(email), "select": "m2_classes(id,name,lessons)"})
+        rows = self._request("GET", "m2_class_members", {"email": self._eq(email), "select": "m2_classes(id,name,lessons,ai_enabled,ai_daily_checks)"})
         return [r["m2_classes"] for r in rows]
 
     def add_member(self, class_id: int, email: str) -> None:
@@ -944,7 +1036,8 @@ class SupabaseStore:
         pid = str(picture_id)
         return {"assignments": sorted(r["id"] for r in self._request("GET", "m2_assignments", {"pages": f"cs.{{{pid}}}", "select": "id"})),
                 "submissions": sorted(r["id"] for r in self._request("GET", "m2_submissions", {"pictures": f"cs.{{{pid}}}", "select": "id"})),
-                "requests": sorted(r["id"] for r in self._request("GET", "m2_photo_requests", {"picture_id": self._eq(pid), "select": "id"}))}
+                "requests": sorted(r["id"] for r in self._request("GET", "m2_photo_requests", {"picture_id": self._eq(pid), "select": "id"})),
+                "ai_requests": sorted(r["id"] for r in self._request("GET", "m2_ai_requests", {"picture_id": self._eq(pid), "select": "id"}))}
 
     def create_assignment(self, class_id: int, title: str, due_date: date, created_by: str, kind: str, *, note: str = "", pages=(),
                           quiz_lesson: str | None = None, test_id: int | None = None, exercise_number: int | None = None,
@@ -1001,6 +1094,81 @@ class SupabaseStore:
 
     def submissions_of_user(self, user_id: str) -> list[dict]:
         return [_submission_row(r) for r in self._request("GET", "m2_submissions", {"user_id": self._eq(user_id), "select": "*"})]
+
+    # --- AI help: requests, allowances (budgets) and usage ---
+
+    def create_ai_request(self, kind: str, user_id: str, class_id: int | None, *, picture_id: str | None = None, assignment_id: int | None = None,
+                          skill_id: str | None = None, snapshot: dict | None = None, created_at: datetime | None = None) -> dict:
+        if kind not in ("photo", "check", "again") or (kind == "photo" and not picture_id) or (kind != "photo" and assignment_id is None):
+            raise ValueError("an AI request needs its picture (a photo) or its assignment (a check, a look again)")
+        body = {"kind": kind, "user_id": user_id, "class_id": class_id, "picture_id": picture_id, "assignment_id": assignment_id,
+                "skill_id": skill_id, "snapshot": snapshot}
+        if created_at:
+            body["created_at"] = created_at.isoformat()
+        return _ai_row(self._request("POST", "m2_ai_requests", body=body, returning=True)[0])
+
+    def get_ai_request(self, request_id: str) -> dict | None:
+        try:
+            rows = self._request("GET", "m2_ai_requests", {"id": self._eq(request_id), "select": "*"})
+        except urllib.error.HTTPError as exc:
+            if exc.code == 400:
+                return None
+            raise
+        return _ai_row(rows[0]) if rows else None
+
+    def save_ai_request(self, request_id: str, **fields) -> dict:
+        unknown = set(fields) - AI_FIELDS
+        if unknown:
+            raise ValueError(f"unknown AI request fields {sorted(unknown)}")
+        body = {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in fields.items()}
+        rows = self._request("PATCH", "m2_ai_requests", {"id": self._eq(request_id)}, body, returning=True)
+        if not rows:
+            raise KeyError(request_id)
+        return _ai_row(rows[0])
+
+    def ai_requests(self, *, user_id: str | None = None, class_ids=None, states=None, kinds=None, assignment_id: int | None = None,
+                    picture_id: str | None = None) -> list[dict]:
+        params = {"select": "*", "order": "created_at,id"}
+        if user_id is not None:
+            params["user_id"] = self._eq(user_id)
+        if class_ids is not None:
+            ids = sorted(set(class_ids))
+            if not ids:
+                return []
+            params["class_id"] = f"in.({','.join(str(i) for i in ids)})"
+        if states is not None:
+            params["state"] = f"in.({','.join(sorted(set(states)))})"
+        if kinds is not None:
+            params["kind"] = f"in.({','.join(sorted(set(kinds)))})"
+        if assignment_id is not None:
+            params["assignment_id"] = self._eq(assignment_id)
+        if picture_id is not None:
+            params["picture_id"] = self._eq(picture_id)
+        return [_ai_row(r) for r in self._request("GET", "m2_ai_requests", params)]
+
+    def start_ai_request(self, request_id: str, sent_by: str, at: datetime) -> dict | None:
+        rows = self._request("PATCH", "m2_ai_requests", {"id": self._eq(request_id), "state": "in.(waiting,failed)"},
+                             {"state": "processing", "failure": None, "sent_by": sent_by, "sent_at": at.isoformat()}, returning=True)
+        return _ai_row(rows[0]) if rows else None
+
+    def requeue_processing_ai_requests(self) -> int:
+        return len(self._request("PATCH", "m2_ai_requests", {"state": "eq.processing"}, {"state": "waiting"}, returning=True) or [])
+
+    def take_ai_allowance(self, scope: str, day: date, n: int, cap: int) -> bool:
+        return bool(self._request("POST", "rpc/m2_ai_take", body={"p_scope": scope, "p_day": day.isoformat(), "p_n": n, "p_cap": cap}))
+
+    def give_back_ai_allowance(self, scope: str, day: date, n: int) -> None:
+        self._request("POST", "rpc/m2_ai_give_back", body={"p_scope": scope, "p_day": day.isoformat(), "p_n": n})
+
+    def ai_allowance_used(self, scope: str, day: date) -> int:
+        rows = self._request("GET", "m2_ai_allowance", {"scope": self._eq(scope), "day": self._eq(day.isoformat()), "select": "used"})
+        return rows[0]["used"] if rows else 0
+
+    def add_ai_usage(self, row: dict) -> None:
+        self._request("POST", "m2_ai_usage", body={k: v for k, v in row.items() if k != "created_at"})
+
+    def ai_usage_rows(self) -> list[dict]:
+        return self._request("GET", "m2_ai_usage", {"select": "*", "order": "created_at"})
 
     # --- photo requests and push subscriptions ---
 

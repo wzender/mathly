@@ -174,6 +174,19 @@ def _exercise_result(request: Request, user: dict, row: dict) -> tuple[str, int 
     return ("done", max(grades)) if grades else ("not_done", None)
 
 
+def _student_ai(request: Request, user: dict, row: dict, sub: dict, klass: dict | None) -> dict:
+    """What the student can do about an answer: ask for an AI check (class with the AI on, not checked yet) or ask the teacher to look again, and the
+    state of their requests about it."""
+    from . import ai_help
+    store = request.app.state.store
+    mine = store.ai_requests(user_id=user["id"], assignment_id=row["id"], kinds=["check", "again"])
+    checks, again = [r for r in mine if r["kind"] == "check"], [r for r in mine if r["kind"] == "again"]
+    asked_again = any(r["state"] == "waiting" for r in again)
+    return {"can_check": bool(klass and klass["ai_enabled"] and sub["state"] == "handed_in" and not any(r["state"] in ai_help.OPEN for r in checks)),
+            "can_look_again": (sub["state"] in ("graded", "returned") or any(r["state"] == "done" for r in checks)) and not asked_again,
+            "asked_again": asked_again, "checks": [ai_help.view(request, r) for r in reversed(checks)][:3]}
+
+
 def student_assignment(request: Request, user: dict, row: dict, sub: dict | None, today: Day) -> dict:
     """An assignment as its student sees it: its state, grade and the teacher's note."""
     out = {"id": row["id"], "title": row["title"], "note": row["note"], "kind": row["kind"], "due_date": row["due_date"].isoformat(),
@@ -188,6 +201,8 @@ def student_assignment(request: Request, user: dict, row: dict, sub: dict | None
     else:
         out.update(state=sub["state"], grade=sub["grade"], teacher_note=sub["teacher_note"], late=sub["late"], handed_at=sub["handed_at"].isoformat())
     out["overdue"] = out["days_left"] < 0 and out["state"] in OPEN_STATES
+    if row["kind"] != "exercise_test" and sub is not None:
+        out["ai"] = _student_ai(request, user, row, sub, klass)
     return out
 
 
@@ -279,7 +294,14 @@ def inbox(request: Request, user: dict = Depends(need("class.teach"))) -> list[d
     for klass in _teachable_classes(request, user):
         rows = {r["id"]: r for r in store.assignments_of_classes([klass["id"]]) if r["kind"] != "exercise_test"}
         emails = _student_emails(request, klass["id"])
-        items += [inbox_item(request, s, rows[s["assignment_id"]], klass, emails) for s in store.submissions_of_assignments(list(rows)) if s["state"] == "handed_in"]
+        subs = store.submissions_of_assignments(list(rows))
+        items += [inbox_item(request, s, rows[s["assignment_id"]], klass, emails) for s in subs if s["state"] == "handed_in"]
+        again = {(r["assignment_id"], r["user_id"]): r for r in store.ai_requests(class_ids=[klass["id"]], kinds=["again"], states=["waiting"])}
+        for s in subs:                                                  # a student asked to look again at a checked answer
+            asked = again.get((s["assignment_id"], s["user_id"]))
+            if asked and s["state"] != "handed_in":
+                items.append({**inbox_item(request, s, rows[s["assignment_id"]], klass, emails), "kind": "again", "asked_at": asked["created_at"].isoformat(),
+                              "handed_at": asked["created_at"].isoformat(), "seen": s["handed_at"].isoformat()})
     return sorted(items, key=lambda i: (i["handed_at"], i["id"]))
 
 
@@ -299,6 +321,16 @@ def open_submission(submission_id: int, request: Request, user: dict = Depends(n
     out.update(state=sub["state"], grade=sub["grade"], teacher_note=sub["teacher_note"], pages=row["pages"], note=row["note"],
                quiz=quiz_view(request.app.state.bank, row["quiz_lesson"]) if row["kind"] == "quiz" else None)
     out["pictures"] = [{"id": p, "deleted": bool((request.app.state.store.get_picture(p) or {}).get("deleted_at"))} for p in sub["pictures"]]
+    from . import ai_help
+    store = request.app.state.store
+    check = ai_help.latest_check(store, sub["assignment_id"], sub["user_id"])
+    out["ai"] = ai_help.view(request, check, staff=True) if check else None                        # a suggestion: the teacher's grade wins
+    checks = store.ai_requests(user_id=sub["user_id"], assignment_id=sub["assignment_id"], kinds=["check"])
+    newest = checks[-1] if checks else None
+    out["ai_open"] = bool(newest and newest["state"] in ai_help.OPEN)
+    out["ai_failed"] = ai_help.view(request, newest, staff=True) if newest and newest["state"] == "failed" else None
+    out["ai_enabled"] = bool(klass["ai_enabled"])
+    out["look_again"] = bool(store.ai_requests(user_id=sub["user_id"], assignment_id=sub["assignment_id"], kinds=["again"], states=["waiting"]))
     return out
 
 
@@ -308,7 +340,8 @@ def _check(request: Request, user: dict, submission_id: int, seen: str) -> tuple
         saw = datetime.fromisoformat(seen)
     except ValueError:
         raise HTTPException(422, "seen לא תקין") from None
-    if sub["state"] != "handed_in":
+    again = bool(request.app.state.store.ai_requests(user_id=sub["user_id"], assignment_id=sub["assignment_id"], kinds=["again"], states=["waiting"]))
+    if sub["state"] != "handed_in" and not again:
         raise HTTPException(409, "ההגשה כבר נבדקה או הוחזרה")
     if saw != sub["handed_at"]:
         raise HTTPException(409, "ההגשה השתנתה. פתחו אותה שוב.")
@@ -317,19 +350,23 @@ def _check(request: Request, user: dict, submission_id: int, seen: str) -> tuple
 
 @router.post("/submissions/{submission_id}/grade")
 def grade_submission(submission_id: int, body: Check, request: Request, user: dict = Depends(need("class.teach"))) -> dict:
+    from . import ai_help
     sub, _ = _check(request, user, submission_id, body.seen)
     saved = request.app.state.store.save_submission(sub["assignment_id"], sub["user_id"], state="graded", grade=body.grade, teacher_note=body.note.strip(),
                                                     checked_at=clock.now(), checked_by=user["email"])
+    ai_help.close_look_again(request.app.state.store, sub["assignment_id"], sub["user_id"])      # saving a review closes the student's request
     return {"id": saved["id"], "state": saved["state"], "grade": saved["grade"]}
 
 
 @router.post("/submissions/{submission_id}/return")
 def return_submission(submission_id: int, body: SendBack, request: Request, user: dict = Depends(need("class.teach"))) -> dict:
+    from . import ai_help
     sub, _ = _check(request, user, submission_id, body.seen)
     if not body.note.strip():
         raise HTTPException(422, "צריך לכתוב מה לתקן")
     saved = request.app.state.store.save_submission(sub["assignment_id"], sub["user_id"], state="returned", grade=None, teacher_note=body.note.strip(),
                                                     checked_at=clock.now(), checked_by=user["email"])
+    ai_help.close_look_again(request.app.state.store, sub["assignment_id"], sub["user_id"])
     return {"id": saved["id"], "state": saved["state"]}
 
 
@@ -389,4 +426,6 @@ def teaching_counts(request: Request, user: dict = Depends(need("class.teach")))
     waiting = sum(1 for s in store.submissions_of_assignments(graded_by_student) if s["state"] == "handed_in")
     here.prefetch(*[("members", i) for i in ids])
     students = len({m["email"] for i in ids for m in here.members(i)})
-    return {"classes": len(classes), "tests": len(tests), "assignments": len(assignments), "inbox": waiting, "progress": students}
+    ai_waiting = len(store.ai_requests(class_ids=ids, kinds=["photo", "check"], states=["waiting"])) if ids else 0
+    again = len(store.ai_requests(class_ids=ids, kinds=["again"], states=["waiting"])) if ids else 0          # students asking to look again are in the inbox
+    return {"classes": len(classes), "tests": len(tests), "assignments": len(assignments), "inbox": waiting + again, "progress": students, "ai": ai_waiting}

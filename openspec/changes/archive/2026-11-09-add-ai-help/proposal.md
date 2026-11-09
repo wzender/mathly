@@ -12,6 +12,7 @@ Students get stuck on problems outside the bank, and teachers cannot check every
 - Budgets: per class per day (default 150) and 3 personal requests per teacher per day.
 - Privacy: the AI is off per class until a manager switches it on; no names or emails go to the AI.
 - Clear messages when the AI fails, and a record of every call's cost.
+- A student can ask the teacher to look again at a checked answer; the request appears in the teacher's inbox.
 
 Screens: `docs/mockups/mathly2-screens.html` (student tab: photo help on home; teacher tab: AI queue).
 
@@ -25,5 +26,6 @@ Screens: `docs/mockups/mathly2-screens.html` (student tab: photo help on home; t
 ## Impact
 
 - Builds on `written-answers`, `assignments` and the class AI switch and budget from `accounts-and-classes`.
-- New `m2_` tables for requests, reviews, budgets and usage. Uses `ANTHROPIC_API_KEY` and `MATH_MODEL`.
-- Ports mathly1's `app/math_photo.py`, `app/answer_grading.py`, `app/ai_queue.py`, `app/ai_batches.py`, `app/teacher_ai.py`, `app/ai_usage.py` behavior.
+- New `m2_` tables for requests, allowances (budgets) and usage, and a new picture kind for help photos. Uses `ANTHROPIC_API_KEY` and `MATH_MODEL`. The AI is called from a small background pool, so a send returns at once and a batch does not hold the teacher's page.
+- Ports the behavior (prompts, schemas, failure reasons, prices) of mathly1's `app/math_photo.py`, `app/answer_grading.py`, `app/ai_usage.py`; the queue, batches and budgets are rebuilt on the `m2_` tables.
+- Developers' usage totals (DEV-4) belong to `add-developer-tools`; this change only records them.

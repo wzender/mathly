@@ -197,7 +197,7 @@ def test_supabase_student_and_member_requests():
     assert s.all_students() == [{"email": "y@x.test", "classes": ["A", "B"]}]
     assert s.remove_member(1, "s@x.test") is True and s.remove_member(1, "s@x.test") is False
     s.link_user("s@x.test", "u1")
-    assert s.calls[0][2] == {"email": "eq.s@x.test", "select": "m2_classes(id,name,lessons)"}
+    assert s.calls[0][2] == {"email": "eq.s@x.test", "select": "m2_classes(id,name,lessons,ai_enabled,ai_daily_checks)"}
     assert s.calls[2][2] == {"class_id": "eq.1", "email": "eq.s@x.test"}
     assert s.calls[4][2] == {"email": "eq.s@x.test", "user_id": "is.null"}
 

@@ -458,3 +458,16 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .pbar span { position: relative; display: block; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; color: var(--ink); text-shadow: 0 0 3px var(--surface); }
 .qgrade { margin-top: 3px; font-size: 13px; font-weight: 600; }
 .qgrade .warn { color: var(--sky-danger); }
+
+/* Photo help (STU-6): the student's sheet; it opens above the exercise sheet */
+.ai-window { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 12px; background: rgb(0 0 0 / .72); }
+.ai-window .sheet { width: min(100%, 460px); max-height: 92vh; overflow: auto; background: var(--surface); border: 2px solid var(--sky-gold); border-radius: 18px; padding: 14px 16px; display: grid; gap: 8px; }
+.ai-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ai-top h3 { margin: 0; }
+.ai-window img { max-width: 100%; max-height: 220px; border-radius: 10px; }
+.ai-steps { display: grid; gap: 10px; padding: 0; list-style: none; }
+.ai-hint { margin: 0 0 4px; }
+.ai-work { margin: 0; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--sky-accent) 14%, var(--surface)); }
+.ai-card { border: 2px dashed var(--sky-accent); border-radius: 14px; padding: 10px 14px; margin-top: 8px; display: grid; gap: 6px; }
+.ai-card ul { margin: 0; }
+.ai-check { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin-top: 6px; }

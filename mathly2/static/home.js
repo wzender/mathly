@@ -1,6 +1,7 @@
 // The student's home for a subject: the nearest test with its readiness and one task for today, the required simulation,
 // the other tests, and a button that continues the path.
 import { swr } from "./api.js";
+import * as aiSheet from "./ai_sheet.js";
 import { esc, fmt } from "./math.js";
 import { PATH, backToSubjects, daysText, shortDate, tabs } from "./ui.js";
 
@@ -65,16 +66,28 @@ function assignmentsCard(all) {
   }).join("")}</ul></section>`;
 }
 
-export const show = view => swr(["/api/home", "/api/assignments"], ([data, assignments]) => draw(view, data, assignments));
+/** The photo help card (STU-6): only for a class with the AI on; it also lists the student's latest requests with their state. */
+function aiCard(ai) {
+  if (!ai?.on) return "";
+  return `<section class="card ai-card" id="ai-card"><h2>תקועים על תרגיל? צלמו אותו</h2>
+    <p class="muted">המורה רואה את התמונה לפני שהיא נשלחת ל־AI.</p>
+    <p><button type="button" class="primary" id="ai-new">📷 עזרה מתמונה</button></p>
+    ${ai.requests.length ? `<ul class="plain" id="ai-requests">${ai.requests.map(r => `<li data-request="${esc(r.id)}"><button type="button" data-ai-open="${esc(r.id)}">
+      <span class="tag st-${esc(r.state)}">${esc(aiSheet.stateWord(r.state))}</span> ${r.skill ? fmt(r.skill.name) : "תרגיל מצולם"}</button></li>`).join("")}</ul>` : ""}</section>`;
+}
 
-function draw(view, data, assignments) {
+export const show = view => swr(["/api/home", "/api/assignments", "/api/ai/status"], ([data, assignments, ai]) => draw(view, data, assignments, ai));
+
+function draw(view, data, assignments, ai) {
   const [first] = data.tests;
   const required = data.tests.filter(t => t.simulation.required);
   view(`${tabs("home")}${backToSubjects()}
     ${first ? nearest(first, data.task, data.next_skill) : `<section class="card" id="no-test"><h2>הבית</h2>
       <p class="muted">המורה עוד לא קבע מבחן. בינתיים אפשר להמשיך במסלול.</p></section>`}
-    ${assignmentsCard(assignments)}
+    ${assignmentsCard(assignments)}${aiCard(ai)}
     ${required.map(t => `<a class="required" href="#/sim/${t.id}" data-required="${t.id}"><b>חובה</b> מבחן סימולציה למבחן ב־${shortDate(t.date)}<span aria-hidden="true">‹</span></a>`).join("")}
     <p>${data.next_skill ? `<a class="primary-link" id="continue-path" href="#/skill/${encodeURIComponent(data.next_skill.id)}">להמשיך במסלול: ${fmt(data.next_skill.name)} <span aria-hidden="true">‹</span></a>`
       : `<a class="primary-link" id="continue-path" href="${PATH}">למסלול: כל הכוכבים פתוחים לתרגול <span aria-hidden="true">‹</span></a>`}</p>`);
+  document.getElementById("ai-new")?.addEventListener("click", () => aiSheet.open());
+  document.querySelectorAll("[data-ai-open]").forEach(b => b.addEventListener("click", () => aiSheet.open({ id: b.dataset.aiOpen })));
 }

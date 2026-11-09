@@ -4,11 +4,12 @@ import { api, ApiError } from "./api.js";
 import { figures } from "./figures.js";
 import { clear as clearComet, cross as crossComet } from "./comets.js";
 import { esc, fmt } from "./math.js";
+import * as aiSheet from "./ai_sheet.js";
 import { PATH, shuffled } from "./ui.js";
 
 
 const COUNTDOWN = 3;   // seconds before the next question after a right answer
-let layer = null, skill = null, timer = null, helped = false, boardReady = null;
+let layer = null, skill = null, timer = null, helped = false, boardReady = null, aiOn = false;
 
 const script = src => new Promise((ok, no) => {
   const s = document.createElement("script");
@@ -34,8 +35,9 @@ export const isOpen = () => !!layer;
 /** Open (or switch to) a skill's sheet. */
 export async function open(id) {
   stop();
-  const [data] = await Promise.all([api(`/api/skills/${encodeURIComponent(id)}`), loadBoard()]);
+  const [data, , ai] = await Promise.all([api(`/api/skills/${encodeURIComponent(id)}`), loadBoard(), aiSheet.status()]);
   skill = data;
+  aiOn = !!ai.on;                                                     // photo help only for a class with the AI on (AI-10)
   if (!layer) {
     layer = document.createElement("div");
     layer.className = "mx-layer";
@@ -50,6 +52,7 @@ export async function open(id) {
 /** Close the sheet: stop timers, bring the board back from full screen, and remove everything. */
 export function close() {
   if (!layer) return;
+  aiSheet.close();
   stop();
   clearComet();
   window.MathlyBoard?.closeFull?.();
@@ -60,6 +63,7 @@ export function close() {
 const heading = () => `<div class="mx-shtop"><div><span class="ex-chip">${fmt(skill.lesson.name)}</span>
     <h3 id="ex-title">${fmt(skill.name)}${skill.state === "mastered" ? ' <span class="ex-done" title="נשלטה">✓ נשלטה</span>' : ""}</h3></div>
   <div class="mx-shacts">${window.MathlyBoard?.button() || ""}
+    ${aiOn ? `<button type="button" class="ex-help ex-ai" data-ai aria-label="עזרה מתמונה: צלמו תרגיל ושלחו למורה" title="עזרה מתמונה">📷</button>` : ""}
     <button type="button" class="ex-help" data-help aria-label="עזרה: ההסבר והדוגמה הפתורה" title="עזרה" aria-expanded="false">?</button>
     <button type="button" class="mx-x" data-close aria-label="סגירה">✕</button></div></div>`;
 
@@ -94,7 +98,8 @@ const helpBox = () => {
   return `<div class="ex-helpbox" id="ex-helpbox" hidden><h4>הסבר</h4><p>${fmt(skill.help.explanation)}</p>
     ${ex ? `<h4>דוגמה פתורה</h4><p class="ex-eq">${fmt(ex.question)}</p><ol class="ex-steps">${ex.steps.map(s =>
       `<li>${fmt(s.do)}<br><span class="muted">${fmt(s.why)}</span></li>`).join("")}</ol><p><b>תשובה:</b> ${fmt(ex.answer)}</p>` : ""}
-    ${skill.question ? `<p class="muted" id="ex-helpnote">פתחתם עזרה: התשובה לשאלה הזו לא תיספר לשליטה.</p>` : ""}</div>`;
+    ${skill.question ? `<p class="muted" id="ex-helpnote">פתחתם עזרה: התשובה לשאלה הזו לא תיספר לשליטה.</p>` : ""}
+    ${aiOn ? `<p><button type="button" data-ai id="ex-stuck">עדיין תקועים? צלמו</button></p>` : ""}</div>`;
 };
 
 const related = () => {
@@ -253,6 +258,7 @@ function onClick(event) {
   const target = event.target;
   if (target.closest("[data-close]")) { location.hash = PATH; return; }
   if (target.closest("[data-board-toggle]")) { window.MathlyBoard?.toggle(); return; }
+  if (target.closest("[data-ai]")) { aiSheet.open({ skillId: skill.id }); return; }
   if (target.closest("[data-help]")) { openHelp(); return; }
   if (target.closest("#ex-newround")) { newRound(); return; }
   const choice = target.closest(".ex-choice");

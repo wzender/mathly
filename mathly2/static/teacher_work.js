@@ -122,8 +122,8 @@ export const showInbox = (ctx, notice = "") => swr("/api/teaching/inbox", items 
 
 async function drawInbox(ctx, items, notice) {
   ctx.draw(`${ctx.tabs("inbox")}<section id="inbox"><h2>תיבת בדיקה</h2>${notice ? `<p class="ex-note" role="status" id="inbox-notice">${esc(notice)}</p>` : ""}
-    ${items.length ? `<ul class="plain inbox-list" id="inbox-list">${items.map(i => `<li data-submission="${i.id}"><button type="button" class="open-submission" data-open="${i.id}">
-      <b>${esc(i.student || "תלמיד/ה")}</b> · ${fmt(i.assignment.title)}<br><span class="muted">${esc(i.assignment.class.name)} · הוגש ${when(i.handed_at)}${i.late ? " · באיחור" : ""}</span></button></li>`).join("")}</ul>`
+    ${items.length ? `<ul class="plain inbox-list" id="inbox-list">${items.map(i => `<li data-submission="${i.id}" data-kind="${esc(i.kind)}"><button type="button" class="open-submission" data-open="${i.id}">
+      <b>${esc(i.student || "תלמיד/ה")}</b> · ${fmt(i.assignment.title)}<br><span class="muted">${esc(i.assignment.class.name)} · ${i.kind === "again" ? `ביקש/ה בדיקה חוזרת ${when(i.asked_at)}` : `הוגש ${when(i.handed_at)}${i.late ? " · באיחור" : ""}`}</span></button></li>`).join("")}</ul>`
       : `<p class="muted" id="inbox-empty">אין מה לבדוק. כל ההגשות נבדקו.</p>`}</section>`);
   ctx.wire();
   document.getElementById("inbox").addEventListener("click", event => {
@@ -132,13 +132,30 @@ async function drawInbox(ctx, items, notice) {
   });
 }
 
+/** The AI's check of the answer, as a suggestion: the teacher's grade is what counts. */
+function aiSuggestion(s) {
+  const a = s.ai;
+  if (a && a.state === "done" && !s.ai_open) {
+    const r = a.result || {};
+    const score = r.score === null || r.score === undefined ? `<p>ה־AI לא נתן ציון (${r.verdict === "unreadable" ? "התמונה לא קריאה" : "לא היה בטוח"}). כדאי לבדוק בעצמכם.</p>` : `<p>הציון המוצע: <b id="ai-score">${r.score}</b></p>`;
+    return `<section class="ai-check" id="ai-suggestion"><h4>הצעה של AI (הציון שלכם קובע)</h4>${score}<p>${fmt(r.feedback || "")}</p>
+      <details><summary>מה ה־AI קרא ומה הפתרון</summary><p class="muted">${fmt(r.transcription || "")}</p><p>${fmt(r.solution || "")}</p></details></section>`;
+  }
+  if (s.ai_open) return `<p class="muted" id="ai-pending" role="status">בדיקת ה־AI בדרך…</p>`;
+  const f = s.ai_failed;
+  const failed = f ? `<p class="error" id="ai-failed">בדיקת ה־AI נכשלה: ${esc(f.failure?.label || "")}. ${esc(f.failure?.todo || "")} <span class="muted" dir="ltr">${esc(f.failure?.detail || "")}</span></p>` : "";
+  return `${failed}${s.ai_enabled ? `<p><button type="button" id="teacher-ai-check">${f ? "ניסיון חוזר: בדיקת AI" : "בדיקת AI"}</button></p>` : ""}`;
+}
+
 async function openSubmission(ctx, id) {
   const s = await api(`/api/submissions/${id}`);
   const material = s.quiz ? `<h4>הבוחן הכתוב</h4><ol class="qz-written">${s.quiz.questions.map(x => `<li><p class="ex-text" dir="auto">${fmt(x.question)}</p><span class="muted">${x.points} נק׳</span></li>`).join("")}</ol>`
     : s.pages.length ? `<h4>הדף שניתן</h4><div class="pages">${s.pages.map(p => `<img data-picture="${esc(p)}" alt="עמוד של המשימה" hidden>`).join("")}</div>` : "";
   ctx.draw(`${ctx.tabs("inbox")}<section id="check" class="card" data-submission="${s.id}"><p><button type="button" id="back-to-inbox">‹ חזרה לתיבה</button></p>
     <h2>${esc(s.student)}: ${fmt(s.assignment.title)}</h2><p class="muted">${esc(s.assignment.class.name)} · הוגש ${when(s.handed_at)}${s.late ? " · באיחור" : ""}</p>
+    ${s.look_again ? `<p class="ex-note" id="look-again-note" role="status">התלמיד/ה ביקש/ה שתבדקו שוב.</p>` : ""}
     <h4>התשובה</h4><div class="pages" id="answer-pictures">${s.pictures.map(p => p.deleted ? `<p class="muted">התמונה נמחקה</p>` : `<img data-picture="${esc(p.id)}" alt="תמונה של התשובה" hidden>`).join("")}</div>
+    ${aiSuggestion(s)}
     <details><summary>מה ביקשנו</summary>${material || `<p class="muted">אין תוכן להצגה.</p>`}</details>
     <form id="check-form"><label>ציון (0 עד 100)<input name="grade" type="number" min="0" max="100" step="1" inputmode="numeric"></label>
       <label>הערה לתלמיד/ה<textarea name="note" rows="3" maxlength="2000"></textarea></label>
@@ -147,6 +164,11 @@ async function openSubmission(ctx, id) {
   ctx.wire();
   document.querySelectorAll("#check img[data-picture]").forEach(async img => { try { img.src = await pictureUrl(img.dataset.picture); img.hidden = false; } catch { img.remove(); } });
   const form = document.getElementById("check-form"), error = document.getElementById("check-error");
+  document.getElementById("teacher-ai-check")?.addEventListener("click", async event => {
+    try { await withBusy(event.currentTarget, api(`/api/submissions/${id}/ai-check`, { method: "POST" })); } catch (e) { error.textContent = e.message; error.hidden = false; return; }
+    openSubmission(ctx, id);
+  });
+  if (s.ai_open) setTimeout(() => { if (document.getElementById("check")?.dataset.submission === String(id)) openSubmission(ctx, id); }, 5000);   // the check is on its way
   const fail = text => { error.textContent = text; error.hidden = false; };
   document.getElementById("back-to-inbox").addEventListener("click", () => showInbox(ctx));
   const send = async (path, body, done) => {

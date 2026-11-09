@@ -46,6 +46,10 @@ def _class_ids_of(request: Request, picture: dict) -> set[int]:
         found = store.get_assignment(sub["assignment_id"]) if sub else None
         if found:
             classes.add(found["class_id"])
+    for rid in refs.get("ai_requests", []):
+        asked = store.get_ai_request(rid)
+        if asked and asked["class_id"]:
+            classes.add(asked["class_id"])
     return classes
 
 

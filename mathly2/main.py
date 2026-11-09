@@ -15,7 +15,7 @@ from .access import RoleResolver, learner, permissions_of
 from .auth import DevAuthenticator, SupabaseAuthenticator, current_user
 from .bank import Bank, load_bank
 
-from . import accounts, assignments, classes, cleanup, progress, quizzes, reads, realtests, skills, written
+from . import accounts, ai, ai_help, assignments, classes, cleanup, progress, quizzes, reads, realtests, skills, written
 from .config import Settings, load_settings
 from .cached import CachedStore
 from .store import InMemoryStore, StoreUnavailable, SupabaseStore
@@ -36,12 +36,13 @@ class FreshStaticFiles(StaticFiles):
 log = logging.getLogger("mathly2")
 
 
-def create_app(settings: Settings | None = None, bank: Bank | None = None, store=None, authenticator=None, picture_store=None, pusher=None) -> FastAPI:
+def create_app(settings: Settings | None = None, bank: Bank | None = None, store=None, authenticator=None, picture_store=None, pusher=None, ai_client=None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         # Against the real database the pictures are tidied every hour (nothing runs without Supabase, so local runs and tests are quiet).
         stop = cleanup.start_hourly(application.state.store, application.state.pictures) if application.state.settings.supabase_on else None
         application.state.cleanup_stop = stop
+        ai_help.requeue_after_restart(application.state.store)     # a request that was being processed when the server stopped waits again
         yield
         if stop:
             stop.set()
@@ -60,6 +61,7 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
                                            if settings.supabase_on else MemoryPictures())
     app.state.pusher = pusher or Pusher(app.state.store, settings.vapid_private_key, default_subject(settings))
     app.state.notify_request = written.notify_new_request
+    app.state.ai = ai_client or ai.make_ai(settings)
     app.state.roles = RoleResolver(settings, app.state.store)
     @app.exception_handler(StoreUnavailable)
     async def store_unavailable(request: Request, exc: StoreUnavailable) -> JSONResponse:
@@ -78,6 +80,7 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     app.include_router(quizzes.router)
     app.include_router(realtests.router)
     app.include_router(progress.router)
+    app.include_router(ai_help.router)
     app.include_router(written.router)
     app.include_router(assignments.router)
 

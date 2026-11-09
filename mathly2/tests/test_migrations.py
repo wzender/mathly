@@ -393,3 +393,63 @@ def test_the_server_role_keeps_one_date_per_lesson_and_rls_has_no_policies(db):
     with psycopg.connect(db, autocommit=True) as c:
         assert c.execute("select relrowsecurity from pg_class where relname = 'm2_curriculum'").fetchone() == (True,)
         assert c.execute("select count(*) from pg_policies where tablename = 'm2_curriculum'").fetchone() == (0,)
+
+
+# --- AI help ---
+
+@pytest.mark.parametrize("role", ["authenticated", "anon"])
+@pytest.mark.parametrize("table", ["m2_ai_requests", "m2_ai_allowance", "m2_ai_usage"])
+def test_browser_roles_cannot_touch_ai_tables(db, role, table):
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        as_role(db, role, f"select * from public.{table}")
+
+
+@pytest.mark.parametrize("role", ["authenticated", "anon"])
+def test_browser_roles_cannot_call_the_budget_functions(db, role):
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        as_role(db, role, "select public.m2_ai_take('class:1', '2026-11-09', 1, 5)")
+
+
+def test_ai_requests_have_defaults_checks_and_cascade_with_the_class(db):
+    with psycopg.connect(db, autocommit=True) as c:
+        cid = _class(c, "בינה-1")
+        pic = c.execute("insert into public.m2_pictures(owner_id, kind, path, content_type, size) values ('11111111-1111-1111-1111-111111111111', 'help', 'h/1.jpg', 'image/jpeg', 10) returning id").fetchone()[0]
+        rid = c.execute("insert into public.m2_ai_requests(kind, user_id, class_id, picture_id) values ('photo', '11111111-1111-1111-1111-111111111111', %s, %s) returning id", (cid, pic)).fetchone()[0]
+        assert c.execute("select state, teacher_note from public.m2_ai_requests where id = %s", (rid,)).fetchone() == ("waiting", "")
+        with pytest.raises(psycopg.errors.CheckViolation):                                     # a photo needs its picture
+            c.execute("insert into public.m2_ai_requests(kind, user_id, class_id) values ('photo', '11111111-1111-1111-1111-111111111111', %s)", (cid,))
+        with pytest.raises(psycopg.errors.CheckViolation):                                     # a check needs its assignment
+            c.execute("insert into public.m2_ai_requests(kind, user_id, class_id) values ('check', '11111111-1111-1111-1111-111111111111', %s)", (cid,))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            c.execute("insert into public.m2_ai_requests(kind, user_id, class_id, picture_id, state) values ('photo', '11111111-1111-1111-1111-111111111111', %s, %s, 'bogus')", (cid, pic))
+        c.execute("delete from public.m2_classes where id = %s", (cid,))
+        assert c.execute("select count(*) from public.m2_ai_requests where id = %s", (rid,)).fetchone() == (0,)
+
+
+def test_the_allowance_is_taken_in_one_step_never_past_the_cap_and_can_be_given_back(db):
+    take = lambda n, cap: as_role(db, "service_role", "select public.m2_ai_take('class:9', '2026-11-09', %s, %s)", n, cap)[0][0]
+    assert take(3, 5) is True and take(3, 5) is False and take(2, 5) is True and take(1, 5) is False
+    as_role(db, "service_role", "select public.m2_ai_give_back('class:9', '2026-11-09', 2)")
+    assert take(2, 5) is True
+    as_role(db, "service_role", "select public.m2_ai_give_back('class:9', '2026-11-09', 99)")
+    assert as_role(db, "service_role", "select used from public.m2_ai_allowance where scope = 'class:9'") == [(0,)]       # never below zero
+
+
+def test_two_takes_at_once_never_pass_the_cap(db):
+    import threading
+    got = []
+
+    def go():
+        with psycopg.connect(db, autocommit=True) as c:
+            got.append(c.execute("select public.m2_ai_take('class:10', '2026-11-09', 1, 3)").fetchone()[0])
+    threads = [threading.Thread(target=go) for _ in range(12)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert got.count(True) == 3 and got.count(False) == 9
+
+
+def test_the_server_role_keeps_ai_usage(db):
+    as_role(db, "service_role", "insert into public.m2_ai_usage(feature, model, input_tokens, output_tokens, cost_usd) values ('photo', 'claude-opus-5-5', 100, 50, 0.001)")
+    assert as_role(db, "service_role", "select count(*) from public.m2_ai_usage") == [(1,)]
+    with pytest.raises(psycopg.errors.CheckViolation):
+        as_role(db, "service_role", "insert into public.m2_ai_usage(feature, model) values ('other', 'x')")

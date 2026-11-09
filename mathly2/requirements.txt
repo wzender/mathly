@@ -6,3 +6,4 @@ tzdata>=2024.1
 Pillow==12.3.0  # checks and cleans answer pictures (mathly2/pictures.py)
 pypdfium2>=4.30,<6  # a teacher's PDF to page images
 pywebpush>=2.0,<3  # notifications to a student's phone for a photo request
+anthropic>=1.0  # photographed-problem hints and AI checks of handwritten answers (mathly2/ai.py)

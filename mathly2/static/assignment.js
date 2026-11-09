@@ -1,6 +1,7 @@
 // One assignment: its material (pages or the bank's written quiz), the student's answer as pictures (from the board, the camera, a file or
 // the phone) and handing it in; afterwards its state, and the grade and note or the request to correct.
 import { api } from "./api.js";
+import { stateWord } from "./ai_sheet.js";
 import { loadBoard } from "./exercise.js";
 import { figures } from "./figures.js";
 import { assignmentState } from "./home.js";
@@ -39,6 +40,25 @@ function stateBox(a) {
   if (a.state === "returned") return `${head}<div class="returned" id="returned"><b>המורה החזיר/ה את המשימה לתיקון.</b>${note}<p>תקנו והגישו שוב.</p></div>`;
   if (a.state === "graded") return `${head}<p class="grade-big" id="grade">הציון: <b>${a.grade}</b></p>${note}`;
   return head;
+}
+
+/** What the student can do about a handed-in answer: ask for an AI check (it waits for the teacher), see its result as a suggestion, or ask
+ *  the teacher to look again. */
+function aiBox(a) {
+  const ai = a.ai;
+  if (!ai || (!ai.can_check && !ai.can_look_again && !ai.asked_again && !ai.checks.length)) return "";
+  const checks = ai.checks.map(c => {
+    const r = c.result;
+    const body = c.state === "done"
+      ? (r.score === null || r.score === undefined ? `<p>ה־AI לא הצליח לקרוא את התשובה. המורה יבדוק/תבדוק.</p>` : `<p>הציון המוצע: <b>${r.score}</b> (המורה קובע/ת את הציון)</p>`) + `<p>${fmt(r.feedback || "")}</p>${r.next_step ? `<p class="muted">${fmt(r.next_step)}</p>` : ""}`
+      : c.state === "declined" ? `<p>${c.teacher_note ? fmt(c.teacher_note) : "המורה לא שלח/ה את הבקשה."}</p>`
+      : c.state === "failed" ? `<p class="error">${esc(c.failure?.message || "לא הצלחנו כרגע. נסו שוב מאוחר יותר.")}</p>` : "";
+    return `<div class="ai-check" data-check="${esc(c.id)}" data-state="${esc(c.state)}"><p><span class="tag st-${esc(c.state)}">${esc(stateWord(c.state))}</span></p>${body}</div>`;
+  }).join("");
+  return `<section class="card" id="ai-box"><h3>בדיקה נוספת</h3>
+    ${ai.can_check ? `<p><button type="button" id="ask-check">בקשת בדיקה של AI</button> <span class="muted">המורה יראה/תראה את הבקשה קודם.</span></p>` : ""}
+    ${ai.can_look_again ? `<p><button type="button" id="ask-again">בקשה מהמורה לבדוק שוב</button></p>` : ""}
+    ${ai.asked_again ? `<p class="muted" id="again-asked">ביקשתם מהמורה לבדוק שוב.</p>` : ""}${checks}</section>`;
 }
 
 function draftHtml() {
@@ -120,6 +140,17 @@ async function handIn() {
   }
 }
 
+let pollTimer = null;
+function wireAi(id) {
+  clearTimeout(pollTimer);
+  const ask = async path => { try { await api(path, { method: "POST" }); } catch (e) { message = e.message; } await show(draw, id); };
+  q("#ask-check")?.addEventListener("click", e => withBusy(e.currentTarget, ask(`/api/assignments/${current.id}/ai-check`)));
+  q("#ask-again")?.addEventListener("click", e => withBusy(e.currentTarget, ask(`/api/assignments/${current.id}/look-again`)));
+  if ((current.ai?.checks || []).some(c => ["waiting", "processing"].includes(c.state)) && q("#assignment")) {      // look again while a check is on its way
+    pollTimer = setTimeout(() => { if (q("#assignment")?.dataset.id === String(current.id)) show(draw, id); }, 5000);
+  }
+}
+
 export async function show(view, id) {
   draw = view;
   current = await api(`/api/assignments/${encodeURIComponent(id)}`);
@@ -129,7 +160,8 @@ export async function show(view, id) {
     <section class="card" id="assignment" data-id="${current.id}" data-state="${esc(current.state)}"><h2>${fmt(current.title)}</h2>
       <p class="muted">${esc(current.class.name)} · עד ${shortDate(current.due_date)}${current.overdue ? " · באיחור" : ""}</p>
       ${current.note ? `<p id="assignment-note">${fmt(current.note)}</p>` : ""}${stateBox(current)}</section>
-    <section class="card" id="material">${material(current)}</section>${answerBox(current)}`);
+    <section class="card" id="material">${material(current)}</section>${answerBox(current)}${aiBox(current)}`);
+  wireAi(id);
   document.querySelectorAll("img[data-picture]:not(#draft img)").forEach(img => fill(img, img.dataset.picture));
   if (!editable(current) || current.kind === "exercise_test") return;
   renderDraft();
