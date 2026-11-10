@@ -78,7 +78,7 @@ export async function showSubjects(view) {
   const path = await api("/api/path");
   const total = path.lessons.reduce((n, l) => n + l.skills.length, 0), lit = path.lessons.reduce((n, l) => n + l.mastered, 0);
   view(`<section class="subjects" aria-label="מקצועות">
-    <h2>במה נתרגל היום?</h2>
+    <h2>מה נתרגל היום?</h2>
     <a class="subject-card" href="${HOME}" data-subject="מתמטיקה"><span class="subject-icon" aria-hidden="true">∑</span>
       <span class="grow"><b>מתמטיקה כיתה ט - מצוינות</b>
         <span class="bar" role="progressbar" aria-label="מיומנויות שהושלמו" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${lit}"><i style="width:${total ? Math.round(100 * lit / total) : 0}%"></i></span>
