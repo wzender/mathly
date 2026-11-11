@@ -8,9 +8,9 @@
 
 ## 2. Merged bank (stage 1)
 
-- [ ] 2.1 Give the file's units `subject_id = "math"` and teach `Bank` to take extra units from published lessons, with the same checks. A broken published lesson is left out and logged; a broken file still stops start-up. Verify with bank tests: merged lessons in subject order, a broken database lesson skipped, a broken file refused.
-- [ ] 2.2 Build the bank from the file plus published lessons at start-up, and rebuild and swap `app.state.bank` after publish, unpublish and reorder. If the tables are missing, log it and serve the file only. Verify with tests: a published lesson appears without a restart, a failed build keeps the old bank, and start-up works without the migration.
-- [ ] 2.3 Give server-made ids to lessons, skills and mistakes (`w<n>`, `w<n>_<k>`, `w<n>_m<k>`), never reused within a lesson. Verify with tests: deleting a skill keeps the others' ids, and mastery and review survive a reorder.
+- [x] 2.1 Give the file's units `subject_id = "math"` and teach `Bank` to take extra units from published lessons, with the same checks. A broken published lesson is left out and logged; a broken file still stops start-up. Verify with bank tests: merged lessons in subject order, a broken database lesson skipped, a broken file refused.
+- [x] 2.2 Build the bank from the file plus published lessons at start-up, and rebuild and swap `app.state.bank` after publish, unpublish and reorder. If the tables are missing, log it and serve the file only. Verify with tests: a published lesson appears without a restart, a failed build keeps the old bank, and start-up works without the migration.
+- [x] 2.3 Give server-made ids to lessons, skills and mistakes (`w<n>`, `w<n>_<k>`, `w<n>_m<k>`), never reused within a lesson. Verify with tests: deleting a skill keeps the others' ids, and mastery and review survive a reorder.
 
 ## 3. Subjects and classes (stage 1)
 

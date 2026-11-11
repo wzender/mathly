@@ -112,9 +112,106 @@ def check_bank(data: dict) -> list[str]:
     return problems
 
 
+# ---- lessons kept in the database (add-subjects-and-worksheets) ----
+#
+# A lesson row of m2_lessons holds a document per state (draft, published), one unit in this shape:
+#   {"name": "...", "skills": [{"id": "w7_1", "name", "short", "description", "questions": [question, ...]}, ...],
+#    "mistakes": {"w7_m1": {"name", "tip", "back"?}, ...}, "next_skill": 2, "next_mistake": 2}
+# A question is as in the content file ({"question", "choices": [{"text", "correct"?: true, "mistake"?: id}]}) plus "source":
+# "sheet", "ai" or "person", which the editor shows and the bank drops (so the label never changes a question's key).
+# Ids are made by the server from the row's id and counters that only grow, so they never clash with the content file's ids
+# or with each other, and deleting or moving a skill keeps every other id.
+
+MATH = {"id": "math", "name": "מתמטיקה", "icon": "∑"}
+QUESTION_FIELDS = ("question", "choices", "figure", "graph")
+
+
+def lesson_unit_id(lesson_id: int) -> str:
+    return f"w{lesson_id}"
+
+
+def lesson_problems(document: dict, lesson_id: int) -> list[str]:
+    """What is wrong with a lesson document as the bank would load it (its shape, its own ids, then the bank's own checks)."""
+    if not isinstance(document, dict):
+        return ["the lesson is not a document"]
+    prefix, problems = lesson_unit_id(lesson_id), []
+    if not str(document.get("name") or "").strip():
+        problems.append("the lesson has no name")
+    skills, mistakes = document.get("skills"), document.get("mistakes", {})
+    if not isinstance(skills, list) or not isinstance(mistakes, dict):
+        return problems + ["the lesson needs a list of skills and a set of mistakes"]
+    for skill in skills:
+        if not isinstance(skill, dict) or not str(skill.get("id", "")).startswith(prefix + "_") or not str(skill.get("name") or "").strip():
+            problems.append(f"skill '{skill.get('id') if isinstance(skill, dict) else skill}': needs a name and an id of this lesson")
+        elif not isinstance(skill.get("questions", []), list) or any(not isinstance(q, dict) or not str(q.get("question") or "").strip()
+                                                                    for q in skill.get("questions", [])):
+            problems.append(f"skill '{skill['id']}': every question needs its text")
+    for mid, mistake in mistakes.items():
+        if not mid.startswith(prefix + "_m") or not isinstance(mistake, dict) or not str(mistake.get("name") or "").strip():
+            problems.append(f"mistake '{mid}': needs a name and an id of this lesson")
+    if problems:
+        return problems
+    unit, unit_skills, unit_mistakes = lesson_unit(document, lesson_id, "x")
+    return check_bank({"units": [unit], "skills": unit_skills, "mistakes": unit_mistakes})
+
+
+def lesson_unit(document: dict, lesson_id: int, subject_id: str) -> tuple[dict, list[dict], dict]:
+    """A lesson document as the bank's unit, skills and mistakes."""
+    unit = {"id": lesson_unit_id(lesson_id), "subject_id": subject_id, "name": document["name"].strip()}
+    skills = [{"id": s["id"], "unit": unit["id"], "name": s["name"].strip(), "short": (s.get("short") or s["name"]).strip(),
+               "description": s.get("description", ""), "prereqs": [],
+               "questions": [{k: q[k] for k in QUESTION_FIELDS if k in q} for q in s.get("questions", [])]}
+              for s in document["skills"]]
+    mistakes = {mid: {k: m[k] for k in ("name", "tip", "back") if m.get(k)} for mid, m in document.get("mistakes", {}).items()}
+    return unit, skills, mistakes
+
+
+def merge(data: dict, subjects: list[dict], lessons: list[dict], log=None) -> dict:
+    """The content file's data with the published lessons added: math's file lessons first, then each subject's lessons in the
+    subjects' order and the lessons' positions. A lesson that fails the checks is left out (and logged); the rest load."""
+    merged = {**data, "units": [{**u, "subject_id": "math"} for u in data["units"]], "skills": list(data["skills"]),
+              "mistakes": dict(data["mistakes"]), "subjects": [{k: s[k] for k in ("id", "name", "icon")} for s in subjects] or [MATH]}
+    known = {s["id"] for s in merged["subjects"]}
+    order = {s["id"]: i for i, s in enumerate(merged["subjects"])}
+    for row in sorted(lessons, key=lambda r: (order.get(r["subject_id"], len(order)), r.get("position", 0), r["id"])):
+        document = row.get("published")
+        problems = ["its subject does not exist"] if row["subject_id"] not in known else lesson_problems(document, row["id"])
+        if not problems:
+            unit, skills, mistakes = lesson_unit(document, row["id"], row["subject_id"])
+            backs = {m["back"] for m in mistakes.values() if m.get("back")} - {s["id"] for s in merged["skills"] + skills}
+            problems = [f"mistake points back to unknown skill '{b}'" for b in sorted(backs)]
+        if problems:
+            if log:
+                log(f"lesson {row['id']} left out of the bank: {'; '.join(problems[:5])}")
+            continue
+        merged["units"].append(unit)
+        merged["skills"].extend(skills)
+        merged["mistakes"].update(mistakes)
+    return merged
+
+
 @dataclass(frozen=True)
 class Bank:
     data: dict
+
+    @property
+    def subjects(self) -> list[dict]:
+        """The subjects in order, math first: [{"id", "name", "icon"}]."""
+        return self.data.get("subjects") or [MATH]
+
+    @cached_property
+    def _subject_of_lesson(self) -> dict[str, str]:
+        return {u["id"]: u.get("subject_id", "math") for u in self.lessons}
+
+    def subject_of_lesson(self, lesson_id: str) -> str | None:
+        return self._subject_of_lesson.get(lesson_id)
+
+    def subject_of_skill(self, skill_id: str) -> str | None:
+        skill = self.skill(skill_id)
+        return self.subject_of_lesson(skill["unit"]) if skill else None
+
+    def lessons_of_subject(self, subject_id: str) -> list[dict]:
+        return [u for u in self.lessons if u.get("subject_id", "math") == subject_id]
 
     @property
     def lessons(self) -> list[dict]:

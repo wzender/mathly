@@ -15,7 +15,7 @@ from .access import RoleResolver, learner, permissions_of
 from .auth import DevAuthenticator, SupabaseAuthenticator, current_user
 from .bank import Bank, load_bank
 
-from . import accounts, ai, ai_help, assignments, classes, cleanup, progress, quizzes, reads, realtests, review, skills, status, written
+from . import accounts, ai, ai_help, assignments, classes, cleanup, content, progress, quizzes, reads, realtests, review, skills, status, written
 from .config import Settings, load_settings
 from .cached import CachedStore
 from .store import InMemoryStore, StoreUnavailable, SupabaseStore
@@ -62,6 +62,8 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     app.state.pusher = pusher or Pusher(app.state.store, settings.vapid_private_key, default_subject(settings))
     app.state.notify_request = written.notify_new_request
     app.state.ai = ai_client or ai.make_ai(settings)
+    app.state.base_bank = app.state.bank          # the content file's lessons; the served bank adds the published ones
+    content.rebuild(app)
     app.state.roles = RoleResolver(settings, app.state.store)
     @app.exception_handler(StoreUnavailable)
     async def store_unavailable(request: Request, exc: StoreUnavailable) -> JSONResponse:
