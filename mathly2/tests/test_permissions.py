@@ -24,6 +24,7 @@ NEEDS = {   # (method, path) -> permission
     ("POST", "/api/subjects/{subject_id}/lessons"): "content.load",
     ("GET", "/api/dev/activity"): "dev.status",          # no role lists it: the developer's alone
     ("GET", "/api/path"): "path.use",
+    ("GET", "/api/my-subjects"): "path.use",
     ("GET", "/api/collection"): "path.use",
     ("GET", "/api/teaching/tests"): "class.teach",
     ("POST", "/api/classes/{class_id}/tests"): "class.teach",

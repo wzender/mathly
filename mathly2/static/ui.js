@@ -9,14 +9,20 @@ export const stateTag = state => {
   return `<span class="tag st-${esc(state)}"><span aria-hidden="true">${symbol}</span> ${word}</span>`;
 };
 
-/** The subject's home and its path: the card on the subjects screen opens the home; the tab bar leads to the rest. */
-export const HOME = "#/subject/math";
-export const PATH = "#/subject/math/path";
+/** The subject the student's screens are about: set by the address ("#/subject/<id>", or the skill, lesson or test opened), math
+ *  by default. Its home and its path: the card on the subjects screen opens the home; the tab bar leads to the rest. */
+let subject = "math";
+export const currentSubject = () => subject;
+export const setSubject = id => { subject = id || "math"; };
+export const homeHref = () => `#/subject/${encodeURIComponent(subject)}`;
+export const pathHref = () => `#/subject/${encodeURIComponent(subject)}/path`;
+/** A student API address for the current subject ("/api/path" -> "/api/path?subject=math"). */
+export const forSubject = url => `${url}${url.includes("?") ? "&" : "?"}subject=${encodeURIComponent(subject)}`;
 
 /** The student's tab bar, fixed at the bottom of the screen (the CSS places it): home, path, grades, collection. */
 export const tabs = active => `<nav class="tabs" aria-label="תפריט התלמיד">
-  <a href="${HOME}" ${active === "home" ? 'aria-current="page"' : ""}>בית</a>
-  <a href="${PATH}" ${active === "path" ? 'aria-current="page"' : ""}>מסלול</a>
+  <a href="${homeHref()}" ${active === "home" ? 'aria-current="page"' : ""}>בית</a>
+  <a href="${pathHref()}" ${active === "path" ? 'aria-current="page"' : ""}>מסלול</a>
   <a href="#/submissions" ${active === "submissions" ? 'aria-current="page"' : ""}>הגשות</a>
   <a href="#/grades" ${active === "grades" ? 'aria-current="page"' : ""}>ציונים</a>
   <a href="#/collection" ${active === "collection" ? 'aria-current="page"' : ""}>האוסף</a>

@@ -3,7 +3,7 @@
 import { api, swr } from "./api.js";
 import { esc, fmt } from "./math.js";
 import { owl, ringSvg, spark } from "./sky.js";
-import { HOME, backToSubjects, goalBar, shortDate, tabs } from "./ui.js";
+import { backToSubjects, forSubject, goalBar, shortDate, tabs } from "./ui.js";
 
 export const STATES = {
   not_started: { symbol: "○", word: "לא התחלת" },
@@ -62,7 +62,7 @@ export function pathHtml(path) {
 /** Draw the path. `scroll`: bring the next skill to the middle of the screen (when the path opens); a refresh keeps the place. */
 export const show = (view, { scroll = true } = {}) => {
   let first = true;                                  // a refresh of the same screen keeps the place
-  return swr("/api/path", path => { const result = drawPath(view, path, scroll && first); first = false; return result; });
+  return swr(forSubject("/api/path"), path => { const result = drawPath(view, path, scroll && first); first = false; return result; });
 };
 
 function drawPath(view, path, scroll) {
@@ -73,15 +73,17 @@ function drawPath(view, path, scroll) {
   return path;
 }
 
-/** The first screen: a card per subject of the student's classes. Math is the only subject today; its bar counts mastered skills. */
+/** Math's card keeps the course's full name; other subjects show their own name. */
+const cardName = s => s.id === "math" ? "מתמטיקה כיתה ט - מצוינות" : s.name;
+
+/** The first screen: a card per subject of the student's classes, math first; each bar counts that subject's mastered skills. */
 export async function showSubjects(view) {
-  const path = await api("/api/path");
-  const total = path.lessons.reduce((n, l) => n + l.skills.length, 0), lit = path.lessons.reduce((n, l) => n + l.mastered, 0);
+  const subjects = await api("/api/my-subjects");
   view(`<section class="subjects" aria-label="מקצועות">
     <h2>מה נתרגל היום?</h2>
-    <a class="subject-card" href="${HOME}" data-subject="מתמטיקה"><span class="subject-icon" aria-hidden="true">∑</span>
-      <span class="grow"><b>מתמטיקה כיתה ט - מצוינות</b>
-        <span class="bar" role="progressbar" aria-label="מיומנויות שהושלמו" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${lit}"><i style="width:${total ? Math.round(100 * lit / total) : 0}%"></i></span>
-        <small>${lit} מתוך ${total} מיומנויות</small></span><i aria-hidden="true">‹</i></a></section>`);
-  return path;
+    ${subjects.map(s => `<a class="subject-card" href="#/subject/${encodeURIComponent(s.id)}" data-subject="${esc(s.id)}"><span class="subject-icon" aria-hidden="true">${esc(s.icon)}</span>
+      <span class="grow"><b>${esc(cardName(s))}</b>
+        <span class="bar" role="progressbar" aria-label="מיומנויות שהושלמו" aria-valuemin="0" aria-valuemax="${s.total}" aria-valuenow="${s.mastered}"><i style="width:${s.total ? Math.round(100 * s.mastered / s.total) : 0}%"></i></span>
+        <small>${s.mastered} מתוך ${s.total} מיומנויות</small></span><i aria-hidden="true">‹</i></a>`).join("")}</section>`);
+  return subjects;
 }

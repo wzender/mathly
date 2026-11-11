@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from . import attempts, clock, quiz, reads
@@ -78,7 +78,7 @@ def quiz_facts(lesson_id: str, request: Request, user: dict = Depends(learner)) 
     lesson = _lesson(request, user, lesson_id)
     found = quiz.facts(request.app.state.store, request.app.state.bank, user["id"], clock.now()).get(lesson_id, {})
     open_ = found.get("open")
-    return {"lesson": {"id": lesson["id"], "name": lesson["name"]}, "best": found.get("best"), "attempts": found.get("attempts", 0),
+    return {"lesson": {"id": lesson["id"], "name": lesson["name"]}, "subject_id": lesson.get("subject_id", "math"), "best": found.get("best"), "attempts": found.get("attempts", 0),
             "open": {"id": open_["id"], "due_at": _iso(open_["due_at"])} if open_ else None,
             "size": attempts.QUIZ_SIZE, "minutes": None}                                # a quiz has no time limit
 
@@ -131,14 +131,16 @@ def _test_ref(request: Request, test: dict) -> dict:
 
 
 @router.get("/grades")
-def grades(request: Request, user: dict = Depends(learner)) -> dict:
+def grades(request: Request, user: dict = Depends(learner), subject: str = Query("math", max_length=40)) -> dict:
     """Every grade the student has: each lesson's best quiz grade, each real test's exercise tests (best of each) and its simulation.
     A removed test keeps its row, so the grades already earned stay."""
     store, bank, now, here, uid = request.app.state.store, request.app.state.bank, clock.now(), reads.of(request), user["id"]
+    from .skills import subject_param
+    subject = subject_param(request, user, subject)
     here.prefetch(("attempts_of", uid, "quiz"), ("attempts_of", uid, "exercise_test"), ("attempts_of", uid, "simulation"))      # one wait
     found = quiz.facts(store, bank, uid, now, here)
     lessons = []
-    for lesson in bank.lessons:
+    for lesson in bank.lessons_of_subject(subject):
         item = found.get(lesson["id"])
         if item and item["best"] is not None:
             lessons.append({"lesson": {"id": lesson["id"], "name": lesson["name"]}, "best": item["best"], "attempts": item["attempts"],
@@ -153,7 +155,7 @@ def grades(request: Request, user: dict = Depends(learner)) -> dict:
     for (kind, scope), rows in groups.items():
         test_id, _, number = scope.partition(":")
         test = store.get_test(int(test_id)) if test_id.isdigit() else None
-        if test is None:
+        if test is None or test.get("subject_id", "math") != subject:
             continue
         item = {"test": _test_ref(request, test), "best": max(r["grade"] for r in rows), "attempts": len(rows),
                 "last": _iso(max(r["submitted_at"] for r in rows))}

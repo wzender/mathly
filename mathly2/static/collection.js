@@ -3,10 +3,10 @@ import { api } from "./api.js";
 import { esc } from "./math.js";
 import { showCard } from "./comets.js";
 import { constellationSvg } from "./sky.js";
-import { tabs } from "./ui.js";
+import { forSubject, tabs } from "./ui.js";
 
 export async function show(view) {
-  const [{ skills, lessons }, { comets, caught, total }] = await Promise.all([api("/api/collection"), api("/api/comets")]);
+  const [{ skills, lessons }, { comets, caught, total }] = await Promise.all([api(forSubject("/api/collection")), api("/api/comets")]);
   view(`${tabs("collection")}<section class="card" id="collection"><h2>האוסף שלי</h2>
     <h3>קבוצות כוכבים (${lessons.length})</h3>
     ${lessons.length ? `<div class="cons" id="done-lessons">${lessons.map(l => `<figure class="con-card" data-lesson="${esc(l.id)}">

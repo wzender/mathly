@@ -2,7 +2,7 @@
 // Assignments will add their rows later.
 import { swr } from "./api.js";
 import { esc, fmt } from "./math.js";
-import { shortDate, tabs } from "./ui.js";
+import { forSubject, shortDate, tabs } from "./ui.js";
 
 const day = iso => iso ? new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "numeric" }) : "";
 const tries = n => `${n} ${n === 1 ? "ניסיון" : "ניסיונות"}`;
@@ -16,7 +16,7 @@ function row({ attrs, href, title, best, attempts, last }) {
 
 const testTitle = (t, suffix) => `מבחן ב־${shortDate(t.date)}: ${suffix}${t.removed ? " (הוסר)" : ""}`;
 
-export const show = view => swr("/api/grades", data => draw(view, data));
+export const show = view => swr(forSubject("/api/grades"), data => draw(view, data));
 
 function draw(view, { quizzes, exercise_tests: exercises = [], simulations = [], assignments = [] }) {
   const none = !quizzes.length && !exercises.length && !simulations.length && !assignments.length;

@@ -275,3 +275,75 @@ def test_an_oauth_fragment_in_the_address_does_not_skip_the_subject_cards(browse
         page.click("#dev button")
         page.wait_for_selector(".subject-card")
         assert page.locator(".orbit").count() == 0
+
+
+# --- add-subjects-and-worksheets 4.1: a card per subject, and each subject's own path ---
+
+def lesson_ids(page):
+    return {o.get_attribute("id")[len("lesson-"):] for o in page.locator("section.orbit").all()}
+
+
+def two_subjects(bank):
+    """A math lesson from the bank and a published science lesson; the student's two classes study one subject each."""
+    from mathly2 import content
+    from mathly2.lessons import assign_ids
+    math_lesson = lessons_by_size(bank)[0]
+    store = InMemoryStore()
+    store.create_subject("science", "מדעים", "setup", icon="⚗")
+    row = store.create_lesson("science", "setup", {})
+    doc = assign_ids({"name": "תאים", "mistakes": {"m": {"name": "בלבול", "tip": "קראו שוב"}}, "skills": [
+        {"name": f"מיומנות {k}", "questions": [{"question": f"שאלה {k}.{i}", "choices": [{"text": "כן", "correct": True}, {"text": "לא", "mistake": "m"}]}
+                                              for i in range(5)]} for k in (1, 2)]}, row["id"])
+    store.save_lesson(row["id"], draft=doc, published=doc)
+    store.add_member(store.create_class("setup", "A")["id"], KID)
+    store.add_member(store.create_class("setup", "B", subjects=["science"])["id"], KID)
+    app = create_app(Settings(), bank=only(bank, [math_lesson]), store=store)
+    content.rebuild(app)
+    return app, store, math_lesson, f"w{row['id']}"
+
+
+@pytest.mark.parametrize("viewport", [PHONE, {"width": 1280, "height": 800}])
+def test_each_subject_has_a_card_its_home_and_its_own_path(browser, bank, viewport):
+    app, store, math_lesson, unit = two_subjects(bank)
+    with running(app) as url:
+        page = offline_formulas(browser.new_page(viewport=viewport))
+        page.goto(url)
+        page.fill("#email", KID)
+        page.click("#dev button")
+        page.wait_for_selector(".subject-card")
+        cards = page.locator(".subject-card")
+        assert cards.count() == 2
+        assert "מתמטיקה כיתה ט - מצוינות" in cards.nth(0).inner_text() and "מדעים" in cards.nth(1).inner_text()
+        assert "0 מתוך 2 מיומנויות" in cards.nth(1).inner_text()
+        cards.nth(1).click()
+        page.wait_for_selector(".tabs")
+        assert page.evaluate("location.hash") == "#/subject/science"
+        assert page.locator("#to-subjects").count() == 1                                        # a way back to the subjects
+        page.click(".tabs a[href='#/subject/science/path']")
+        page.wait_for_selector(".orbit")
+        assert lesson_ids(page) == {unit}                    # only science's lesson
+        assert page.locator(".star.next").get_attribute("data-skill") == f"{unit}_1"
+        page.click(".tabs a[href='#/subject/science']")
+        page.click("#to-subjects")
+        page.wait_for_selector(".subject-card")
+        page.locator(".subject-card").nth(0).click()
+        page.click(".tabs a[href='#/subject/math/path']")
+        page.wait_for_selector(".orbit")
+        assert unit not in lesson_ids(page) and math_lesson in lesson_ids(page)
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+
+def test_a_link_to_a_skill_opens_its_own_subjects_path(browser, bank):
+    app, store, math_lesson, unit = two_subjects(bank)
+    with running(app) as url:
+        page = offline_formulas(browser.new_page(viewport=PHONE))
+        page.goto(url)
+        page.fill("#email", KID)
+        page.click("#dev button")
+        page.wait_for_selector(".subject-card")
+        page.goto(f"{url}#/skill/{unit}_2")
+        page.reload()
+        page.wait_for_selector(".mx-sheet")
+        assert lesson_ids(page) == {unit}
+        page.click(".mx-x")
+        page.wait_for_function("location.hash === '#/subject/science/path'")

@@ -23,8 +23,8 @@
 
 ## 4. Per-subject student screens (stage 1)
 
-- [ ] 4.1 Show a card per subject on the first screen, in subject order with math first, each counting only its skills; route `#/subject/<id>` keeps `#/subject/math` working, and `#/skill/<id>` opens its subject's path. Verify with Playwright tests for one subject and for two subjects.
-- [ ] 4.2 Filter the path, the next skill, the home, grades and the collection by the open subject. Verify with API tests: another subject's lessons are absent, and the owl stays in its subject.
+- [x] 4.1 Show a card per subject on the first screen, in subject order with math first, each counting only its skills; route `#/subject/<id>` keeps `#/subject/math` working, and `#/skill/<id>` opens its subject's path. Verify with Playwright tests for one subject and for two subjects.
+- [x] 4.2 Filter the path, the next skill, the home, grades and the collection by the open subject. Verify with API tests: another subject's lessons are absent, and the owl stays in its subject.
 - [ ] 4.3 Give tests a subject: the test form picks a subject the class studies and only its lessons, and the server refuses lessons of two subjects. The home and test card show only the open subject's tests. Verify with API and Playwright tests.
 - [ ] 4.4 Group the curriculum tab by subject. Verify with a Playwright test with two subjects.
 - [ ] 4.5 Check practice, mastery, the lesson quiz, the review list, exercise tests, the simulation and grades end to end on a lesson loaded by JSON in a second subject. Verify with one journey test, API plus browser.

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from datetime import date as Day
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from . import attempts, clock, countdown, exam, readiness, reads
@@ -134,7 +134,7 @@ def card(request: Request, user_id: str | None, test: dict, today: date) -> dict
                           "open": bool(open_), "due_at": open_["due_at"].isoformat() if open_ and attempts.is_timed(open_) else None})
     sim = facts["simulation"]
     opens_in = max(0, days_left - p["sim"])
-    return {"id": test["id"], "date": test["date"].isoformat(), "days_left": days_left, "note": test["note"],
+    return {"id": test["id"], "date": test["date"].isoformat(), "days_left": days_left, "note": test["note"], "subject_id": test.get("subject_id", "math"),
             "lessons": [{"id": i, "name": n} for i, n in zip(test["lessons"], lesson_names(request, test["lessons"]))],
             "questions": test["questions"], "minutes": test["minutes"],
             "plan": countdown.outline(p, facts), "task": countdown.task(days_left, p, facts), "readiness": readiness_for(facts),
@@ -239,33 +239,35 @@ def _with_skill_name(request: Request, task: dict) -> dict:
     return {**task, "skill_name": skill["name"] if skill else None}
 
 
-def _next_path_skill(request: Request, user: dict) -> str | None:
-    """The suggested next skill of the student's path (the same rule as the path's owl)."""
+def _next_path_skill(request: Request, user: dict, subject: str = "math") -> str | None:
+    """The suggested next skill of the student's path in this subject (the same rule as the path's owl)."""
     from .skills import RECENT, visible_lesson_ids
     bank, here = request.app.state.bank, reads.of(request)
     shown = visible_lesson_ids(request, user)
-    order = [s["id"] for lesson in bank.lessons_with_skills() if shown is None or lesson["id"] in shown for s in lesson["skills"]]
+    order = [s["id"] for lesson in bank.lessons_with_skills() if (shown is None or lesson["id"] in shown) and lesson["subject_id"] == subject
+             for s in lesson["skills"]]
     states = {p["skill_id"]: skill_state(p) for p in here.progress_of(user["id"])}
     return next_skill(order, states, here.recent_skills(user["id"], RECENT))
 
 
 @router.get("/home")
-def home(request: Request, user: dict = Depends(learner)) -> dict:
+def home(request: Request, user: dict = Depends(learner), subject: str = Query("math", max_length=40)) -> dict:
     """The student's home: the upcoming tests (nearest first) with their readiness, today's one task from the nearest test,
     the required simulation, and the next skill of the path."""
     here, today, uid = reads.of(request), clock.school_day(), user["id"]
     class_ids = [c["id"] for c in here.classes_of_student(user["email"])]
-    from .skills import RECENT, behind_lessons
+    from .skills import RECENT, behind_lessons, subject_param
+    subject = subject_param(request, user, subject)
     here.prefetch(("tests_of_classes", class_ids), ("recent_skills", uid, RECENT), ("attempts_of", uid, "quiz"), ("curriculum",), *_student_reads(uid))       # the tests and the student's facts: one wait
-    tests = [t for t in here.tests_of_classes(class_ids) if t["date"] >= today]
+    tests = [t for t in here.tests_of_classes(class_ids) if t["date"] >= today and t.get("subject_id", "math") == subject]
     cards = [card(request, user["id"], t, today) for t in tests]
     nearest = cards[0] if cards else None
-    next_id = _next_path_skill(request, user)
+    next_id = _next_path_skill(request, user, subject)
     next_skill_row = request.app.state.bank.skill(next_id) if next_id else None
     return {"tests": cards, "task": {"test_id": nearest["id"], **_with_skill_name(request, nearest["task"])} if nearest else None,
             "required_simulations": [{"test_id": c["id"], "date": c["date"], "days_left": c["days_left"]} for c in cards if c["simulation"]["required"]],
             "next_skill": {"id": next_id, "name": next_skill_row["name"]} if next_skill_row else None,
-            "behind": behind_lessons(request, user),
+            "behind": behind_lessons(request, user, subject), "subject": subject,
             "weak_tests": [{"test_id": c["id"], "date": c["date"], "days_left": c["days_left"], "number": e["number"], "best": e["best"], "open": e["open"]}
                            for c in cards[:1] for e in c["exercise_tests"] if e["best"] is not None and e["best"] < attempts.PASS_GRADE]}   # the nearest test's card only
 

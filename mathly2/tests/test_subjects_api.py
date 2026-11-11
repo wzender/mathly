@@ -159,3 +159,51 @@ def test_a_student_in_no_class_has_no_lessons_and_a_teacher_has_every_subject():
     sid, unit = published_science(c, store)
     assert c.get("/api/lessons", headers=auth(KID)).status_code == 403              # not in a class: asked to talk to the teacher
     assert unit in [l["id"] for l in c.get("/api/lessons", headers=auth(TEACHER)).json()]
+
+
+# ---- per-subject student screens (4.1, 4.2) ----
+
+def two_subject_student(c, store):
+    sid, unit = published_science(c, store)
+    store.add_member(store.create_class("setup", "ט'1")["id"], KID)
+    store.add_member(store.create_class("setup", "מדעים ט", subjects=[sid])["id"], KID)
+    return sid, unit
+
+
+def test_the_subject_cards_are_the_students_subjects_math_first_each_counting_its_own_skills():
+    c, store = world()
+    sid, unit = two_subject_student(c, store)
+    cards = c.get("/api/my-subjects", headers=auth(KID)).json()
+    assert [s["id"] for s in cards] == ["math", sid]
+    assert cards[1] == {"id": sid, "name": "מדעים", "icon": "⚗", "total": 1, "mastered": 0}
+    assert cards[0]["total"] == sum(len(l["skills"]) for l in c.app.state.bank.lessons_with_skills() if l["subject_id"] == "math")
+
+
+def test_the_path_home_grades_and_collection_are_per_subject_and_another_subjects_lessons_are_absent():
+    c, store = world()
+    sid, unit = two_subject_student(c, store)
+    science = c.get(f"/api/path?subject={sid}", headers=auth(KID)).json()
+    assert [l["id"] for l in science["lessons"]] == [unit] and science["next"] == f"{unit}_1"
+    math = c.get("/api/path", headers=auth(KID)).json()
+    assert unit not in [l["id"] for l in math["lessons"]] and math["next"] != f"{unit}_1"
+    assert c.get(f"/api/home?subject={sid}", headers=auth(KID)).json()["next_skill"]["id"] == f"{unit}_1"
+    assert c.get(f"/api/grades?subject={sid}", headers=auth(KID)).status_code == 200
+    assert c.get(f"/api/collection?subject={sid}", headers=auth(KID)).json() == {"skills": [], "lessons": []}
+    assert c.get("/api/path?subject=nowhere", headers=auth(KID)).status_code == 404
+
+
+def test_the_owl_stays_in_its_subject():
+    c, store = world()
+    sid, unit = two_subject_student(c, store)
+    key = c.get(f"/api/skills/{unit}_1", headers=auth(KID)).json()["question"]["key"]
+    c.post(f"/api/skills/{unit}_1/answer", json={"question_key": key, "choice": 1}, headers=auth(KID))     # last answer: in science
+    math = c.get("/api/path", headers=auth(KID)).json()
+    assert math["next"].startswith("w") is False                                                     # math's owl is on a math skill
+
+
+def test_a_student_cannot_open_a_subject_their_classes_do_not_study():
+    c, store = world()
+    sid, unit = published_science(c, store)
+    store.add_member(store.create_class("setup", "ט'1")["id"], KID)
+    assert [s["id"] for s in c.get("/api/my-subjects", headers=auth(KID)).json()] == ["math"]
+    assert c.get(f"/api/path?subject={sid}", headers=auth(KID)).status_code == 404
