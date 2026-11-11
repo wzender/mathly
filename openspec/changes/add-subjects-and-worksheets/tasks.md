@@ -52,16 +52,16 @@
 
 ## 7. Publishing and subject-aware help (stage 3)
 
-- [ ] 7.1 Add publishing:
+- [x] 7.1 Add publishing:
   - run the checks: a name, at least one skill, ≥ 5 questions per skill, one right choice, and a mistake with a name and a tip for every wrong choice;
   - list every problem and where it is;
   - copy the draft to published, last in the subject;
   - rebuild the bank.
 
   Verify with API tests: each failing check named, and a published lesson on a studying student's path without a restart.
-- [ ] 7.2 Add editing a published lesson (edit the draft, publish again) and unpublishing, which is refused while a coming test covers the lesson. Verify with API tests: an edited question gets a new key and old answers are kept, unpublishing hides the lesson and keeps progress, and the coming-test refusal names the test.
-- [ ] 7.3 Make photo help subject-aware: send the subject's name and only its skills; if no skill was given, use the subject of the home the student is on. Verify with tests using a fake AI client: a science photo's request holds science skills only, and the named skill must belong to that subject.
-- [ ] 7.4 Update the PRD (AI help, real tests, curriculum) and the remaining spec deltas. Verify that `openspec validate add-subjects-and-worksheets --strict` passes.
+- [x] 7.2 Add editing a published lesson (edit the draft, publish again) and unpublishing, which is refused while a coming test covers the lesson. Verify with API tests: an edited question gets a new key and old answers are kept, unpublishing hides the lesson and keeps progress, and the coming-test refusal names the test.
+- [x] 7.3 Make photo help subject-aware: send the subject's name and only its skills; if no skill was given, use the subject of the home the student is on. Verify with tests using a fake AI client: a science photo's request holds science skills only, and the named skill must belong to that subject.
+- [x] 7.4 Update the PRD (AI help, real tests, curriculum) and the remaining spec deltas. Verify that `openspec validate add-subjects-and-worksheets --strict` passes.
 
 ## 8. Integration
 

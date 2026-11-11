@@ -25,6 +25,11 @@ async function request(path, { method = "GET", body } = {}) {
   }
   let detail = "";
   try { detail = (await response.json()).detail; } catch { /* no body */ }
+  if (detail && typeof detail === "object" && typeof detail.message === "string") {        // {message, problems}: a refusal with its list
+    const error = new ApiError(response.status, detail.message);
+    error.problems = Array.isArray(detail.problems) ? detail.problems : [];
+    throw error;
+  }
   throw new ApiError(response.status, typeof detail === "string" && detail ? detail : (MESSAGES[response.status] || "משהו השתבש, נסו שוב"));
 }
 

@@ -104,3 +104,26 @@ def test_a_failed_draft_says_why_and_trying_again_brings_the_draft(browser, tmp_
         page.click("#le-retry")
         page.wait_for_selector("#lesson-editor .le-skill", timeout=15000)
         assert page.locator("#le-retry").count() == 0
+
+
+def test_publishing_from_the_editor_lists_what_is_missing_then_publishes_and_unpublishes(browser, tmp_path):
+    app, store = app_with(FakeAI())
+    with running(app) as url:
+        page = open_subjects(browser, url, DESKTOP)
+        upload_new_subject(page, pdf_file(tmp_path, 1))
+        page.wait_for_selector("#lesson-editor .le-skill", timeout=15000)
+        mistake = page.locator(".le-mistake input").nth(1)
+        mistake.fill("")                                                                  # a mistake without a tip
+        page.wait_for_function("document.getElementById('le-saved').textContent === 'נשמר'")
+        page.click("#le-do-publish")
+        page.wait_for_selector("#le-problems")
+        assert "חסר שם או טיפ" in page.inner_text("#le-problems") and store.lessons_of()[0]["published"] is None
+        page.locator(".le-mistake input").nth(1).fill("קראו שוב את השאלה")
+        page.click("#le-do-publish")
+        page.wait_for_selector("#le-publish-msg")
+        assert "פורסם" in page.inner_text("#le-publish-msg") and store.lessons_of()[0]["published"] is not None
+        assert app.state.bank.lessons_of_subject(store.lessons_of()[0]["subject_id"])            # served at once
+        page.once("dialog", lambda d: d.accept())
+        page.click("#le-unpublish")
+        page.wait_for_function("document.getElementById('le-publish-msg')?.textContent.includes('בוטל')")
+        assert store.lessons_of()[0]["published"] is None

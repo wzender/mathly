@@ -238,3 +238,65 @@ def test_a_test_covering_two_subjects_or_a_subject_the_class_does_not_study_is_r
     assert wrong.status_code == 422
     math_only = store.create_class("setup", "ט'10", teacher_email=TEACHER)
     assert c.post(f"/api/classes/{math_only['id']}/tests", json={"date": "2099-01-10", "lessons": [unit]}, headers=auth(TEACHER)).status_code == 422
+
+
+# ---- subject-aware photo help (7.3) ----
+
+def _photo(c, who, **params):
+    import io
+    import time
+    from PIL import Image
+    out = io.BytesIO()
+    Image.new("RGB", (300, 200), (230, 230, 230)).save(out, "JPEG")
+    q = "&".join(f"{k}={v}" for k, v in params.items())
+    made = c.post("/api/ai/photo" + (f"?{q}" if q else ""), content=out.getvalue(), headers={**auth(who), "Content-Type": "image/jpeg"})
+    assert made.status_code == 201, made.text
+    for _ in range(200):
+        got = c.get(f"/api/ai/requests/{made.json()['id']}", headers=auth(who)).json()
+        if got["state"] in ("done", "failed"):
+            return got
+        time.sleep(0.02)
+    raise AssertionError("the photo was not processed")
+
+
+def ai_world():
+    from mathly2.ai import FakeAI
+    store = InMemoryStore()
+    store.give_role(MGR, "manager", "setup")
+    fake = FakeAI()
+    app = create_app(Settings(developers=frozenset({DEV}), teachers=frozenset({TEACHER})), store=store, ai_client=fake)
+    return TestClient(app), store, fake
+
+
+def test_photo_help_from_a_science_skill_gets_science_skills_only_and_the_subjects_name():
+    c, store, fake = ai_world()
+    sid, unit = published_science(c, store)
+    done = _photo(c, DEV, skill_id=f"{unit}_1")
+    kind, _, _, skills, subject = fake.calls[-1]
+    assert kind == "solve" and skills == [f"{unit}_1"] and subject == "מדעים"
+    assert done["result"]["skill"]["id"] == f"{unit}_1"                                       # the named skill is of that subject
+
+
+def test_photo_help_from_the_home_uses_the_subject_of_the_home():
+    c, store, fake = ai_world()
+    sid, unit = published_science(c, store)
+    _photo(c, DEV, subject=sid)
+    assert fake.calls[-1][3] == [f"{unit}_1"] and fake.calls[-1][4] == "מדעים"
+
+
+def test_math_photo_help_is_unchanged_math_skills_and_no_subject_named():
+    c, store, fake = ai_world()
+    published_science(c, store)
+    _photo(c, DEV)
+    call = fake.calls[-1]
+    assert len(call) == 4                                                                     # no subject: math's own wording
+    math_skills = {s["id"] for s in c.app.state.bank.skills if c.app.state.bank.subject_of_skill(s["id"]) == "math"}
+    assert set(call[3]) == math_skills
+
+
+def test_the_photo_prompt_names_another_subject_and_keeps_maths_wording():
+    from mathly2.ai import photo_prompt
+    skills = [{"id": "w1_1", "name": "מבנה התא"}]
+    assert "מורה פרטי למתמטיקה" in photo_prompt(skills) and "מורה פרטי למתמטיקה" in photo_prompt(skills, "מתמטיקה")
+    science = photo_prompt(skills, "מדעים")
+    assert "\"מדעים\"" in science and "למתמטיקה" not in science and "w1_1: מבנה התא" in science

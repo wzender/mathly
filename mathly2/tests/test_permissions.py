@@ -25,6 +25,8 @@ NEEDS = {   # (method, path) -> permission
     ("POST", "/api/worksheets"): "content.manage",
     ("GET", "/api/subjects/lessons/{lesson_id}"): "content.manage",
     ("PUT", "/api/subjects/lessons/{lesson_id}/draft"): "content.manage",
+    ("POST", "/api/subjects/lessons/{lesson_id}/publish"): "content.manage",
+    ("POST", "/api/subjects/lessons/{lesson_id}/unpublish"): "content.manage",
     ("POST", "/api/worksheets/{lesson_id}/files"): "content.manage",
     ("GET", "/api/worksheets/{lesson_id}"): "content.manage",
     ("GET", "/api/worksheets/{lesson_id}/pages/{index}"): "content.manage",

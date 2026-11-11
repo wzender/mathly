@@ -45,3 +45,49 @@ def assign_ids(document: dict, lesson_id: int) -> dict:
                     choice["mistake"] = renamed[choice["mistake"]]
     doc["skills"], doc["next_skill"], doc["next_mistake"] = skills, next_skill, next_mistake
     return doc
+
+
+MIN_QUESTIONS = 5               # questions a skill needs before its lesson can be published
+
+
+def publish_problems(document: dict, lesson_id: int) -> list[str]:
+    """Every reason the draft cannot be published yet, in words and with where it is: a name, at least one skill, at least
+    MIN_QUESTIONS questions per skill, exactly one right choice per question, and for every wrong choice a mistake with a name
+    and a tip. Then the bank's own checks (bank.lesson_problems), so a published lesson always loads."""
+    from .bank import lesson_problems
+    problems: list[str] = []
+    if not str(document.get("name") or "").strip():
+        problems.append("לשיעור אין שם")
+    skills, mistakes = document.get("skills") or [], document.get("mistakes") or {}
+    if not skills:
+        problems.append("אין בשיעור אף מיומנות")
+    for si, skill in enumerate(skills, 1):
+        where = f"מיומנות {si}"
+        if not str(skill.get("name") or "").strip():
+            problems.append(f"{where}: אין שם")
+        questions = skill.get("questions") or []
+        if len(questions) < MIN_QUESTIONS:
+            problems.append(f"{where}: יש {len(questions)} שאלות, צריך לפחות {MIN_QUESTIONS}")
+        for qi, question in enumerate(questions, 1):
+            at = f"{where}, שאלה {qi}"
+            if not str(question.get("question") or "").strip():
+                problems.append(f"{at}: אין נוסח")
+            choices = question.get("choices") or []
+            right = sum(1 for c in choices if c.get("correct"))
+            if right != 1:
+                problems.append(f"{at}: צריכה תשובה נכונה אחת בדיוק (יש {right})")
+            if len(choices) < 2:
+                problems.append(f"{at}: צריך לפחות שתי תשובות")
+            for ci, choice in enumerate(choices, 1):
+                if not str(choice.get("text") or "").strip():
+                    problems.append(f"{at}, תשובה {ci}: אין טקסט")
+                if choice.get("correct"):
+                    continue
+                mistake = mistakes.get(choice.get("mistake") or "")
+                if not mistake:
+                    problems.append(f"{at}, תשובה {ci}: לתשובה השגויה אין טעות")
+                elif not str(mistake.get("name") or "").strip() or not str(mistake.get("tip") or "").strip():
+                    problems.append(f"{at}, תשובה {ci}: לטעות שהיא מראה חסר שם או טיפ")
+    if not problems:
+        problems += lesson_problems(document, lesson_id)
+    return problems

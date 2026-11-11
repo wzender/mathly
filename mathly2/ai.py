@@ -122,9 +122,12 @@ def photo_schema(skill_ids: list[str]) -> dict:
                            "answer": {"type": "string"}, "skill": {"type": "string", "enum": [*skill_ids, ""]}, "note": {"type": "string"}}}
 
 
-def photo_prompt(skills: list[dict]) -> str:
+def photo_prompt(skills: list[dict], subject: str | None = None) -> str:
+    """The photo prompt. Math keeps its own wording; another subject is named in it (its skills are the list below)."""
     listed = "\n".join(f"- {s['id']}: {s['name'].replace('$', '')}" for s in skills)
-    return f"""אתה מורה פרטי למתמטיקה לתלמידי כיתה ט׳ בהקבצה של 5 יחידות, בישראל. תלמיד צילם תרגיל ושלח לך את התמונה.
+    role = ("אתה מורה פרטי למתמטיקה לתלמידי כיתה ט׳ בהקבצה של 5 יחידות, בישראל." if not subject or subject == "מתמטיקה"
+            else f"אתה מורה פרטי במקצוע \"{subject}\" לתלמידי חטיבת ביניים בישראל. ענה רק בנושאי המקצוע הזה.")
+    return f"""{role} תלמיד צילם תרגיל ושלח לך את התמונה.
 
 1. קרא את התרגיל מהתמונה בדיוק כפי שהוא כתוב, ורשום אותו ב־problem. אם בתמונה כמה תרגילים, פתור את הראשון וכתוב זאת ב־note.
 2. פתור את התרגיל נכון, ובדוק את הפתרון (למשל בהצבה) לפני שאתה עונה.
@@ -315,11 +318,11 @@ class AnthropicAI:
         except (ValueError, StopIteration) as exc:
             raise AIFailure("bad_output", "the answer was not JSON") from exc
 
-    def solve(self, image: bytes, media_type: str, skills: list[dict]) -> dict:
+    def solve(self, image: bytes, media_type: str, skills: list[dict], subject: str | None = None) -> dict:
         if media_type not in MEDIA_TYPES:
             raise AIFailure("bad_request", f"media type {media_type}")
         res = self._call(model=self.model, max_tokens=16000, betas=["server-side-fallback-2026-07-01"], fallbacks="default",
-                         system=photo_prompt(skills), cache_control={"type": "ephemeral"},
+                         system=photo_prompt(skills, subject), cache_control={"type": "ephemeral"},
                          output_config={"effort": "medium", "format": {"type": "json_schema", "schema": photo_schema([s["id"] for s in skills])}},
                          messages=[{"role": "user", "content": [
                              {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": base64.standard_b64encode(image).decode("ascii")}},
@@ -374,8 +377,8 @@ class FakeAI:
         self.calls: list[tuple] = []
         self.fail, self.check_result = fail, check_result
 
-    def solve(self, image: bytes, media_type: str, skills: list[dict]) -> dict:
-        self.calls.append(("solve", image, media_type, [s["id"] for s in skills]))
+    def solve(self, image: bytes, media_type: str, skills: list[dict], subject: str | None = None) -> dict:
+        self.calls.append(("solve", image, media_type, [s["id"] for s in skills]) + ((subject,) if subject else ()))
         if self.fail:
             raise AIFailure(self.fail, "fake")
         return {"readable": True, "problem": "$x + 1 = 3$", "steps": [{"hint": "מה עושים עם ה־1?", "work": "$x = 3 − 1$"}, {"hint": "חשבו", "work": "$x = 2$"}],

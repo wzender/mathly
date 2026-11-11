@@ -191,8 +191,8 @@ def test_a_draft_never_reaches_a_student():
 
 # ---- 6.1 reading and saving the draft ----
 
-def drafted(c):
-    lesson = start(c).json()["id"]
+def drafted(c, subject_id=None):
+    lesson = (start(c, subject_id=subject_id) if subject_id else start(c)).json()["id"]
     upload(c, lesson, pdf(), "application/pdf")
     c.post(f"/api/worksheets/{lesson}/draft", headers=auth(MGR))
     return lesson, c.get(f"/api/subjects/lessons/{lesson}", headers=auth(MGR)).json()["draft"]
@@ -225,3 +225,93 @@ def test_an_unfinished_draft_saves_but_a_broken_shape_does_not_and_others_are_re
     assert broken.status_code == 422
     assert c.put(f"/api/subjects/lessons/{lesson}/draft", json={"lesson": draft}, headers=auth(TEACHER)).status_code == 403
     assert c.get(f"/api/subjects/lessons/{lesson}", headers=auth(TEACHER)).status_code == 403
+
+
+# ---- 7.1 publishing, 7.2 editing a published lesson and unpublishing ----
+
+def publish(c, lesson, who=MGR):
+    return c.post(f"/api/subjects/lessons/{lesson}/publish", headers=auth(who))
+
+
+def test_publishing_lists_every_failing_check_with_where_it_is():
+    c, store = world()
+    lesson, draft = drafted(c)
+    q = draft["skills"][0]["questions"]
+    q[3]["choices"][1]["mistake"] = ""                                                    # a wrong choice without a mistake
+    q[4]["choices"][0]["correct"] = False                                                 # no right answer
+    draft["skills"].append({"name": "", "questions": []})                                 # a skill with no name and no questions
+    draft["mistakes"][f"w{lesson}_m1"]["tip"] = ""                                         # a mistake without a tip
+    c.put(f"/api/subjects/lessons/{lesson}/draft", json={"lesson": draft}, headers=auth(MGR))
+    refused = publish(c, lesson)
+    assert refused.status_code == 422
+    problems = refused.json()["detail"]["problems"]
+    assert "מיומנות 1, שאלה 4, תשובה 2: לתשובה השגויה אין טעות" in problems
+    assert any(p.startswith("מיומנות 1, שאלה 5: צריכה תשובה נכונה אחת") for p in problems)
+    assert "מיומנות 2: אין שם" in problems and "מיומנות 2: יש 0 שאלות, צריך לפחות 5" in problems
+    assert any("חסר שם או טיפ" in p for p in problems)
+    assert store.get_lesson(lesson)["published"] is None
+
+
+def published_lesson(c, store):
+    lesson, draft = drafted(c)
+    assert publish(c, lesson).status_code == 200
+    sid = store.get_lesson(lesson)["subject_id"]
+    klass = store.create_class("setup", "ט'1", teacher_email=TEACHER, subjects=[sid])
+    store.add_member(klass["id"], "kid@school.test")
+    return lesson, sid, klass
+
+
+def test_a_published_lesson_reaches_a_studying_student_at_once_last_in_its_subject():
+    c, store = world()
+    lesson, sid, _ = published_lesson(c, store)
+    second, _ = drafted(c, sid)
+    assert publish(c, second).status_code == 200
+    assert [u["id"] for u in c.app.state.bank.lessons_of_subject(sid)] == [f"w{lesson}", f"w{second}"]
+    path = c.get(f"/api/path?subject={sid}", headers=auth("kid@school.test")).json()
+    assert [l["id"] for l in path["lessons"]] == [f"w{lesson}", f"w{second}"]
+    assert c.post(f"/api/lessons/w{lesson}/quiz/start", headers=auth("kid@school.test")).status_code == 200
+
+
+def test_editing_a_published_question_makes_a_new_question_and_keeps_old_answers():
+    c, store = world()
+    lesson, sid, _ = published_lesson(c, store)
+    kid = "kid@school.test"
+    skill = f"w{lesson}_1"
+    first = c.get(f"/api/skills/{skill}", headers=auth(kid)).json()["question"]["key"]
+    c.post(f"/api/skills/{skill}/answer", json={"question_key": first, "choice": 0}, headers=auth(kid))
+    draft = c.get(f"/api/subjects/lessons/{lesson}", headers=auth(MGR)).json()["draft"]
+    draft["skills"][0]["questions"] = [{**q, "question": q["question"] + " (מתוקן)"} for q in draft["skills"][0]["questions"]]
+    c.put(f"/api/subjects/lessons/{lesson}/draft", json={"lesson": draft}, headers=auth(MGR))
+    assert first in c.app.state.bank.question_keys(skill)                                    # students keep the published copy until publishing
+    assert publish(c, lesson).status_code == 200
+    assert first not in c.app.state.bank.question_keys(skill)                                # an edited question is a new question
+    import uuid
+    kid_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, kid))
+    assert [a["question_key"] for a in store.answers_of(kid_id, skill)] == [first]          # the earlier answer stays in the history
+
+
+def test_unpublishing_hides_the_lesson_and_keeps_progress_but_not_while_a_coming_test_covers_it():
+    from datetime import date, timedelta
+    c, store = world()
+    lesson, sid, klass = published_lesson(c, store)
+    kid = "kid@school.test"
+    import uuid
+    kid_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, kid))
+    store.save_progress(kid_id, f"w{lesson}_1", started_at="then", mastered_at="then")
+    test = store.create_test(klass["id"], date.today() + timedelta(days=30), [f"w{lesson}"], TEACHER, subject_id=sid)
+    refused = c.post(f"/api/subjects/lessons/{lesson}/unpublish", headers=auth(MGR))
+    assert refused.status_code == 409 and "ט'1" in refused.json()["detail"]                 # names the test
+    store.remove_test(test["id"])
+    assert c.post(f"/api/subjects/lessons/{lesson}/unpublish", headers=auth(MGR)).json()["published"] is False
+    assert c.app.state.bank.lessons_of_subject(sid) == []
+    assert c.get(f"/api/path?subject={sid}", headers=auth(kid)).json()["lessons"] == []
+    assert store.get_progress(kid_id, f"w{lesson}_1")["mastered_at"] == "then"
+    assert publish(c, lesson).status_code == 200                                            # published again: the progress shows
+    path = c.get(f"/api/path?subject={sid}", headers=auth(kid)).json()
+    assert path["lessons"][0]["mastered"] == 1
+
+
+def test_only_managers_and_developers_publish():
+    c, store = world()
+    lesson, _ = drafted(c)
+    assert publish(c, lesson, who=TEACHER).status_code == 403

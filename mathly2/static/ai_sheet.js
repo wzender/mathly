@@ -1,6 +1,7 @@
 // Photo help for a student (STU-6): a sheet to photograph a problem and send it to the teacher, then follow the request: waiting, being
 // worked on, and then the AI's hints one at a time (the steps and the answer only when asked), or the teacher's note.
 import { api } from "./api.js";
+import { currentSubject } from "./ui.js";
 import { esc, fmt } from "./math.js";
 import { isTouch, prepare, pictureUrl, sendPicture } from "./media.js";
 
@@ -61,7 +62,8 @@ export async function openNew(context = {}) {
       button.disabled = true;
       try {
         seenReminder();
-        const params = new URLSearchParams(Object.entries({ skill_id: context.skillId, class_id: context.classId }).filter(([, v]) => v));
+        const params = new URLSearchParams(Object.entries({ skill_id: context.skillId, class_id: context.classId,
+          subject: context.skillId ? "" : currentSubject() }).filter(([, v]) => v));          // from home: the subject whose home it is
         const made = await sendPicture(`/api/ai/photo${params.size ? `?${params}` : ""}`, chosen);
         status(true);
         follow(made.id);

@@ -204,3 +204,62 @@ def save_draft(lesson_id: int, body: LessonBody, request: Request, user: dict = 
     if problems:
         raise HTTPException(422, {"message": "הטיוטה לא נשמרה", "problems": problems})
     return lesson_view(store.save_lesson(lesson_id, draft=assign_ids(body.lesson, lesson_id)))
+
+
+# ---- publishing, editing a published lesson, unpublishing (add-subjects-and-worksheets 7.1, 7.2) ----
+
+def _coming_tests(request: Request, unit_id: str) -> list[dict]:
+    """Tests not yet past their date (and not removed) that cover this lesson, with their class."""
+    from . import clock
+    store, today = _store(request), clock.school_day()
+    classes = {c["id"]: c for c in store.classes()}
+    tests = store.tests_of_classes(list(classes))
+    return [{**t, "class_name": classes[t["class_id"]]["name"]} for t in tests if t["date"] >= today and unit_id in t["lessons"]]
+
+
+@router.post("/lessons/{lesson_id}/publish")
+def publish(lesson_id: int, request: Request, user: dict = Depends(need("content.manage"))) -> dict:
+    """The draft becomes what students get (the first time, last in its subject). Refused, with every problem and where it is, until
+    it passes the checks. Publishing again after edits replaces the published copy; an edited question is a new question."""
+    from datetime import datetime, timezone
+
+    from .lessons import publish_problems
+    store = _store(request)
+    row = store.get_lesson(lesson_id)
+    if row is None:
+        raise HTTPException(404, "השיעור לא נמצא")
+    if row["status"] == "drafting":
+        raise HTTPException(409, "הטיוטה עוד בהכנה")
+    document = assign_ids(row["draft"] or {}, lesson_id)
+    problems = publish_problems(document, lesson_id)
+    if problems:
+        raise HTTPException(422, {"message": "השיעור עוד לא מוכן לפרסום", "problems": problems})
+    fields = {"draft": document, "published": document, "published_at": datetime.now(timezone.utc)}
+    if row["published"] is None:                                 # a first publish: last in the subject's order
+        fields["position"] = max((l["position"] for l in store.lessons_of(row["subject_id"]) if l["id"] != lesson_id), default=0) + 1
+    try:
+        saved = store.save_lesson(lesson_id, **fields)
+        content.rebuild(request.app)
+    except Exception:
+        store.save_lesson(lesson_id, published=row["published"], published_at=row["published_at"])     # the old bank stays served
+        raise
+    return lesson_view(saved)
+
+
+@router.post("/lessons/{lesson_id}/unpublish")
+def unpublish(lesson_id: int, request: Request, user: dict = Depends(need("content.manage"))) -> dict:
+    """The lesson leaves every path, quiz and test choice and is a draft again; nobody's progress is touched. Refused while a test
+    that has not taken place covers it."""
+    store = _store(request)
+    row = store.get_lesson(lesson_id)
+    if row is None:
+        raise HTTPException(404, "השיעור לא נמצא")
+    if row["published"] is None:
+        return lesson_view(row)
+    coming = _coming_tests(request, f"w{lesson_id}")
+    if coming:
+        named = ", ".join(f"{t['class_name']} ב־{t['date'].day}.{t['date'].month}" for t in coming)
+        raise HTTPException(409, f"השיעור נמצא במבחן שעוד לא התקיים ({named}). קודם מסירים אותו מהמבחן")
+    saved = store.save_lesson(lesson_id, published=None, published_at=None)
+    content.rebuild(request.app)
+    return lesson_view(saved)

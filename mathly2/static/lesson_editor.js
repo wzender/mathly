@@ -90,11 +90,21 @@ function pagesColumn() {
     ${!pages && !state.text ? `<p class="muted">אין דף עבודה לשיעור הזה.</p>` : ""}</aside>`;
 }
 
+function publishPanel() {
+  if (!state.doc) return "";
+  const problems = state.problems || [];
+  return `<section class="card le-publish" id="le-publish"><div class="hrow"><b class="grow" id="le-state">${state.published ? "השיעור פורסם לתלמידים" : "טיוטה: התלמידים עוד לא רואים את השיעור"}</b>
+      <button type="button" class="primary" id="le-do-publish">${state.published ? "פרסום השינויים" : "פרסום"}</button>
+      ${state.published ? `<button type="button" id="le-unpublish">ביטול הפרסום</button>` : ""}</div>
+    ${state.publishMessage ? `<p role="status" id="le-publish-msg">${esc(state.publishMessage)}</p>` : ""}
+    ${problems.length ? `<div class="error" role="alert" id="le-problems"><b>${esc(state.problemsTitle || "עוד לא אפשר לפרסם:")}</b><ul>${problems.map(p => `<li>${esc(p)}</li>`).join("")}</ul></div>` : ""}</section>`;
+}
+
 function html() {
   const doc = state.doc;
   return `<section id="lesson-editor" data-lesson="${state.id}">
     <p><button type="button" id="le-back">‹ חזרה למקצועות</button> <span class="muted" id="le-saved" role="status" aria-live="polite"></span></p>
-    ${statusPanel()}
+    ${statusPanel()}${publishPanel()}
     <div class="le-layout">${pagesColumn()}
       <div class="le-draft">${doc ? `<section class="card"><label for="le-name">שם השיעור</label><input id="le-name" data-f="name" maxlength="80" value="${esc(doc.name || "")}">
         ${doc.note ? `<p class="muted">הערת ה־AI: ${esc(doc.note)}</p>` : ""}</section>
@@ -160,9 +170,32 @@ function onInput(event) {
   changed({ redraw: event.type === "change" && field.tagName === "SELECT" });
 }
 
+async function publish() {
+  if (state.timer) await saveNow();
+  try {
+    const done = await api(`/api/subjects/lessons/${state.id}/publish`, { method: "POST" });
+    Object.assign(state, { published: true, problems: [], publishMessage: "השיעור פורסם. התלמידים של הכיתות שלומדות את המקצוע רואים אותו עכשיו.", doc: done.draft });
+  } catch (e) {
+    Object.assign(state, { problems: e.problems || [e.message], problemsTitle: "עוד לא אפשר לפרסם:", publishMessage: "" });
+  }
+  draw();
+  document.getElementById("le-problems")?.scrollIntoView({ block: "nearest" });
+}
+
+async function unpublish() {
+  if (!confirm("לבטל את הפרסום? השיעור ייעלם מהמסלול של התלמידים, וההתקדמות שלהם תישמר.")) return;
+  try {
+    await api(`/api/subjects/lessons/${state.id}/unpublish`, { method: "POST" });
+    Object.assign(state, { published: false, problems: [], publishMessage: "הפרסום בוטל. השיעור חזר להיות טיוטה." });
+  } catch (e) { Object.assign(state, { problems: [e.message], problemsTitle: "אי אפשר לבטל את הפרסום:", publishMessage: "" }); }
+  draw();
+}
+
 function onClick(event) {
   const button = event.target.closest("[data-act]");
   if (event.target.closest("#le-back")) { leave(); return; }
+  if (event.target.closest("#le-do-publish")) { publish(); return; }
+  if (event.target.closest("#le-unpublish")) { unpublish(); return; }
   if (event.target.closest("#le-retry")) { retry(); return; }
   if (!button || !state?.doc) return;
   const doc = state.doc, act = button.dataset.act;
@@ -223,7 +256,8 @@ export async function open(root, lessonId, onBack) {
   root.id = "lesson-editor-root";
   const lesson = await api(`/api/subjects/lessons/${lessonId}`);
   const view = lesson.source === "worksheet" ? await api(`/api/worksheets/${lessonId}`) : { status: "ready", pages: [], has_text: false };
-  state = { id: lessonId, view, doc: view.status === "ready" ? lesson.draft : null, pages: [], text: "", timer: null, poll: null, onBack };
+  state = { id: lessonId, view, doc: view.status === "ready" ? lesson.draft : null, pages: [], text: "", timer: null, poll: null, onBack,
+            published: lesson.published, problems: [], publishMessage: "" };
   if (state.doc && !Object.keys(state.doc).length) state.doc = { name: "", skills: [], mistakes: {} };
   state.pages = await Promise.all(view.pages.map(i => pageUrl(lessonId, i)));
   if (view.has_text) state.text = (await api(`/api/worksheets/${lessonId}/text`)).text;

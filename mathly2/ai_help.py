@@ -147,7 +147,11 @@ def run(app, request_id: str) -> None:
             pic = store.get_picture(row["picture_id"])
             if pic is None or pic["deleted_at"]:
                 raise ai.AIFailure("bad_request", "the photo is gone")
-            result = app.state.ai.solve(app.state.pictures.get(pic["path"]), "image/jpeg", [{"id": s["id"], "name": s["name"]} for s in bank.skills])
+            subject = bank.subject_of_skill(row["skill_id"]) if row["skill_id"] else (row["snapshot"] or {}).get("subject")
+            subject = subject if any(s["id"] == subject for s in bank.subjects) else "math"
+            skills = [{"id": s["id"], "name": s["name"]} for s in bank.skills if bank.subject_of_skill(s["id"]) == subject]
+            name = next(s["name"] for s in bank.subjects if s["id"] == subject)
+            result = app.state.ai.solve(app.state.pictures.get(pic["path"]), "image/jpeg", skills, *([] if subject == "math" else [name]))
             unreadable = not result.get("readable")
         else:
             images = _check_images(app, row)
@@ -246,7 +250,8 @@ def _check_student_limits(request: Request, user: dict, photo: bool) -> None:
 
 
 @router.post("/ai/photo", status_code=201)
-async def photo(request: Request, class_id: int | None = None, skill_id: str | None = None, user: dict = Depends(learner)) -> dict:
+async def photo(request: Request, class_id: int | None = None, skill_id: str | None = None, subject: str | None = None,
+                user: dict = Depends(learner)) -> dict:
     """A photographed problem (raw image bytes; the Content-Type says which kind). A student's goes to the queue of the class's teacher; a teacher's or
     developer's own is sent at once."""
     staff = _is_staff(user)
@@ -266,7 +271,9 @@ async def photo(request: Request, class_id: int | None = None, skill_id: str | N
             _check_student_limits(request, user, True)
         jpeg = pictures.clean_image(data, content_type)
         pic = pictures.store_picture(store, request.app.state.pictures, user["id"], "help", jpeg)
-        row = store.create_ai_request("photo", user["id"], klass["id"] if klass else None, picture_id=pic["id"], skill_id=skill_id, created_at=clock.now())
+        known = subject if subject and any(s["id"] == subject for s in request.app.state.bank.subjects) else None
+        row = store.create_ai_request("photo", user["id"], klass["id"] if klass else None, picture_id=pic["id"], skill_id=skill_id,
+                                      snapshot={"subject": known} if known and not skill_id else None, created_at=clock.now())
         if staff:
             try:
                 row = send(request, user, row)                       # their own request goes straight out
