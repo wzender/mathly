@@ -159,18 +159,28 @@ def test_activity_is_for_developers_only_and_takes_7_or_30_days():
     assert "user_id" not in json.dumps(got)                                             # counts only, never who
 
 
-def test_the_supabase_store_reads_the_activity_view_in_pages(monkeypatch):
+def test_the_supabase_store_reads_the_activity_view_in_pages_after_the_last_row_read(monkeypatch):
     from datetime import date
     from mathly2.store import SupabaseStore
     s = SupabaseStore("https://x.invalid", "secret")
     monkeypatch.setattr(SupabaseStore, "ACTIVITY_PAGE", 2)
-    rows = [{"day": "2026-11-10", "user_id": f"u{i}", "answers": 1, "attempts": 0} for i in range(5)]
+    table = [{"day": d, "user_id": u, "answers": 1, "attempts": 0} for d, u in
+             (("2026-11-09", "u1"), ("2026-11-10", "u1"), ("2026-11-10", "u3"), ("2026-11-10", "u5"), ("2026-11-11", "u2"))]
     asked = []
-    def fake(method, table, params=None, **kw):
-        asked.append((table, params["day"], params["offset"]))
-        start = int(params["offset"])
-        return rows[start:start + int(params["limit"])]
+    def fake(method, table_name, params=None, **kw):
+        asked.append(params.get("or"))
+        if len(asked) == 2:                                          # a new row lands before the page already read
+            table.insert(1, {"day": "2026-11-09", "user_id": "u0", "answers": 1, "attempts": 0})
+            table.sort(key=lambda r: (r["day"], r["user_id"]))
+        rows = table
+        if params.get("or"):                                         # day.gt.D or (day.eq.D and user_id.gt.U)
+            d = params["or"].split("day.gt.")[1].split(",")[0]
+            u = params["or"].split("user_id.gt.")[1].rstrip("))")
+            rows = [r for r in table if r["day"] > d or (r["day"] == d and r["user_id"] > u)]
+        return rows[:int(params["limit"])]
     monkeypatch.setattr(s, "_request", fake)
     got = s.activity_since(date(2026, 11, 5))
-    assert [r["user_id"] for r in got] == [f"u{i}" for i in range(5)] and got[0]["day"] == date(2026, 11, 10)
-    assert asked == [("m2_activity", "gte.2026-11-05", "0"), ("m2_activity", "gte.2026-11-05", "2"), ("m2_activity", "gte.2026-11-05", "4")]
+    assert [(r["day"].isoformat(), r["user_id"]) for r in got] == [("2026-11-09", "u1"), ("2026-11-10", "u1"), ("2026-11-10", "u3"),
+                                                                   ("2026-11-10", "u5"), ("2026-11-11", "u2")]   # each once, none skipped
+    assert asked == [None, "(day.gt.2026-11-10,and(day.eq.2026-11-10,user_id.gt.u1))",
+                     "(day.gt.2026-11-10,and(day.eq.2026-11-10,user_id.gt.u5))"]

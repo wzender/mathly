@@ -1360,14 +1360,18 @@ class SupabaseStore:
     ACTIVITY_PAGE = 1000
 
     def activity_since(self, first: date) -> list[dict]:
-        rows, offset = [], 0
-        while True:                                           # read in pages: the API returns at most a page at a time
-            page = self._request("GET", "m2_activity", {"day": f"gte.{first.isoformat()}", "select": "day,user_id,answers,attempts",
-                                                        "order": "day,user_id", "limit": str(self.ACTIVITY_PAGE), "offset": str(offset)})
+        """Read in pages (the API returns at most a page at a time). Each page starts after the last (day, user_id) read, not at an
+        offset, so a row added meanwhile cannot shift a row into two pages or out of both."""
+        rows: list[dict] = []
+        params = {"day": f"gte.{first.isoformat()}", "select": "day,user_id,answers,attempts", "order": "day,user_id",
+                  "limit": str(self.ACTIVITY_PAGE)}
+        while True:
+            page = self._request("GET", "m2_activity", params)
             rows += page
             if len(page) < self.ACTIVITY_PAGE:
                 break
-            offset += self.ACTIVITY_PAGE
+            last = page[-1]
+            params = {**params, "or": f"(day.gt.{last['day']},and(day.eq.{last['day']},user_id.gt.{last['user_id']}))"}
         return [{**r, "day": date.fromisoformat(r["day"])} for r in rows]
 
     def daily_correct(self, user_id: str) -> dict[date, int]:
