@@ -21,6 +21,13 @@ A manager or a developer SHALL be able to upload a worksheet as one PDF (up to 2
 - **WHEN** a teacher asks the server to upload a worksheet
 - **THEN** the server refuses with 403
 
+### Requirement: A daily limit on uploads
+A person SHALL be able to start at most 20 worksheets in 24 hours, since each draft is a paid AI call. Beyond that, starting another SHALL be refused with a message saying to try again tomorrow.
+
+#### Scenario: The twenty-first worksheet
+- **WHEN** a manager who started 20 worksheets in the last 24 hours starts another
+- **THEN** it is refused with 429 and a message to try again tomorrow
+
 ### Requirement: The AI drafts one lesson
 The AI SHALL read the worksheet and draft one lesson: a name, its skills each with a name, a short name and a one-line description, and multiple-choice questions for each skill. Each question SHALL have one right choice and two to four wrong ones, and each wrong choice SHALL name a mistake with a name and a tip.
 

@@ -38,7 +38,7 @@
 ## 6. The draft editor (stage 2)
 
 - [x] 6.1 Add the draft routes: read, and save the whole document. Saving checks the shape, not completeness. Verify with API tests: save and read back, and 403 for others.
-- [ ] 6.2 Build the editor screen:
+- [x] 6.2 Build the editor screen:
   - the worksheet's pages beside the draft;
   - the lesson's name;
   - skills, questions, choices, the right choice and mistakes, with add, delete and reorder;
@@ -47,8 +47,8 @@
   - every change saved.
 
   Verify with Playwright tests: fixing a right answer survives leaving and coming back, an added question is marked as written by a person, and no sideways scroll on a phone.
-- [ ] 6.3 Show the drafting status and failures on the editor, with "נסו שוב". Verify with a Playwright test with a fake AI that first fails, then succeeds.
-- [ ] 6.4 Update the PRD and the `worksheet-lessons` spec delta if behavior moved. Verify that `openspec validate add-subjects-and-worksheets --strict` passes.
+- [x] 6.3 Show the drafting status and failures on the editor, with "נסו שוב". Verify with a Playwright test with a fake AI that first fails, then succeeds.
+- [x] 6.4 Update the PRD and the `worksheet-lessons` spec delta if behavior moved. Verify that `openspec validate add-subjects-and-worksheets --strict` passes.
 
 ## 7. Publishing and subject-aware help (stage 3)
 

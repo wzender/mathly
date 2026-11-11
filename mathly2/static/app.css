@@ -566,3 +566,29 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .c-subjects legend { font-weight: 600; padding: 0 4px; }
 .c-subjects p { flex-basis: 100%; margin: 4px 0 0; font-size: 14px; }
 .test-form .check[hidden] { display: none; }
+
+/* The lesson editor (lesson_editor.js): the worksheet beside the draft on a wide screen, one above the other on a phone. */
+.le-layout { display: grid; gap: 12px; }
+@media (min-width: 900px) { .le-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; }
+  .le-sheet { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; } }
+.le-sheet { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; background: var(--surface); }
+.le-sheet img { display: block; width: 100%; height: auto; border-radius: 6px; margin-bottom: 8px; background: #fff; }
+.le-text { white-space: pre-wrap; font: inherit; margin: 0; }
+.le-draft label { font-weight: 600; }
+.le-question { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+.le-question textarea { min-height: 60px; }
+.le-choices { margin: 8px 0; }
+.le-choice { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; border: 0; }
+.le-choice input.grow { flex: 1 1 160px; width: auto; }
+.le-choice select { flex: 1 1 140px; width: auto; }
+.le-choice button, .le-skill .hrow button, .le-question .hrow button { min-height: 36px; padding: 4px 10px; }
+.le-right { display: inline-flex; gap: 4px; align-items: center; margin: 0; font-weight: 400; white-space: nowrap; }
+.le-right input { width: auto; }
+.le-source { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+.le-ai { color: var(--sky-gold); border-color: var(--sky-gold); }
+.le-preview { margin-top: 6px; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 10px; font-size: 14px; }
+.le-preview p { margin: 0 0 4px; }
+.le-preview ul { margin: 0; padding-inline-start: 18px; }
+.le-mistake { display: flex; flex-wrap: wrap; gap: 6px; }
+.le-mistake input { flex: 1 1 140px; width: auto; }
+.le-status { margin: 8px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); }
