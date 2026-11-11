@@ -73,7 +73,7 @@ def test_starting_again_resumes_the_same_open_attempt(world):
     assert again["id"] == first["id"] and [q["key"] for q in again["questions"]] == [q["key"] for q in first["questions"]]
     assert len(again["answers"]) == 1 and again["due_at"] == first["due_at"]
     facts = client.get(f"/api/lessons/{lesson}/quiz", headers=auth()).json()
-    assert facts["open"]["id"] == first["id"] and facts["best"] is None and facts["attempts"] == 0 and facts["size"] == 15 and facts["minutes"] == 45
+    assert facts["open"]["id"] == first["id"] and facts["best"] is None and facts["attempts"] == 0 and facts["size"] == 15 and facts["minutes"] is None
 
 
 def test_a_student_in_no_class_is_refused_a_missing_lesson_is_404_and_a_manager_is_refused(world):
@@ -193,7 +193,7 @@ def test_the_path_gives_each_lesson_its_quiz_state(world):
     start(client, other)
     state = quizzes()
     assert state[lesson]["best"] == 93 and state[lesson]["open"] is False
-    assert state[other]["best"] is None and state[other]["open"] is True and state[other]["due_at"]
+    assert state[other]["best"] is None and state[other]["open"] is True and state[other]["due_at"] is None   # a quiz has no deadline
 
 
 # --- 2.4 written quizzes are not lesson quizzes ---

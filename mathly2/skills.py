@@ -236,7 +236,7 @@ def lesson_rows(request: Request, user: dict) -> tuple[list[dict], list[str], di
         lessons.append({"id": lesson["id"], "name": lesson["name"], "skills": skills, "mastered": mastered,
                         "completed": completed, "passed": passed, "due_date": due.isoformat() if due else None,
                         "behind": bool(due and due < today and not completed),
-                        "quiz": {"best": fact.get("best"), "open": bool(fact.get("open")), "due_at": fact["open"]["due_at"].isoformat() if fact.get("open") else None}})
+                        "quiz": {"best": fact.get("best"), "open": bool(fact.get("open")), "due_at": fact["open"]["due_at"].isoformat() if fact.get("open") and fact["open"]["due_at"] else None}})
     return lessons, order, states
 
 

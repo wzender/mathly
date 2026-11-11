@@ -332,14 +332,15 @@ def test_when_the_simulations_countdown_reaches_zero_it_is_handed_in_as_it_stand
     app, store, klass, lessons = world(bank)
     started_skills(store, bank, lessons)
     test = add_test(store, klass, lessons, 4, questions=6, minutes=45)
-    now = clock.now()
     drawn = quiz.draw(bank, lessons[0])[:5]
-    row = store.create_attempt(KID_ID, "simulation", str(test["id"]), now - timedelta(minutes=45) + timedelta(seconds=3),
-                               now + timedelta(seconds=3), drawn)
     with running(app) as url:
-        page = sign_in(browser, url, f"#/sim/{test['id']}/{row['id']}")
+        page = sign_in(browser, url)                                                                         # signed in before the clock starts
+        now = clock.now()
+        row = store.create_attempt(KID_ID, "simulation", str(test["id"]), now - timedelta(minutes=45) + timedelta(seconds=8),
+                                   now + timedelta(seconds=8), drawn)
+        page.goto(url + f"#/sim/{test['id']}/{row['id']}")
         page.wait_for_selector("#qz-timer")
-        page.wait_for_selector("#qz-grade", timeout=15000)
+        page.wait_for_selector("#qz-grade", timeout=25000)
         assert page.inner_text("#qz-grade b") == "0" and "הזמן נגמר" in page.inner_text(".qz-result")
 
 

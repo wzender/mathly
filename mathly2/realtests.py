@@ -131,7 +131,7 @@ def card(request: Request, user_id: str | None, test: dict, today: date) -> dict
         rows = facts["exercise"][n]
         open_ = next((r for r in rows if attempts.is_open(r)), None)
         exercises.append({"number": n, "best": facts["best"][n], "attempts": len([r for r in rows if not attempts.is_open(r)]),
-                          "open": bool(open_), "due_at": open_["due_at"].isoformat() if open_ else None})
+                          "open": bool(open_), "due_at": open_["due_at"].isoformat() if open_ and attempts.is_timed(open_) else None})
     sim = facts["simulation"]
     opens_in = max(0, days_left - p["sim"])
     return {"id": test["id"], "date": test["date"].isoformat(), "days_left": days_left, "note": test["note"],

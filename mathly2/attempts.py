@@ -74,7 +74,8 @@ def settle(store, bank, row: dict, now: datetime) -> dict:
 
 
 def submit(store, bank, row: dict, now: datetime) -> dict:
-    """The student hands in. Idempotent: a submitted attempt is returned unchanged; one past its deadline is settled as timed out."""
+    """The student hands in. Idempotent: a submitted attempt is returned unchanged; a timed attempt (the simulation) past its deadline
+    is settled as timed out. An untimed one is graded now, however late."""
     if not is_open(row):
         return row
     if is_overdue(row, now):
