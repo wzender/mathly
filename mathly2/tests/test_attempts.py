@@ -36,10 +36,11 @@ def choose(bank, ref, right=True):
     return picks[0]
 
 
-def make(bank, n=4, **answers):
+def make(bank, n=4, kind="simulation"):
+    """A timed attempt by default: only the simulation has a deadline."""
     store = InMemoryStore()
     questions = refs(bank, n)
-    row = store.create_attempt(U, "quiz", "t", T0, DUE, questions)
+    row = store.create_attempt(U, kind, "t", T0, DUE, questions)
     return store, row, questions
 
 
@@ -79,6 +80,16 @@ def test_submitting_after_the_deadline_is_a_timeout(bank):
     store, row, questions = make(bank, 4)
     done = attempts.submit(store, bank, row, DUE + timedelta(minutes=1))
     assert done["timed_out"] is True and done["grade"] == 0
+
+
+@pytest.mark.parametrize("kind", ["quiz", "exercise_test"])
+def test_a_quiz_or_an_exercise_test_has_no_time_limit(bank, kind):
+    store, row, questions = make(bank, 4, kind=kind)
+    store.save_attempt(row["id"], answers={q["key"]: choose(bank, q) for q in questions[:3]})
+    later = DUE + timedelta(days=2)
+    assert attempts.settle(store, bank, store.get_attempt(row["id"]), later)["submitted_at"] is None   # still open long after due_at
+    done = attempts.submit(store, bank, store.get_attempt(row["id"]), later)
+    assert done["timed_out"] is False and done["grade"] == 75 and done["submitted_at"] == later
 
 
 def test_the_result_lists_lost_skills_and_mistakes_but_never_the_right_answer(bank):

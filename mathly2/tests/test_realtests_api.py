@@ -292,7 +292,7 @@ def test_an_exercise_test_has_the_tests_questions_and_time_and_no_right_answers_
     assert got.status_code == 200
     attempt = got.json()
     assert attempt["kind"] == "exercise_test" and attempt["state"] == "open" and len(attempt["questions"]) == 6
-    assert datetime.fromisoformat(attempt["due_at"]) - datetime.fromisoformat(attempt["now"]) == timedelta(minutes=30)
+    assert attempt["due_at"] is None                                                       # only the simulation is timed
     assert attempt["test"]["id"] == test["id"] and attempt["test"]["number"] == 1
     blob = json.dumps(attempt, ensure_ascii=False)
     assert '"correct"' not in blob and '"mistake"' not in blob and '"skill' not in blob

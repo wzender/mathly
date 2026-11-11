@@ -56,7 +56,7 @@ def view(request: Request, row: dict) -> dict:
         base["test"] = _test_info(request, row)
     if attempts.is_open(row):
         questions = [q for q in (bank.practice_question(r["skill_id"], r["key"]) for r in row["questions"]) if q]
-        return {**base, "state": "open", "due_at": _iso(row["due_at"]), "now": _iso(clock.now()), "answers": row["answers"], "questions": questions}
+        return {**base, "state": "open", "due_at": _iso(row["due_at"]) if attempts.is_timed(row) else None, "now": _iso(clock.now()), "answers": row["answers"], "questions": questions}
     result = attempts.result(bank, row)
     result.pop("lesson", None)
     return {**base, "state": "submitted", **result, "submitted_at": _iso(row["submitted_at"])}

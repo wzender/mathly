@@ -1,4 +1,4 @@
-// A lesson quiz: 10 multiple-choice questions on a server timer, as a dialog over the path (the same sheet as the exercise screen).
+// A lesson quiz, an exercise test or the simulation: multiple-choice questions (only the simulation is on a server timer), as a dialog over the path (the same sheet as the exercise screen).
 // A tap saves the choice on the server; nothing says whether it is right. After the submit (or when time ends) the result shows the
 // grade, the skills that lost points and the mistakes' names and tips, never the right answers.
 import { api, ApiError } from "./api.js";
@@ -66,10 +66,9 @@ function show(data) {
   if (data.state === "open") {
     if (!(data.id in orders)) orders = { [data.id]: {} };
     at = Math.min(at, data.questions.length - 1);
-    deadline = performance.now() + Math.max(0, new Date(data.due_at) - new Date(data.now));       // the server's clock, not the device's
+    deadline = data.due_at ? performance.now() + Math.max(0, new Date(data.due_at) - new Date(data.now)) : 0;   // the server's clock, not the device's
     renderQuestion();
-    timer = setInterval(tick, 1000);
-    tick();
+    if (data.due_at) { timer = setInterval(tick, 1000); tick(); }
   } else {
     renderResult();
   }
@@ -88,7 +87,7 @@ export function close() {
 const left = () => Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
 
 async function tick() {
-  if (!layer || attempt?.state !== "open") return;
+  if (!layer || attempt?.state !== "open" || !attempt.due_at) return;
   const secs = left();
   const label = q("#qz-timer");
   if (label) label.textContent = clock(secs);
@@ -125,7 +124,7 @@ function renderQuestion() {
   const total = attempt.questions.length, question = attempt.questions[at], saved = attempt.answers[question.key];
   const answered = Object.keys(attempt.answers).length;
   q(".mx-sheet").innerHTML = `${heading(names(attempt).title)}
-    <div class="qz-bar"><span class="qz-timer" id="qz-timer" aria-label="הזמן שנשאר">${clock(left())}</span>
+    <div class="qz-bar">${attempt.due_at ? `<span class="qz-timer" id="qz-timer" aria-label="הזמן שנשאר">${clock(left())}</span>` : ""}
       <span id="qz-count">שאלה ${at + 1} מתוך ${total}</span></div>
     <span class="mx-sr" id="qz-live" role="status" aria-live="polite"></span>
     <div class="qz-dots" role="group" aria-label="נענו ${answered} מתוך ${total}">${attempt.questions.map((x, i) =>

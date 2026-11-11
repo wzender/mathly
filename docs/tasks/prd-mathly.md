@@ -36,7 +36,7 @@ reused as files (see 7.1); everything else is rebuilt.
 | lesson | שיעור | A set of skills, e.g. טכניקה אלגברית 1. Shown on the path as a hub with its skills around it |
 | class | כיתה | A named group of students with one teacher. Every class studies the whole course |
 | quiz | בוחן | A test on a single lesson. Can be retaken; best grade wins; each retake draws new questions. It is the only quiz type (no one-time summary quiz); its best grade is the lesson's grade |
-| exercise test | מבחן תרגול | A timed test on a set of lessons. Can be retaken; best grade wins |
+| exercise test | מבחן תרגול | A practice test on a set of lessons, with no time limit. Can be retaken; best grade wins |
 | simulation test | מבחן סימולציה | A timed test on a set of lessons. One time only |
 | test | מבחן | The real-life test. Appears in the app as a date + the lessons it covers + number of questions and time limit (default 12 questions, 45 minutes). Set by the teacher |
 | smart board | לוח | The drawing board on which a student or teacher writes and draws a solution |
@@ -65,7 +65,7 @@ reused as files (see 7.1); everything else is rebuilt.
 - As a student, I want to photograph a problem I'm stuck on and get hints one at a time, so I can learn instead of just copying the answer.
 - As a student, I want my handwritten answer checked, and to ask my teacher to look again if I disagree.
 - As a student, I want to see how many days are left until my test, how ready I am, and what to do today, so I don't have to plan by myself.
-- As a student, I want to practice with timed, mixed tests before the real test, so the real test doesn't surprise me.
+- As a student, I want to practice with mixed tests before the real test, so the real test doesn't surprise me.
 - As a student, I want one full simulation of the real test, so I know where I stand while there is still time to fix gaps.
 - As a student, I want to catch comets and fill my collection of stars and constellations, so practice feels like a game.
 
@@ -272,14 +272,14 @@ The exercise screen is where a student practices one skill.
 
 - **QZ-1 Quiz per lesson.** Every lesson has one quiz: the lesson's "boss level", a node on the trail after the lesson's ring. It is always open (PTH-4). The student can retake it at any time;
   the best grade counts, and the quiz's best grade is the lesson's grade.
-- **QZ-2 Format.** A quiz is **15 multiple-choice questions** drawn from the bank questions of the lesson's skills, at least one per skill and the rest spread evenly across the skills, in **45 minutes** (3 minutes for each question). It is **passed** with a grade of at least 87 (13 right out of 15); a pass stays whatever a later retake scores (QZ-7).
-  The timer runs on the server; when it ends the quiz is submitted as it stands and unanswered questions count as wrong. Skill names are not shown and there is no feedback until the end.
+- **QZ-2 Format.** A quiz is **15 multiple-choice questions** drawn from the bank questions of the lesson's skills, at least one per skill and the rest spread evenly across the skills, with **no time limit** (only the simulation is timed). It is **passed** with a grade of at least 87 (13 right out of 15); a pass stays whatever a later retake scores (QZ-7).
+  The quiz stays open until the student hands it in; unanswered questions then count as wrong. Skill names are not shown and there is no feedback until the end.
   The smart board and the calculator are available.
 - **QZ-3 Retakes draw new questions.** Each retake prefers questions the student has not had in earlier attempts at this lesson's quiz, the least-used first. While the lesson has enough unused questions (four skills of ten give two quizzes in a row without a repeat), none repeats; after that the least-used come first.
 - **QZ-7 Passing.** A quiz is passed with a grade of at least 87 (13 of 15). Passing completes the lesson (PTH-10) and does not change any skill's mastery.
 - **QZ-4 After a quiz.** The student sees the grade, the skills where points were lost (each linked to its star, so they can practice before retaking) and, for each missed question, the name and tip of the mistake they made (as in EXR-5).
   The correct answers are never shown, so a retake tests understanding and not memory.
-- **QZ-5 Grades on the server.** Quiz grades and timers are computed and stored on the server.
+- **QZ-5 Grades on the server.** Quiz grades are computed and stored on the server.
 - **QZ-6 Written quizzes.** The four written quizzes authored in the bank (four written questions, 100 points, 45 minutes) are not lesson quizzes. A teacher can give one to a class as an assignment (TCH-2).
 
 ### 4.10 Test countdown (TST)
@@ -306,7 +306,7 @@ The exercise screen is where a student practices one skill.
 - **EXT-1 Created by the app.** When the teacher sets a test, the system creates 2 exercise tests for every student in the class and places them on the student's countdown.
 - **EXT-2 Teacher can assign one.** The teacher can send an exercise test to the whole class as an assignment (built with the assignments, stage 6): it shows in "המשימות שלי", opens the exercise test and counts as done when the student has taken it; it is not handed in as a picture.
 - **EXT-3 Retakes.** The student can start or retake an exercise test at any time. Each retake draws new questions; the best grade counts.
-- **EXT-4 Like the simulation.** Exercise tests have the same number of questions and the same time limit as the simulation (that is, as the real test, TST-1),
+- **EXT-4 Like the simulation.** Exercise tests have the same number of questions as the simulation (that is, as the real test, TST-1) but no time limit,
   mix questions from all covered lessons, and do not show the skill name. Feedback comes **only at the end**, not after each question.
 - **EXT-5 Question mix.** The system picks questions in these proportions:
 
@@ -319,7 +319,7 @@ The exercise screen is where a student practices one skill.
   Skills in the "not started" state do not appear; instead, the card lists them as "practice these first".
   If the student has fewer weak skills than needed, the rest comes from the other covered skills.
 - **EXT-6 Result links back.** After an exercise test, the system shows the weak skills it found and links each one to its star on the path.
-- **EXT-7 Grades on the server.** Exercise test grades and the timer are computed and kept on the server.
+- **EXT-7 Grades on the server.** Exercise test grades are computed and kept on the server.
 
 ### 4.12 Simulation test (מבחן סימולציה) (SIM)
 
@@ -335,7 +335,7 @@ The exercise screen is where a student practices one skill.
 
 - **GRD-1 One scale.** Every grade (quiz, exercise test, simulation, assignment) is a whole number from 0 to 100. In a multiple-choice quiz or test every question is worth the same, and the grade is the share of right answers, rounded.
   Teachers' grades for assignments are on the same scale.
-- **GRD-2 When time ends.** When a timer ends (quiz, exercise test, simulation) the attempt is submitted as it stands, and unanswered questions count as wrong.
+- **GRD-2 When time ends.** Only the simulation is timed. When its timer ends it is submitted as it stands, and unanswered questions count as wrong.
   Leaving the screen does not stop the timer.
 - **RDY-1 Readiness meter.** For each upcoming test, the system shows the student (and the teacher) one **readiness number from 0 to 100**, drawn as a level bar, with its three parts under it:
   - **mastery (שליטה)**: the % of the covered skills that are mastered;
@@ -515,7 +515,7 @@ Rebuilt, not copied as a whole; read the places named in each requirement group.
   The server reads the same fact once per request, makes independent database reads at the same time, and reuses its connections: a student's screen waits for the database at most 3 times in a row and a practice answer at most 4 (each call to a remote database costs about 0.4 seconds).
   The server remembers the classes, their students, the roles, the tests and the assignments for at most 30 seconds (`MATHLY_CACHE_SECONDS`, 0 turns it off) and forgets them at once when the app changes one; a screen opened again shows what it last knew and refreshes it, without redrawing over something being typed. One server process is assumed.
   Further settings: the AI key and model (`ANTHROPIC_API_KEY`, `MATH_MODEL`), the push keys (`VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`), the private bucket for answer pictures, and the teacher and developer email lists.
-- **Server decides.** Correctness of answers, the date of each answer, mastery, grades, the budgets, and the simulation and exercise-test timers are decided and stored on the server.
+- **Server decides.** Correctness of answers, the date of each answer, mastery, grades, the budgets, and the simulation timer are decided and stored on the server.
   Grades that matter cannot be changed from the device.
 - **Content gaps in the bank.** The app needs content the bank does not have yet:
   - nothing for lesson quizzes: they are drawn from the existing questions (QZ-2);

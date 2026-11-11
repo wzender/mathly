@@ -17,11 +17,15 @@ Every grade SHALL be a whole number from 0 to 100. In a multiple-choice quiz or 
 - **THEN** the grade is 67
 
 ### Requirement: When time ends
-When the timer of a timed attempt ends, the server SHALL submit it as it stands, and unanswered questions SHALL count as wrong. Closing or refreshing the app MUST NOT stop or reset the timer.
+The simulation SHALL be the only timed attempt; a lesson quiz and an exercise test have no time limit. When the simulation's timer ends, the server SHALL submit it as it stands, and unanswered questions SHALL count as wrong. Closing or refreshing the app MUST NOT stop or reset the timer.
 
 #### Scenario: Closed the app
-- **WHEN** a student closes the app 5 minutes into a 15-minute quiz and opens it 20 minutes later
-- **THEN** the quiz has been submitted with the answers given
+- **WHEN** a student closes the app 5 minutes into a 15-minute simulation and opens it 20 minutes later
+- **THEN** the simulation has been submitted with the answers given
+
+#### Scenario: A quiz is not timed
+- **WHEN** a student closes the app 5 minutes into a lesson quiz and opens it an hour later
+- **THEN** the quiz is still open with the answers given
 
 ### Requirement: Grades screen
 The student SHALL have a grades screen listing every grade they have: each lesson's quiz (best grade), and every exercise test, simulation and assignment grade as those exist.

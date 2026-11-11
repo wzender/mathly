@@ -1,6 +1,9 @@
-"""Timed, graded attempts (the engine under lesson quizzes; exercise tests and the simulation will use it too).
+"""Graded attempts: the engine under lesson quizzes, exercise tests and the simulation.
 
-An attempt is open until it is graded. The server settles an overdue attempt on the first read after its deadline, so there is no
+Only the simulation is timed (TIMED_KINDS); a lesson quiz or an exercise test stays open until the student hands it in. Every attempt
+still stores a due_at (the database requires one), but only a timed attempt is held to it.
+
+An attempt is open until it is graded. The server settles an overdue timed attempt on the first read after its deadline, so there is no
 background job and the answer is right even if nothing ran at the deadline. Nothing here ever says which choice was right."""
 from __future__ import annotations
 
@@ -13,6 +16,7 @@ QUIZ_SIZE = 15
 MINUTES_PER_QUESTION = 3
 QUIZ_MINUTES = MINUTES_PER_QUESTION * QUIZ_SIZE   # 45
 PASS_RIGHT = 13                    # right answers out of QUIZ_SIZE that pass a lesson quiz
+TIMED_KINDS = frozenset({"simulation"})   # the only attempts with a time limit
 
 
 def percent(right: int, total: int) -> int:
@@ -51,8 +55,12 @@ def is_open(row: dict) -> bool:
     return row["submitted_at"] is None
 
 
+def is_timed(row: dict) -> bool:
+    return row["kind"] in TIMED_KINDS
+
+
 def is_overdue(row: dict, now: datetime) -> bool:
-    return is_open(row) and now >= row["due_at"]
+    return is_open(row) and is_timed(row) and now >= row["due_at"]
 
 
 def settle(store, bank, row: dict, now: datetime) -> dict:

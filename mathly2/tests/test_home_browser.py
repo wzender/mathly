@@ -277,7 +277,7 @@ def started_skills(store, bank, lessons, n=5):
     return skills
 
 
-def test_an_exercise_test_runs_with_the_tests_length_and_timer_and_links_its_weak_skills_at_the_end(browser, bank):
+def test_an_exercise_test_runs_with_the_tests_length_and_no_timer_and_links_its_weak_skills_at_the_end(browser, bank):
     app, store, klass, lessons = world(bank)
     skills = started_skills(store, bank, lessons)
     test = add_test(store, klass, lessons, 10, questions=6, minutes=30)
@@ -286,7 +286,7 @@ def test_an_exercise_test_runs_with_the_tests_length_and_timer_and_links_its_wea
         page.wait_for_selector("#qz-q")
         assert page.evaluate("location.hash").startswith(f"#/exam/{test['id']}/1/")                         # the address names the attempt
         assert "מבחן תרגול 1" in page.inner_text(".mx-sheet") and page.locator(".qz-dot").count() == 6
-        assert page.inner_text("#qz-timer").startswith("29:") or page.inner_text("#qz-timer") == "30:00"
+        assert page.locator("#qz-timer").count() == 0                                                         # only the simulation is timed
         sheet = page.inner_text(".mx-sheet")
         assert not any(bank.skill(i)["name"] in sheet for i in skills)                                       # no skill names, no feedback
         page.click("#qz-submit")
@@ -312,6 +312,7 @@ def test_the_simulation_can_be_taken_once_and_a_second_visit_shows_the_result(br
         page = sign_in(browser, url, f"#/sim/{test['id']}")
         page.wait_for_selector("#qz-q")
         assert "מבחן סימולציה" in page.inner_text(".mx-sheet") and page.locator(".qz-dot").count() == 6
+        assert page.inner_text("#qz-timer").startswith("44:") or page.inner_text("#qz-timer") == "45:00"        # the test's minutes
         page.click("#qz-submit")
         page.click("#qz-yes")
         page.wait_for_selector("#qz-grade")
@@ -324,6 +325,22 @@ def test_the_simulation_can_be_taken_once_and_a_second_visit_shows_the_result(br
         page.click(".qz-actions [data-close]")
         page.wait_for_selector("#test-card")
         assert page.inner_text("#sim-grade") == "0"
+
+
+def test_when_the_simulations_countdown_reaches_zero_it_is_handed_in_as_it_stands(browser, bank):
+    from mathly2 import quiz
+    app, store, klass, lessons = world(bank)
+    started_skills(store, bank, lessons)
+    test = add_test(store, klass, lessons, 4, questions=6, minutes=45)
+    now = clock.now()
+    drawn = quiz.draw(bank, lessons[0])[:5]
+    row = store.create_attempt(KID_ID, "simulation", str(test["id"]), now - timedelta(minutes=45) + timedelta(seconds=3),
+                               now + timedelta(seconds=3), drawn)
+    with running(app) as url:
+        page = sign_in(browser, url, f"#/sim/{test['id']}/{row['id']}")
+        page.wait_for_selector("#qz-timer")
+        page.wait_for_selector("#qz-grade", timeout=15000)
+        assert page.inner_text("#qz-grade b") == "0" and "הזמן נגמר" in page.inner_text(".qz-result")
 
 
 def test_the_simulation_before_its_window_says_when_it_opens_and_does_not_start(browser, bank):
