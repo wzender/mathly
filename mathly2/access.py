@@ -18,7 +18,7 @@ GRANTABLE = ("student", "teacher", "manager", "admin")   # roles an admin can gi
 PERMISSIONS: dict[str, frozenset[str]] = {
     "student": frozenset({"path.use"}),
     "teacher": frozenset({"path.use", "class.teach", "class.roster"}),
-    "manager": frozenset({"classes.manage", "class.roster", "students.list"}),
+    "manager": frozenset({"classes.manage", "class.roster", "students.list", "content.manage"}),   # content: subjects and lessons
     "admin": frozenset({"roles.manage"}),
     "developer": frozenset({"*"}),
 }

@@ -29,6 +29,10 @@ class MemberExists(ValueError):
     """The email already belongs to this class."""
 
 
+class SubjectExists(ValueError):
+    """A subject with this name (ignoring case) already exists."""
+
+
 class TeacherIsStudent(ValueError):
     """A class's teacher cannot also be one of its students."""
 
@@ -63,7 +67,18 @@ def _attempt_row(row: dict) -> dict:
             "questions": list(row.get("questions") or []), "answers": dict(row.get("answers") or {})}
 
 
-TEST_FIELDS = {"date", "lessons", "note", "questions", "minutes"}
+TEST_FIELDS = {"date", "lessons", "note", "questions", "minutes", "subject_id"}
+CLASS_FIELDS = {"name", "lessons", "teacher_email", "ai_enabled", "ai_daily_checks", "subjects"}
+SUBJECT_FIELDS = {"name", "icon", "position"}
+LESSON_FIELDS = {"subject_id", "position", "draft", "published", "status", "failure", "files", "published_at"}
+MATH = {"id": "math", "name": "מתמטיקה", "icon": "∑", "position": 0, "created_by": "setup"}
+
+
+def _lesson_row(row: dict) -> dict:
+    """A lesson row as both stores give it: real datetimes, the draft and published documents as plain dicts (published may be None)."""
+    return {**row, "draft": dict(row.get("draft") or {}), "published": dict(row["published"]) if row.get("published") else None,
+            "files": list(row.get("files") or []), "created_at": _when(row.get("created_at")), "updated_at": _when(row.get("updated_at")),
+            "published_at": _when(row.get("published_at"))}
 
 
 def _check_test(fields: dict) -> None:
@@ -79,7 +94,8 @@ def _check_test(fields: dict) -> None:
 def _test_row(row: dict) -> dict:
     """A database row as the in-memory store gives it: a real date and datetimes, a plain list."""
     day = row["date"] if isinstance(row["date"], date) else date.fromisoformat(str(row["date"])[:10])
-    return {**row, "date": day, "lessons": list(row.get("lessons") or []), "created_at": _when(row["created_at"]), "removed_at": _when(row.get("removed_at"))}
+    return {**row, "date": day, "lessons": list(row.get("lessons") or []), "subject_id": row.get("subject_id") or "math",
+            "created_at": _when(row["created_at"]), "removed_at": _when(row.get("removed_at"))}
 
 
 PICTURE_KINDS = ("page", "answer", "help")
@@ -132,6 +148,8 @@ class InMemoryStore:
         self._allowance: dict[tuple[str, date], int] = {}   # (scope, day) -> used
         self._ai_usage: list[dict] = []
         self._subs: dict[int, dict] = {}                    # push subscriptions
+        self._subjects: dict[str, dict] = {"math": {**MATH, "created_at": datetime.now(timezone.utc)}}
+        self._lessons: dict[int, dict] = {}                 # lessons kept in the database (drafts and published)
 
     # --- classes ---
 
@@ -139,24 +157,24 @@ class InMemoryStore:
         return sum(1 for (c, _) in self._members if c == class_id)
 
     def _row(self, row: dict) -> dict:
-        return {**row, "lessons": list(row["lessons"]), "students": self._students(row["id"])}
+        return {**row, "lessons": list(row["lessons"]), "subjects": list(row.get("subjects") or ["math"]), "students": self._students(row["id"])}
 
     def _taken(self, name: str, except_id: int | None = None) -> bool:
         return any(c["name"].lower() == name.lower() and c["id"] != except_id for c in self._classes.values())
 
     def create_class(self, created_by: str, name: str, *, lessons=(), teacher_email: str | None = None,
-                     ai_enabled: bool = False, ai_daily_checks: int = 150) -> dict:
+                     ai_enabled: bool = False, ai_daily_checks: int = 150, subjects=("math",)) -> dict:
         with self._lock:
             if self._taken(name):
                 raise ClassExists(name)
             row = {"id": next(self._ids), "name": name, "created_by": created_by, "teacher_email": teacher_email,
                    "lessons": list(lessons), "ai_enabled": ai_enabled, "ai_daily_checks": ai_daily_checks,
-                   "created_at": _now()}
+                   "subjects": list(subjects), "created_at": _now()}
             self._classes[row["id"]] = row
             return self._row(row)
 
     def update_class(self, class_id: int, **fields) -> dict:
-        unknown = set(fields) - {"name", "lessons", "teacher_email", "ai_enabled", "ai_daily_checks"}
+        unknown = set(fields) - CLASS_FIELDS
         if unknown:
             raise ValueError(f"unknown class fields {sorted(unknown)}")
         with self._lock:
@@ -168,7 +186,7 @@ class InMemoryStore:
             teacher = fields.get("teacher_email", row["teacher_email"])
             if teacher and (class_id, teacher) in self._members:
                 raise TeacherIsStudent(teacher)
-            row.update({k: (list(v) if k == "lessons" else v) for k, v in fields.items()})
+            row.update({k: (list(v) if k in ("lessons", "subjects") else v) for k, v in fields.items()})
             return self._row(row)
 
     def delete_class(self, class_id: int) -> bool:
@@ -202,7 +220,8 @@ class InMemoryStore:
 
     def classes_of_student(self, email: str) -> list[dict]:
         with self._lock:
-            return [{"id": c["id"], "name": c["name"], "lessons": list(c["lessons"]), "ai_enabled": c["ai_enabled"], "ai_daily_checks": c["ai_daily_checks"]}
+            return [{"id": c["id"], "name": c["name"], "lessons": list(c["lessons"]), "ai_enabled": c["ai_enabled"], "ai_daily_checks": c["ai_daily_checks"],
+                     "subjects": list(c.get("subjects") or ["math"])}
                     for (cid, e), _ in self._members.items() if e == email for c in [self._classes[cid]]]
 
     def add_member(self, class_id: int, email: str) -> None:
@@ -361,8 +380,8 @@ class InMemoryStore:
     # --- real tests (a teacher sets them for a class) ---
 
     def create_test(self, class_id: int, test_day: date, lessons: list[str], created_by: str, *, note: str = "", questions: int = 12,
-                    minutes: int = 45, created_at: datetime | None = None) -> dict:
-        fields = {"lessons": list(lessons), "questions": questions, "minutes": minutes}
+                    minutes: int = 45, created_at: datetime | None = None, subject_id: str = "math") -> dict:
+        fields = {"lessons": list(lessons), "questions": questions, "minutes": minutes, "subject_id": subject_id}
         _check_test(fields)
         with self._lock:
             row = {"id": next(self._ids), "class_id": class_id, "date": test_day, **fields, "note": note, "created_by": created_by,
@@ -760,6 +779,81 @@ class InMemoryStore:
                     days[a["skill_id"]] = a["day"]
             return days
 
+    # --- subjects and the lessons kept in the database ---
+
+    def subjects(self) -> list[dict]:
+        with self._lock:
+            return [dict(s) for s in sorted(self._subjects.values(), key=lambda s: (s["position"], s["created_at"]))]
+
+    def create_subject(self, subject_id: str, name: str, created_by: str, *, icon: str = "∑") -> dict:
+        with self._lock:
+            if subject_id in self._subjects or any(s["name"].lower() == name.lower() for s in self._subjects.values()):
+                raise SubjectExists(name)
+            row = {"id": subject_id, "name": name, "icon": icon, "created_by": created_by, "created_at": datetime.now(timezone.utc),
+                   "position": max((s["position"] for s in self._subjects.values()), default=0) + 1}
+            self._subjects[subject_id] = row
+            return dict(row)
+
+    def update_subject(self, subject_id: str, **fields) -> dict:
+        unknown = set(fields) - SUBJECT_FIELDS
+        if unknown:
+            raise ValueError(f"unknown subject fields {sorted(unknown)}")
+        with self._lock:
+            row = self._subjects.get(subject_id)
+            if row is None:
+                raise KeyError(subject_id)
+            if "name" in fields and any(s["name"].lower() == fields["name"].lower() and s["id"] != subject_id for s in self._subjects.values()):
+                raise SubjectExists(fields["name"])
+            row.update(fields)
+            return dict(row)
+
+    def delete_subject(self, subject_id: str) -> bool:
+        with self._lock:
+            return self._subjects.pop(subject_id, None) is not None
+
+    def create_lesson(self, subject_id: str, created_by: str, draft: dict, *, source: str = "json", status: str = "ready",
+                      files: list | None = None) -> dict:
+        with self._lock:
+            if subject_id not in self._subjects:
+                raise KeyError(subject_id)
+            now = datetime.now(timezone.utc)
+            position = max((l["position"] for l in self._lessons.values() if l["subject_id"] == subject_id), default=0) + 1
+            row = {"id": next(self._ids), "subject_id": subject_id, "position": position, "draft": copy.deepcopy(draft), "published": None,
+                   "status": status, "failure": None, "files": list(files or []), "source": source, "created_by": created_by,
+                   "created_at": now, "updated_at": now, "published_at": None}
+            self._lessons[row["id"]] = row
+            return _lesson_row(copy.deepcopy(row))
+
+    def get_lesson(self, lesson_id: int) -> dict | None:
+        with self._lock:
+            row = self._lessons.get(lesson_id)
+            return _lesson_row(copy.deepcopy(row)) if row else None
+
+    def lessons_of(self, subject_id: str | None = None) -> list[dict]:
+        """The lessons kept in the database (drafts and published), of one subject or all, in subject and position order."""
+        with self._lock:
+            rows = [l for l in self._lessons.values() if subject_id is None or l["subject_id"] == subject_id]
+            return [_lesson_row(copy.deepcopy(l)) for l in sorted(rows, key=lambda l: (l["subject_id"], l["position"], l["id"]))]
+
+    def published_lessons(self) -> list[dict]:
+        return [l for l in self.lessons_of() if l["published"] is not None]
+
+    def save_lesson(self, lesson_id: int, **fields) -> dict:
+        unknown = set(fields) - LESSON_FIELDS
+        if unknown:
+            raise ValueError(f"unknown lesson fields {sorted(unknown)}")
+        with self._lock:
+            row = self._lessons.get(lesson_id)
+            if row is None:
+                raise KeyError(lesson_id)
+            row.update(copy.deepcopy(fields))
+            row["updated_at"] = datetime.now(timezone.utc)
+            return _lesson_row(copy.deepcopy(row))
+
+    def delete_lesson(self, lesson_id: int) -> bool:
+        with self._lock:
+            return self._lessons.pop(lesson_id, None) is not None
+
     def activity_since(self, first: date) -> list[dict]:
         """One row per person and Israel day from `first` on, with their practice answers and started attempts (view m2_activity)."""
         from .clock import school_day
@@ -835,26 +929,47 @@ class SupabaseStore:
             return conflict
         return StoreUnavailable(f"supabase refused ({exc.code}): {self._why(exc) or exc.reason}")
 
-    _CLASS = "id,name,created_by,teacher_email,lessons,ai_enabled,ai_daily_checks,created_at"
+    _CLASS_BASE = "id,name,created_by,teacher_email,lessons,ai_enabled,ai_daily_checks,created_at"
+    _has_subjects: bool | None = None          # does m2_classes have the subjects column? (None: not asked yet)
+
+    def _class_select(self) -> str:
+        return self._CLASS_BASE + (",subjects" if self._has_subjects is not False else "")
+
+    def _class_rows(self, params: dict) -> list[dict]:
+        """Classes with their subjects. Before the subjects migration is applied the column is missing: then every class studies math,
+        and the classes still load (the subject screens say the migration is needed)."""
+        try:
+            rows = self._request("GET", "m2_classes", {**params, "select": f"{self._class_select()},m2_class_members(count)"})
+        except urllib.error.HTTPError as exc:
+            if self._has_subjects is False or exc.code != 400 or "subjects" not in self._why(exc):
+                raise self._refused(exc, StoreUnavailable("classes")) from exc
+            self._has_subjects = False
+            rows = self._request("GET", "m2_classes", {**params, "select": f"{self._class_select()},m2_class_members(count)"})
+        else:
+            if self._has_subjects is None:
+                self._has_subjects = True
+        return [self._class_row(r) for r in rows]
 
     def _class_row(self, row: dict) -> dict:
         count = (row.get("m2_class_members") or [{"count": 0}])[0]["count"]
-        return {**{k: row[k] for k in self._CLASS.split(",")}, "students": count}
+        return {**{k: row[k] for k in self._CLASS_BASE.split(",")}, "subjects": list(row.get("subjects") or ["math"]), "students": count}
 
     # --- classes ---
 
     def create_class(self, created_by: str, name: str, *, lessons=(), teacher_email: str | None = None,
-                     ai_enabled: bool = False, ai_daily_checks: int = 150) -> dict:
+                     ai_enabled: bool = False, ai_daily_checks: int = 150, subjects=("math",)) -> dict:
         body = {"created_by": created_by, "name": name, "lessons": list(lessons), "teacher_email": teacher_email,
                 "ai_enabled": ai_enabled, "ai_daily_checks": ai_daily_checks}
+        if list(subjects) != ["math"]:                       # math is the column's default, so a class works before the migration too
+            body["subjects"] = list(subjects)
         try:
             rows = self._request("POST", "m2_classes", body=body, returning=True)
         except urllib.error.HTTPError as exc:
             raise self._refused(exc, ClassExists(name)) from exc
-        return {**rows[0], "students": 0}
+        return {**rows[0], "subjects": list(rows[0].get("subjects") or ["math"]), "students": 0}
 
     def update_class(self, class_id: int, **fields) -> dict:
-        unknown = set(fields) - {"name", "lessons", "teacher_email", "ai_enabled", "ai_daily_checks"}
+        unknown = set(fields) - CLASS_FIELDS
         if unknown:
             raise ValueError(f"unknown class fields {sorted(unknown)}")
         try:
@@ -871,17 +986,14 @@ class SupabaseStore:
         return bool(self._request("DELETE", "m2_classes", {"id": self._eq(class_id)}, returning=True))
 
     def get_class(self, class_id: int) -> dict | None:
-        rows = self._request("GET", "m2_classes", {"id": self._eq(class_id), "select": f"{self._CLASS},m2_class_members(count)"})
-        return self._class_row(rows[0]) if rows else None
+        rows = self._class_rows({"id": self._eq(class_id)})
+        return rows[0] if rows else None
 
     def classes(self) -> list[dict]:
-        rows = self._request("GET", "m2_classes", {"select": f"{self._CLASS},m2_class_members(count)", "order": "id"})
-        return [self._class_row(r) for r in rows]
+        return self._class_rows({"order": "id"})
 
     def classes_taught(self, email: str) -> list[dict]:
-        rows = self._request("GET", "m2_classes", {"teacher_email": self._eq(email),
-                             "select": f"{self._CLASS},m2_class_members(count)", "order": "id"})
-        return [self._class_row(r) for r in rows]
+        return self._class_rows({"teacher_email": self._eq(email), "order": "id"})
 
     # --- students ---
 
@@ -890,8 +1002,19 @@ class SupabaseStore:
                              "select": "email,user_id,added_at", "order": "added_at,email"})
 
     def classes_of_student(self, email: str) -> list[dict]:
-        rows = self._request("GET", "m2_class_members", {"email": self._eq(email), "select": "m2_classes(id,name,lessons,ai_enabled,ai_daily_checks)"})
-        return [r["m2_classes"] for r in rows]
+        def read(columns: str) -> list[dict]:
+            rows = self._request("GET", "m2_class_members", {"email": self._eq(email), "select": f"m2_classes({columns})"})
+            return [{**r["m2_classes"], "subjects": list(r["m2_classes"].get("subjects") or ["math"])} for r in rows]
+        base = "id,name,lessons,ai_enabled,ai_daily_checks"
+        if self._has_subjects is False:
+            return read(base)
+        try:
+            return read(base + ",subjects")
+        except urllib.error.HTTPError as exc:                # before the subjects migration: every class studies math
+            if exc.code != 400 or "subjects" not in self._why(exc):
+                raise self._refused(exc, StoreUnavailable("classes")) from exc
+            self._has_subjects = False
+            return read(base)
 
     def add_member(self, class_id: int, email: str) -> None:
         try:
@@ -1011,10 +1134,12 @@ class SupabaseStore:
     # --- real tests ---
 
     def create_test(self, class_id: int, test_day: date, lessons: list[str], created_by: str, *, note: str = "", questions: int = 12,
-                    minutes: int = 45, created_at: datetime | None = None) -> dict:
+                    minutes: int = 45, created_at: datetime | None = None, subject_id: str = "math") -> dict:
         fields = {"lessons": list(lessons), "questions": questions, "minutes": minutes}
         _check_test(fields)
         body = {"class_id": class_id, "date": test_day.isoformat(), **fields, "note": note, "created_by": created_by}
+        if subject_id != "math":                              # math is the column's default (tests work before the migration too)
+            body["subject_id"] = subject_id
         if created_at:
             body["created_at"] = created_at.isoformat()
         return _test_row(self._request("POST", "m2_tests", body=body, returning=True)[0])
@@ -1356,6 +1481,75 @@ class SupabaseStore:
     def last_answered(self, user_id: str) -> dict[str, date]:
         rows = self._request("GET", "m2_last_answered", {"user_id": self._eq(user_id), "select": "skill_id,day"})
         return {r["skill_id"]: date.fromisoformat(r["day"]) for r in rows}
+
+    # --- subjects and the lessons kept in the database ---
+
+    def subjects(self) -> list[dict]:
+        rows = self._request("GET", "m2_subjects", {"select": "*", "order": "position,created_at"})
+        return [{**r, "created_at": _when(r.get("created_at"))} for r in rows]
+
+    def create_subject(self, subject_id: str, name: str, created_by: str, *, icon: str = "∑") -> dict:
+        position = max((s["position"] for s in self.subjects()), default=0) + 1
+        body = {"id": subject_id, "name": name, "icon": icon, "created_by": created_by, "position": position}
+        try:
+            rows = self._request("POST", "m2_subjects", body=body, returning=True)
+        except urllib.error.HTTPError as exc:
+            raise self._refused(exc, SubjectExists(name)) from exc
+        return {**rows[0], "created_at": _when(rows[0].get("created_at"))}
+
+    def update_subject(self, subject_id: str, **fields) -> dict:
+        unknown = set(fields) - SUBJECT_FIELDS
+        if unknown:
+            raise ValueError(f"unknown subject fields {sorted(unknown)}")
+        try:
+            rows = self._request("PATCH", "m2_subjects", {"id": self._eq(subject_id)}, fields, returning=True)
+        except urllib.error.HTTPError as exc:
+            raise self._refused(exc, SubjectExists(str(fields.get("name")))) from exc
+        if not rows:
+            raise KeyError(subject_id)
+        return {**rows[0], "created_at": _when(rows[0].get("created_at"))}
+
+    def delete_subject(self, subject_id: str) -> bool:
+        return bool(self._request("DELETE", "m2_subjects", {"id": self._eq(subject_id)}, returning=True))
+
+    def create_lesson(self, subject_id: str, created_by: str, draft: dict, *, source: str = "json", status: str = "ready",
+                      files: list | None = None) -> dict:
+        last = self._request("GET", "m2_lessons", {"subject_id": self._eq(subject_id), "select": "position", "order": "position.desc", "limit": "1"})
+        body = {"subject_id": subject_id, "created_by": created_by, "draft": draft, "source": source, "status": status,
+                "files": list(files or []), "position": (last[0]["position"] if last else 0) + 1}
+        try:
+            rows = self._request("POST", "m2_lessons", body=body, returning=True)
+        except urllib.error.HTTPError as exc:
+            raise self._refused(exc, KeyError(subject_id)) from exc
+        return _lesson_row(rows[0])
+
+    def get_lesson(self, lesson_id: int) -> dict | None:
+        rows = self._request("GET", "m2_lessons", {"id": self._eq(lesson_id), "select": "*"})
+        return _lesson_row(rows[0]) if rows else None
+
+    def lessons_of(self, subject_id: str | None = None) -> list[dict]:
+        params = {"select": "*", "order": "subject_id,position,id"}
+        if subject_id is not None:
+            params["subject_id"] = self._eq(subject_id)
+        return [_lesson_row(r) for r in self._request("GET", "m2_lessons", params)]
+
+    def published_lessons(self) -> list[dict]:
+        rows = self._request("GET", "m2_lessons", {"published": "not.is.null", "select": "*", "order": "subject_id,position,id"})
+        return [_lesson_row(r) for r in rows]
+
+    def save_lesson(self, lesson_id: int, **fields) -> dict:
+        unknown = set(fields) - LESSON_FIELDS
+        if unknown:
+            raise ValueError(f"unknown lesson fields {sorted(unknown)}")
+        body = {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in fields.items()}
+        body["updated_at"] = datetime.now(timezone.utc).isoformat()
+        rows = self._request("PATCH", "m2_lessons", {"id": self._eq(lesson_id)}, body, returning=True)
+        if not rows:
+            raise KeyError(lesson_id)
+        return _lesson_row(rows[0])
+
+    def delete_lesson(self, lesson_id: int) -> bool:
+        return bool(self._request("DELETE", "m2_lessons", {"id": self._eq(lesson_id)}, returning=True))
 
     ACTIVITY_PAGE = 1000
 

@@ -4,7 +4,7 @@ import urllib.error
 
 import pytest
 
-from mathly2.store import ClassExists, InMemoryStore, MemberExists, StoreUnavailable, SupabaseStore, TeacherIsStudent
+from mathly2.store import ClassExists, InMemoryStore, MemberExists, StoreUnavailable, SubjectExists, SupabaseStore, TeacherIsStudent
 
 
 @pytest.fixture
@@ -197,7 +197,7 @@ def test_supabase_student_and_member_requests():
     assert s.all_students() == [{"email": "y@x.test", "classes": ["A", "B"]}]
     assert s.remove_member(1, "s@x.test") is True and s.remove_member(1, "s@x.test") is False
     s.link_user("s@x.test", "u1")
-    assert s.calls[0][2] == {"email": "eq.s@x.test", "select": "m2_classes(id,name,lessons,ai_enabled,ai_daily_checks)"}
+    assert s.calls[0][2] == {"email": "eq.s@x.test", "select": "m2_classes(id,name,lessons,ai_enabled,ai_daily_checks,subjects)"}
     assert s.calls[2][2] == {"class_id": "eq.1", "email": "eq.s@x.test"}
     assert s.calls[4][2] == {"email": "eq.s@x.test", "user_id": "is.null"}
 
@@ -561,3 +561,112 @@ def test_answers_of_carries_the_mistake_for_the_round_result(store):
     store.add_answer(U, "s1", "k2", True, True, None, date(2026, 11, 2))
     assert [(r["question_key"], r["mistake_id"]) for r in store.answers_of(U, "s1")] == [("k1", "m7"), ("k2", None)]
     assert store.save_progress(U, "s1", round_start=2)["round_start"] == 2
+
+
+
+# --- subjects, lessons kept in the database, class subjects and a test's subject (add-subjects-and-worksheets 1.2) ---
+
+def test_math_is_a_subject_from_the_start_and_names_are_unique_ignoring_case(store):
+    assert [(s["id"], s["name"]) for s in store.subjects()] == [("math", "מתמטיקה")]
+    science = store.create_subject("science", "מדעים", "m@x.test", icon="⚗")
+    assert science["icon"] == "⚗" and science["position"] > 0
+    with pytest.raises(SubjectExists):
+        store.create_subject("science2", "מדעים", "m@x.test")
+    with pytest.raises(SubjectExists):
+        store.update_subject("science", name="מתמטיקה")
+    assert store.update_subject("science", name="ביולוגיה", icon="🧬")["name"] == "ביולוגיה"
+    assert [s["id"] for s in store.subjects()] == ["math", "science"]
+    assert store.delete_subject("science") is True and store.delete_subject("science") is False
+    with pytest.raises(KeyError):
+        store.update_subject("nowhere", name="x")
+
+
+def test_lessons_are_drafts_until_published_and_keep_their_order_in_a_subject(store):
+    store.create_subject("science", "מדעים", "m@x.test")
+    first = store.create_lesson("science", "m@x.test", {"name": "תאים"})
+    second = store.create_lesson("science", "m@x.test", {"name": "חומרים"}, source="worksheet", status="drafting")
+    assert first["published"] is None and first["status"] == "ready" and second["status"] == "drafting"
+    assert second["position"] > first["position"] and second["source"] == "worksheet"
+    assert [l["draft"]["name"] for l in store.lessons_of("science")] == ["תאים", "חומרים"]
+    assert store.published_lessons() == []
+    store.save_lesson(first["id"], published={"name": "תאים"}, position=5)
+    assert [l["id"] for l in store.published_lessons()] == [first["id"]]
+    assert [l["draft"]["name"] for l in store.lessons_of("science")] == ["חומרים", "תאים"]          # position 5 is now last
+    got = store.get_lesson(first["id"])
+    got["draft"]["name"] = "changed"                                                                 # a copy, not the stored row
+    assert store.get_lesson(first["id"])["draft"]["name"] == "תאים"
+    with pytest.raises(ValueError):
+        store.save_lesson(first["id"], nonsense=1)
+    with pytest.raises(KeyError):
+        store.create_lesson("nowhere", "m@x.test", {})
+    assert store.delete_lesson(second["id"]) is True and store.get_lesson(second["id"]) is None
+
+
+def test_a_class_studies_math_unless_given_subjects_and_a_student_sees_them(store):
+    plain = make(store)
+    both = make(store, "ט'4", subjects=["math", "science"])
+    assert plain["subjects"] == ["math"] and both["subjects"] == ["math", "science"]
+    assert store.update_class(plain["id"], subjects=["science"])["subjects"] == ["science"]
+    store.add_member(both["id"], "s@x.test")
+    assert store.classes_of_student("s@x.test")[0]["subjects"] == ["math", "science"]
+
+
+def test_a_test_belongs_to_math_unless_given_a_subject(store):
+    from datetime import date
+    klass = make(store)
+    plain = store.create_test(klass["id"], date(2026, 12, 1), ["t"], "t@x.test")
+    other = store.create_test(klass["id"], date(2026, 12, 2), ["w1"], "t@x.test", subject_id="science")
+    assert plain["subject_id"] == "math" and other["subject_id"] == "science"
+    assert store.update_test(plain["id"], subject_id="science")["subject_id"] == "science"
+
+
+def test_supabase_subject_and_lesson_requests():
+    lesson = {"id": 7, "subject_id": "science", "position": 2, "draft": {"name": "x"}, "published": None, "status": "ready", "files": [],
+              "source": "json", "created_by": "m@x.test", "created_at": "2026-11-11T10:00:00+00:00", "updated_at": "2026-11-11T10:00:00+00:00",
+              "published_at": None}
+    math = [{"id": "math", "name": "מתמטיקה", "icon": "∑", "position": 0, "created_at": "2026-11-11T10:00:00+00:00"}]
+    s = Recorder([math, math, [{"id": "science", "name": "מדעים", "icon": "⚗", "position": 1, "created_at": None}],
+                  [{"position": 1}], [lesson], [lesson], [{**lesson, "published": {"name": "x"}}]])
+    s.subjects()
+    assert s.create_subject("science", "מדעים", "m@x.test", icon="⚗")["id"] == "science"
+    assert s.create_lesson("science", "m@x.test", {"name": "x"})["position"] == 2
+    assert s.published_lessons()[0]["id"] == 7
+    assert s.save_lesson(7, published={"name": "x"})["published"] == {"name": "x"}
+    post_subject, last, post_lesson, published, patch = s.calls[2], s.calls[3], s.calls[4], s.calls[5], s.calls[6]
+    assert post_subject[:2] == ("POST", "m2_subjects") and post_subject[3]["position"] == 1
+    assert last[2]["order"] == "position.desc" and post_lesson[3]["position"] == 2 and post_lesson[3]["draft"] == {"name": "x"}
+    assert published[2]["published"] == "not.is.null"
+    assert patch[:3] == ("PATCH", "m2_lessons", {"id": "eq.7"}) and patch[3]["published"] == {"name": "x"} and "updated_at" in patch[3]
+    with pytest.raises(SubjectExists):
+        Recorder([[], conflict()]).create_subject("science", "מדעים", "m@x.test")
+
+
+def test_supabase_missing_subject_tables_are_reported_as_unavailable():
+    with pytest.raises(StoreUnavailable):
+        Recorder([StoreUnavailable("supabase answered 404 for GET m2_subjects")]).subjects()
+    with pytest.raises(StoreUnavailable):
+        Recorder([[], refusal(404, "relation does not exist")]).create_subject("x", "x", "m@x.test")
+
+
+def test_supabase_classes_still_load_before_the_subjects_column_exists():
+    row = {"id": 1, "name": "A", "created_by": "m@x.test", "teacher_email": None, "lessons": [], "ai_enabled": False,
+           "ai_daily_checks": 150, "created_at": "z", "m2_class_members": [{"count": 2}]}
+    s = Recorder([refusal(400, "column m2_classes.subjects does not exist"), [row], [row]])
+    assert s.classes()[0]["subjects"] == ["math"]
+    assert "subjects" not in s.calls[1][2]["select"]
+    s.classes()                                                                   # the second read does not ask for the column again
+    assert len(s.calls) == 3 and "subjects" not in s.calls[2][2]["select"]
+    with_column = Recorder([[{**row, "subjects": ["math", "science"]}]])
+    assert with_column.classes()[0]["subjects"] == ["math", "science"]
+
+
+def test_supabase_a_math_class_or_test_sends_no_subject_so_it_works_before_the_migration():
+    from datetime import date
+    s = Recorder([[{"id": 1}], [{"id": 2, "date": "2026-12-01", "lessons": ["t"], "created_at": "2026-11-11T10:00:00+00:00"}]])
+    assert s.create_class("m@x.test", "A")["subjects"] == ["math"]
+    assert s.create_test(1, date(2026, 12, 1), ["t"], "t@x.test")["subject_id"] == "math"
+    assert "subjects" not in s.calls[0][3] and "subject_id" not in s.calls[1][3]
+    s2 = Recorder([[{"id": 1, "subjects": ["science"]}], [{"id": 2, "date": "2026-12-01", "lessons": ["w"], "created_at": "2026-11-11T10:00:00+00:00", "subject_id": "science"}]])
+    s2.create_class("m@x.test", "A", subjects=["science"])
+    s2.create_test(1, date(2026, 12, 1), ["w"], "t@x.test", subject_id="science")
+    assert s2.calls[0][3]["subjects"] == ["science"] and s2.calls[1][3]["subject_id"] == "science"

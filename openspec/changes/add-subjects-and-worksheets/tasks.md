@@ -2,9 +2,9 @@
 
 ## 1. Data (stage 1)
 
-- [ ] 1.1 Add migrations: `m2_subjects` (seeded with math), `m2_lessons` (subject, position, draft, published, drafting status, worksheet files), `m2_classes.subjects` (default `{math}`), `m2_tests.subject_id` (default `math`), server-only grants, and the private bucket `m2-worksheets`. Verify on a local PostgreSQL that all migrations apply in order, that existing classes and tests read as math, and that the browser roles are refused (`test_migrations.py`).
-- [ ] 1.2 Add the store methods for subjects, lessons (draft and published), class subjects and a test's subject, in both `InMemoryStore` and `SupabaseStore`; add the new reads and changes to `cached.py`. Verify with store tests for each method, including a missing table reported as unavailable.
-- [ ] 1.3 Add the `content.manage` permission for manager and developer in `access.py`. Verify that the permission-matrix test covers every new route.
+- [x] 1.1 Add migrations: `m2_subjects` (seeded with math), `m2_lessons` (subject, position, draft, published, drafting status, worksheet files), `m2_classes.subjects` (default `{math}`), `m2_tests.subject_id` (default `math`), server-only grants, and the private bucket `m2-worksheets` (made by the server when first needed, as `m2-answers` is, not by the migration). Verify on a local PostgreSQL that all migrations apply in order, that existing classes and tests read as math, and that the browser roles are refused (`test_migrations.py`).
+- [x] 1.2 Add the store methods for subjects, lessons (draft and published), class subjects and a test's subject, in both `InMemoryStore` and `SupabaseStore`; add the new reads and changes to `cached.py`. Verify with store tests for each method, including a missing table reported as unavailable.
+- [x] 1.3 Add the `content.manage` permission for manager and developer in `access.py`. Verify that the permission-matrix test covers every new route.
 
 ## 2. Merged bank (stage 1)
 
