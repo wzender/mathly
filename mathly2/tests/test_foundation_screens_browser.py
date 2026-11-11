@@ -178,6 +178,35 @@ def test_the_developer_screen_shows_the_system_status_version_and_update_date(br
         no_sideways_scroll(page)
 
 
+
+@pytest.mark.parametrize("viewport", [PHONE, DESKTOP])
+def test_the_developer_sees_how_many_people_were_active_each_day_for_7_or_30_days(browser, viewport):
+    from datetime import timedelta
+    from mathly2 import clock
+    app, store = seeded()
+    today = clock.school_day()
+    for who, back in (("a", 0), ("b", 0), ("a", 1), ("c", 3), ("d", 20)):
+        store.add_answer(who, "s", "k", True, True, None, today - timedelta(days=back))
+    with running(app) as url:
+        page = page_for(browser, viewport)
+        sign_in(page, url, DEV)
+        page.wait_for_selector("#nav .roles")
+        page.click("#nav [data-role='developer']")
+        page.wait_for_selector(".ac-col")
+        assert page.locator(".ac-col").count() == 7
+        assert [int(c.get_attribute("data-users")) for c in page.locator(".ac-col").all()] == [0, 0, 0, 1, 0, 1, 2]   # oldest first, today last
+        assert page.inner_text("#ac-today") == "2 משתמשים" and page.inner_text("#ac-range") == "3 משתמשים"
+        page.locator(".ac-col").last.focus()                                               # the keyboard shows the same tooltip as hover
+        assert page.locator(".ac-col").last.locator(".ac-tip").is_visible()
+        assert "2 משתמשים" in page.locator(".ac-col").last.locator(".ac-tip").inner_text()
+        page.click("[data-range='30']")
+        page.wait_for_function("document.querySelectorAll('.ac-col').length === 30")
+        assert page.inner_text("#ac-range") == "4 משתמשים"
+        assert page.get_attribute("[data-range='30']", "aria-pressed") == "true"
+        page.click(".ac-table summary")
+        assert page.locator(".ac-table tbody tr").count() == 30
+        no_sideways_scroll(page)
+
 # --- 4.4 the manager's screens ---
 
 def fill_class(page, name, lessons, teacher, students):

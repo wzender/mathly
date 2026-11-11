@@ -455,6 +455,7 @@ A tab bar at the bottom of the screen leads between them: home, path, submission
 - **DEV-4 AI usage.** A page shows the AI's calls and estimated cost (AI-9): by day, by class and by kind of call.
 - **DEV-5 System status (מצב המערכת).** The developer's home starts with a status card: one overall state (תקין, שימו לב, תקלה), the running version (short commit), the date of the last update and when the server started, and one row per part: the database (asked directly, with how long it took), sign-in, the question bank, AI help, phone notifications, answer pictures and the hourly cleanup. A key is reported as set or not set, never shown. "בדיקה מחדש" checks again.
   The Hugging Face sync writes the version and date (`mathly2/version.json`) when it deploys; a local checkout reads them from git.
+- **DEV-6 Activity (פעילות).** Below the status card, a chart shows how many different people were active on each of the last 7 days (or 30, by a toggle), oldest on the left: active means they answered a practice question or started a quiz or a test that Israel day. Above it: today's count, the number of different people over the range, and the range's practice answers and started quizzes and tests. Each column shows its day's numbers on hover or focus, and the same numbers are in a table. Only counts are shown, never who. Needs the migration `20261116090000_m2_activity.sql` (the view `m2_activity`).
 
 ## 5. Non-Goals (Out of Scope)
 

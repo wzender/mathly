@@ -7,7 +7,9 @@ from __future__ import annotations
 import platform
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from datetime import timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from . import clock, version
 from .auth import signed_in
@@ -80,6 +82,38 @@ def status(request: Request, user: dict = Depends(developer)) -> dict:
     return {"overall": overall(found), "checks": found, "version": app.state.version,
             "started_at": started.isoformat(), "uptime_seconds": max(0, int((now - started).total_seconds())), "now": now.isoformat(),
             "python": platform.python_version()}
+
+
+ACTIVITY_DAYS = (7, 30)
+
+
+def activity(rows: list[dict], last, days: int) -> dict:
+    """Per Israel day from `last - days + 1` to `last` (days without activity included, as zeros): how many people were active,
+    their practice answers and their started quizzes and tests; and over the whole range, how many different people."""
+    first = last - timedelta(days=days - 1)
+    per = {first + timedelta(days=i): {"users": set(), "answers": 0, "attempts": 0} for i in range(days)}
+    for r in rows:
+        if r["day"] in per:
+            d = per[r["day"]]
+            d["users"].add(r["user_id"])
+            d["answers"] += r["answers"]
+            d["attempts"] += r["attempts"]
+    everyone = set().union(*(d["users"] for d in per.values()))
+    return {"from": first.isoformat(), "to": last.isoformat(),
+            "days": [{"day": day.isoformat(), "users": len(d["users"]), "answers": d["answers"], "attempts": d["attempts"]}
+                     for day, d in per.items()],
+            "users": len(everyone), "answers": sum(d["answers"] for d in per.values()),
+            "attempts": sum(d["attempts"] for d in per.values())}
+
+
+@router.get("/activity")
+def activity_route(request: Request, days: int = Query(7), user: dict = Depends(developer)) -> dict:
+    """Who used the app on each of the last `days` days (7 or 30). Counts only, never who."""
+    if days not in ACTIVITY_DAYS:
+        raise HTTPException(422, "days must be 7 or 30")
+    last = clock.school_day()
+    store = request.app.state.store
+    return activity(getattr(store, "_store", store).activity_since(last - timedelta(days=days - 1)), last, days)
 
 
 def setup(app) -> None:

@@ -15,7 +15,8 @@ PUBLIC = {("GET", "/api/health")}
 ANY_SIGNED_IN = {("GET", "/api/me")}
 NEEDS = {   # (method, path) -> permission
     ("GET", "/api/lessons"): "path.use",
-    ("GET", "/api/dev/status"): "dev.status",          # no role lists it: the developer's alone
+    ("GET", "/api/dev/status"): "dev.status",
+    ("GET", "/api/dev/activity"): "dev.status",          # no role lists it: the developer's alone
     ("GET", "/api/path"): "path.use",
     ("GET", "/api/collection"): "path.use",
     ("GET", "/api/teaching/tests"): "class.teach",
