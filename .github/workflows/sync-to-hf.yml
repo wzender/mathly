@@ -4,6 +4,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# One sync at a time, in order: an older run never force-pushes over a newer one.
+concurrency:
+  group: sync-to-hf
+  cancel-in-progress: false
+
 jobs:
   sync:
     runs-on: ubuntu-latest

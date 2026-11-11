@@ -17,6 +17,8 @@ def _from_file(path: Path) -> dict | None:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
+    if not isinstance(data, dict):
+        return None
     commit, date = data.get("commit"), data.get("date")
     return {"commit": commit, "date": date} if isinstance(commit, str) and commit else None
 

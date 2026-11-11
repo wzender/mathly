@@ -28,14 +28,18 @@ function card(s) {
     <p class="muted st-foot">נבדק ב־${esc(when(s.now))} · Python ${esc(s.python)}</p>`;
 }
 
+let asked = 0;                                     // only the latest check is drawn, if two overlap
+
 async function load() {
-  const box = document.getElementById("st-body");
-  if (!box) return;
+  const mine = ++asked;
+  let html;
   try {
-    box.innerHTML = card(await api("/api/dev/status"));
+    html = card(await api("/api/dev/status"));
   } catch (error) {
-    box.innerHTML = `<p class="error" role="alert">לא הצלחנו לקרוא את מצב המערכת: ${esc(error.message || "")}</p>`;
+    html = `<p class="error" role="alert">לא הצלחנו לקרוא את מצב המערכת: ${esc(error.message || "")}</p>`;
   }
+  const box = document.getElementById("st-body");
+  if (box && mine === asked) box.innerHTML = html;
 }
 
 export async function show(me, view) {

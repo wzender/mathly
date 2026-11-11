@@ -66,8 +66,8 @@ class DevAuthenticator:
         return {"id": str(uuid.uuid5(uuid.NAMESPACE_DNS, email)), "email": email}
 
 
-def current_user(request: Request) -> dict:
-    """The signed-in person: id, email and roles (decided now, by the server: see access.RoleResolver)."""
+def signed_in(request: Request) -> dict:
+    """The signed-in person (id and email) from the token, without reading the database. 401/503 as current_user."""
     header = request.headers.get("authorization", "")
     token = header[7:].strip() if header.lower().startswith("bearer ") else ""
     if not token:
@@ -78,5 +78,11 @@ def current_user(request: Request) -> dict:
         raise HTTPException(503, "sign-in service unavailable, try again") from None
     if not user:
         raise HTTPException(401, "sign in required")
+    return user
+
+
+def current_user(request: Request) -> dict:
+    """The signed-in person: id, email and roles (decided now, by the server: see access.RoleResolver)."""
+    user = signed_in(request)
     from . import reads
     return {**user, "roles": sorted(request.app.state.roles.resolve(user["email"], reads.of(request)))}
