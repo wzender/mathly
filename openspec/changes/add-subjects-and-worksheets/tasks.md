@@ -25,19 +25,19 @@
 
 - [x] 4.1 Show a card per subject on the first screen, in subject order with math first, each counting only its skills; route `#/subject/<id>` keeps `#/subject/math` working, and `#/skill/<id>` opens its subject's path. Verify with Playwright tests for one subject and for two subjects.
 - [x] 4.2 Filter the path, the next skill, the home, grades and the collection by the open subject. Verify with API tests: another subject's lessons are absent, and the owl stays in its subject.
-- [ ] 4.3 Give tests a subject: the test form picks a subject the class studies and only its lessons, and the server refuses lessons of two subjects. The home and test card show only the open subject's tests. Verify with API and Playwright tests.
-- [ ] 4.4 Group the curriculum tab by subject. Verify with a Playwright test with two subjects.
-- [ ] 4.5 Check practice, mastery, the lesson quiz, the review list, exercise tests, the simulation and grades end to end on a lesson loaded by JSON in a second subject. Verify with one journey test, API plus browser.
+- [x] 4.3 Give tests a subject: the test form picks a subject the class studies and only its lessons, and the server refuses lessons of two subjects. The home and test card show only the open subject's tests. Verify with API and Playwright tests.
+- [x] 4.4 Group the curriculum tab by subject. Verify with a Playwright test with two subjects.
+- [x] 4.5 Check practice, mastery, the lesson quiz, the review list, exercise tests, the simulation and grades end to end on a lesson loaded by JSON in a second subject. Verify with one journey test, API plus browser.
 
 ## 5. Worksheet upload and AI draft (stage 2)
 
-- [ ] 5.1 Add the upload route for managers and developers. It accepts one PDF (≤ 20 pages), 1–10 photos or one .docx, up to 15 MB, for an existing or a new subject; renders the pages to images in `m2-worksheets`; and creates a lesson with status `drafting`. Add `python-docx` to the requirements. Verify with API tests: each format, a refused spreadsheet, 403 for a teacher, the 20-a-day limit.
-- [ ] 5.2 Add the drafting call to `ai.py`. PDFs go as a document, photos as images, Word as text plus images. The reply is a fixed tool schema (the unit shape plus a source mark per question), with 8–12 questions per skill. It is given only the pages and the subject's name, and usage is recorded as "worksheet". Verify with tests using a fake AI client: the request carries no person's or class's name, a malformed reply fails as "an unusable answer", and the usage record is written.
-- [ ] 5.3 Run drafting in a background worker that writes the draft or the failure cause. Rows left `drafting` by a restart become retryable failures, and retrying needs no new upload. Verify with tests for success, each failure cause in words, retry, and recovery after a restart.
+- [x] 5.1 Add the upload route for managers and developers. It accepts one PDF (≤ 20 pages), 1–10 photos or one .docx, up to 15 MB, for an existing or a new subject; renders the pages to images in `m2-worksheets`; and creates a lesson with status `drafting`. Add `python-docx` to the requirements. Verify with API tests: each format, a refused spreadsheet, 403 for a teacher, the 20-a-day limit.
+- [x] 5.2 Add the drafting call to `ai.py`. PDFs go as a document, photos as images, Word as text plus images. The reply is a fixed tool schema (the unit shape plus a source mark per question), with 8–12 questions per skill. It is given only the pages and the subject's name, and usage is recorded as "worksheet". Verify with tests using a fake AI client: the request carries no person's or class's name, a malformed reply fails as "an unusable answer", and the usage record is written.
+- [x] 5.3 Run drafting in a background worker that writes the draft or the failure cause. Rows left `drafting` by a restart become retryable failures, and retrying needs no new upload. Verify with tests for success, each failure cause in words, retry, and recovery after a restart.
 
 ## 6. The draft editor (stage 2)
 
-- [ ] 6.1 Add the draft routes: read, and save the whole document. Saving checks the shape, not completeness. Verify with API tests: save and read back, and 403 for others.
+- [x] 6.1 Add the draft routes: read, and save the whole document. Saving checks the shape, not completeness. Verify with API tests: save and read back, and 403 for others.
 - [ ] 6.2 Build the editor screen:
   - the worksheet's pages beside the draft;
   - the lesson's name;

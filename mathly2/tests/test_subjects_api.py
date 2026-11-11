@@ -207,3 +207,34 @@ def test_a_student_cannot_open_a_subject_their_classes_do_not_study():
     store.add_member(store.create_class("setup", "ט'1")["id"], KID)
     assert [s["id"] for s in c.get("/api/my-subjects", headers=auth(KID)).json()] == ["math"]
     assert c.get(f"/api/path?subject={sid}", headers=auth(KID)).status_code == 404
+
+
+# ---- a test covers one subject (4.3) ----
+
+def test_a_teacher_sets_a_test_in_another_subject_and_only_its_students_home_shows_it():
+    c, store = world()
+    sid, unit = two_subject_student(c, store)
+    klass = store.create_class("setup", "ט'9", teacher_email=TEACHER, subjects=["math", sid])
+    store.add_member(klass["id"], KID)
+    offer = next(o["class"] for o in c.get("/api/teaching/tests", headers=auth(TEACHER)).json() if o["class"]["id"] == klass["id"])
+    assert [s["id"] for s in offer["subjects"]] == ["math", sid] and unit in [l["id"] for l in offer["lessons"]]
+    made = c.post(f"/api/classes/{klass['id']}/tests", json={"date": "2099-01-10", "lessons": [unit]}, headers=auth(TEACHER))
+    assert made.status_code == 201 and made.json()["subject_id"] == sid                       # the subject of its lessons
+    science_home = c.get(f"/api/home?subject={sid}", headers=auth(KID)).json()
+    assert [t["id"] for t in science_home["tests"]] == [made.json()["id"]]
+    assert c.get("/api/home", headers=auth(KID)).json()["tests"] == []                       # not on math's home
+    card = c.get(f"/api/tests/{made.json()['id']}", headers=auth(KID)).json()
+    assert card["subject_id"] == sid
+
+
+def test_a_test_covering_two_subjects_or_a_subject_the_class_does_not_study_is_refused():
+    c, store = world()
+    sid, unit = published_science(c, store)
+    klass = store.create_class("setup", "ט'9", teacher_email=TEACHER, subjects=["math", sid])
+    math_lesson = c.app.state.bank.lessons_of_subject("math")[0]["id"]
+    both = c.post(f"/api/classes/{klass['id']}/tests", json={"date": "2099-01-10", "lessons": [math_lesson, unit]}, headers=auth(TEACHER))
+    assert both.status_code == 422 and "מקצוע אחד" in both.json()["detail"]
+    wrong = c.post(f"/api/classes/{klass['id']}/tests", json={"date": "2099-01-10", "lessons": [math_lesson], "subject_id": sid}, headers=auth(TEACHER))
+    assert wrong.status_code == 422
+    math_only = store.create_class("setup", "ט'10", teacher_email=TEACHER)
+    assert c.post(f"/api/classes/{math_only['id']}/tests", json={"date": "2099-01-10", "lessons": [unit]}, headers=auth(TEACHER)).status_code == 422

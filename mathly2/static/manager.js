@@ -40,8 +40,12 @@ async function curriculumView() {
   const lessons = await api("/api/curriculum");
   return `<form class="card" id="curriculum-form"><h3>תכנית לימודים</h3>
     <p class="muted">התאריך שעד אליו כל שיעור אמור להסתיים. תלמיד שלא סיים שיעור אחרי התאריך רואה אותו מסומן בפיגור. אפשר להשאיר תאריך ריק.</p>
-    <ul class="plain curriculum">${lessons.map(l => `<li><label for="due-${esc(l.id)}">${esc(l.name)} <span class="muted">${esc(l.month)}</span></label>
-      <input id="due-${esc(l.id)}" type="date" data-lesson="${esc(l.id)}" value="${esc(l.due_date || "")}"></li>`).join("")}</ul>
+    ${[...new Set(lessons.map(l => l.subject?.id || "math"))].map(sid => {
+      const mine = lessons.filter(l => (l.subject?.id || "math") === sid);
+      return `<section class="curriculum-subject" data-subject="${esc(sid)}"><h4>${esc(mine[0].subject?.name || "מתמטיקה")}</h4>
+      <ul class="plain curriculum">${mine.map(l => `<li><label for="due-${esc(l.id)}">${esc(l.name)} <span class="muted">${esc(l.month)}</span></label>
+      <input id="due-${esc(l.id)}" type="date" data-lesson="${esc(l.id)}" value="${esc(l.due_date || "")}"></li>`).join("")}</ul></section>`;
+    }).join("")}
     <p><button class="primary" type="submit" id="save-curriculum">שמירה</button></p></form>`;
 }
 

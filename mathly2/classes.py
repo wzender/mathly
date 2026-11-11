@@ -216,10 +216,12 @@ class Dates(BaseModel):
 
 @curriculum.get("")
 def read_curriculum(request: Request, user: dict = Depends(need("classes.manage"))) -> list[dict]:
-    """Every lesson in the bank's order with its date (or null) and the bank's month as a hint."""
-    dates = reads.of(request).curriculum()
-    return [{"id": lesson["id"], "name": lesson["name"], "month": lesson.get("when", ""), "due_date": dates[lesson["id"]].isoformat() if lesson["id"] in dates else None}
-            for lesson in request.app.state.bank.lessons]
+    """Every published lesson, grouped by subject in the subjects' order and each subject's lessons in order, with its date (or null)
+    and the bank's month as a hint."""
+    dates, bank = reads.of(request).curriculum(), request.app.state.bank
+    return [{"id": lesson["id"], "name": lesson["name"], "subject": {"id": s["id"], "name": s["name"]}, "month": lesson.get("when", ""),
+             "due_date": dates[lesson["id"]].isoformat() if lesson["id"] in dates else None}
+            for s in bank.subjects for lesson in bank.lessons_of_subject(s["id"])]
 
 
 @curriculum.put("")

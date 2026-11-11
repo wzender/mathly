@@ -22,6 +22,14 @@ NEEDS = {   # (method, path) -> permission
     ("DELETE", "/api/subjects/{subject_id}"): "content.manage",
     ("PUT", "/api/subjects/{subject_id}/order"): "content.manage",
     ("POST", "/api/subjects/{subject_id}/lessons"): "content.load",
+    ("POST", "/api/worksheets"): "content.manage",
+    ("GET", "/api/subjects/lessons/{lesson_id}"): "content.manage",
+    ("PUT", "/api/subjects/lessons/{lesson_id}/draft"): "content.manage",
+    ("POST", "/api/worksheets/{lesson_id}/files"): "content.manage",
+    ("GET", "/api/worksheets/{lesson_id}"): "content.manage",
+    ("GET", "/api/worksheets/{lesson_id}/pages/{index}"): "content.manage",
+    ("GET", "/api/worksheets/{lesson_id}/text"): "content.manage",
+    ("POST", "/api/worksheets/{lesson_id}/draft"): "content.manage",
     ("GET", "/api/dev/activity"): "dev.status",          # no role lists it: the developer's alone
     ("GET", "/api/path"): "path.use",
     ("GET", "/api/my-subjects"): "path.use",
@@ -121,7 +129,7 @@ def world():
 
 
 def call(client, method, path, email):
-    url = path.format(skill_id="t_ext", lesson_id="t", attempt_id="x", test_id="1", number="1", picture_id="x", assignment_id="1", submission_id="1", request_id="x", class_id="1", subject_id="math", email="someone@school.test", role="teacher")
+    url = path.format(skill_id="t_ext", lesson_id="t", attempt_id="x", test_id="1", number="1", picture_id="x", assignment_id="1", submission_id="1", request_id="x", class_id="1", subject_id="math", index="0", email="someone@school.test", role="teacher")
     sends = method in ("POST", "PUT", "PATCH")
     return client.request(method, url, headers={"Authorization": f"Bearer dev:{email}"}, json={} if sends else None)
 

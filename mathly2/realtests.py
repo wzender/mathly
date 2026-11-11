@@ -19,6 +19,7 @@ LESSON_FIELDS = ("date", "lessons", "note", "questions", "minutes")
 
 class TestBody(BaseModel):
     date: Day
+    subject_id: str | None = Field(default=None, max_length=40)   # None: the subject of the chosen lessons
     lessons: list[str] = Field(min_length=1, max_length=200)
     note: str = Field(default="", max_length=500)
     questions: int = Field(default=12, ge=1, le=40)
@@ -163,11 +164,22 @@ def _my_test(request: Request, user: dict, test_id: int) -> tuple[dict, dict]:
     return test, _my_class(request, user, test["class_id"])
 
 
-def _checked_lessons(klass: dict, lessons: list[str]) -> list[str]:
-    ids = list(dict.fromkeys(lessons))
-    if not ids or any(i not in klass["lessons"] for i in ids):
+def class_lessons(request: Request, klass: dict) -> list[dict]:
+    """The lessons a class studies: every lesson of its subjects, in the bank's order."""
+    subjects = klass.get("subjects") or ["math"]
+    return [l for l in request.app.state.bank.lessons if l.get("subject_id", "math") in subjects]
+
+
+def _checked_lessons(request: Request, klass: dict, lessons: list[str], subject: str | None = None) -> tuple[list[str], str]:
+    """(the lessons, their one subject). A test covers lessons the class studies, all of one subject."""
+    bank, ids = request.app.state.bank, list(dict.fromkeys(lessons))
+    studied = {l["id"] for l in class_lessons(request, klass)}
+    if not ids or any(i not in studied for i in ids):
         raise HTTPException(422, "אפשר לבחור רק שיעורים של הכיתה")
-    return ids
+    subjects = {bank.subject_of_lesson(i) for i in ids}
+    if len(subjects) > 1 or (subject is not None and subjects != {subject}):
+        raise HTTPException(422, "מבחן מכסה שיעורים של מקצוע אחד בלבד")
+    return ids, subjects.pop()
 
 
 def teacher_view(request: Request, test: dict, klass: dict, today: date) -> dict:
@@ -181,6 +193,7 @@ def teacher_view(request: Request, test: dict, klass: dict, today: date) -> dict
                          "readiness": readiness_for(facts)})
     taken = sum(1 for s in students if s["simulation_taken"])
     return {"id": test["id"], "class": {"id": klass["id"], "name": klass["name"]}, "date": test["date"].isoformat(), "note": test["note"],
+            "subject_id": test.get("subject_id", "math"),
             "days_left": (test["date"] - today).days, "questions": test["questions"], "minutes": test["minutes"],
             "lessons": [{"id": i, "name": n} for i, n in zip(test["lessons"], lesson_names(request, test["lessons"]))],
             "simulation": {"taken": taken, "total": len(students), "missing": [s["email"] for s in students if not s["simulation_taken"]]},
@@ -193,7 +206,12 @@ def teaching_tests(request: Request, user: dict = Depends(need("class.teach"))) 
     store, today = request.app.state.store, clock.school_day()
     classes = store.classes() if allowed(user["roles"], "*") else store.classes_taught(user["email"])
     by_id = {c["id"]: c for c in classes}
-    return [{"class": {"id": c["id"], "name": c["name"], "lessons": [{"id": i, "name": n} for i, n in zip(c["lessons"], lesson_names(request, c["lessons"]))]},
+    subjects = {s["id"]: s for s in request.app.state.bank.subjects}
+    def offer(c: dict) -> dict:
+        lessons = class_lessons(request, c)
+        return {"id": c["id"], "name": c["name"], "lessons": [{"id": l["id"], "name": l["name"], "subject_id": l.get("subject_id", "math")} for l in lessons],
+                "subjects": [{"id": s, "name": subjects[s]["name"]} for s in (c.get("subjects") or ["math"]) if s in subjects]}
+    return [{"class": offer(c),
              "tests": [teacher_view(request, t, c, today) for t in store.tests_of_classes([c["id"]])]} for c in by_id.values()]
 
 
@@ -203,9 +221,9 @@ def set_test(class_id: int, body: TestBody, request: Request, user: dict = Depen
     today = clock.school_day()
     if body.date < today:
         raise HTTPException(422, "תאריך המבחן כבר עבר")
-    lessons = _checked_lessons(klass, body.lessons)
+    lessons, subject = _checked_lessons(request, klass, body.lessons, body.subject_id)
     test = request.app.state.store.create_test(class_id, body.date, lessons, user["email"], note=body.note.strip(), questions=body.questions,
-                                                 minutes=body.minutes, created_at=clock.now())
+                                                 minutes=body.minutes, created_at=clock.now(), subject_id=subject)
     return teacher_view(request, test, klass, today)
 
 
@@ -219,7 +237,7 @@ def change_test(test_id: int, body: TestChange, request: Request, user: dict = D
     if "date" in fields and fields["date"] < today:
         raise HTTPException(422, "תאריך המבחן כבר עבר")
     if "lessons" in fields:
-        fields["lessons"] = _checked_lessons(klass, fields["lessons"])
+        fields["lessons"], _ = _checked_lessons(request, klass, fields["lessons"], test.get("subject_id", "math"))
     if "note" in fields:
         fields["note"] = fields["note"].strip()
     updated = request.app.state.store.update_test(test_id, **fields) if fields else test

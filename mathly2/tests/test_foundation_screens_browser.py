@@ -501,3 +501,53 @@ def test_the_class_editor_chooses_the_subjects_a_class_studies(browser, viewport
         said(page, "השינויים נשמרו")
         assert store.get_class(made["id"])["subjects"] == ["math"]
         no_sideways_scroll(page)
+
+
+@pytest.mark.parametrize("viewport", [PHONE, DESKTOP])
+def test_a_teacher_sets_a_test_in_one_subject_of_a_class_with_two(browser, viewport):
+    app, store = seeded()
+    store.create_subject("science", "מדעים", MGR, icon="⚗")
+    lesson = _science(store, "תאים")
+    from mathly2 import content
+    content.rebuild(app)
+    klass = store.create_class("setup", "ט'8", teacher_email=TEACHER, subjects=["math", "science"])
+    with running(app) as url:
+        page = page_for(browser, viewport)
+        sign_in(page, url, TEACHER)
+        page.wait_for_selector("#teaching")
+        page.click("[data-tab='tests']")
+        page.wait_for_selector(f".class-tests[data-class='{klass['id']}'] .set-test")
+        box = page.locator(f".class-tests[data-class='{klass['id']}']")
+        box.locator(".set-test summary").click()
+        visible = lambda: [l.inner_text().strip() for l in box.locator(".set-test [data-lesson-subject]").all() if l.is_visible()]
+        assert "תאים" not in visible()                                                         # math first: its lessons only
+        box.locator("[data-subject-pick]").select_option("science")
+        assert visible() == ["תאים"]
+        assert box.locator(f".set-test input[value='w{lesson['id']}']").is_checked()
+        box.locator(".set-test input[name=date]").fill("2099-01-10")
+        box.locator(".set-test button[type=submit]").click()
+        page.wait_for_function(f"document.querySelectorAll(\".class-tests[data-class='{klass['id']}'] .test-row\").length === 1")
+        made = store.tests_of_classes([klass["id"]])[0]
+        assert made["subject_id"] == "science" and made["lessons"] == [f"w{lesson['id']}"]
+        no_sideways_scroll(page)
+
+
+def test_the_curriculum_is_grouped_by_subject(browser):
+    app, store = seeded()
+    store.create_subject("science", "מדעים", MGR, icon="⚗")
+    lesson = _science(store, "תאים")
+    from mathly2 import content
+    content.rebuild(app)
+    with running(app) as url:
+        page = page_for(browser, DESKTOP)
+        sign_in(page, url, MGR)
+        page.wait_for_selector("#mgr")
+        page.click("#mgr-tabs [data-tab='curriculum']")
+        page.wait_for_selector(".curriculum-subject")
+        assert [h.inner_text() for h in page.locator(".curriculum-subject h4").all()] == ["מתמטיקה", "מדעים"]
+        science = page.locator(".curriculum-subject[data-subject='science']")
+        assert science.locator("li").count() == 1 and "תאים" in science.inner_text()
+        science.locator("input[type=date]").fill("2026-12-01")
+        page.click("#save-curriculum")
+        said(page, "נשמרה")
+        assert str(store.curriculum()[f"w{lesson['id']}"]) == "2026-12-01"

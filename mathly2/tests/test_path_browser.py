@@ -347,3 +347,19 @@ def test_a_link_to_a_skill_opens_its_own_subjects_path(browser, bank):
         assert lesson_ids(page) == {unit}
         page.click(".mx-x")
         page.wait_for_function("location.hash === '#/subject/science/path'")
+
+
+def test_a_wrong_answer_in_a_second_subject_names_its_mistake_on_the_exercise_screen(browser, bank):
+    app, store, math_lesson, unit = two_subjects(bank)
+    with running(app) as url:
+        page = offline_formulas(browser.new_page(viewport=PHONE))
+        page.goto(url)
+        page.fill("#email", KID)
+        page.click("#dev button")
+        page.wait_for_selector(".subject-card")
+        page.goto(f"{url}#/skill/{unit}_1")
+        page.wait_for_selector("#ex-choices .ex-choice")
+        page.click("#ex-choices .ex-choice[data-i='1']")                                      # choice 1 is always the wrong one here
+        page.wait_for_selector("#ex-fb .ex-bad")
+        assert "בלבול" in page.inner_text("#ex-fb") and "קראו שוב" in page.inner_text("#ex-fb")
+        assert store.review_of(KID_ID)[0]["skill_id"] == f"{unit}_1"

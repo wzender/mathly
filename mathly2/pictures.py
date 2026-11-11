@@ -71,9 +71,9 @@ def clean_image(data: bytes, content_type: str) -> bytes:
     return out.getvalue()
 
 
-def render_pdf(data: bytes) -> list[bytes]:
+def render_pdf(data: bytes, limit: int = MAX_PDF) -> list[bytes]:
     """The pages of a teacher's PDF as stored pictures (JPEG); PictureError 413, 415 or 400 when it is not one we take."""
-    if len(data) > MAX_PDF:
+    if len(data) > limit:
         raise PictureError(413, "pdf_too_large")
     if not data.startswith(b"%PDF-"):
         raise PictureError(415, "not_a_pdf")

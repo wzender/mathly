@@ -148,3 +148,59 @@ def load_lesson(subject_id: str, body: LessonBody, request: Request, user: dict 
         store.delete_lesson(row["id"])
         raise HTTPException(422, {"message": "השיעור לא עבר את הבדיקות", "problems": problems})
     return lesson_summary(store.save_lesson(row["id"], draft=document)) | {"draft": document}
+
+
+# ---- a lesson's draft: read it, and save the whole document from the editor (add-subjects-and-worksheets 6.1) ----
+
+MAX_SKILLS, MAX_QUESTIONS, MAX_CHOICES = 20, 40, 6
+
+
+def draft_shape_problems(document) -> list[str]:
+    """What makes a draft unsavable: its shape only (the editor saves unfinished work; publishing checks the rest)."""
+    if not isinstance(document, dict):
+        return ["הטיוטה לא תקינה"]
+    problems = []
+    if not isinstance(document.get("name", ""), str):
+        problems.append("שם השיעור צריך להיות טקסט")
+    skills, mistakes = document.get("skills", []), document.get("mistakes", {})
+    if not isinstance(skills, list) or len(skills) > MAX_SKILLS:
+        return problems + [f"עד {MAX_SKILLS} מיומנויות בשיעור"]
+    if not isinstance(mistakes, dict) or any(not isinstance(m, dict) for m in mistakes.values()):
+        return problems + ["רשימת הטעויות לא תקינה"]
+    for number, skill in enumerate(skills, 1):
+        questions = skill.get("questions", []) if isinstance(skill, dict) else None
+        if not isinstance(questions, list) or len(questions) > MAX_QUESTIONS:
+            problems.append(f"מיומנות {number}: עד {MAX_QUESTIONS} שאלות")
+            continue
+        for q_number, question in enumerate(questions, 1):
+            choices = question.get("choices", []) if isinstance(question, dict) else None
+            if not isinstance(choices, list) or len(choices) > MAX_CHOICES or any(not isinstance(c, dict) for c in choices):
+                problems.append(f"מיומנות {number}, שאלה {q_number}: עד {MAX_CHOICES} תשובות")
+    return problems
+
+
+def lesson_view(row: dict) -> dict:
+    return {**lesson_summary(row), "subject_id": row["subject_id"], "source": row["source"], "draft": row["draft"], "published_document": row["published"]}
+
+
+@router.get("/lessons/{lesson_id}")
+def read_lesson(lesson_id: int, request: Request, user: dict = Depends(need("content.manage"))) -> dict:
+    row = _store(request).get_lesson(lesson_id)
+    if row is None:
+        raise HTTPException(404, "השיעור לא נמצא")
+    return lesson_view(row)
+
+
+@router.put("/lessons/{lesson_id}/draft")
+def save_draft(lesson_id: int, body: LessonBody, request: Request, user: dict = Depends(need("content.manage"))) -> dict:
+    """The editor's whole document. New skills and mistakes get this lesson's ids; nothing reaches students until it is published."""
+    store = _store(request)
+    row = store.get_lesson(lesson_id)
+    if row is None:
+        raise HTTPException(404, "השיעור לא נמצא")
+    if row["status"] == "drafting":
+        raise HTTPException(409, "הטיוטה עוד בהכנה")
+    problems = draft_shape_problems(body.lesson)
+    if problems:
+        raise HTTPException(422, {"message": "הטיוטה לא נשמרה", "problems": problems})
+    return lesson_view(store.save_lesson(lesson_id, draft=assign_ids(body.lesson, lesson_id)))

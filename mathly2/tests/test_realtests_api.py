@@ -77,8 +77,8 @@ def test_the_length_can_be_changed_and_is_limited(world):
 
 def test_lessons_outside_the_class_and_a_past_date_are_refused(world):
     client, _, lessons = world
-    foreign = client.post(f"/api/classes/{client.class_id}/tests", json={"date": "2026-12-01", "lessons": [lessons[3]]}, headers=auth(TEACHER))
-    assert foreign.status_code == 422
+    foreign = client.post(f"/api/classes/{client.class_id}/tests", json={"date": "2026-12-01", "lessons": ["not-a-lesson"]}, headers=auth(TEACHER))
+    assert foreign.status_code == 422                                           # a lesson the class does not study (see test_subjects_api)
     assert client.post(f"/api/classes/{client.class_id}/tests", json={"date": "2026-12-01", "lessons": []}, headers=auth(TEACHER)).status_code == 422
     assert set_test(client, lessons, days=-1).status_code == 422
     assert set_test(client, lessons, days=0).status_code == 201                # the test day itself is allowed
