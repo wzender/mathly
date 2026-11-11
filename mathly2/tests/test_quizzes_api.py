@@ -44,15 +44,14 @@ def take(client, bank, lesson, rights, who=KID):
 
 # --- 2.1 starting ---
 
-def test_a_new_student_starts_a_quiz_of_fifteen_questions_due_in_forty_five_minutes(world):
+def test_a_new_student_starts_a_quiz_of_fifteen_questions_with_no_time_limit(world):
     client, _, bank = world
     lesson = lesson_id(bank)
     got = start(client, lesson)
     assert got.status_code == 200
     quiz = got.json()
     assert quiz["state"] == "open" and len(quiz["questions"]) == 15 and quiz["answers"] == {}
-    from datetime import datetime
-    assert datetime.fromisoformat(quiz["due_at"]) - datetime.fromisoformat(quiz["now"]) == timedelta(minutes=45)
+    assert quiz["due_at"] is None
     assert quiz["lesson"]["id"] == lesson
 
 
@@ -74,7 +73,7 @@ def test_starting_again_resumes_the_same_open_attempt(world):
     assert again["id"] == first["id"] and [q["key"] for q in again["questions"]] == [q["key"] for q in first["questions"]]
     assert len(again["answers"]) == 1 and again["due_at"] == first["due_at"]
     facts = client.get(f"/api/lessons/{lesson}/quiz", headers=auth()).json()
-    assert facts["open"]["id"] == first["id"] and facts["best"] is None and facts["attempts"] == 0 and facts["size"] == 15 and facts["minutes"] == 45
+    assert facts["open"]["id"] == first["id"] and facts["best"] is None and facts["attempts"] == 0 and facts["size"] == 15 and facts["minutes"] is None
 
 
 def test_a_student_in_no_class_is_refused_a_missing_lesson_is_404_and_a_manager_is_refused(world):
@@ -108,18 +107,17 @@ def test_submitting_twice_returns_the_same_result(world):
     assert one == two and client.get(f"/api/attempts/{attempt['id']}", headers=auth()).json() == one
 
 
-def test_an_answer_after_the_deadline_is_refused_and_settles_the_attempt(world):
+def test_an_answer_long_after_starting_is_still_saved(world):
     client, _, bank = world
     attempt = start(client, lesson_id(bank)).json()
     answer(client, attempt, bank, attempt["questions"][0]["key"])
     client.set_time(MON + timedelta(minutes=46))
-    late = answer(client, attempt, bank, attempt["questions"][1]["key"])
-    assert late.status_code == 409
-    settled = client.get(f"/api/attempts/{attempt['id']}", headers=auth()).json()
-    assert settled["state"] == "submitted" and settled["timed_out"] is True and settled["grade"] == 7 and settled["right"] == 1
+    assert answer(client, attempt, bank, attempt["questions"][1]["key"]).status_code == 200
+    still = client.get(f"/api/attempts/{attempt['id']}", headers=auth()).json()
+    assert still["state"] == "open" and len(still["answers"]) == 2
 
 
-def test_closing_the_app_for_forty_five_minutes_leaves_a_submitted_attempt_with_the_answers_given(world):
+def test_closing_the_app_for_forty_five_minutes_leaves_the_quiz_open_with_the_answers_given(world):
     client, _, bank = world
     attempt = start(client, lesson_id(bank)).json()
     for q in attempt["questions"][:6]:
@@ -127,7 +125,9 @@ def test_closing_the_app_for_forty_five_minutes_leaves_a_submitted_attempt_with_
     client.set_time(MON + timedelta(minutes=5))                                            # five minutes in, the app is closed
     client.set_time(MON + timedelta(minutes=50))                                           # it is opened again 45 minutes later
     back = client.get(f"/api/attempts/{attempt['id']}", headers=auth()).json()
-    assert back["state"] == "submitted" and back["timed_out"] is True and back["grade"] == 40 and back["right"] == 6
+    assert back["state"] == "open" and len(back["answers"]) == 6
+    done = client.post(f"/api/attempts/{attempt['id']}/submit", headers=auth()).json()
+    assert done["state"] == "submitted" and done["timed_out"] is False and done["grade"] == 40 and done["right"] == 6
 
 
 def test_the_deadline_is_the_servers_a_late_device_clock_changes_nothing(world):
@@ -167,7 +167,7 @@ def test_the_best_grade_stays_and_a_better_retake_replaces_it(world):
     assert facts["best"] == 80 and facts["attempts"] == 3
 
 
-def test_the_grades_screen_data_lists_only_lessons_with_a_quiz_and_settles_overdue_ones(world):
+def test_the_grades_screen_data_lists_only_lessons_with_a_submitted_quiz(world):
     client, _, bank = world
     lesson = lesson_id(bank)
     assert client.get("/api/grades", headers=auth()).json() == {"quizzes": [], "exercise_tests": [], "simulations": [], "assignments": []}
@@ -176,7 +176,9 @@ def test_the_grades_screen_data_lists_only_lessons_with_a_quiz_and_settles_overd
     abandoned = start(client, other).json()
     answer(client, abandoned, bank, abandoned["questions"][0]["key"])
     assert [q["lesson"]["id"] for q in client.get("/api/grades", headers=auth()).json()["quizzes"]] == [lesson]   # open: not listed yet
-    client.set_time(MON + timedelta(hours=1))                                              # the overdue attempt is settled by the read
+    client.set_time(MON + timedelta(hours=1))                                              # no time limit: still open an hour later
+    assert [q["lesson"]["id"] for q in client.get("/api/grades", headers=auth()).json()["quizzes"]] == [lesson]
+    client.post(f"/api/attempts/{abandoned['id']}/submit", headers=auth())
     grades = client.get("/api/grades", headers=auth()).json()["quizzes"]
     assert {g["lesson"]["id"]: g["best"] for g in grades} == {lesson: 67, other: 7}
     assert all(g["attempts"] == 1 and g["last"] for g in grades)
@@ -191,7 +193,7 @@ def test_the_path_gives_each_lesson_its_quiz_state(world):
     start(client, other)
     state = quizzes()
     assert state[lesson]["best"] == 93 and state[lesson]["open"] is False
-    assert state[other]["best"] is None and state[other]["open"] is True and state[other]["due_at"]
+    assert state[other]["best"] is None and state[other]["open"] is True and state[other]["due_at"] is None   # a quiz has no deadline
 
 
 # --- 2.4 written quizzes are not lesson quizzes ---

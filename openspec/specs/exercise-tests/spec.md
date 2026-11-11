@@ -1,7 +1,7 @@
 # exercise-tests Specification
 
 ## Purpose
-Two timed, mixed practice tests per real test that train the student under test conditions and aim at their weak skills, retakeable until they are good.
+Two mixed practice tests per real test (with no time limit) that train the student under test conditions and aim at their weak skills, retakeable until they are good.
 
 ## Requirements
 
@@ -13,11 +13,15 @@ When a teacher sets a test, the app SHALL create 2 exercise tests for every stud
 - **THEN** each of the 25 students has exercise test 1 and exercise test 2 on their countdown
 
 ### Requirement: Like the real test
-An exercise test SHALL have the real test's number of questions and time limit, mix questions from all the covered lessons, hide skill names, and give feedback only at the end.
+An exercise test SHALL have the real test's number of questions, mix questions from all the covered lessons, hide skill names, and give feedback only at the end. It SHALL have no time limit: only the simulation is timed.
 
 #### Scenario: During the test
 - **WHEN** a student answers a question in an exercise test
 - **THEN** no right or wrong is shown until the test ends
+
+#### Scenario: No timer
+- **WHEN** a student starts an exercise test of a real test set for 30 minutes
+- **THEN** it shows no timer and stays open until the student hands it in
 
 ### Requirement: Question mix
 Exercise test 1 SHALL draw 60% of its questions from weak skills and 40% from other covered skills; exercise test 2 SHALL draw 30% and 70%. A weak skill is one in the learning state or answered wrong in an earlier exercise test. Not-started skills MUST NOT appear; they are listed as "practice these first". Missing weak questions are filled from other covered skills.

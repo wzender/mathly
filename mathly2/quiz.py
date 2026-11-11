@@ -34,14 +34,14 @@ def draw(bank, lesson_id: str, used: dict[str, int] | None = None, rng: random.R
 
 
 def facts(store, bank, user_id: str, now, reads=None) -> dict[str, dict]:
-    """Per lesson the student has attempted: {best, attempts, open, last}. Overdue open attempts are settled first, so a quiz abandoned
-    past its deadline is graded from the answers given. `best` is None until an attempt is submitted."""
+    """Per lesson the student has attempted: {best, attempts, open, last}. A quiz has no time limit, so an open attempt stays open until
+    the student hands it in and carries no deadline. `best` is None until an attempt is submitted."""
     found: dict[str, dict] = {}
     for row in (reads or store).attempts_of(user_id, "quiz"):
         row = attempts.settle(store, bank, row, now)
         item = found.setdefault(row["scope"], {"best": None, "attempts": 0, "open": None, "last": None, "passed": False})
         if attempts.is_open(row):
-            item["open"] = {"id": row["id"], "due_at": row["due_at"]}
+            item["open"] = {"id": row["id"], "due_at": row["due_at"] if attempts.is_timed(row) else None}
             continue
         item["attempts"] += 1
         item["passed"] = item["passed"] or row["grade"] >= attempts.PASS_GRADE

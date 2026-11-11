@@ -52,13 +52,15 @@ def test_a_quiz_sends_its_wrong_and_unanswered_questions(world):
     assert store.review_of(KID_ID) == submitted_twice
 
 
-def test_a_timed_out_quiz_sends_its_unanswered_questions(world):
+def test_a_quiz_submitted_with_unanswered_questions_sends_them(world):
     client, store, bank = world
     lesson = lesson_id(bank)
     attempt = start(client, lesson).json()
     answer(client, attempt, bank, attempt["questions"][0]["key"], True)
     client.set_time(MON + timedelta(minutes=46))
-    client.get(f"/api/attempts/{attempt['id']}", headers=auth())                              # the read settles it
+    client.get(f"/api/attempts/{attempt['id']}", headers=auth())
+    assert store.review_of(KID_ID) == []                                                       # no time limit: nothing is settled
+    client.post(f"/api/attempts/{attempt['id']}/submit", headers=auth())
     assert len(store.review_of(KID_ID)) == 14                                                  # the right one is not there, the 14 unanswered are
 
 

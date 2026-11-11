@@ -113,7 +113,7 @@ def test_every_lesson_has_a_quiz_node_with_its_state_in_words_and_it_is_a_keyboa
 
 # --- 3.2 the sheet ---
 
-def test_the_quiz_opens_with_fifteen_questions_no_skill_names_and_a_countdown(browser, bank):
+def test_the_quiz_opens_with_fifteen_questions_no_skill_names_and_no_countdown(browser, bank):
     (lesson,) = lessons_of(bank, 4)
     app, store = world(bank, [lesson])
     with running(app) as url:
@@ -124,7 +124,7 @@ def test_the_quiz_opens_with_fifteen_questions_no_skill_names_and_a_countdown(br
         assert "מתוך 15" in page.inner_text("#qz-count") and page.locator(".qz-dot").count() == 15
         sizes = page.eval_on_selector_all(".qz-dot", "els => els.map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })")
         assert all(w == h for w, h in sizes), sizes                                           # round, not tall ovals (the global button height once stretched them)
-        assert page.inner_text("#qz-timer").startswith("44:") or page.inner_text("#qz-timer") == "45:00"
+        assert page.locator("#qz-timer").count() == 0                                         # only the simulation is timed
         sheet = page.inner_text(".mx-sheet")
         assert not any(s["name"] in sheet for s in bank.skills if s["unit"] == lesson)
         assert page.locator(".qz-choice").count() >= 2 and page.locator(".qz-choice.right, .qz-choice.wrong").count() == 0
@@ -151,11 +151,11 @@ def test_a_choice_is_saved_on_the_server_survives_a_reload_and_shows_no_right_or
         assert saved == {key: right(bank, ref, ok=False)}
         before = store.attempts_of(KID_ID, "quiz", lesson)[-1]["id"]
         page.reload()
-        page.wait_for_selector("#qz-q")                                                    # the same attempt, the same timer
+        page.wait_for_selector("#qz-q")                                                    # the same attempt
         assert store.attempts_of(KID_ID, "quiz", lesson)[-1]["id"] == before and len(store.attempts_of(KID_ID, "quiz", lesson)) == 1
         page.click(".qz-dot >> nth=0")
         assert page.locator(".qz-dot.done").count() == 1
-        assert page.inner_text("#qz-timer") < "45:01" and page.inner_text("#qz-timer") >= "44:00"
+        assert page.locator("#qz-timer").count() == 0
 
 
 def test_the_board_and_calculator_are_available_in_a_quiz(browser, bank):
@@ -236,27 +236,17 @@ def test_the_result_shows_the_grade_the_lost_skill_with_its_link_and_the_mistake
         assert page.locator("#qz-grade").count() == 0
 
 
-def test_an_attempt_that_ran_out_of_time_shows_its_result_after_the_server_settles_it(browser, bank):
+def test_a_quiz_started_long_ago_is_still_open_with_its_answers(browser, bank):
     (lesson,) = lessons_of(bank, 4)
     app, store = world(bank, [lesson])
-    row = seed_attempt(store, bank, lesson, minutes_left=-5)                                     # its clock ended five minutes ago
+    row = seed_attempt(store, bank, lesson, minutes_left=-5)                                     # its stored due_at passed five minutes ago
     store.save_attempt(row["id"], answers=answers_for(bank, row["questions"], [True] * 6))
     with running(app) as url:
         page = path_page(browser, url, f"#/quiz/{lesson}/{row['id']}")
-        page.wait_for_selector("#qz-grade")
-        assert page.inner_text("#qz-grade b") == "40" and "הזמן נגמר" in page.inner_text(".qz-result")
-
-
-def test_when_the_countdown_reaches_zero_the_quiz_is_handed_in_as_it_stands(browser, bank):
-    (lesson,) = lessons_of(bank, 4)
-    app, store = world(bank, [lesson])
-    row = seed_attempt(store, bank, lesson, seconds_left=3)
-    store.save_attempt(row["id"], answers=answers_for(bank, row["questions"], [True] * 3))
-    with running(app) as url:
-        page = path_page(browser, url, f"#/quiz/{lesson}/{row['id']}")
         page.wait_for_selector("#qz-q")
-        page.wait_for_selector("#qz-grade", timeout=15000)
-        assert page.inner_text("#qz-grade b") == "20" and "הזמן נגמר" in page.inner_text(".qz-result")
+        assert page.locator(".qz-dot.done").count() == 6 and page.locator("#qz-timer").count() == 0
+        page.wait_for_timeout(1500)
+        assert page.locator("#qz-grade").count() == 0                                             # nothing hands it in
 
 
 def test_a_retake_draws_new_questions_and_a_second_quiz_does_not_replace_the_best_grade(browser, bank):
