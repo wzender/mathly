@@ -482,3 +482,19 @@ def test_the_daily_goal_view_counts_answers_and_review_answers_together(db):
     as_role(db, "service_role", "insert into public.m2_review_done(user_id, day, question_key) values (%s, '2026-11-09', 's:b')", u)
     as_role(db, "service_role", "insert into public.m2_review_done(user_id, day, question_key) values (%s, '2026-11-10', 's:c')", u)
     assert as_role(db, "service_role", "select day::text, correct from public.m2_daily_correct where user_id = %s order by day", u) == [("2026-11-09", 2), ("2026-11-10", 1)]
+
+
+def test_the_activity_view_counts_each_person_once_a_day_on_israel_time_and_is_server_only(db):
+    with psycopg.connect(db, autocommit=True) as c:
+        c.execute("insert into public.m2_answers(user_id, skill_id, question_key, correct, day) values "
+                  "('00000000-0000-0000-0000-0000000000a1', 's', 'k1', true, '2026-11-10'), "
+                  "('00000000-0000-0000-0000-0000000000a1', 's', 'k2', false, '2026-11-10')")
+        c.execute("insert into public.m2_attempts(user_id, kind, scope, started_at, due_at, questions) values "
+                  "('00000000-0000-0000-0000-0000000000a2', 'quiz', 't', '2026-11-10 22:30:00+00', '2026-11-10 23:15:00+00', '[]')")
+    rows = as_role(db, "service_role", "select day::text, user_id::text, answers, attempts from public.m2_activity "
+                                       "where user_id in ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000a2') order by day, user_id")
+    assert rows == [("2026-11-10", "00000000-0000-0000-0000-0000000000a1", 2, 0),
+                    ("2026-11-11", "00000000-0000-0000-0000-0000000000a2", 0, 1)]     # 00:30 in Israel is the next day
+    for role in ("anon", "authenticated"):
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            as_role(db, role, "select * from public.m2_activity")

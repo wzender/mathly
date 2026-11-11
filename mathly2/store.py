@@ -760,6 +760,20 @@ class InMemoryStore:
                     days[a["skill_id"]] = a["day"]
             return days
 
+    def activity_since(self, first: date) -> list[dict]:
+        """One row per person and Israel day from `first` on, with their practice answers and started attempts (view m2_activity)."""
+        from .clock import school_day
+        with self._lock:
+            found: dict[tuple, dict] = {}
+            for a in self._answers:
+                if a["day"] >= first:
+                    found.setdefault((a["day"], a["user_id"]), {"day": a["day"], "user_id": a["user_id"], "answers": 0, "attempts": 0})["answers"] += 1
+            for r in self._attempts.values():
+                day = school_day(r["started_at"])
+                if day >= first:
+                    found.setdefault((day, r["user_id"]), {"day": day, "user_id": r["user_id"], "answers": 0, "attempts": 0})["attempts"] += 1
+            return sorted(found.values(), key=lambda r: (r["day"], r["user_id"]))
+
     def daily_correct(self, user_id: str) -> dict[date, int]:
         """Correct practice answers per day (helped answers included): the daily goal and the streak."""
         with self._lock:
@@ -1342,6 +1356,23 @@ class SupabaseStore:
     def last_answered(self, user_id: str) -> dict[str, date]:
         rows = self._request("GET", "m2_last_answered", {"user_id": self._eq(user_id), "select": "skill_id,day"})
         return {r["skill_id"]: date.fromisoformat(r["day"]) for r in rows}
+
+    ACTIVITY_PAGE = 1000
+
+    def activity_since(self, first: date) -> list[dict]:
+        """Read in pages (the API returns at most a page at a time). Each page starts after the last (day, user_id) read, not at an
+        offset, so a row added meanwhile cannot shift a row into two pages or out of both."""
+        rows: list[dict] = []
+        params = {"day": f"gte.{first.isoformat()}", "select": "day,user_id,answers,attempts", "order": "day,user_id",
+                  "limit": str(self.ACTIVITY_PAGE)}
+        while True:
+            page = self._request("GET", "m2_activity", params)
+            rows += page
+            if len(page) < self.ACTIVITY_PAGE:
+                break
+            last = page[-1]
+            params = {**params, "or": f"(day.gt.{last['day']},and(day.eq.{last['day']},user_id.gt.{last['user_id']}))"}
+        return [{**r, "day": date.fromisoformat(r["day"])} for r in rows]
 
     def daily_correct(self, user_id: str) -> dict[date, int]:
         rows = self._request("GET", "m2_daily_correct", {"user_id": self._eq(user_id), "select": "day,correct"})

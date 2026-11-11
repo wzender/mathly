@@ -120,3 +120,67 @@ def test_the_version_file_wins_then_git_then_nothing(tmp_path):
     for bad in ("not json", "[1, 2]", "\"text\"", "{\"commit\": 5}"):
         f.write_text(bad)
         assert version.read(f, tmp_path / "nowhere")["source"] is None
+
+
+# ---- activity (how many people used the app on each of the last 7 or 30 days) ----
+
+def test_activity_counts_people_per_israel_day_with_empty_days_and_the_range_total(monkeypatch):
+    from datetime import datetime, timezone
+    c = client()
+    store = c.app.state.store
+    now = datetime(2026, 11, 11, 10, 0, tzinfo=timezone.utc)                         # 12:00 in Israel, Wednesday 11.11
+    monkeypatch.setattr(clock, "now", lambda: now)
+    today = clock.school_day()
+    store.add_answer("a", "s", "k1", True, True, None, today)
+    store.add_answer("a", "s", "k2", False, True, None, today)
+    store.add_answer("b", "s", "k1", True, True, None, today - timedelta(days=2))
+    store.add_answer("old", "s", "k1", True, True, None, today - timedelta(days=7))      # one day before the 7-day range
+    late = datetime(2026, 11, 9, 22, 30, tzinfo=timezone.utc)                         # 00:30 on 10.11 in Israel
+    store.create_attempt("c", "quiz", "t", late, late + timedelta(minutes=45), [])
+    store.create_attempt("a", "quiz", "t", now, now + timedelta(minutes=45), [])
+    got = c.get("/api/dev/activity?days=7", headers=auth(DEV)).json()
+    assert got["from"] == "2026-11-05" and got["to"] == "2026-11-11" and len(got["days"]) == 7
+    by = {d["day"]: d for d in got["days"]}
+    assert by["2026-11-11"] == {"day": "2026-11-11", "users": 1, "answers": 2, "attempts": 1}     # "a" once, however much they did
+    assert by["2026-11-10"]["users"] == 1 and by["2026-11-10"]["attempts"] == 1                  # the attempt counts on Israel's day
+    assert by["2026-11-09"]["users"] == 1 and by["2026-11-05"]["users"] == 0
+    assert got["users"] == 3 and got["answers"] == 3 and got["attempts"] == 2                    # different people over the week
+    month = c.get("/api/dev/activity?days=30", headers=auth(DEV)).json()
+    assert len(month["days"]) == 30 and month["users"] == 4
+
+
+def test_activity_is_for_developers_only_and_takes_7_or_30_days():
+    c = client()
+    assert c.get("/api/dev/activity").status_code == 401
+    assert c.get("/api/dev/activity", headers=auth(TEACHER)).status_code == 403
+    assert c.get("/api/dev/activity?days=9", headers=auth(DEV)).status_code == 422
+    got = c.get("/api/dev/activity", headers=auth(DEV)).json()
+    assert len(got["days"]) == 7 and got["users"] == 0
+    assert "user_id" not in json.dumps(got)                                             # counts only, never who
+
+
+def test_the_supabase_store_reads_the_activity_view_in_pages_after_the_last_row_read(monkeypatch):
+    from datetime import date
+    from mathly2.store import SupabaseStore
+    s = SupabaseStore("https://x.invalid", "secret")
+    monkeypatch.setattr(SupabaseStore, "ACTIVITY_PAGE", 2)
+    table = [{"day": d, "user_id": u, "answers": 1, "attempts": 0} for d, u in
+             (("2026-11-09", "u1"), ("2026-11-10", "u1"), ("2026-11-10", "u3"), ("2026-11-10", "u5"), ("2026-11-11", "u2"))]
+    asked = []
+    def fake(method, table_name, params=None, **kw):
+        asked.append(params.get("or"))
+        if len(asked) == 2:                                          # a new row lands before the page already read
+            table.insert(1, {"day": "2026-11-09", "user_id": "u0", "answers": 1, "attempts": 0})
+            table.sort(key=lambda r: (r["day"], r["user_id"]))
+        rows = table
+        if params.get("or"):                                         # day.gt.D or (day.eq.D and user_id.gt.U)
+            d = params["or"].split("day.gt.")[1].split(",")[0]
+            u = params["or"].split("user_id.gt.")[1].rstrip("))")
+            rows = [r for r in table if r["day"] > d or (r["day"] == d and r["user_id"] > u)]
+        return rows[:int(params["limit"])]
+    monkeypatch.setattr(s, "_request", fake)
+    got = s.activity_since(date(2026, 11, 5))
+    assert [(r["day"].isoformat(), r["user_id"]) for r in got] == [("2026-11-09", "u1"), ("2026-11-10", "u1"), ("2026-11-10", "u3"),
+                                                                   ("2026-11-10", "u5"), ("2026-11-11", "u2")]   # each once, none skipped
+    assert asked == [None, "(day.gt.2026-11-10,and(day.eq.2026-11-10,user_id.gt.u1))",
+                     "(day.gt.2026-11-10,and(day.eq.2026-11-10,user_id.gt.u5))"]
