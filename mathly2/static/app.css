@@ -562,3 +562,6 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .sb-published { color: var(--sky-aurora); border-color: var(--sky-aurora); }
 .sb-failed { color: var(--danger); border-color: var(--danger); }
 .sb-drafting { color: var(--sky-gold); border-color: var(--sky-gold); }
+.c-subjects { border: 1px solid var(--line); border-radius: 10px; margin: 12px 0; padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.c-subjects legend { font-weight: 600; padding: 0 4px; }
+.c-subjects p { flex-basis: 100%; margin: 4px 0 0; font-size: 14px; }

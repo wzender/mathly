@@ -12,6 +12,7 @@ const tabs = () => `<div class="subtabs" id="mgr-tabs" role="group" aria-label="
     `<button type="button" data-tab="${id}" aria-pressed="${tab === id}">${label}</button>`).join("")}</div>`;
 
 async function render() {
+  if (tab === "edit") subjects = (await api("/api/subjects")).subjects;
   const body = tab === "classes" ? await classesView() : tab === "students" ? await studentsView() : tab === "curriculum" ? await curriculumView()
     : tab === "subjects" ? await subjectsTab.view() : editorView();
   draw(`<section id="mgr"><h2>מנהל כיתות</h2>${tabs()}${note()}${body}</section>`);
@@ -82,9 +83,12 @@ function wireClasses() {
   });
 }
 
+let subjects = [];   // every subject, for the class editor's choice (loaded when the editor opens)
+
 function editorView() {
   const c = editing, d = draft;   // a refused save keeps what was typed
   const value = (typed, saved, fallback = "") => d ? (typed ?? fallback) : (saved ?? fallback);
+  const studies = d ? d.subjects : (c?.subjects || ["math"]);
   return `<form class="card" id="class-form"><h3>${c ? `עריכת ${esc(c.name)}` : "כיתה חדשה"}</h3>
     <label for="c-name">שם הכיתה</label><input id="c-name" required maxlength="80" autocomplete="off" value="${esc(value(d?.name, c?.name))}">
     <label for="c-teacher">מורה הכיתה (כתובת אחת; לא אחד התלמידים של הכיתה)</label>
@@ -94,6 +98,9 @@ function editorView() {
     <div class="hrow" style="margin-top:12px"><label class="switch"><input id="c-ai" type="checkbox" ${value(d?.ai_enabled, c?.ai_enabled, false) ? "checked" : ""}> AI לכיתה</label>
       <label for="c-budget" style="margin:0">בדיקות AI ביום</label><input id="c-budget" type="number" min="0" max="10000" style="width:110px" value="${value(d?.ai_daily_checks, c?.ai_daily_checks, 150)}"></div>
     <p class="muted">ה־AI כבוי עד שבית הספר מאשר שהמשפחות מסכימות. רק אחרי זה מפעילים אותו.</p>
+    <fieldset class="c-subjects" id="c-subjects"><legend>מקצועות שהכיתה לומדת</legend>
+      ${subjects.map(s => `<label class="switch"><input type="checkbox" value="${esc(s.id)}" ${studies.includes(s.id) ? "checked" : ""}> <span aria-hidden="true">${esc(s.icon)}</span> ${esc(s.name)}</label>`).join("")}
+      <p class="muted">הכיתה לומדת את כל השיעורים שפורסמו במקצועות שנבחרו. הסרת מקצוע לא מוחקת את ההתקדמות של התלמידים.</p></fieldset>
     ${flash.error ? `<p class="error" role="alert" id="form-error" tabindex="-1"><b>לא נשמר:</b> ${esc(flash.error)}</p>` : ""}
     <div class="hrow"><button class="primary" type="submit" id="c-save">${c ? "שמירת השינויים" : "פתיחת הכיתה"}</button><button type="button" id="c-cancel">ביטול</button></div></form>`;
 }
@@ -108,6 +115,7 @@ function wireEditor() {
       students: document.getElementById("c-students").value,
       ai_enabled: document.getElementById("c-ai").checked,
       ai_daily_checks: Number(document.getElementById("c-budget").value),
+      subjects: [...document.querySelectorAll("#c-subjects input:checked")].map(i => i.value),
     };
     try {
       const saved = editing ? await api(`/api/classes/${editing.id}`, { method: "PUT", body }) : await api("/api/classes", { method: "POST", body });

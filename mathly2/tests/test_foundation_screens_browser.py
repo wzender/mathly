@@ -472,3 +472,32 @@ def test_a_manager_creates_renames_orders_and_deletes_subjects(browser, viewport
         page.locator("#subjects [data-subject='science'] [data-delete]").click()
         page.wait_for_selector("[role=alert]")
         assert "מבטלים את פרסומם" in page.inner_text("[role=alert]")                             # published lessons keep it
+
+
+@pytest.mark.parametrize("viewport", [PHONE, DESKTOP])
+def test_the_class_editor_chooses_the_subjects_a_class_studies(browser, viewport):
+    app, store = seeded()
+    store.create_subject("science", "מדעים", MGR, icon="⚗")
+    from mathly2 import content
+    content.rebuild(app)
+    with running(app) as url:
+        page = page_for(browser, viewport)
+        sign_in(page, url, MGR)
+        page.wait_for_selector("#new-class")
+        page.click("#new-class")
+        page.wait_for_selector("#c-subjects")
+        assert page.is_checked("#c-subjects input[value='math']") and not page.is_checked("#c-subjects input[value='science']")
+        page.fill("#c-name", "ט'7")
+        page.check("#c-subjects input[value='science']")
+        page.click("#c-save")
+        said(page, "הכיתה נפתחה")
+        made = next(k for k in store.classes() if k["name"] == "ט'7")
+        assert made["subjects"] == ["math", "science"]
+        page.click(f"#classes [data-edit='{made['id']}']")
+        page.wait_for_selector("#c-subjects")
+        assert page.is_checked("#c-subjects input[value='science']")
+        page.uncheck("#c-subjects input[value='science']")
+        page.click("#c-save")
+        said(page, "השינויים נשמרו")
+        assert store.get_class(made["id"])["subjects"] == ["math"]
+        no_sideways_scroll(page)

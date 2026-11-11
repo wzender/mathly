@@ -109,10 +109,9 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     @app.get("/api/lessons")
     def lessons(request: Request, user: dict = Depends(learner)) -> list[dict]:
         """The lessons of the student's classes; a teacher or developer sees every lesson."""
-        everything = app.state.bank.lessons_with_skills()
-        if set(user["roles"]) - {"student"}:
-            return everything
-        return everything if reads.of(request).classes_of_student(user["email"]) else []
+        from .skills import visible_lesson_ids
+        shown = visible_lesson_ids(request, user)
+        return [l for l in app.state.bank.lessons_with_skills() if shown is None or l["id"] in shown]
 
     @app.get("/", include_in_schema=False)
     def index() -> HTMLResponse:

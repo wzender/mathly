@@ -142,7 +142,7 @@ Requirements are grouped; each id (for example `ACC-3`) is stable and is what Op
 - **CLS-5 Editing.** The manager can change a class's name, students, teacher and AI budget. Removing a student from a class does not delete that student's progress.
 - **CLS-6 Deleting.** The manager can delete a class after confirming. Deleting a class does not delete its students' progress.
 - **CLS-7 Class list.** The list shows, for each class, its name, number of students and their emails, and its teacher, with shortcuts to edit and delete.
-- **CLS-8 Lessons in the path.** A class has no chosen lessons: every class studies every lesson of the bank, one course called "מתמטיקה כיתה ט - מצוינות". A student in at least one class sees every lesson in the path.
+- **CLS-8 Lessons in the path.** A class has no chosen lessons: it chooses the **subjects** it studies (math for a new class; SUB-4) and studies every published lesson of them. A student in at least one class sees every published lesson of the subjects of their classes; a class's old stored lessons are ignored.
   Within those lessons everything is open (PTH-4).
 
 ### 4.3 The exercise bank (BNK)
@@ -156,6 +156,15 @@ Requirements are grouped; each id (for example `ACC-3`) is stable and is what Op
   The server grades.
 - **BNK-6 Ten practice questions.** Practice on the exercise screen uses 10 questions per skill: the first 10 of the skill's questions in the bank (five skills have 30). The other questions stay in the bank and are still drawn by quizzes, exercise tests and the simulation.
 - **BNK-5 Bank content tools.** A tool lists what the bank still lacks (see 7.3).
+- **BNK-7 Lessons in the database.** Besides the math content file, lessons can be kept in the database (SUB-3). Once published they join the bank after the file's lessons, in subject then lesson order, with the same checks; a published lesson that fails them is left out and logged, and the server still starts. Their skills and mistakes get ids made by the server (`w<lesson>_<n>`, `w<lesson>_m<n>`) that are never reused, so mastery, review and grades keep pointing at the right skill after an edit or a reorder.
+
+### 4.3a Subjects (SUB)
+
+- **SUB-1 A subject** has a name (1–60 characters, unique ignoring case), an icon from a fixed set and its lessons in order. Math is a subject from the start: it owns the content file's lessons in the file's order, and it cannot be renamed or deleted.
+- **SUB-2 Who manages them.** A manager or a developer creates subjects, renames them, changes their icon and orders their lessons in the manager's "מקצועות" tab (MGR-4). A subject with a published lesson cannot be deleted; deleting an empty subject deletes its drafts with it.
+- **SUB-3 Lessons in the database.** A lesson of a subject is a draft until it is published; a draft never reaches a student. A developer can load a lesson as JSON in the lesson document's shape (`mathly2/bank.py`); it is saved as a draft after the bank's checks.
+- **SUB-4 Classes study subjects.** The class editor chooses the subjects a class studies (math is ticked for a new class). Removing a subject from a class, unpublishing a lesson or moving a lesson never deletes progress.
+- **SUB-5 Without the migration.** Until the subjects migration is applied, the app serves the content file's math lessons only and the subjects tab says the migration is needed.
 
 ### 4.4 The path (PTH)
 
@@ -435,6 +444,7 @@ A tab bar at the bottom of the screen leads between them: home, path, submission
 - **MGR-1 Classes.** The manager's home lists all classes (CLS-7) with a button for a new class, and an editor for creating and changing a class (CLS-2 – CLS-6). When a save is refused (for example the teacher is also one of the students), the editor says why right above the save button, in view, and keeps what was typed.
 - **MGR-3 Curriculum.** A tab "תכנית לימודים" lists every lesson in the bank's order, with the bank's month as a hint and a date the manager can set, change or clear (PTH-11).
 - **MGR-2 Students.** A list of all students with the classes each belongs to.
+- **MGR-4 Subjects.** A tab "מקצועות" lists every subject with its icon and its lessons (draft, published, being prepared or failed), with a form for a new subject, renaming, deleting an empty subject and moving lessons up and down (SUB-1 – SUB-3).
 
 ### 4.19 Admin screens (ADM)
 

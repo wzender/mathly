@@ -23,9 +23,11 @@ class Answer(BaseModel):
     choice: int
 
 
-def _skill(request: Request, skill_id: str) -> dict:
+def _skill(request: Request, skill_id: str, user: dict | None = None) -> dict:
+    """The skill, or 404. With a user: also 404 when it is in a lesson they cannot see (a subject their classes do not study)."""
     skill = request.app.state.bank.skill(skill_id)
-    if not skill:
+    shown = visible_lesson_ids(request, user) if user else None
+    if not skill or (shown is not None and skill["unit"] not in shown):
         raise HTTPException(404, "המיומנות לא נמצאה")
     return skill
 
@@ -84,19 +86,27 @@ def _round_view(request: Request, skill_id: str, rows: list[dict], round_start: 
     return view
 
 
-def visible_lesson_ids(request: Request, user: dict) -> set[str] | None:
-    """The lessons the student can see: every lesson once they are in a class, none before. None means all (a teacher or a developer)."""
+def studied_subjects(request: Request, user: dict) -> list[str] | None:
+    """The subjects of the student's classes, in the bank's subject order; None means all (a teacher or a developer)."""
     if set(user["roles"]) - {"student"}:
         return None
-    if not reads.of(request).classes_of_student(user["email"]):
-        return set()
-    return {lesson["id"] for lesson in request.app.state.bank.lessons}
+    mine = {s for c in reads.of(request).classes_of_student(user["email"]) for s in (c.get("subjects") or ["math"])}
+    return [s["id"] for s in request.app.state.bank.subjects if s["id"] in mine]
+
+
+def visible_lesson_ids(request: Request, user: dict) -> set[str] | None:
+    """The lessons the student can see: every published lesson of the subjects their classes study, none before they are in a
+    class. None means all (a teacher or a developer)."""
+    subjects = studied_subjects(request, user)
+    if subjects is None:
+        return None
+    return {lesson["id"] for lesson in request.app.state.bank.lessons if lesson.get("subject_id", "math") in subjects}
 
 
 @router.get("/skills/{skill_id}")
 def open_skill(skill_id: str, request: Request, user: dict = Depends(learner)) -> dict:
     bank, here = request.app.state.bank, reads.of(request)
-    skill, uid = _skill(request, skill_id), user["id"]
+    skill, uid = _skill(request, skill_id, user), user["id"]
     here.prefetch(("get_progress", uid, skill_id), ("answers_of", uid, skill_id), ("daily_correct", uid))      # one wait for all three
     rows = here.answers_of(uid, skill_id)
     question, progress = _current_question(request, user, skill_id, here.get_progress(uid, skill_id), rows)
@@ -117,7 +127,7 @@ def open_skill(skill_id: str, request: Request, user: dict = Depends(learner)) -
 @router.post("/skills/{skill_id}/help")
 def open_help(skill_id: str, request: Request, user: dict = Depends(learner)) -> dict:
     """The student opened help for the question on screen: that answer will not count for mastery."""
-    _skill(request, skill_id)
+    _skill(request, skill_id, user)
     request.app.state.store.save_progress(user["id"], skill_id, current_helped=True)
     return {"ok": True}
 
@@ -133,7 +143,7 @@ def _to_review(store, user_id: str, skill_id: str, key: str) -> None:
 def answer(skill_id: str, body: Answer, request: Request, user: dict = Depends(learner)) -> dict:
     """Grade one practice answer. The waits: the reads together, the answer written, the progress written once."""
     bank, store, here = request.app.state.bank, request.app.state.store, reads.of(request)
-    _skill(request, skill_id)
+    _skill(request, skill_id, user)
     uid, today, now = user["id"], clock.school_day(), clock.now().isoformat()
     here.prefetch(("get_progress", uid, skill_id), ("answers_of", uid, skill_id), ("daily_correct", uid), ("reward_state", uid))
     progress = here.get_progress(uid, skill_id)
@@ -187,7 +197,7 @@ def answer(skill_id: str, body: Answer, request: Request, user: dict = Depends(l
 def new_round(skill_id: str, request: Request, user: dict = Depends(learner)) -> dict:
     """"סבב חדש": after a finished round, all the skill's practice questions again in a new order. Before the round is done it changes nothing."""
     bank, store, here = request.app.state.bank, request.app.state.store, reads.of(request)
-    _skill(request, skill_id)
+    _skill(request, skill_id, user)
     uid = user["id"]
     here.prefetch(("get_progress", uid, skill_id), ("answers_of", uid, skill_id))
     keys, rows, progress = bank.practice_keys(skill_id), here.answers_of(uid, skill_id), here.get_progress(uid, skill_id)

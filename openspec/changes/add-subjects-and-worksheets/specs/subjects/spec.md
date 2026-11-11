@@ -18,7 +18,7 @@ A subject SHALL have a name (1–60 characters, unique ignoring case), an icon c
 - **THEN** it is refused with a message that the name is taken
 
 ### Requirement: Who creates and renames subjects
-A manager or a developer SHALL be able to create a subject and change its name and icon. Nobody else SHALL be able to. A subject with published lessons MUST NOT be deleted; an empty subject MAY be deleted.
+A manager or a developer SHALL be able to create a subject and change its name and icon. Nobody else SHALL be able to. Math MUST NOT be renamed or deleted. A subject with published lessons MUST NOT be deleted; a subject with no published lesson MAY be deleted, and its drafts with it.
 
 #### Scenario: A manager creates a subject
 - **WHEN** a manager creates the subject "מדעים" with an icon
@@ -27,6 +27,10 @@ A manager or a developer SHALL be able to create a subject and change its name a
 #### Scenario: A teacher cannot
 - **WHEN** a teacher asks the server to create a subject
 - **THEN** the server refuses with 403
+
+#### Scenario: Math is fixed
+- **WHEN** a manager renames or deletes math
+- **THEN** it is refused, and math keeps its name and its lessons
 
 #### Scenario: Deleting a subject with lessons
 - **WHEN** a manager deletes a subject that has a published lesson

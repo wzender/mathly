@@ -285,7 +285,7 @@ class Bank:
                 "month": skill.get("month", ""),
             })
         return [{
-            "id": lesson["id"], "name": lesson["name"], "when": lesson.get("when", ""),
+            "id": lesson["id"], "subject_id": lesson.get("subject_id", "math"), "name": lesson["name"], "when": lesson.get("when", ""),
             "has_quiz": bool(lesson.get("quiz")), "skills": by_lesson.get(lesson["id"], []),
         } for lesson in self.lessons]
 

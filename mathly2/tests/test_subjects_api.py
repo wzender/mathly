@@ -96,3 +96,66 @@ def test_a_malformed_lesson_is_refused_with_the_checks_messages_and_nothing_is_k
     got = c.post(f"/api/subjects/{sid}/lessons", json={"lesson": bad}, headers=auth(DEV))
     assert got.status_code == 422 and any("2 correct choices" in p for p in got.json()["detail"]["problems"])
     assert store.lessons_of(sid) == []
+
+
+# ---- a class studies chosen subjects (3.4) ----
+
+def test_a_new_class_studies_math_and_a_manager_adds_and_removes_a_subject_keeping_progress():
+    c, store = world()
+    sid = c.post("/api/subjects", json={"name": "מדעים", "icon": "⚗"}, headers=auth(MGR)).json()["id"]
+    made = c.post("/api/classes", json={"name": "ט'3", "students": "kid@school.test"}, headers=auth(MGR)).json()
+    assert made["subjects"] == ["math"]
+    body = {"name": "ט'3", "subjects": ["math", sid]}
+    assert c.put(f"/api/classes/{made['id']}", json=body, headers=auth(MGR)).json()["subjects"] == ["math", sid]
+    store.save_progress("u-kid", "w1_1", started_at="then", mastered_at="then")
+    assert c.put(f"/api/classes/{made['id']}", json={"name": "ט'3", "subjects": ["math"]}, headers=auth(MGR)).json()["subjects"] == ["math"]
+    assert store.get_progress("u-kid", "w1_1")["mastered_at"] == "then"                    # removing a subject keeps progress
+    unchanged = c.put(f"/api/classes/{made['id']}", json={"name": "ט'3 א"}, headers=auth(MGR)).json()
+    assert unchanged["subjects"] == ["math"]                                                   # an older client keeps the subjects
+
+
+def test_a_class_needs_a_known_subject_and_at_least_one():
+    c, _ = world()
+    assert c.post("/api/classes", json={"name": "ט'5", "subjects": ["nowhere"]}, headers=auth(MGR)).status_code == 422
+    assert c.post("/api/classes", json={"name": "ט'5", "subjects": []}, headers=auth(MGR)).status_code == 422
+
+
+# ---- a student's lessons are the published lessons of their classes' subjects (3.5) ----
+
+KID = "kid@school.test"
+
+
+def published_science(c, store):
+    sid = c.post("/api/subjects", json={"name": "מדעים", "icon": "⚗"}, headers=auth(MGR)).json()["id"]
+    lesson = c.post(f"/api/subjects/{sid}/lessons", json={"lesson": science_lesson()}, headers=auth(DEV)).json()
+    store.save_lesson(lesson["id"], published=store.get_lesson(lesson["id"])["draft"])
+    from mathly2 import content
+    content.rebuild(c.app)
+    return sid, f"w{lesson['id']}"
+
+
+def test_a_student_of_a_math_class_does_not_see_or_open_another_subjects_lesson():
+    c, store = world()
+    sid, unit = published_science(c, store)
+    store.add_member(store.create_class("setup", "ט'1")["id"], KID)
+    lessons = c.get("/api/lessons", headers=auth(KID)).json()
+    assert lessons and all(l["subject_id"] == "math" for l in lessons)
+    assert c.get(f"/api/skills/{unit}_1", headers=auth(KID)).status_code == 404
+    assert c.get(f"/api/lessons/{unit}/quiz", headers=auth(KID)).status_code == 404
+
+
+def test_two_classes_with_two_subjects_give_a_student_both():
+    c, store = world()
+    sid, unit = published_science(c, store)
+    store.add_member(store.create_class("setup", "ט'1")["id"], KID)
+    store.add_member(store.create_class("setup", "מדעים ט", subjects=[sid])["id"], KID)
+    lessons = c.get("/api/lessons", headers=auth(KID)).json()
+    assert {l["subject_id"] for l in lessons} == {"math", sid} and lessons[-1]["id"] == unit
+    assert c.get(f"/api/skills/{unit}_1", headers=auth(KID)).status_code == 200
+
+
+def test_a_student_in_no_class_has_no_lessons_and_a_teacher_has_every_subject():
+    c, store = world()
+    sid, unit = published_science(c, store)
+    assert c.get("/api/lessons", headers=auth(KID)).status_code == 403              # not in a class: asked to talk to the teacher
+    assert unit in [l["id"] for l in c.get("/api/lessons", headers=auth(TEACHER)).json()]

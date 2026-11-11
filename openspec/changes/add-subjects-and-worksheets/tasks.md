@@ -17,9 +17,9 @@
 - [x] 3.1 Add the subject routes: list, create, rename and change icon, delete an empty subject, and reorder a subject's lessons. Verify with API tests: unique names ignoring case, 403 for a teacher, deleting a subject with lessons refused.
 - [x] 3.2 Add a developer route that loads a lesson as JSON in the bank's unit shape into a subject as a draft. Verify with an API test that loads a sample science lesson and that a malformed one is refused with the checks' messages.
 - [x] 3.3 Add the subjects tab to the manager screen: the list, create, rename and icon, and lesson order. Verify with a Playwright test on a phone and a desktop.
-- [ ] 3.4 Add the subject choice to the class editor (math ticked by default), and store and return a class's subjects. Verify with API and Playwright tests: a new class studies math, adding and removing a subject, and progress kept after removing one.
-- [ ] 3.5 Make a student's lessons the published lessons of their classes' subjects, through one helper used by every "every lesson" call site. Verify that the existing access and path tests still pass and a new test covers two classes with two subjects.
-- [ ] 3.6 Update the PRD (subjects, CLS rules) and the `subjects`, `exercise-bank` and `accounts-and-classes` spec deltas if behavior moved during implementation. Verify that `openspec validate add-subjects-and-worksheets --strict` passes.
+- [x] 3.4 Add the subject choice to the class editor (math ticked by default), and store and return a class's subjects. Verify with API and Playwright tests: a new class studies math, adding and removing a subject, and progress kept after removing one.
+- [x] 3.5 Make a student's lessons the published lessons of their classes' subjects, through one helper used by every "every lesson" call site. Verify that the existing access and path tests still pass and a new test covers two classes with two subjects.
+- [x] 3.6 Update the PRD (subjects, CLS rules) and the `subjects`, `exercise-bank` and `accounts-and-classes` spec deltas if behavior moved during implementation. Verify that `openspec validate add-subjects-and-worksheets --strict` passes.
 
 ## 4. Per-subject student screens (stage 1)
 
