@@ -18,4 +18,9 @@ jobs:
         run: |
           # The LFS image contents are not on GitHub; the Space already has them.
           git config lfs.allowincompletepush true
+          # The running app shows its version and update date (developer status card): write them on top of main for the Space only.
+          sha=$(git rev-parse HEAD)
+          printf '{"commit": "%s", "date": "%s"}\n' "$sha" "$(git log -1 --format=%cI)" > mathly2/version.json
+          git add -f mathly2/version.json
+          git -c user.name="Mathly sync" -c user.email="sync@mathly.invalid" commit -q -m "Version ${sha:0:7}"
           git push --force https://wzender:$HF_TOKEN@huggingface.co/spaces/wzender/mathly main

@@ -19,3 +19,4 @@ checkpoints/
 .zero-shot-deps/
 # exported models (scripts/export_powsm_onnx.py): uploaded to the Hub, never committed
 exports/
+mathly2/version.json
