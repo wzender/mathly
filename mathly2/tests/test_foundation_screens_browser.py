@@ -413,3 +413,62 @@ def test_an_admin_a_manager_a_teacher_and_a_student_each_do_their_part(browser):
         page.wait_for_selector("#path")
         assert [m["user_id"] is not None for m in store.members(store.classes()[0]["id"]) if m["email"] == "s3@school.test"] == [True]
         no_sideways_scroll(page)
+
+
+# --- add-subjects-and-worksheets 3.3: the manager's subjects tab ---
+
+def said(page, words):
+    page.wait_for_function("w => (document.getElementById('msg')?.textContent || '').includes(w)", arg=words)
+
+
+def _science(store, name):
+    from mathly2.lessons import assign_ids
+    row = store.create_lesson("science", MGR, {})
+    doc = assign_ids({"name": name, "mistakes": {"m": {"name": "בלבול", "tip": "קראו שוב"}}, "skills": [{"name": "תא", "questions": [
+        {"question": f"שאלה {i}", "choices": [{"text": "כן", "correct": True}, {"text": "לא", "mistake": "m"}]} for i in range(5)]}]}, row["id"])
+    return store.save_lesson(row["id"], draft=doc, published=doc)
+
+
+@pytest.mark.parametrize("viewport", [PHONE, DESKTOP])
+def test_a_manager_creates_renames_orders_and_deletes_subjects(browser, viewport):
+    app, store = seeded()
+    with running(app) as url:
+        page = page_for(browser, viewport)
+        sign_in(page, url, MGR)
+        page.wait_for_selector("#mgr")
+        page.click("#mgr-tabs [data-tab='subjects']")
+        page.wait_for_selector("#new-subject")
+        assert page.locator("#subjects [data-subject='math'] [data-delete]").count() == 0          # math is fixed
+        page.fill("#sb-name", "מדעים")
+        page.click("#new-subject .sb-icon >> nth=1")
+        page.click("#sb-create")
+        said(page, "נוצר")
+        card = page.locator("#subjects article").nth(1)
+        assert "מדעים" in card.inner_text() and "⚗" in card.inner_text()
+        no_sideways_scroll(page)
+
+        page.once("dialog", lambda d: d.accept())
+        card.locator("[data-delete]").click()                                                   # an empty subject can go
+        said(page, "נמחק")
+        assert page.locator("#subjects article").count() == 1
+
+        store.create_subject("science", "מדעים", MGR, icon="⚗")                                 # two lessons to order
+        a, b = _science(store, "תאים"), _science(store, "חומרים")
+        page.click("#mgr-tabs [data-tab='subjects']")
+        page.wait_for_selector("#subjects [data-subject='science'] [data-lesson]")
+        page.click(f"#subjects [data-lesson='{b['id']}'] [data-move='-1']")
+        said(page, "הסדר נשמר")
+        assert [int(li.get_attribute("data-lesson")) for li in page.locator("#subjects [data-subject='science'] [data-lesson]").all()] == [b["id"], a["id"]]
+        assert [u["name"] for u in app.state.bank.lessons_of_subject("science")] == ["חומרים", "תאים"]
+
+        science = page.locator("#subjects [data-subject='science']")
+        science.locator("[data-rename]").click()
+        science.locator(".sb-rename input:not([type])").fill("ביולוגיה")
+        science.locator(".sb-rename button[type=submit]").click()
+        said(page, "עודכן")
+        assert "ביולוגיה" in page.locator("#subjects [data-subject='science'] h3").inner_text()
+
+        page.once("dialog", lambda d: d.accept())
+        page.locator("#subjects [data-subject='science'] [data-delete]").click()
+        page.wait_for_selector("[role=alert]")
+        assert "מבטלים את פרסומם" in page.inner_text("[role=alert]")                             # published lessons keep it

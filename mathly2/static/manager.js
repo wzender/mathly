@@ -1,17 +1,19 @@
-// The manager's screens: every class (make, change, delete) and every student. A manager sees no learning data.
+// The manager's screens: every class (make, change, delete), every student, the curriculum and the subjects. A manager sees no learning data.
 import { api } from "./api.js";
 import { esc } from "./math.js";
+import * as subjectsTab from "./subjects_tab.js";
 
 let draw, tab = "classes", editing = null, draft = null, flash = { message: "", error: "" };
 // draft: what was typed in the editor when a save was refused, so the form keeps it and the person can fix one thing
 
 const note = () => `${flash.error && tab !== "edit" ? `<p class="error" role="alert">${esc(flash.error)}</p>` : ""}${flash.message ? `<p role="status" id="msg">${esc(flash.message)}</p>` : ""}`;
 const tabs = () => `<div class="subtabs" id="mgr-tabs" role="group" aria-label="מנהל כיתות">
-  ${[["classes", "כיתות"], ["edit", editing ? "עריכת כיתה" : "כיתה חדשה"], ["students", "תלמידים"], ["curriculum", "תכנית לימודים"]].map(([id, label]) =>
+  ${[["classes", "כיתות"], ["edit", editing ? "עריכת כיתה" : "כיתה חדשה"], ["students", "תלמידים"], ["curriculum", "תכנית לימודים"], ["subjects", "מקצועות"]].map(([id, label]) =>
     `<button type="button" data-tab="${id}" aria-pressed="${tab === id}">${label}</button>`).join("")}</div>`;
 
 async function render() {
-  const body = tab === "classes" ? await classesView() : tab === "students" ? await studentsView() : tab === "curriculum" ? await curriculumView() : editorView();
+  const body = tab === "classes" ? await classesView() : tab === "students" ? await studentsView() : tab === "curriculum" ? await curriculumView()
+    : tab === "subjects" ? await subjectsTab.view() : editorView();
   draw(`<section id="mgr"><h2>מנהל כיתות</h2>${tabs()}${note()}${body}</section>`);
   document.getElementById("mgr-tabs").addEventListener("click", event => {
     const next = event.target.closest("[data-tab]")?.dataset.tab;
@@ -22,6 +24,7 @@ async function render() {
   });
   if (tab === "classes") wireClasses();
   if (tab === "curriculum") wireCurriculum();
+  if (tab === "subjects") subjectsTab.wire(go, (message, error) => { flash = { message, error }; });
   if (tab === "edit") wireEditor();
   if (tab === "edit" && flash.error) {   // the form is long: bring the reason into view, next to the buttons that were pressed
     const reason = document.getElementById("form-error");

@@ -548,3 +548,17 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .ac-table table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
 .ac-table th, .ac-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; }
 .ac-table th { color: var(--muted); font-weight: 600; }
+
+/* The manager's subjects tab (subjects_tab.js). */
+.sb-icons { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.sb-icon { position: relative; margin: 0; }
+.sb-icon input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.sb-icon > span[aria-hidden] { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 10px; font-size: 20px; }
+.sb-icon input:checked + span { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.sb-icon input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sb-lessons li { gap: 6px; }
+.sb-lessons li button { min-height: 36px; padding: 4px 10px; }
+.sb-state { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); margin-inline-start: 6px; }
+.sb-published { color: var(--sky-aurora); border-color: var(--sky-aurora); }
+.sb-failed { color: var(--danger); border-color: var(--danger); }
+.sb-drafting { color: var(--sky-gold); border-color: var(--sky-gold); }

@@ -16,6 +16,12 @@ ANY_SIGNED_IN = {("GET", "/api/me")}
 NEEDS = {   # (method, path) -> permission
     ("GET", "/api/lessons"): "path.use",
     ("GET", "/api/dev/status"): "dev.status",
+    ("GET", "/api/subjects"): "content.manage",
+    ("POST", "/api/subjects"): "content.manage",
+    ("PUT", "/api/subjects/{subject_id}"): "content.manage",
+    ("DELETE", "/api/subjects/{subject_id}"): "content.manage",
+    ("PUT", "/api/subjects/{subject_id}/order"): "content.manage",
+    ("POST", "/api/subjects/{subject_id}/lessons"): "content.load",
     ("GET", "/api/dev/activity"): "dev.status",          # no role lists it: the developer's alone
     ("GET", "/api/path"): "path.use",
     ("GET", "/api/collection"): "path.use",
@@ -114,7 +120,7 @@ def world():
 
 
 def call(client, method, path, email):
-    url = path.format(skill_id="t_ext", lesson_id="t", attempt_id="x", test_id="1", number="1", picture_id="x", assignment_id="1", submission_id="1", request_id="x", class_id="1", email="someone@school.test", role="teacher")
+    url = path.format(skill_id="t_ext", lesson_id="t", attempt_id="x", test_id="1", number="1", picture_id="x", assignment_id="1", submission_id="1", request_id="x", class_id="1", subject_id="math", email="someone@school.test", role="teacher")
     sends = method in ("POST", "PUT", "PATCH")
     return client.request(method, url, headers={"Authorization": f"Bearer dev:{email}"}, json={} if sends else None)
 

@@ -15,7 +15,7 @@ from .access import RoleResolver, learner, permissions_of
 from .auth import DevAuthenticator, SupabaseAuthenticator, current_user
 from .bank import Bank, load_bank
 
-from . import accounts, ai, ai_help, assignments, classes, cleanup, content, progress, quizzes, reads, realtests, review, skills, status, written
+from . import accounts, ai, ai_help, assignments, classes, cleanup, content, progress, quizzes, reads, realtests, review, skills, status, subjects, written
 from .config import Settings, load_settings
 from .cached import CachedStore
 from .store import InMemoryStore, StoreUnavailable, SupabaseStore
@@ -86,6 +86,7 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     app.include_router(review.router)
     app.include_router(written.router)
     app.include_router(assignments.router)
+    app.include_router(subjects.router)
     status.setup(app)
 
     @app.get("/api/health")
