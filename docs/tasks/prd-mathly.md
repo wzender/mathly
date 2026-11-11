@@ -453,6 +453,8 @@ A tab bar at the bottom of the screen leads between them: home, path, submission
   A saved text can have an **outline (ראשי פרקים)**: on request the AI rewrites the text as the same slides with two to four very short topic reminders each, once; it is kept with the text and can be edited. Changing the text without sending an outline drops the outline, so a stale one is never shown.
 - **DEV-3 Lab (מעבדה).** A developers-only area for testing and development tools. In mathly1 it is an empty page that says tools will be added; the same here, until the first tool is chosen.
 - **DEV-4 AI usage.** A page shows the AI's calls and estimated cost (AI-9): by day, by class and by kind of call.
+- **DEV-5 System status (מצב המערכת).** The developer's home starts with a status card: one overall state (תקין, שימו לב, תקלה), the running version (short commit), the date of the last update and when the server started, and one row per part: the database (asked directly, with how long it took), sign-in, the question bank, AI help, phone notifications, answer pictures and the hourly cleanup. A key is reported as set or not set, never shown. "בדיקה מחדש" checks again.
+  The Hugging Face sync writes the version and date (`mathly2/version.json`) when it deploys; a local checkout reads them from git.
 
 ## 5. Non-Goals (Out of Scope)
 

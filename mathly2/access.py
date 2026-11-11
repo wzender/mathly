@@ -14,7 +14,7 @@ from .auth import current_user
 ROLES = ("student", "teacher", "manager", "admin", "developer")
 GRANTABLE = ("student", "teacher", "manager", "admin")   # roles an admin can give; developer comes only from the settings
 
-# What each role may do. "*" (developer) is every permission.
+# What each role may do. "*" (developer) is every permission; a permission no role lists (dev.status, checked in status.py) is the developer's alone.
 PERMISSIONS: dict[str, frozenset[str]] = {
     "student": frozenset({"path.use"}),
     "teacher": frozenset({"path.use", "class.teach", "class.roster"}),

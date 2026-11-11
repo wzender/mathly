@@ -502,3 +502,22 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .rd-parts .rd-part { display: flex; align-items: baseline; gap: 10px; }
 .rd-parts .grow { flex: 1; min-width: 0; }
 .rd-parts .rd-val { min-width: 42px; text-align: end; color: var(--sky-gold); }
+
+/* The developer's status card (developer.js). */
+.st-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.st-top h2 { margin: 0; }
+.st-head { display: flex; align-items: center; gap: 10px; margin-block: 12px; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); }
+.st-dot { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-weight: 700; font-size: 14px; flex: none; }
+.st-ok { color: var(--sky-aurora); } .st-warn { color: var(--sky-gold); } .st-error { color: var(--danger); } .st-off { color: var(--muted); }
+.st-dot.st-ok, .st-head.st-ok .st-dot { background: color-mix(in srgb, var(--sky-aurora) 18%, transparent); }
+.st-dot.st-warn, .st-head.st-warn .st-dot { background: color-mix(in srgb, var(--sky-gold) 18%, transparent); }
+.st-dot.st-error, .st-head.st-error .st-dot { background: color-mix(in srgb, var(--danger) 18%, transparent); }
+.st-dot.st-off { background: color-mix(in srgb, var(--muted) 18%, transparent); }
+.st-head.st-ok { border-color: var(--sky-aurora); } .st-head.st-warn { border-color: var(--sky-gold); } .st-head.st-error { border-color: var(--danger); }
+.st-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin: 0 0 8px; }
+.st-facts div { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.st-facts dt { color: var(--muted); font-size: 13px; }
+.st-facts dd { margin: 2px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.st-checks li > span:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.st-word { font-size: 13px; font-weight: 600; flex: none; }
+.st-foot { margin: 8px 0 0; font-size: 13px; }
