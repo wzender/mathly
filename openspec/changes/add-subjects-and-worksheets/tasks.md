@@ -65,7 +65,7 @@
 
 ## 8. Integration
 
-- [ ] 8.1 Run one full journey with a fake AI client: a manager uploads a worksheet for a new subject, edits the draft, publishes, and adds the subject to a class; a student of the class practises, masters a skill and takes the quiz; the teacher sets a test in the new subject. Verify that the journey test passes and the full `mathly2/tests` suite passes.
+- [x] 8.1 Run one full journey with a fake AI client: a manager uploads a worksheet for a new subject, edits the draft, publishes, and adds the subject to a class; a student of the class practises, masters a skill and takes the quiz; the teacher sets a test in the new subject. Verify that the journey test passes and the full `mathly2/tests` suite passes.
 
 ## Workflow follow-up
 
