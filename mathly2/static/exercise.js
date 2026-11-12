@@ -5,7 +5,7 @@ import { figures } from "./figures.js";
 import { clear as clearComet, cross as crossComet } from "./comets.js";
 import { esc, fmt } from "./math.js";
 import * as aiSheet from "./ai_sheet.js";
-import { PATH, shuffled } from "./ui.js";
+import { pathHref, shuffled } from "./ui.js";
 
 
 const COUNTDOWN = 3;   // seconds before the next question after a right answer
@@ -256,7 +256,7 @@ async function openHelp() {
 
 function onClick(event) {
   const target = event.target;
-  if (target.closest("[data-close]")) { location.hash = PATH; return; }
+  if (target.closest("[data-close]")) { location.hash = pathHref(); return; }
   if (target.closest("[data-board-toggle]")) { window.MathlyBoard?.toggle(); return; }
   if (target.closest("[data-ai]")) { aiSheet.open({ skillId: skill.id }); return; }
   if (target.closest("[data-help]")) { openHelp(); return; }
@@ -268,5 +268,5 @@ function onClick(event) {
 window.addEventListener("mathly:leave", close);     // another role's screen opened, or the person signed out
 
 document.addEventListener("keydown", event => {
-  if (event.key === "Escape" && layer && !document.querySelector(".mx-board.full")) location.hash = PATH;
+  if (event.key === "Escape" && layer && !document.querySelector(".mx-board.full")) location.hash = pathHref();
 });

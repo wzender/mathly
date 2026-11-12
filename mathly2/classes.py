@@ -26,6 +26,7 @@ class ClassBody(BaseModel):
     students: str | None = Field(default=None, max_length=40000)   # pasted text: the whole roster of the class
     ai_enabled: bool = False
     ai_daily_checks: int = 150
+    subjects: list[str] | None = Field(default=None, max_length=50)   # None: math for a new class, unchanged for an edited one
 
 
 class NewStudents(BaseModel):
@@ -47,6 +48,7 @@ def parse_emails(text: str) -> tuple[list[str], list[str]]:
 
 def shown(request: Request, row: dict, with_students: bool = True) -> dict:
     out = {k: row[k] for k in ("id", "name", "lessons", "teacher_email", "ai_enabled", "ai_daily_checks", "students")}
+    out["subjects"] = list(row.get("subjects") or ["math"])
     if with_students:
         out["student_emails"] = [m["email"] for m in request.app.state.store.members(row["id"])]
     return out
@@ -68,8 +70,16 @@ def checked(request: Request, body: ClassBody) -> dict:
         raise HTTPException(422, "יותר מדי תלמידים בבת אחת")
     if teacher and teacher in roster:
         raise HTTPException(422, "מורה הכיתה לא יכול להיות גם תלמיד בה")
+    subjects = None
+    if body.subjects is not None:
+        known = {s["id"] for s in request.app.state.bank.subjects}
+        subjects = list(dict.fromkeys(body.subjects))
+        if not subjects:
+            raise HTTPException(422, "כיתה לומדת לפחות מקצוע אחד")
+        if any(s not in known for s in subjects):
+            raise HTTPException(422, "אחד המקצועות שנבחרו לא קיים")
     return {"name": name, "lessons": lessons, "teacher_email": teacher, "ai_enabled": body.ai_enabled,
-            "ai_daily_checks": body.ai_daily_checks, "roster": roster, "invalid": invalid}
+            "ai_daily_checks": body.ai_daily_checks, "roster": roster, "invalid": invalid, "subjects": subjects}
 
 
 def sync_roster(store, class_id: int, roster: list[str]) -> None:
@@ -105,7 +115,8 @@ def create_class(body: ClassBody, request: Request, user: dict = Depends(need("c
     store = request.app.state.store
     try:
         row = store.create_class(user["email"], fields["name"], lessons=fields["lessons"], teacher_email=fields["teacher_email"],
-                                 ai_enabled=fields["ai_enabled"], ai_daily_checks=fields["ai_daily_checks"])
+                                 ai_enabled=fields["ai_enabled"], ai_daily_checks=fields["ai_daily_checks"],
+                                 subjects=fields["subjects"] or ["math"])
     except ClassExists:
         raise HTTPException(409, "כבר יש כיתה בשם הזה") from None
     sync_roster(store, row["id"], fields["roster"])
@@ -119,7 +130,8 @@ def change_class(class_id: int, body: ClassBody, request: Request, user: dict = 
     store = request.app.state.store
     try:
         store.update_class(class_id, name=fields["name"], lessons=fields["lessons"], teacher_email=fields["teacher_email"],
-                           ai_enabled=fields["ai_enabled"], ai_daily_checks=fields["ai_daily_checks"])
+                           ai_enabled=fields["ai_enabled"], ai_daily_checks=fields["ai_daily_checks"],
+                           **({"subjects": fields["subjects"]} if fields["subjects"] is not None else {}))
     except KeyError:
         raise HTTPException(404, "הכיתה לא נמצאה") from None
     except ClassExists:
@@ -184,7 +196,7 @@ def my_classes(request: Request, user: dict = Depends(need("class.teach"))) -> l
     """The classes I teach, each with its students. A developer sees every class."""
     store = request.app.state.store
     rows = store.classes() if allowed(user["roles"], "*") else store.classes_taught(user["email"])
-    return [{"id": c["id"], "name": c["name"], "lessons": c["lessons"], "ai_enabled": c["ai_enabled"],
+    return [{"id": c["id"], "name": c["name"], "lessons": c["lessons"], "ai_enabled": c["ai_enabled"], "subjects": list(c.get("subjects") or ["math"]),
              "students": [{"email": m["email"], "signed_in": bool(m["user_id"])} for m in store.members(c["id"])]} for c in rows]
 
 
@@ -204,10 +216,12 @@ class Dates(BaseModel):
 
 @curriculum.get("")
 def read_curriculum(request: Request, user: dict = Depends(need("classes.manage"))) -> list[dict]:
-    """Every lesson in the bank's order with its date (or null) and the bank's month as a hint."""
-    dates = reads.of(request).curriculum()
-    return [{"id": lesson["id"], "name": lesson["name"], "month": lesson.get("when", ""), "due_date": dates[lesson["id"]].isoformat() if lesson["id"] in dates else None}
-            for lesson in request.app.state.bank.lessons]
+    """Every published lesson, grouped by subject in the subjects' order and each subject's lessons in order, with its date (or null)
+    and the bank's month as a hint."""
+    dates, bank = reads.of(request).curriculum(), request.app.state.bank
+    return [{"id": lesson["id"], "name": lesson["name"], "subject": {"id": s["id"], "name": s["name"]}, "month": lesson.get("when", ""),
+             "due_date": dates[lesson["id"]].isoformat() if lesson["id"] in dates else None}
+            for s in bank.subjects for lesson in bank.lessons_of_subject(s["id"])]
 
 
 @curriculum.put("")

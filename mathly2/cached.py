@@ -11,10 +11,12 @@ import time
 READS = frozenset({
     "classes", "classes_of_student", "classes_taught", "members", "get_class", "roles_of",
     "tests_of_classes", "get_test", "assignments_of_classes", "get_assignment", "all_students", "accounts", "curriculum",
+    "subjects",
 })
 CHANGES = frozenset({
     "create_class", "update_class", "delete_class", "add_member", "remove_member", "give_role", "take_role", "link_user",
     "create_test", "update_test", "remove_test", "create_assignment", "remove_assignment", "set_lesson_dates",
+    "create_subject", "update_subject", "delete_subject", "create_lesson", "save_lesson", "delete_lesson",
 })
 
 

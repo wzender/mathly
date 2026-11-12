@@ -3,7 +3,7 @@
 import { swr } from "./api.js";
 import * as aiSheet from "./ai_sheet.js";
 import { esc, fmt } from "./math.js";
-import { PATH, backToSubjects, daysText, shortDate, tabs } from "./ui.js";
+import { backToSubjects, daysText, forSubject, pathHref, shortDate, tabs } from "./ui.js";
 
 /** One part of the readiness number as a row in plain Hebrew: its name, what the number is, and its value ("—" when there is none yet). */
 const part = (id, name, what, value, unit = "") => `<li class="rd-part" data-part="${id}"><span class="grow"><b>${name}</b> <span class="muted">${what}</span></span><b class="rd-val">${value === null ? "—" : value + unit}</b></li>`;
@@ -44,12 +44,12 @@ export function readinessBar(r) {
 function taskLink(task, test, next) {
   const skill = id => `#/skill/${encodeURIComponent(id)}`;
   switch (task.kind) {
-    case "path": return { label: task.skill ? `לסיים את המסלול: ${task.skill_name}` : "לסיים את המסלול", href: task.skill ? skill(task.skill) : PATH };
+    case "path": return { label: task.skill ? `לסיים את המסלול: ${task.skill_name}` : "לסיים את המסלול", href: task.skill ? skill(task.skill) : pathHref() };
     case "ex1": case "ex2": return { label: `מבחן תרגול ${task.kind === "ex1" ? 1 : 2}`, href: `#/exam/${test.id}/${task.kind === "ex1" ? 1 : 2}` };
     case "sim": return { label: "מבחן סימולציה", href: `#/sim/${test.id}` };
     case "review": return { label: `חזרה על ${task.skill_name}`, href: skill(task.skill) };
-    case "mixed_review": return task.skill ? { label: `חזרה קלה: ${task.skill_name}`, href: skill(task.skill) } : { label: "חזרה קלה במסלול", href: PATH };
-    default: return next ? { label: `להמשיך במסלול: ${next.name}`, href: skill(next.id) } : { label: "למסלול", href: PATH };
+    case "mixed_review": return task.skill ? { label: `חזרה קלה: ${task.skill_name}`, href: skill(task.skill) } : { label: "חזרה קלה במסלול", href: pathHref() };
+    default: return next ? { label: `להמשיך במסלול: ${next.name}`, href: skill(next.id) } : { label: "למסלול", href: pathHref() };
   }
 }
 
@@ -120,7 +120,7 @@ function aiCard(ai) {
       <span class="tag st-${esc(r.state)}">${esc(aiSheet.stateWord(r.state))}</span> ${r.skill ? fmt(r.skill.name) : "תרגיל מצולם"}</button></li>`).join("")}</ul>` : ""}</section>`;
 }
 
-export const show = view => swr(["/api/home", "/api/assignments", "/api/ai/status"], ([data, assignments, ai]) => draw(view, data, assignments, ai));
+export const show = view => swr([forSubject("/api/home"), "/api/assignments", "/api/ai/status"], ([data, assignments, ai]) => draw(view, data, assignments, ai));
 
 function draw(view, data, assignments, ai) {
   const [first] = data.tests;
@@ -131,7 +131,7 @@ function draw(view, data, assignments, ai) {
     ${behindCard(data.behind)}${assignmentsCard(assignments)}${aiCard(ai)}
     ${required.map(t => `<a class="required" href="#/sim/${t.id}" data-required="${t.id}"><b>חובה</b> מבחן סימולציה למבחן ב־${shortDate(t.date)}<span aria-hidden="true">‹</span></a>`).join("")}
     <p>${data.next_skill ? `<a class="primary-link" id="continue-path" href="#/skill/${encodeURIComponent(data.next_skill.id)}">להמשיך במסלול: ${fmt(data.next_skill.name)} <span aria-hidden="true">‹</span></a>`
-      : `<a class="primary-link" id="continue-path" href="${PATH}">למסלול: כל הכוכבים פתוחים לתרגול <span aria-hidden="true">‹</span></a>`}</p>`);
+      : `<a class="primary-link" id="continue-path" href="${pathHref()}">למסלול: כל הכוכבים פתוחים לתרגול <span aria-hidden="true">‹</span></a>`}</p>`);
   document.getElementById("ai-new")?.addEventListener("click", () => aiSheet.open());
   document.querySelectorAll("[data-ai-open]").forEach(b => b.addEventListener("click", () => aiSheet.open({ id: b.dataset.aiOpen })));
 }

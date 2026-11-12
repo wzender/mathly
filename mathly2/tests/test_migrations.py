@@ -498,3 +498,27 @@ def test_the_activity_view_counts_each_person_once_a_day_on_israel_time_and_is_s
     for role in ("anon", "authenticated"):
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             as_role(db, role, "select * from public.m2_activity")
+
+
+def test_subjects_start_with_math_and_existing_classes_and_tests_read_as_math(db):
+    with psycopg.connect(db, autocommit=True) as c:
+        assert c.execute("select id, name from public.m2_subjects where id = 'math'").fetchone() == ("math", "מתמטיקה")
+        cid = _class(c, "נושאים1")
+        assert c.execute("select subjects from public.m2_classes where id = %s", (cid,)).fetchone() == (["math"],)
+        tid = c.execute("insert into public.m2_tests(class_id, date, lessons, created_by) values (%s, '2026-12-01', '{t}', 't@school.test') returning id",
+                        (cid,)).fetchone()[0]
+        assert c.execute("select subject_id from public.m2_tests where id = %s", (tid,)).fetchone() == ("math",)
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            c.execute("insert into public.m2_subjects(id, name) values ('math2', 'מתמטיקה')")       # names are unique, ignoring case
+        c.execute("insert into public.m2_subjects(id, name) values ('science', 'מדעים')")
+        lid = c.execute("insert into public.m2_lessons(subject_id, draft, created_by) values ('science', '{\"name\": \"x\"}', 'm@school.test') returning id").fetchone()[0]
+        assert c.execute("select published, status from public.m2_lessons where id = %s", (lid,)).fetchone() == (None, "ready")
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            c.execute("insert into public.m2_lessons(subject_id, created_by) values ('nowhere', 'm@school.test')")
+
+
+@pytest.mark.parametrize("role", ["authenticated", "anon"])
+def test_browser_roles_cannot_read_subjects_or_lessons(db, role):
+    for table in ("m2_subjects", "m2_lessons"):
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            as_role(db, role, f"select * from public.{table}")

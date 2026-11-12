@@ -548,3 +548,47 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .ac-table table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
 .ac-table th, .ac-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; }
 .ac-table th { color: var(--muted); font-weight: 600; }
+
+/* The manager's subjects tab (subjects_tab.js). */
+.sb-icons { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.sb-icon { position: relative; margin: 0; }
+.sb-icon input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.sb-icon > span[aria-hidden] { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 10px; font-size: 20px; }
+.sb-icon input:checked + span { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.sb-icon input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sb-lessons li { gap: 6px; }
+.sb-lessons li button { min-height: 36px; padding: 4px 10px; }
+.sb-state { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); margin-inline-start: 6px; }
+.sb-published { color: var(--sky-aurora); border-color: var(--sky-aurora); }
+.sb-failed { color: var(--danger); border-color: var(--danger); }
+.sb-drafting { color: var(--sky-gold); border-color: var(--sky-gold); }
+.c-subjects { border: 1px solid var(--line); border-radius: 10px; margin: 12px 0; padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.c-subjects legend { font-weight: 600; padding: 0 4px; }
+.c-subjects p { flex-basis: 100%; margin: 4px 0 0; font-size: 14px; }
+.test-form .check[hidden] { display: none; }
+
+/* The lesson editor (lesson_editor.js): the worksheet beside the draft on a wide screen, one above the other on a phone. */
+.le-layout { display: grid; gap: 12px; }
+@media (min-width: 900px) { .le-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; }
+  .le-sheet { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; } }
+.le-sheet { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; background: var(--surface); }
+.le-sheet img { display: block; width: 100%; height: auto; border-radius: 6px; margin-bottom: 8px; background: #fff; }
+.le-text { white-space: pre-wrap; font: inherit; margin: 0; }
+.le-draft label { font-weight: 600; }
+.le-question { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+.le-question textarea { min-height: 60px; }
+.le-choices { margin: 8px 0; }
+.le-choice { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; border: 0; }
+.le-choice input.grow { flex: 1 1 160px; width: auto; }
+.le-choice select { flex: 1 1 140px; width: auto; }
+.le-choice button, .le-skill .hrow button, .le-question .hrow button { min-height: 36px; padding: 4px 10px; }
+.le-right { display: inline-flex; gap: 4px; align-items: center; margin: 0; font-weight: 400; white-space: nowrap; }
+.le-right input { width: auto; }
+.le-source { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+.le-ai { color: var(--sky-gold); border-color: var(--sky-gold); }
+.le-preview { margin-top: 6px; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 10px; font-size: 14px; }
+.le-preview p { margin: 0 0 4px; }
+.le-preview ul { margin: 0; padding-inline-start: 18px; }
+.le-mistake { display: flex; flex-wrap: wrap; gap: 6px; }
+.le-mistake input { flex: 1 1 140px; width: auto; }
+.le-status { margin: 8px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); }

@@ -1,5 +1,9 @@
-// The student's screens, switched by the address after "#": "/" the subjects, "/subject/math" the home, "/subject/math/path" the path, "/skill/<id>" a skill's sheet over the path, "/collection".
+// The student's screens, switched by the address after "#": "/" the subjects, "/subject/<id>" a subject's home, "/subject/<id>/path"
+// its path, "/skill/<id>" a skill's sheet over its subject's path, "/collection". The subject of a skill, a quiz or a test opened by a
+// link is asked from the server, so a reload lands on the right subject's path.
+import { api } from "./api.js";
 import { esc } from "./math.js";
+import { setSubject } from "./ui.js";
 import * as exercise from "./exercise.js";
 import * as home from "./home.js";
 import * as phone from "./phone.js";
@@ -23,12 +27,18 @@ export async function show(me, view) {
       if (where.startsWith("/skill/")) {
         quiz.close();
         lastSkill = decodeURIComponent(where.slice(7));
-        if (!document.getElementById("path")) await path.show(view);       // a link or a reload: the path first, then the sheet over it
+        if (!document.getElementById("path")) {                            // a link or a reload: the skill's subject's path first, then the sheet
+          setSubject((await api(`/api/skills/${encodeURIComponent(lastSkill)}`)).subject_id);
+          await path.show(view);
+        }
         await exercise.open(lastSkill);
       } else if (where.startsWith("/quiz/")) {
         exercise.close();
         const [lesson, attempt] = where.slice(6).split("/").map(decodeURIComponent);
-        if (!document.getElementById("path")) await path.show(view);                  // a link or a reload: the path first, then the sheet
+        if (!document.getElementById("path")) {                                       // a link or a reload: the lesson's subject's path first
+          setSubject((await api(`/api/lessons/${encodeURIComponent(lesson)}/quiz`)).subject_id);
+          await path.show(view);
+        }
         if (attempt) await quiz.open(attempt); else await quiz.start(lesson);       // the node starts or resumes; the address then names the attempt
       } else if (where === "/submissions") {
         exercise.close(); quiz.close();
@@ -57,13 +67,16 @@ export async function show(me, view) {
       } else if (where === "/") {
         exercise.close(); quiz.close();
         await path.showSubjects(view);
-      } else if (where === "/subject/math") {
+      } else if (/^\/subject\/[^/]+$/.test(where)) {
         exercise.close(); quiz.close();
+        setSubject(decodeURIComponent(where.slice(9)));
         await home.show(view);
       } else if (where === "/collection") {
         exercise.close(); quiz.close();
         await (await import("./collection.js")).show(view);
-      } else {                                                              // "/subject/math/path", and any unknown address
+      } else {                                                              // "/subject/<id>/path", and any unknown address
+        const named = where.match(/^\/subject\/([^/]+)\/path$/);
+        if (named) setSubject(decodeURIComponent(named[1]));
         const wasOpen = exercise.isOpen() || quiz.isOpen();
         exercise.close(); quiz.close();
         await path.show(view, { scroll: !wasOpen });                       // closing a sheet refreshes the stars and keeps the place

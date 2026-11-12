@@ -5,7 +5,7 @@ import { api, ApiError } from "./api.js";
 import { loadBoard } from "./exercise.js";
 import { figures } from "./figures.js";
 import { esc, fmt } from "./math.js";
-import { PATH, shuffled } from "./ui.js";
+import { pathHref, shuffled } from "./ui.js";
 
 const LIVE_AT = new Set([300, 60, 10, 0]);        // seconds left at which the timer is announced to a screen reader
 
@@ -45,7 +45,7 @@ export async function startSimulation(testId) {
 const names = a => a.kind === "exercise_test" ? { title: `מבחן תרגול ${a.test.number}`, again: "מבחן חוזר" }
   : a.kind === "simulation" ? { title: "מבחן סימולציה", again: "" } : { title: "בוחן", again: "בוחן חוזר" };
 const chip = a => a.kind === "quiz" ? fmt(a.lesson.name) : a.test.lessons.map(fmt).join(", ");
-const leaveTo = () => !attempt || attempt.kind === "quiz" ? PATH : `#/test/${attempt.test.id}`;
+const leaveTo = () => !attempt || attempt.kind === "quiz" ? pathHref() : `#/test/${attempt.test.id}`;
 
 function ensureLayer() {
   if (!layer) {

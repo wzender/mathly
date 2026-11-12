@@ -2,7 +2,7 @@
 import { api } from "./api.js";
 import { esc, fmt } from "./math.js";
 import { readinessBar } from "./home.js";
-import { HOME, daysText, shortDate, tabs } from "./ui.js";
+import { daysText, forSubject, homeHref, setSubject, shortDate, tabs } from "./ui.js";
 
 const STEP_NAMES = { path: "לסיים את המסלול של השיעורים", ex1: "מבחן תרגול 1", ex2: "מבחן תרגול 2", sim: "מבחן סימולציה", review: "חזרה על מה שנפל בסימולציה" };
 
@@ -32,9 +32,11 @@ function simulation(test) {
 }
 
 export async function show(view, id) {
-  const [test, home] = await Promise.all([api(`/api/tests/${encodeURIComponent(id)}`), api("/api/home")]);
+  const test = await api(`/api/tests/${encodeURIComponent(id)}`);
+  setSubject(test.subject_id);                                         // a test belongs to one subject: its home and tab bar follow it
+  const home = await api(forSubject("/api/home"));
   const others = home.tests.filter(t => t.id !== test.id);
-  view(`${tabs("home")}<p><a class="back" href="${HOME}">‹ הבית</a></p>
+  view(`${tabs("home")}<p><a class="back" href="${homeHref()}">‹ הבית</a></p>
     <section class="card" id="test-card" data-test="${test.id}"><h2>מבחן ב־${shortDate(test.date)} <span class="muted">(${daysText(test.days_left)})</span></h2>
       <p class="muted">${test.lessons.map(l => fmt(l.name)).join(", ")}${test.note ? ` · ${esc(test.note)}` : ""}<br>${test.questions} שאלות · ${test.minutes} דקות</p>
       ${readinessBar(test.readiness)}</section>

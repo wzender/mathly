@@ -15,7 +15,7 @@ from .access import RoleResolver, learner, permissions_of
 from .auth import DevAuthenticator, SupabaseAuthenticator, current_user
 from .bank import Bank, load_bank
 
-from . import accounts, ai, ai_help, assignments, classes, cleanup, progress, quizzes, reads, realtests, review, skills, status, written
+from . import accounts, ai, ai_help, assignments, classes, cleanup, content, progress, quizzes, reads, realtests, review, skills, status, subjects, worksheets, written
 from .config import Settings, load_settings
 from .cached import CachedStore
 from .store import InMemoryStore, StoreUnavailable, SupabaseStore
@@ -43,6 +43,7 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
         stop = cleanup.start_hourly(application.state.store, application.state.pictures) if application.state.settings.supabase_on else None
         application.state.cleanup_stop = stop
         ai_help.requeue_after_restart(application.state.store)     # a request that was being processed when the server stopped waits again
+        worksheets.recover_after_restart(application.state.store)  # a worksheet left drafting can be tried again
         yield
         if stop:
             stop.set()
@@ -62,6 +63,11 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     app.state.pusher = pusher or Pusher(app.state.store, settings.vapid_private_key, default_subject(settings))
     app.state.notify_request = written.notify_new_request
     app.state.ai = ai_client or ai.make_ai(settings)
+    app.state.worksheet_files = (SupabasePictures(settings.supabase_url, settings.supabase_secret, "m2-worksheets")
+                                 if settings.supabase_on else MemoryPictures())
+    app.state.run_worksheet = worksheets.submit                 # drafting in the background (tests may run it inline)
+    app.state.base_bank = app.state.bank          # the content file's lessons; the served bank adds the published ones
+    content.rebuild(app)
     app.state.roles = RoleResolver(settings, app.state.store)
     @app.exception_handler(StoreUnavailable)
     async def store_unavailable(request: Request, exc: StoreUnavailable) -> JSONResponse:
@@ -84,6 +90,8 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     app.include_router(review.router)
     app.include_router(written.router)
     app.include_router(assignments.router)
+    app.include_router(subjects.router)
+    app.include_router(worksheets.router)
     status.setup(app)
 
     @app.get("/api/health")
@@ -106,10 +114,9 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     @app.get("/api/lessons")
     def lessons(request: Request, user: dict = Depends(learner)) -> list[dict]:
         """The lessons of the student's classes; a teacher or developer sees every lesson."""
-        everything = app.state.bank.lessons_with_skills()
-        if set(user["roles"]) - {"student"}:
-            return everything
-        return everything if reads.of(request).classes_of_student(user["email"]) else []
+        from .skills import visible_lesson_ids
+        shown = visible_lesson_ids(request, user)
+        return [l for l in app.state.bank.lessons_with_skills() if shown is None or l["id"] in shown]
 
     @app.get("/", include_in_schema=False)
     def index() -> HTMLResponse:

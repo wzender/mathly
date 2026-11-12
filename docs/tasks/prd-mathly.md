@@ -142,7 +142,7 @@ Requirements are grouped; each id (for example `ACC-3`) is stable and is what Op
 - **CLS-5 Editing.** The manager can change a class's name, students, teacher and AI budget. Removing a student from a class does not delete that student's progress.
 - **CLS-6 Deleting.** The manager can delete a class after confirming. Deleting a class does not delete its students' progress.
 - **CLS-7 Class list.** The list shows, for each class, its name, number of students and their emails, and its teacher, with shortcuts to edit and delete.
-- **CLS-8 Lessons in the path.** A class has no chosen lessons: every class studies every lesson of the bank, one course called "מתמטיקה כיתה ט - מצוינות". A student in at least one class sees every lesson in the path.
+- **CLS-8 Lessons in the path.** A class has no chosen lessons: it chooses the **subjects** it studies (math for a new class; SUB-4) and studies every published lesson of them. A student in at least one class sees every published lesson of the subjects of their classes; a class's old stored lessons are ignored.
   Within those lessons everything is open (PTH-4).
 
 ### 4.3 The exercise bank (BNK)
@@ -156,6 +156,17 @@ Requirements are grouped; each id (for example `ACC-3`) is stable and is what Op
   The server grades.
 - **BNK-6 Ten practice questions.** Practice on the exercise screen uses 10 questions per skill: the first 10 of the skill's questions in the bank (five skills have 30). The other questions stay in the bank and are still drawn by quizzes, exercise tests and the simulation.
 - **BNK-5 Bank content tools.** A tool lists what the bank still lacks (see 7.3).
+- **BNK-7 Lessons in the database.** Besides the math content file, lessons can be kept in the database (SUB-3). Once published they join the bank after the file's lessons, in subject then lesson order, with the same checks; a published lesson that fails them is left out and logged, and the server still starts. Their skills and mistakes get ids made by the server (`w<lesson>_<n>`, `w<lesson>_m<n>`) that are never reused, so mastery, review and grades keep pointing at the right skill after an edit or a reorder.
+
+### 4.3a Subjects (SUB)
+
+- **SUB-1 A subject** has a name (1–60 characters, unique ignoring case), an icon from a fixed set and its lessons in order. Math is a subject from the start: it owns the content file's lessons in the file's order, and it cannot be renamed or deleted.
+- **SUB-2 Who manages them.** A manager or a developer creates subjects, renames them, changes their icon and orders their lessons in the manager's "מקצועות" tab (MGR-4). A subject with a published lesson cannot be deleted; deleting an empty subject deletes its drafts with it.
+- **SUB-3 Lessons in the database.** A lesson of a subject is a draft until it is published; a draft never reaches a student. A developer can load a lesson as JSON in the lesson document's shape (`mathly2/bank.py`); it is saved as a draft after the bank's checks.
+- **SUB-4 Classes study subjects.** The class editor chooses the subjects a class studies (math is ticked for a new class). Removing a subject from a class, unpublishing a lesson or moving a lesson never deletes progress.
+- **SUB-6 Worksheet → lesson (WKS).** In the subjects tab a manager or a developer uploads a worksheet (one PDF up to 20 pages, 1–10 photos, or one Word document; up to 15 MB; at most 20 a day each) for an existing or a new subject. The files are kept in the private bucket `m2-worksheets`. The AI (given only the worksheet and the subject's name) drafts one lesson in the background: a name, its skills, 8–12 multiple-choice questions per skill (the sheet's own, marked "מהדף", and similar new ones, marked "נכתב על ידי AI"), and for every wrong choice a mistake with a name and a tip. The cost is recorded under "worksheet". A failure says why in words (unreadable sheet, missing key, no credit, overloaded…) with "נסו שוב", which needs no new upload; a draft cut short by a restart can be retried.
+- **SUB-7 The lesson editor.** The draft opens beside the worksheet's pages (a Word document's text too). Everything can be changed, added, deleted and reordered: the lesson's name, skills, questions, choices, the right choice, and the mistakes with their names and tips. Every change is saved a moment after the last keystroke. A question a person edits or adds is marked "נכתב על ידי אדם", and each question has a preview as students see it.
+- **SUB-5 Without the migration.** Until the subjects migration is applied, the app serves the content file's math lessons only and the subjects tab says the migration is needed.
 
 ### 4.4 The path (PTH)
 
@@ -178,7 +189,7 @@ The path is the student's main screen: a trail of stars.
 - **PTH-7 Accessibility.** Each star is a control whose accessible name is its number, the skill's name and its state in words. It can be reached and opened from the keyboard.
   Animations stop when the device asks for reduced motion. The path is dark, like the rest of the app.
 - **PTH-9 Choosing a subject.** After sign-in a student first sees the subjects of their classes as cards (as in mathly1), each with an icon, the subject's name
-  and a bar "N מתוך M מיומנויות" (skills mastered of all skills in the student's lessons). Today the only subject is math, named "מתמטיקה כיתה ט - מצוינות", so there is one card.
+  and a bar "N מתוך M מיומנויות" (skills mastered of all that subject's skills in the student's lessons): one card per subject of the student's classes, math first, named "מתמטיקה כיתה ט - מצוינות". Each subject has its own home, path, grades and collection (`#/subject/<id>`); the path, its next skill and the home's tests are that subject's only.
   Tapping a card opens that subject's home (STU-1, as in mathly1), and the tab bar leads from there to the path, the submissions, the grades and the collection; the subject's screens have a way back to the subjects. A reload or a link to a skill (`#/skill/…`) opens its path directly.
 - **PTH-10 Completed lessons.** A lesson is **completed** when every one of its skills is mastered (about 50 exercises: five skills of ten questions), or when its quiz was passed (QZ-7). The hub says "הושלם".
 - **PTH-11 The curriculum.** Each lesson may have a **date** by which it should be completed, one curriculum for the whole school, set by a manager (MGR-3). The path marks every lesson that should be finished by now: its date has passed and it is not completed. The hub shows a marker and "היה אמור להסתיים ב־<date>", and the top of the path says how many lessons are behind. A lesson without a date, with a date ahead, or completed is not marked. Nothing is locked (PTH-4).
@@ -285,6 +296,7 @@ The exercise screen is where a student practices one skill.
 ### 4.10 Test countdown (TST)
 
 - **TST-1 Setting a test.** The teacher sets a test: date + the lessons it covers (+ an optional note), plus the real test's **number of questions** and **time limit**.
+  A test covers lessons of **one subject** the class studies (SUB-4): a class with several subjects picks the subject first, and the test shows only on that subject's home.
   These start with defaults (12 questions, 45 minutes) that the teacher can change.
 - **TST-2 The countdown plan.** From the moment a test is set, the system shows the student a plan that depends on the days left:
 
@@ -373,6 +385,7 @@ The exercise screen is where a student practices one skill.
 - **AI-11 How it runs.** A send marks the request "processing" and returns at once; the AI is called from a small background pool and the pages look again every few seconds while open. After a server restart, requests that were being processed wait again. A help photo is stored privately like an answer picture and is deleted when the AI has answered, or the request is declined or cancelled; after a failure it is kept for the retry. Settings: `ANTHROPIC_API_KEY` (without it a send fails with "missing key") and `MATH_MODEL` (optional).
 - **AI-3 Photographed-problem help.** The student photographs a problem. The AI reads it and solves it, and answers in a fixed shape: the problem as it read it (so the student can check the reading), the solution as steps, each with a **hint** that does not give the step away and the step itself,
   the final answer, and the skill on the path that the problem practises (linked to its star). The page shows the hints one by one, and the steps and the answer only when the student asks for them. The photo is sent to the AI and is not kept.
+  The AI is told the subject (the subject of the skill the student was on, or of the home the photo was sent from) and gets only that subject's skills, so it names a skill of that subject. Math keeps its own wording.
 - **AI-4 Checking handwritten answers.** The AI checks a saved handwritten answer against the question as it was when the student answered it (a stored copy, so later changes to the bank do not change an old grade), and returns a score and a comment.
   This is a **suggestion** to the teacher. Where an answer's score is used, the teacher's score wins over the AI's. The AI's check is never edited: the teacher's review is kept next to it, the latest review counts, and older ones stay as history.
 - **AI-5 Asking the teacher to look again.** A student who disagrees with a check asks the teacher to look again; there is at most one open request per answer and five per student. Saving a review closes the request.
@@ -433,8 +446,9 @@ A tab bar at the bottom of the screen leads between them: home, path, submission
 ### 4.18 Manager screens (MGR)
 
 - **MGR-1 Classes.** The manager's home lists all classes (CLS-7) with a button for a new class, and an editor for creating and changing a class (CLS-2 – CLS-6). When a save is refused (for example the teacher is also one of the students), the editor says why right above the save button, in view, and keeps what was typed.
-- **MGR-3 Curriculum.** A tab "תכנית לימודים" lists every lesson in the bank's order, with the bank's month as a hint and a date the manager can set, change or clear (PTH-11).
+- **MGR-3 Curriculum.** A tab "תכנית לימודים" lists every published lesson grouped by subject (each subject's lessons in its order), with the bank's month as a hint and a date the manager can set, change or clear (PTH-11).
 - **MGR-2 Students.** A list of all students with the classes each belongs to.
+- **MGR-4 Subjects.** A tab "מקצועות" lists every subject with its icon and its lessons (draft, published, being prepared or failed), with a form for a new subject, renaming, deleting an empty subject and moving lessons up and down (SUB-1 – SUB-3).
 
 ### 4.19 Admin screens (ADM)
 

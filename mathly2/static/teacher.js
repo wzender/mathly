@@ -97,12 +97,18 @@ async function drawClasses(classes, notes) {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+/** A test covers lessons of one subject: a class with several subjects picks the subject first (a set test keeps its own). */
 function testForm(c, test = null) {
   const id = test ? `edit-${test.id}` : `new-${c.id}`;
-  const chosen = new Set(test ? test.lessons.map(l => l.id) : c.lessons.map(l => l.id));
-  return `<form class="test-form" data-class="${c.id}"${test ? ` data-test="${test.id}"` : ""} id="form-${id}">
+  const subjects = c.subjects || [{ id: "math", name: "מתמטיקה" }];
+  const subject = test ? test.subject_id || "math" : subjects[0].id;
+  const chosen = new Set(test ? test.lessons.map(l => l.id) : c.lessons.filter(l => (l.subject_id || "math") === subject).map(l => l.id));
+  const pick = !test && subjects.length > 1 ? `<label for="subj-${id}">המקצוע</label><select id="subj-${id}" name="subject" data-subject-pick>
+      ${subjects.map(s => `<option value="${esc(s.id)}"${s.id === subject ? " selected" : ""}>${esc(s.name)}</option>`).join("")}</select>` : "";
+  return `<form class="test-form" data-class="${c.id}" data-subject="${esc(subject)}"${test ? ` data-test="${test.id}"` : ""} id="form-${id}">
     <label for="date-${id}">תאריך המבחן</label><input id="date-${id}" name="date" type="date" required min="${today()}" value="${test ? test.date : ""}">
-    <fieldset><legend>השיעורים שהמבחן כולל</legend>${c.lessons.map(l => `<label class="check"><input type="checkbox" name="lessons" value="${esc(l.id)}"${chosen.has(l.id) ? " checked" : ""}> ${fmt(l.name)}</label>`).join("")}</fieldset>
+    ${pick}
+    <fieldset><legend>השיעורים שהמבחן כולל</legend>${c.lessons.map(l => `<label class="check" data-lesson-subject="${esc(l.subject_id || "math")}"${(l.subject_id || "math") === subject ? "" : " hidden"}><input type="checkbox" name="lessons" value="${esc(l.id)}"${chosen.has(l.id) ? " checked" : ""}> ${fmt(l.name)}</label>`).join("")}</fieldset>
     <label for="note-${id}">הערה (לא חובה)</label><input id="note-${id}" name="note" maxlength="500" value="${test ? esc(test.note) : ""}">
     <div class="two"><span><label for="q-${id}">מספר שאלות</label><input id="q-${id}" name="questions" type="number" min="1" max="40" value="${test ? test.questions : 12}"></span>
       <span><label for="m-${id}">דקות</label><input id="m-${id}" name="minutes" type="number" min="5" max="180" value="${test ? test.minutes : 45}"></span></div>
@@ -141,6 +147,7 @@ async function drawTests(classes) {
     event.preventDefault();
     const data = new FormData(form), error = form.querySelector(".form-error");
     const body = { date: data.get("date"), lessons: data.getAll("lessons"), note: data.get("note") || "", questions: Number(data.get("questions")), minutes: Number(data.get("minutes")) };
+    if (!form.dataset.test) body.subject_id = form.dataset.subject;
     error.hidden = true;
     try {
       if (form.dataset.test) await api(`/api/tests/${form.dataset.test}`, { method: "PUT", body });
@@ -151,6 +158,17 @@ async function drawTests(classes) {
       error.hidden = false;
       error.scrollIntoView({ block: "nearest" });                                    // the form keeps what was typed
     }
+  });
+  root.addEventListener("change", event => {                                    // another subject: its lessons, all ticked
+    const pick = event.target.closest("[data-subject-pick]");
+    if (!pick) return;
+    const form = pick.closest(".test-form");
+    form.dataset.subject = pick.value;
+    form.querySelectorAll("[data-lesson-subject]").forEach(label => {
+      const mine = label.dataset.lessonSubject === pick.value;
+      label.hidden = !mine;
+      label.querySelector("input").checked = mine;
+    });
   });
   root.addEventListener("click", async event => {
     const edit = event.target.closest("[data-edit]")?.dataset.edit;

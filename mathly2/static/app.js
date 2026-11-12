@@ -18,6 +18,7 @@ const remembered = () => { try { return localStorage.getItem(ROLE_KEY) || ""; } 
 const remember = role => { try { localStorage.setItem(ROLE_KEY, role); } catch { /* private window */ } };
 
 function showSignIn(message = "", canRetry = false) {
+  opened++;                                    // a role screen still loading must not draw over the sign-in page
   leaveScreen();
   nav.innerHTML = "";
   view(`<section class="signin" id="signin"><img class="logo" src="/static/logo.svg" alt="לומדים בכיף" width="489" height="225">${owl(72)}
@@ -52,21 +53,26 @@ function header(me, current) {
   document.getElementById("access").addEventListener("click", async () => {
     clearRoute();
     nav.querySelectorAll("[data-role]").forEach(b => b.setAttribute("aria-pressed", "false"));
+    ++opened;                                    // a role screen still loading must not draw over this one
     await (await import("./access.js")).show(me, view);
   });
   nav.querySelectorAll("[data-role]").forEach(button => button.addEventListener("click", () => open(me, button.dataset.role)));
 }
 
+let opened = 0;   // which role screen is open: a screen opened earlier never draws over a later one (its answers may come late)
+
 async function open(me, role, { keepAddress = false } = {}) {
+  const mine = ++opened;
+  const draw = html => { if (mine === opened) view(html); };
   remember(role);
   clearRoute({ keepAddress });
   header(me, role);
-  view(`<section class="card"><p class="muted">טוען…</p></section>`);
+  draw(`<section class="card"><p class="muted">טוען…</p></section>`);
   try {
-    await (await import(SCREENS[role])).show(me, view);
+    await (await import(SCREENS[role])).show(me, draw);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return signOutAndShow("ההתחברות פגה, יש להיכנס שוב");
-    view(`<section class="card"><p class="error" role="alert">${esc(error.message || "משהו השתבש")}</p></section>`);
+    draw(`<section class="card"><p class="error" role="alert">${esc(error.message || "משהו השתבש")}</p></section>`);
   }
 }
 

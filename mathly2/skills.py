@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import Query, APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from . import attempts, clock, comets, quiz, reads
@@ -23,9 +23,11 @@ class Answer(BaseModel):
     choice: int
 
 
-def _skill(request: Request, skill_id: str) -> dict:
+def _skill(request: Request, skill_id: str, user: dict | None = None) -> dict:
+    """The skill, or 404. With a user: also 404 when it is in a lesson they cannot see (a subject their classes do not study)."""
     skill = request.app.state.bank.skill(skill_id)
-    if not skill:
+    shown = visible_lesson_ids(request, user) if user else None
+    if not skill or (shown is not None and skill["unit"] not in shown):
         raise HTTPException(404, "המיומנות לא נמצאה")
     return skill
 
@@ -84,26 +86,34 @@ def _round_view(request: Request, skill_id: str, rows: list[dict], round_start: 
     return view
 
 
-def visible_lesson_ids(request: Request, user: dict) -> set[str] | None:
-    """The lessons the student can see: every lesson once they are in a class, none before. None means all (a teacher or a developer)."""
+def studied_subjects(request: Request, user: dict) -> list[str] | None:
+    """The subjects of the student's classes, in the bank's subject order; None means all (a teacher or a developer)."""
     if set(user["roles"]) - {"student"}:
         return None
-    if not reads.of(request).classes_of_student(user["email"]):
-        return set()
-    return {lesson["id"] for lesson in request.app.state.bank.lessons}
+    mine = {s for c in reads.of(request).classes_of_student(user["email"]) for s in (c.get("subjects") or ["math"])}
+    return [s["id"] for s in request.app.state.bank.subjects if s["id"] in mine]
+
+
+def visible_lesson_ids(request: Request, user: dict) -> set[str] | None:
+    """The lessons the student can see: every published lesson of the subjects their classes study, none before they are in a
+    class. None means all (a teacher or a developer)."""
+    subjects = studied_subjects(request, user)
+    if subjects is None:
+        return None
+    return {lesson["id"] for lesson in request.app.state.bank.lessons if lesson.get("subject_id", "math") in subjects}
 
 
 @router.get("/skills/{skill_id}")
 def open_skill(skill_id: str, request: Request, user: dict = Depends(learner)) -> dict:
     bank, here = request.app.state.bank, reads.of(request)
-    skill, uid = _skill(request, skill_id), user["id"]
+    skill, uid = _skill(request, skill_id, user), user["id"]
     here.prefetch(("get_progress", uid, skill_id), ("answers_of", uid, skill_id), ("daily_correct", uid))      # one wait for all three
     rows = here.answers_of(uid, skill_id)
     question, progress = _current_question(request, user, skill_id, here.get_progress(uid, skill_id), rows)
     lesson = next(l for l in bank.lessons if l["id"] == skill["unit"])
     return {
         "id": skill_id, "name": skill["name"], "description": skill.get("description", ""),
-        "lesson": {"id": lesson["id"], "name": lesson["name"]},
+        "lesson": {"id": lesson["id"], "name": lesson["name"]}, "subject_id": lesson.get("subject_id", "math"),
         "state": skill_state(progress), "question": question, "practice_available": bool(bank.question_keys(skill_id)),
         "round": _round_view(request, skill_id, rows, progress.get("round_start") if progress else None),
         "correct_in_row": _run(rows),
@@ -117,7 +127,7 @@ def open_skill(skill_id: str, request: Request, user: dict = Depends(learner)) -
 @router.post("/skills/{skill_id}/help")
 def open_help(skill_id: str, request: Request, user: dict = Depends(learner)) -> dict:
     """The student opened help for the question on screen: that answer will not count for mastery."""
-    _skill(request, skill_id)
+    _skill(request, skill_id, user)
     request.app.state.store.save_progress(user["id"], skill_id, current_helped=True)
     return {"ok": True}
 
@@ -133,7 +143,7 @@ def _to_review(store, user_id: str, skill_id: str, key: str) -> None:
 def answer(skill_id: str, body: Answer, request: Request, user: dict = Depends(learner)) -> dict:
     """Grade one practice answer. The waits: the reads together, the answer written, the progress written once."""
     bank, store, here = request.app.state.bank, request.app.state.store, reads.of(request)
-    _skill(request, skill_id)
+    _skill(request, skill_id, user)
     uid, today, now = user["id"], clock.school_day(), clock.now().isoformat()
     here.prefetch(("get_progress", uid, skill_id), ("answers_of", uid, skill_id), ("daily_correct", uid), ("reward_state", uid))
     progress = here.get_progress(uid, skill_id)
@@ -187,7 +197,7 @@ def answer(skill_id: str, body: Answer, request: Request, user: dict = Depends(l
 def new_round(skill_id: str, request: Request, user: dict = Depends(learner)) -> dict:
     """"סבב חדש": after a finished round, all the skill's practice questions again in a new order. Before the round is done it changes nothing."""
     bank, store, here = request.app.state.bank, request.app.state.store, reads.of(request)
-    _skill(request, skill_id)
+    _skill(request, skill_id, user)
     uid = user["id"]
     here.prefetch(("get_progress", uid, skill_id), ("answers_of", uid, skill_id))
     keys, rows, progress = bank.practice_keys(skill_id), here.answers_of(uid, skill_id), here.get_progress(uid, skill_id)
@@ -211,7 +221,7 @@ def _comet_due(request: Request, user_id: str, today_now: dict, state: dict | No
     return True
 
 
-def lesson_rows(request: Request, user: dict) -> tuple[list[dict], list[str], dict]:
+def lesson_rows(request: Request, user: dict, subject: str = "math") -> tuple[list[dict], list[str], dict]:
     """The student's lessons with their skills' states, whether each is completed (all skills mastered or its quiz passed) and behind the curriculum,
     and its quiz state. Shared by the path and the home. Returns (lessons, the skills in the bank's order, the skill states)."""
     store, here, uid = request.app.state.store, reads.of(request), user["id"]
@@ -222,7 +232,7 @@ def lesson_rows(request: Request, user: dict) -> tuple[list[dict], list[str], di
     shown, dates = visible_lesson_ids(request, user), here.curriculum()
     lessons, order = [], []
     for lesson in request.app.state.bank.lessons_with_skills():
-        if shown is not None and lesson["id"] not in shown:
+        if (shown is not None and lesson["id"] not in shown) or lesson["subject_id"] != subject:
             continue
         skills = [{"id": s["id"], "name": s["name"], "short": s["short"], "state": states.get(s["id"], "not_started"),
                    "faded": is_faded(states.get(s["id"], "not_started"), last.get(s["id"]), today)}
@@ -240,9 +250,9 @@ def lesson_rows(request: Request, user: dict) -> tuple[list[dict], list[str], di
     return lessons, order, states
 
 
-def behind_lessons(request: Request, user: dict) -> list[dict]:
+def behind_lessons(request: Request, user: dict, subject: str = "math") -> list[dict]:
     """The lessons behind the curriculum for the home, the earliest date first: each with its quiz (the best grade so far and what passes it)."""
-    lessons, _, _ = lesson_rows(request, user)
+    lessons, _, _ = lesson_rows(request, user, subject)
     rows = []
     for l in lessons:
         if not l["behind"]:
@@ -252,29 +262,57 @@ def behind_lessons(request: Request, user: dict) -> list[dict]:
     return sorted(rows, key=lambda r: (r["due_date"], r["id"]))
 
 
+def subject_param(request: Request, user: dict, subject: str) -> str:
+    """The subject a student screen is about: one the student studies (any subject for a teacher or a developer), else 404."""
+    known = [s["id"] for s in request.app.state.bank.subjects]
+    mine = studied_subjects(request, user)
+    if subject not in known or (mine is not None and subject not in mine):
+        raise HTTPException(404, "המקצוע לא נמצא")
+    return subject
+
+
 @router.get("/path")
-def path(request: Request, user: dict = Depends(learner)) -> dict:
+def path(request: Request, user: dict = Depends(learner), subject: str = Query("math", max_length=40)) -> dict:
     here, uid = reads.of(request), user["id"]
+    subject = subject_param(request, user, subject)
     here.prefetch(("progress_of", uid), ("last_answered", uid), ("daily_correct", uid), ("recent_skills", uid, RECENT), ("attempts_of", uid, "quiz"), ("curriculum",))
-    lessons, order, states = lesson_rows(request, user)
+    lessons, order, states = lesson_rows(request, user, subject)
     today = clock.school_day()
     daily = here.daily_correct(uid)
     return {"lessons": lessons, "behind": sum(1 for l in lessons if l["behind"]), "next": next_skill(order, states, here.recent_skills(uid, RECENT)),
             "today": today_progress(daily, today), "streak": streak(daily, today)}
 
 
-@router.get("/collection")
-def collection(request: Request, user: dict = Depends(learner)) -> dict:
+@router.get("/my-subjects")
+def my_subjects(request: Request, user: dict = Depends(learner)) -> list[dict]:
+    """The cards of the first screen: each subject the student's classes study (every subject with lessons for a teacher or a
+    developer), in order with math first, with its skills mastered of all its skills in the student's lessons."""
     bank, here, uid = request.app.state.bank, reads.of(request), user["id"]
+    mine, shown = studied_subjects(request, user), visible_lesson_ids(request, user)
+    mastered = {p["skill_id"] for p in here.progress_of(uid) if skill_state(p) == MASTERED}
+    cards = []
+    for subject in bank.subjects:
+        lessons = [l for l in bank.lessons_with_skills() if l["subject_id"] == subject["id"] and (shown is None or l["id"] in shown)]
+        if (mine is not None and subject["id"] not in mine) or (mine is None and not lessons):
+            continue
+        skills = [s["id"] for l in lessons for s in l["skills"]]
+        cards.append({**subject, "total": len(skills), "mastered": sum(1 for s in skills if s in mastered)})
+    return cards
+
+
+@router.get("/collection")
+def collection(request: Request, user: dict = Depends(learner), subject: str = Query("math", max_length=40)) -> dict:
+    bank, here, uid = request.app.state.bank, reads.of(request), user["id"]
+    subject = subject_param(request, user, subject)
     here.prefetch(("progress_of", uid), ("last_answered", uid))
     mastered_at = {p["skill_id"]: p["mastered_at"] for p in here.progress_of(uid) if p.get("mastered_at")}
     names = {lesson["id"]: lesson["name"] for lesson in bank.lessons}
     last, today = here.last_answered(uid), clock.school_day()
     skills = [{"id": s["id"], "name": s["name"], "lesson_id": s["unit"], "lesson_name": names[s["unit"]],
                "mastered_at": mastered_at[s["id"]], "faded": is_faded(MASTERED, last.get(s["id"]), today)}
-              for s in bank.skills if s["id"] in mastered_at]
+              for s in bank.skills if s["id"] in mastered_at and bank.subject_of_skill(s["id"]) == subject]
     lessons = []
-    for lesson in bank.lessons:
+    for lesson in bank.lessons_of_subject(subject):
         ids = [s["id"] for s in bank.skills if s["unit"] == lesson["id"]]
         if ids and all(i in mastered_at for i in ids):
             lessons.append({"id": lesson["id"], "name": lesson["name"], "skills": len(ids)})

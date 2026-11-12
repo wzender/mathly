@@ -1,17 +1,20 @@
-// The manager's screens: every class (make, change, delete) and every student. A manager sees no learning data.
+// The manager's screens: every class (make, change, delete), every student, the curriculum and the subjects. A manager sees no learning data.
 import { api } from "./api.js";
 import { esc } from "./math.js";
+import * as subjectsTab from "./subjects_tab.js";
 
-let draw, tab = "classes", editing = null, draft = null, flash = { message: "", error: "" };
+let draw, tab = "classes", editing = null, draft = null, flash = { message: "", error: "" }, lessonId = null;
 // draft: what was typed in the editor when a save was refused, so the form keeps it and the person can fix one thing
 
 const note = () => `${flash.error && tab !== "edit" ? `<p class="error" role="alert">${esc(flash.error)}</p>` : ""}${flash.message ? `<p role="status" id="msg">${esc(flash.message)}</p>` : ""}`;
 const tabs = () => `<div class="subtabs" id="mgr-tabs" role="group" aria-label="מנהל כיתות">
-  ${[["classes", "כיתות"], ["edit", editing ? "עריכת כיתה" : "כיתה חדשה"], ["students", "תלמידים"], ["curriculum", "תכנית לימודים"]].map(([id, label]) =>
-    `<button type="button" data-tab="${id}" aria-pressed="${tab === id}">${label}</button>`).join("")}</div>`;
+  ${[["classes", "כיתות"], ["edit", editing ? "עריכת כיתה" : "כיתה חדשה"], ["students", "תלמידים"], ["curriculum", "תכנית לימודים"], ["subjects", "מקצועות"]].map(([id, label]) =>
+    `<button type="button" data-tab="${id}" aria-pressed="${tab === id || (tab === "lesson" && id === "subjects")}">${label}</button>`).join("")}</div>`;
 
 async function render() {
-  const body = tab === "classes" ? await classesView() : tab === "students" ? await studentsView() : tab === "curriculum" ? await curriculumView() : editorView();
+  if (tab === "edit") subjects = (await api("/api/subjects")).subjects;
+  const body = tab === "classes" ? await classesView() : tab === "students" ? await studentsView() : tab === "curriculum" ? await curriculumView()
+    : tab === "subjects" ? await subjectsTab.view() : tab === "lesson" ? `<div id="lesson-slot"></div>` : editorView();
   draw(`<section id="mgr"><h2>מנהל כיתות</h2>${tabs()}${note()}${body}</section>`);
   document.getElementById("mgr-tabs").addEventListener("click", event => {
     const next = event.target.closest("[data-tab]")?.dataset.tab;
@@ -22,6 +25,9 @@ async function render() {
   });
   if (tab === "classes") wireClasses();
   if (tab === "curriculum") wireCurriculum();
+  const openLesson = id => { lessonId = id; go("lesson"); };
+  if (tab === "subjects") subjectsTab.wire(go, (message, error) => { flash = { message, error }; }, openLesson);
+  if (tab === "lesson") (await import("./lesson_editor.js")).open(document.getElementById("lesson-slot"), lessonId, () => go("subjects"));
   if (tab === "edit") wireEditor();
   if (tab === "edit" && flash.error) {   // the form is long: bring the reason into view, next to the buttons that were pressed
     const reason = document.getElementById("form-error");
@@ -36,8 +42,12 @@ async function curriculumView() {
   const lessons = await api("/api/curriculum");
   return `<form class="card" id="curriculum-form"><h3>תכנית לימודים</h3>
     <p class="muted">התאריך שעד אליו כל שיעור אמור להסתיים. תלמיד שלא סיים שיעור אחרי התאריך רואה אותו מסומן בפיגור. אפשר להשאיר תאריך ריק.</p>
-    <ul class="plain curriculum">${lessons.map(l => `<li><label for="due-${esc(l.id)}">${esc(l.name)} <span class="muted">${esc(l.month)}</span></label>
-      <input id="due-${esc(l.id)}" type="date" data-lesson="${esc(l.id)}" value="${esc(l.due_date || "")}"></li>`).join("")}</ul>
+    ${[...new Set(lessons.map(l => l.subject?.id || "math"))].map(sid => {
+      const mine = lessons.filter(l => (l.subject?.id || "math") === sid);
+      return `<section class="curriculum-subject" data-subject="${esc(sid)}"><h4>${esc(mine[0].subject?.name || "מתמטיקה")}</h4>
+      <ul class="plain curriculum">${mine.map(l => `<li><label for="due-${esc(l.id)}">${esc(l.name)} <span class="muted">${esc(l.month)}</span></label>
+      <input id="due-${esc(l.id)}" type="date" data-lesson="${esc(l.id)}" value="${esc(l.due_date || "")}"></li>`).join("")}</ul></section>`;
+    }).join("")}
     <p><button class="primary" type="submit" id="save-curriculum">שמירה</button></p></form>`;
 }
 
@@ -79,9 +89,12 @@ function wireClasses() {
   });
 }
 
+let subjects = [];   // every subject, for the class editor's choice (loaded when the editor opens)
+
 function editorView() {
   const c = editing, d = draft;   // a refused save keeps what was typed
   const value = (typed, saved, fallback = "") => d ? (typed ?? fallback) : (saved ?? fallback);
+  const studies = d ? d.subjects : (c?.subjects || ["math"]);
   return `<form class="card" id="class-form"><h3>${c ? `עריכת ${esc(c.name)}` : "כיתה חדשה"}</h3>
     <label for="c-name">שם הכיתה</label><input id="c-name" required maxlength="80" autocomplete="off" value="${esc(value(d?.name, c?.name))}">
     <label for="c-teacher">מורה הכיתה (כתובת אחת; לא אחד התלמידים של הכיתה)</label>
@@ -91,6 +104,9 @@ function editorView() {
     <div class="hrow" style="margin-top:12px"><label class="switch"><input id="c-ai" type="checkbox" ${value(d?.ai_enabled, c?.ai_enabled, false) ? "checked" : ""}> AI לכיתה</label>
       <label for="c-budget" style="margin:0">בדיקות AI ביום</label><input id="c-budget" type="number" min="0" max="10000" style="width:110px" value="${value(d?.ai_daily_checks, c?.ai_daily_checks, 150)}"></div>
     <p class="muted">ה־AI כבוי עד שבית הספר מאשר שהמשפחות מסכימות. רק אחרי זה מפעילים אותו.</p>
+    <fieldset class="c-subjects" id="c-subjects"><legend>מקצועות שהכיתה לומדת</legend>
+      ${subjects.map(s => `<label class="switch"><input type="checkbox" value="${esc(s.id)}" ${studies.includes(s.id) ? "checked" : ""}> <span aria-hidden="true">${esc(s.icon)}</span> ${esc(s.name)}</label>`).join("")}
+      <p class="muted">הכיתה לומדת את כל השיעורים שפורסמו במקצועות שנבחרו. הסרת מקצוע לא מוחקת את ההתקדמות של התלמידים.</p></fieldset>
     ${flash.error ? `<p class="error" role="alert" id="form-error" tabindex="-1"><b>לא נשמר:</b> ${esc(flash.error)}</p>` : ""}
     <div class="hrow"><button class="primary" type="submit" id="c-save">${c ? "שמירת השינויים" : "פתיחת הכיתה"}</button><button type="button" id="c-cancel">ביטול</button></div></form>`;
 }
@@ -105,6 +121,7 @@ function wireEditor() {
       students: document.getElementById("c-students").value,
       ai_enabled: document.getElementById("c-ai").checked,
       ai_daily_checks: Number(document.getElementById("c-budget").value),
+      subjects: [...document.querySelectorAll("#c-subjects input:checked")].map(i => i.value),
     };
     try {
       const saved = editing ? await api(`/api/classes/${editing.id}`, { method: "PUT", body }) : await api("/api/classes", { method: "POST", body });

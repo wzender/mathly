@@ -7,3 +7,4 @@ Pillow==12.3.0  # checks and cleans answer pictures (mathly2/pictures.py)
 pypdfium2>=4.30,<6  # a teacher's PDF to page images
 pywebpush>=2.0,<3  # notifications to a student's phone for a photo request
 anthropic>=1.0  # photographed-problem hints and AI checks of handwritten answers (mathly2/ai.py)
+python-docx>=1.1,<2  # reading an uploaded Word worksheet (mathly2/worksheets.py)

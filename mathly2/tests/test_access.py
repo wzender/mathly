@@ -13,10 +13,10 @@ def test_there_are_five_roles_and_developer_is_never_grantable():
 
 
 @pytest.mark.parametrize("role,yes,no", [
-    ("student", {"path.use"}, {"class.teach", "class.roster", "classes.manage", "students.list", "roles.manage"}),
-    ("teacher", {"path.use", "class.teach", "class.roster"}, {"classes.manage", "students.list", "roles.manage"}),
-    ("manager", {"classes.manage", "class.roster", "students.list"}, {"path.use", "class.teach", "roles.manage"}),
-    ("admin", {"roles.manage"}, {"path.use", "class.teach", "class.roster", "classes.manage", "students.list"}),
+    ("student", {"path.use"}, {"class.teach", "class.roster", "classes.manage", "students.list", "roles.manage", "content.manage"}),
+    ("teacher", {"path.use", "class.teach", "class.roster"}, {"classes.manage", "students.list", "roles.manage", "content.manage"}),
+    ("manager", {"classes.manage", "class.roster", "students.list", "content.manage"}, {"path.use", "class.teach", "roles.manage"}),
+    ("admin", {"roles.manage"}, {"path.use", "class.teach", "class.roster", "classes.manage", "students.list", "content.manage"}),
 ])
 def test_each_role_has_only_its_permissions(role, yes, no):
     for permission in yes:
