@@ -592,3 +592,4 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .le-mistake { display: flex; flex-wrap: wrap; gap: 6px; }
 .le-mistake input { flex: 1 1 140px; width: auto; }
 .le-status { margin: 8px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); }
+.st-facts dd.st-title { font-weight: 400; font-size: 14px; color: var(--muted); margin-top: 4px; }

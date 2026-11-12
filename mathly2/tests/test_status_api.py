@@ -106,17 +106,21 @@ def test_the_git_fallback_reads_the_last_commit(tmp_path):
     run("init", "-q")
     (tmp_path / "f").write_text("x")
     run("add", "f")
-    run("-c", "user.name=t", "-c", "user.email=t@t.test", "commit", "-q", "-m", "one")
+    run("-c", "user.name=t", "-c", "user.email=t@t.test", "commit", "-q", "-m", "השינוי הראשון")
     sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True).stdout.strip()
     got = version.read(tmp_path / "missing.json", tmp_path)
     assert got["source"] == "git" and got["commit"] == sha and got["short"] == sha[:7] and got["date"].startswith("20")
+    assert got["title"] == "השינוי הראשון"
 
 
 def test_the_version_file_wins_then_git_then_nothing(tmp_path):
     f = tmp_path / "version.json"
+    f.write_text(json.dumps({"commit": "b" * 40, "date": "2026-11-10T22:00:00+00:00", "title": "מקצועות ודפי עבודה (#6)"}, ensure_ascii=False), encoding="utf-8")
+    assert version.read(f, tmp_path) == {"commit": "b" * 40, "short": "bbbbbbb", "date": "2026-11-10T22:00:00+00:00",
+                                         "title": "מקצועות ודפי עבודה (#6)", "source": "file"}
     f.write_text(json.dumps({"commit": "b" * 40, "date": "2026-11-10T22:00:00+00:00"}))
-    assert version.read(f, tmp_path) == {"commit": "b" * 40, "short": "bbbbbbb", "date": "2026-11-10T22:00:00+00:00", "source": "file"}
-    assert version.read(tmp_path / "missing.json", tmp_path / "nowhere") == {"commit": None, "short": None, "date": None, "source": None}
+    assert version.read(f, tmp_path)["title"] is None                                    # an older file without a title still loads
+    assert version.read(tmp_path / "missing.json", tmp_path / "nowhere") == {"commit": None, "short": None, "date": None, "title": None, "source": None}
     for bad in ("not json", "[1, 2]", "\"text\"", "{\"commit\": 5}"):
         f.write_text(bad)
         assert version.read(f, tmp_path / "nowhere")["source"] is None
