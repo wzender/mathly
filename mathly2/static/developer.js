@@ -19,7 +19,8 @@ function card(s) {
   return `<div class="st-head st-${esc(s.overall)}" id="st-overall" data-state="${esc(s.overall)}">
       <span class="st-dot" aria-hidden="true">${STATES[s.overall].icon}</span><b>${OVERALL[s.overall]}</b></div>
     <dl class="st-facts">
-      <div><dt>גרסה</dt><dd id="st-version" dir="ltr">${v.short ? `<span title="${esc(v.commit)}">${esc(v.short)}</span>` : "לא ידועה"}</dd></div>
+      <div><dt>גרסה</dt><dd id="st-version" dir="ltr">${v.short ? `<span title="${esc(v.commit)}">${esc(v.short)}</span>` : "לא ידועה"}</dd>
+        ${v.title ? `<dd class="st-title" id="st-title-change" dir="auto">${esc(v.title)}</dd>` : ""}</div>
       <div><dt>עדכון אחרון</dt><dd id="st-updated">${esc(when(v.date))}</dd></div>
       <div><dt>השרת עלה</dt><dd id="st-started">${esc(when(s.started_at))} <span class="muted">(${since(s.uptime_seconds)})</span></dd></div>
     </dl>

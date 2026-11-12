@@ -25,7 +25,8 @@ jobs:
           git config lfs.allowincompletepush true
           # The running app shows its version and update date (developer status card): write them on top of main for the Space only.
           sha=$(git rev-parse HEAD)
-          printf '{"commit": "%s", "date": "%s"}\n' "$sha" "$(git log -1 --format=%cI)" > mathly2/version.json
+          # the change's name is the commit's subject line; json.dumps keeps Hebrew and quotes in it valid
+          python3 -c 'import json, subprocess; c, d, t = subprocess.run(["git", "log", "-1", "--format=%H%n%cI%n%s"], capture_output=True, text=True, check=True).stdout.splitlines()[:3]; open("mathly2/version.json", "w", encoding="utf-8").write(json.dumps({"commit": c, "date": d, "title": t}, ensure_ascii=False) + "\n")'
           git add -f mathly2/version.json
           git -c user.name="Mathly sync" -c user.email="sync@mathly.invalid" commit -q -m "Version ${sha:0:7}"
           git push --force https://wzender:$HF_TOKEN@huggingface.co/spaces/wzender/mathly main

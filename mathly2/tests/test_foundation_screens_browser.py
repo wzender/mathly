@@ -157,7 +157,7 @@ def test_a_person_with_one_role_sees_no_chips_and_a_developer_sees_all_five(brow
 @pytest.mark.parametrize("viewport", [PHONE, DESKTOP])
 def test_the_developer_screen_shows_the_system_status_version_and_update_date(browser, viewport):
     app, _ = seeded()
-    app.state.version = {"commit": "c" * 40, "short": "ccccccc", "date": "2026-11-11T05:37:00+00:00", "source": "file"}
+    app.state.version = {"commit": "c" * 40, "short": "ccccccc", "date": "2026-11-11T05:37:00+00:00", "title": "מקצועות ודפי עבודה (#6)", "source": "file"}
     with running(app) as url:
         page = page_for(browser, viewport)
         sign_in(page, url, DEV)
@@ -166,6 +166,7 @@ def test_the_developer_screen_shows_the_system_status_version_and_update_date(br
         page.wait_for_selector("#st-checks li")
         assert page.get_attribute("#st-overall", "data-state") == "warn"                  # no Supabase here: memory only
         assert page.inner_text("#st-version") == "ccccccc"
+        assert page.inner_text("#st-title-change") == "מקצועות ודפי עבודה (#6)"                # the change's name beside the version
         assert "2026" in page.inner_text("#st-updated") and "07:37" in page.inner_text("#st-updated")   # shown in Israel's time
         keys = [li.get_attribute("data-key") for li in page.locator("#st-checks li").all()]
         assert keys == ["database", "sign_in", "bank", "ai", "push", "pictures", "cleanup"]
