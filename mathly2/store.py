@@ -71,6 +71,8 @@ TEST_FIELDS = {"date", "lessons", "note", "questions", "minutes", "subject_id"}
 CLASS_FIELDS = {"name", "lessons", "teacher_email", "ai_enabled", "ai_daily_checks", "subjects"}
 SUBJECT_FIELDS = {"name", "icon", "position"}
 LESSON_FIELDS = {"subject_id", "position", "draft", "published", "status", "failure", "files", "published_at"}
+AI_FEATURES = ("photo", "check", "worksheet", "prompter")      # m2_ai_usage.feature (the database checks the same list)
+PROMPTER_FIELDS = {"title", "body", "outline"}
 MATH = {"id": "math", "name": "מתמטיקה", "icon": "∑", "position": 0, "created_by": "setup"}
 
 
@@ -150,6 +152,7 @@ class InMemoryStore:
         self._subs: dict[int, dict] = {}                    # push subscriptions
         self._subjects: dict[str, dict] = {"math": {**MATH, "created_at": datetime.now(timezone.utc)}}
         self._lessons: dict[int, dict] = {}                 # lessons kept in the database (drafts and published)
+        self._prompter: dict[str, dict] = {}                # the developers' prompter texts by id
 
     # --- classes ---
 
@@ -633,6 +636,8 @@ class InMemoryStore:
             return self._allowance.get((scope, day), 0)
 
     def add_ai_usage(self, row: dict) -> None:
+        if row.get("feature") not in AI_FEATURES:
+            raise ValueError(f"unknown AI usage feature {row.get('feature')!r}")    # the database refuses it too
         with self._lock:
             self._ai_usage.append({**row, "created_at": row.get("created_at") or datetime.now(timezone.utc)})
 
@@ -864,6 +869,47 @@ class InMemoryStore:
     def delete_lesson(self, lesson_id: int) -> bool:
         with self._lock:
             return self._lessons.pop(lesson_id, None) is not None
+
+    # --- the developers' prompter texts (each sees only their own) ---
+
+    def prompter_texts(self, user_id: str) -> list[dict]:
+        """The account's texts, the last changed first."""
+        with self._lock:
+            mine = [dict(t) for t in self._prompter.values() if t["user_id"] == user_id]
+        return sorted(mine, key=lambda t: t["updated_at"], reverse=True)
+
+    def get_prompter_text(self, user_id: str, text_id: str) -> dict | None:
+        with self._lock:
+            row = self._prompter.get(text_id)
+            return dict(row) if row and row["user_id"] == user_id else None
+
+    def add_prompter_text(self, user_id: str, title: str, body: str) -> dict:
+        with self._lock:
+            row = {"id": str(uuid.uuid4()), "user_id": user_id, "title": title, "body": body, "outline": None, "updated_at": datetime.now(timezone.utc)}
+            self._prompter[row["id"]] = row
+            return dict(row)
+
+    def save_prompter_text(self, user_id: str, text_id: str, *, touch: bool = True, **fields) -> dict | None:
+        """Change the given fields of the account's own text (None when it is not theirs). `touch`: the text changed (not only its outline)."""
+        unknown = set(fields) - PROMPTER_FIELDS
+        if unknown:
+            raise ValueError(f"unknown prompter fields {sorted(unknown)}")
+        with self._lock:
+            row = self._prompter.get(text_id)
+            if row is None or row["user_id"] != user_id:
+                return None
+            row.update(fields)
+            if touch:
+                row["updated_at"] = datetime.now(timezone.utc)
+            return dict(row)
+
+    def delete_prompter_text(self, user_id: str, text_id: str) -> bool:
+        with self._lock:
+            row = self._prompter.get(text_id)
+            if row is None or row["user_id"] != user_id:
+                return False
+            del self._prompter[text_id]
+            return True
 
     def activity_since(self, first: date) -> list[dict]:
         """One row per person and Israel day from `first` on, with their practice answers and started attempts (view m2_activity)."""
@@ -1569,6 +1615,38 @@ class SupabaseStore:
 
     def delete_lesson(self, lesson_id: int) -> bool:
         return bool(self._request("DELETE", "m2_lessons", {"id": self._eq(lesson_id)}, returning=True))
+
+    # --- the developers' prompter texts ---
+
+    _PROMPTER = "id,user_id,title,body,outline,updated_at"
+
+    @staticmethod
+    def _prompter_row(row: dict) -> dict:
+        return {**row, "updated_at": _when(row.get("updated_at"))}
+
+    def prompter_texts(self, user_id: str) -> list[dict]:
+        rows = self._request("GET", "m2_prompter_texts", {"user_id": self._eq(user_id), "select": self._PROMPTER, "order": "updated_at.desc", "limit": "200"})
+        return [self._prompter_row(r) for r in rows]
+
+    def get_prompter_text(self, user_id: str, text_id: str) -> dict | None:
+        rows = self._request("GET", "m2_prompter_texts", {"id": self._eq(text_id), "user_id": self._eq(user_id), "select": self._PROMPTER})
+        return self._prompter_row(rows[0]) if rows else None
+
+    def add_prompter_text(self, user_id: str, title: str, body: str) -> dict:
+        rows = self._request("POST", "m2_prompter_texts", body={"user_id": user_id, "title": title, "body": body,
+                                                                 "updated_at": datetime.now(timezone.utc).isoformat()}, returning=True)
+        return self._prompter_row(rows[0])
+
+    def save_prompter_text(self, user_id: str, text_id: str, *, touch: bool = True, **fields) -> dict | None:
+        unknown = set(fields) - PROMPTER_FIELDS
+        if unknown:
+            raise ValueError(f"unknown prompter fields {sorted(unknown)}")
+        body = dict(fields, **({"updated_at": datetime.now(timezone.utc).isoformat()} if touch else {}))
+        rows = self._request("PATCH", "m2_prompter_texts", {"id": self._eq(text_id), "user_id": self._eq(user_id)}, body, returning=True)
+        return self._prompter_row(rows[0]) if rows else None
+
+    def delete_prompter_text(self, user_id: str, text_id: str) -> bool:
+        return bool(self._request("DELETE", "m2_prompter_texts", {"id": self._eq(text_id), "user_id": self._eq(user_id)}, returning=True))
 
     ACTIVITY_PAGE = 1000
 
