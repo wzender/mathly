@@ -336,10 +336,11 @@ def test_the_result_links_the_weak_skills_found_without_right_answers(world):
     assert result["lost_skills"] and all(s["id"] and s["name"] for s in result["lost_skills"]) and '"correct"' not in json.dumps(result)
 
 
-def test_an_exercise_test_with_nothing_started_is_refused_and_a_weak_skill_is_remembered(world):
+def test_an_exercise_test_with_nothing_started_draws_all_the_material_and_a_weak_skill_is_remembered(world):
     client, store, lessons = world
-    test = set_test(client, lessons, days=14).json()
-    assert start_ex(client, test["id"]).status_code == 409
+    test = set_test(client, lessons, days=14, questions=6).json()
+    got = start_ex(client, test["id"])
+    assert got.status_code == 200 and len(got.json()["questions"]) == 6             # not refused: drawn like the simulation
     assert start_ex(client, test["id"], 3).status_code == 404
 
 

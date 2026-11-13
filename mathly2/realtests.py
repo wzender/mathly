@@ -318,6 +318,9 @@ def _start(request: Request, user: dict, test: dict, kind: str, scope: str, shar
             return view(request, row)
     drawn = exam.draw(bank, test["lessons"], facts["states"], test["questions"], share=share, weak_before=facts["weak_before"], used=facts["used"],
                       include_unstarted=include_unstarted)
+    if not drawn["questions"] and kind == "exercise_test" and not include_unstarted:     # nothing started yet: all the material, like the simulation
+        drawn = exam.draw(bank, test["lessons"], facts["states"], test["questions"], share=0.0, weak_before=facts["weak_before"],
+                          used=facts["used"], include_unstarted=True)
     if not drawn["questions"]:
         raise HTTPException(409, "עוד לא התחלתם מיומנויות בשיעורים של המבחן. קודם מתרגלים במסלול.")
     row = store.create_attempt(user["id"], kind, scope, now, now + timedelta(minutes=test["minutes"]), drawn["questions"])
