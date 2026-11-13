@@ -19,10 +19,18 @@ function say(text, error = false) {
   if (el) { el.textContent = text; el.classList.toggle("error", error); }
 }
 
+// Ready-made texts the developer can add with one button: their file under static/libretti/ and the saved text's title.
+const READY = [{ file: "libretti/la-boheme.txt", title: "La bohème — ליברטו (איטלקית ואנגלית)" }];
+
+function ready() {
+  const missing = READY.filter(r => !texts.some(t => t.title === r.title));
+  return missing.length ? `<p class="hrow">${missing.map(r => `<button type="button" data-ready="${esc(r.file)}">הוספת ${esc(r.title)}</button>`).join("")}</p>` : "";
+}
+
 function list() {
-  return texts.length ? `<ul class="plain pr-list" id="pr-list">${texts.map(t => `<li data-text="${esc(t.id)}"${current?.id === t.id ? ' aria-current="true"' : ""}>
+  return ready() + (texts.length ? `<ul class="plain pr-list" id="pr-list">${texts.map(t => `<li data-text="${esc(t.id)}"${current?.id === t.id ? ' aria-current="true"' : ""}>
       <button type="button" class="pr-pick grow" data-pick="${esc(t.id)}"><b dir="auto">${esc(t.title)}</b> <span class="muted">${esc(when(t.updated_at))}${t.outline ? " · יש ראשי פרקים" : ""}</span></button></li>`).join("")}</ul>`
-    : `<p class="muted">עוד אין טקסטים שמורים. כתבו או הדביקו טקסט, ושמרו אותו.</p>`;
+    : `<p class="muted">עוד אין טקסטים שמורים. כתבו או הדביקו טקסט, ושמרו אותו.</p>`);
 }
 
 function editor() {
@@ -30,6 +38,13 @@ function editor() {
   return `<form id="pr-form" class="pr-form">
     <label for="pr-title">כותרת (לא חובה)</label><input id="pr-title" maxlength="120" value="${esc(c.title || "")}" dir="auto">
     <label for="pr-body">הטקסט</label><textarea id="pr-body" rows="10" dir="auto" placeholder="אפשר לכתוב Slide 1 — כותרת בתחילת כל שקף, כדי להציג שקף אחר שקף">${esc(c.body || "")}</textarea>
+    <details class="pr-help"><summary>ליברטו (אופרה): שורה אחר שורה, איטלקית ואנגלית, במסך חשוך</summary>
+      <p>כותבים <b dir="ltr">Libretto</b> בשורה הראשונה. אחר כך שורה לכל קטע, למשל:</p>
+      <pre dir="ltr">Libretto
+Act 1 — In the garret
+RODOLFO: [Italian] || [English]
+(stage direction) || (in English)</pre>
+      <p>במסך: רווח, חץ ימינה או לחיצה בצד ימין – השורה הבאה; חץ שמאלה או לחיצה בצד שמאל – חזרה; ↑/↓ בהירות; +/− גודל; Esc יציאה. המקום בליברטו נשמר.</p></details>
     <details ${c.outline ? "open" : ""}><summary>ראשי פרקים</summary>
       <textarea id="pr-outline" rows="6" dir="auto" placeholder="שורות שמתחילות ב־• מוצגות כתזכורות">${esc(c.outline || "")}</textarea></details>
     <p class="hrow pr-actions">
@@ -56,6 +71,11 @@ async function show(which) {
   read();
   const text = which === "outline" ? current.outline : current.body;
   if (!text.trim()) { say(which === "outline" ? "אין ראשי פרקים להצגה" : "אין טקסט להצגה", true); return; }
+  const libretto = await import("./libretto.js");
+  if (which === "body" && libretto.isLibretto(text)) {                 // an opera's words: one line at a time, dim (libretto.js)
+    if (!libretto.open(text)) say("בליברטו אין שורות להצגה", true);
+    return;
+  }
   if (!window.MathlyPrompter) await import("./prompter.js");
   window.MathlyPrompter.open(text);
 }
@@ -78,6 +98,17 @@ async function onClick(event) {
     if (pick) {
       if (dirty() && !confirm("יש שינויים שלא נשמרו. לעבור לטקסט אחר בלי לשמור?")) return;
       current = { ...texts.find(t => t.id === pick) }; forget(); draw(); return;
+    }
+    const file = target.closest("[data-ready]")?.dataset.ready;
+    if (file) {
+      const r = READY.find(x => x.file === file);
+      say("מוסיפים…");
+      const res = await fetch(`/static/${r.file}`);
+      if (!res.ok) throw new Error("לא הצלחנו לקרוא את הטקסט המוכן");
+      const made = await api("/api/prompter/texts", { method: "POST", body: { title: r.title, body: await res.text() } });
+      texts = [made.text, ...texts]; current = { ...made.text }; forget(); draw();
+      say("נוסף. \"הצגה בפרומפטר\" פותח אותו שורה אחר שורה.");
+      return;
     }
     if (target.closest("[data-show]")) return await show(target.closest("[data-show]").dataset.show);
     if (target.closest("#pr-new")) {

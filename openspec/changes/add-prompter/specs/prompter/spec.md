@@ -45,3 +45,17 @@ On request the AI SHALL write a saved text's outline: the same slides with two t
 #### Scenario: AI busy
 - **WHEN** the AI provider is overloaded
 - **THEN** the card says so and the text is unchanged
+
+### Requirement: Libretto
+A text whose first line is "Libretto" (or "ליברטו") SHALL be shown one cue at a time on a black screen: the singer's name, the Italian, and the English under it, in dim amber, with the next cue fainter at the bottom and no buttons or pointer. A cue is a line "NAME: Italian || English"; Act, Atto, Quadro, Scene and Scena lines are headings, and a cue in parentheses is a stage direction.
+
+#### Scenario: Next line
+- **WHEN** a developer shows a libretto and presses Space
+- **THEN** the next cue's Italian is shown above its English
+
+### Requirement: Libretto controls
+Nothing in a libretto SHALL move by itself. Space, →, Page Down, Enter or a tap on the right two thirds SHALL show the next cue, and ←, Page Up, Backspace or a tap on the left third the one before. ↑/↓ SHALL change the brightness, +/− the size, and Esc SHALL close. The place in each libretto, the brightness and the size SHALL be kept in the browser.
+
+#### Scenario: Closed by mistake
+- **WHEN** a developer closes a libretto at its tenth cue and shows it again
+- **THEN** it opens at the tenth cue
