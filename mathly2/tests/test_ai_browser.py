@@ -71,7 +71,7 @@ def test_no_photo_help_button_or_card_when_the_class_has_the_ai_off(browser, ban
     with running(app) as url:
         page = student(browser, url)
         to_home(page)
-        page.wait_for_selector("#continue-path")
+        page.wait_for_selector("#lesson-map")
         assert page.locator("#ai-card, #ai-new").count() == 0
         skill = next(s["id"] for s in bank.skills if s["unit"] == lesson)
         page.goto(url + f"#/skill/{skill}")

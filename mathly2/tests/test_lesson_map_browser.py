@@ -116,3 +116,22 @@ def test_a_link_to_a_round_opens_the_home_under_it(browser, bank):
         page.click(".mx-x")
         page.wait_for_function("!document.querySelector('.round-layer')")
         assert page.errors == []
+
+
+def test_home_is_one_screen_with_every_lesson_a_test_and_an_assignment(browser, bank):
+    lessons = [l["id"] for l in bank.lessons]
+    store = InMemoryStore()
+    klass = store.create_class("setup", "A", lessons=lessons, teacher_email=TEACHER)
+    store.add_member(klass["id"], KID)
+    store.create_test(klass["id"], clock.school_day() + timedelta(days=9), lessons[:2], TEACHER, created_at=clock.now() - timedelta(days=20))
+    store.create_assignment(klass["id"], "דף", clock.school_day() + timedelta(days=3), TEACHER, "pages", pages=["1"])
+    with running(create_app(Settings(), bank=bank, store=store)) as url:
+        page = sign_in(browser, url)
+        to_home(page)
+        page.wait_for_selector("#lesson-map")
+        page.wait_for_selector("#assignments")
+        assert page.locator(".lnode").count() == len(lessons) and page.locator("#nearest-test #today-task").count() == 1
+        assert page.evaluate("document.documentElement.scrollHeight <= window.innerHeight")                    # nothing to scroll
+        no_sideways_scroll(page)
+        shot(page, "home-one-screen")
+        assert page.errors == []

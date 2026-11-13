@@ -95,21 +95,17 @@ def seeded_assignments(bank):
     return app, store, rows
 
 
-def test_home_lists_only_the_new_assignments_with_due_date_and_state_in_words(browser, bank):
+def test_home_shows_the_new_assignments_as_one_button_to_the_submissions_tab(browser, bank):
     app, store, rows = seeded_assignments(bank)
     with running(app) as url:
         page = sign_in(browser, url)
         to_home(page)
         page.wait_for_selector("#assignments")
-        listed = lambda a: page.locator(f"#assignments li[data-assignment='{a['id']}']")
-        assert "לא הוגש" in listed(rows["fresh"]).inner_text() and f"{day(5).day}.{day(5).month}" in listed(rows["fresh"]).inner_text()
-        assert "באיחור" in listed(rows["late"]).inner_text() and "עוד לא נעשה" in listed(rows["exam"]).inner_text()
-        assert page.get_attribute(f"#assignments li[data-assignment='{rows['fresh']['id']}'] a", "href") == f"#/assignment/{rows['fresh']['id']}"
-        assert page.get_attribute(f"#assignments li[data-assignment='{rows['exam']['id']}'] a", "href") == f"#/exam/{rows['test']['id']}/1"   # an exercise test opens the test
-        assert page.locator("#assignments li b").all_inner_texts() == ["מאחר", "מבחן תרגול", "חדש"]                                       # only the new ones, by due date
-        for hidden in ("handed", "graded", "returned"):
-            assert listed(rows[hidden]).count() == 0                                                                                   # the rest are in "הגשות"
+        chip = page.locator("#assignments")
+        assert chip.get_attribute("data-count") == "3" and "3 משימות חדשות" in chip.inner_text() and "⚠" in chip.inner_text()     # only the new ones; one is late
         no_sideways_scroll(page)
+        chip.click()
+        page.wait_for_selector("#submissions")
         assert page.errors == []
 
 

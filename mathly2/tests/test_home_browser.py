@@ -126,7 +126,6 @@ def test_with_no_test_home_shows_the_map_and_a_link_to_the_path(browser, bank):
         to_home(page)
         page.wait_for_selector("#lesson-map")
         assert page.locator("#nearest-test").count() == 0
-        assert page.get_attribute("#continue-path", "href") == "#/subject/math/path"
         assert page.get_attribute("#play", "href") == f"#/round/{lessons[0]}"
         no_sideways_scroll(page)
 
@@ -140,9 +139,11 @@ def test_nine_days_before_the_test_the_button_opens_exercise_test_1_with_the_rea
     with running(app) as url:
         page = sign_in(browser, url)
         to_home(page)
-        assert "בעוד 9 ימים" in page.inner_text("#nearest-test h2")
+        assert "בעוד 9 ימים" in page.inner_text("#nearest-test h2") and "מוכנות 75" in page.inner_text("#nearest-test")      # one strip on home
         assert page.get_attribute("#today-task", "href") == f"#/exam/{test['id']}/1" and "מבחן תרגול 1" in page.inner_text("#today-task")
-        bar = page.locator("#nearest-test [role=progressbar]")
+        page.click("#nearest-test .strip-main")                                                                       # the bar is on the test's card
+        page.wait_for_selector("#test-card")
+        bar = page.locator("#test-card [role=progressbar]")
         assert bar.get_attribute("aria-valuenow") == "75" and "75" in bar.get_attribute("aria-label")
         part = lambda p: page.locator(f".rd-part[data-part={p}]")
         assert part("M").inner_text().split() == ["שליטה", "אחוז", "המיומנויות", "שנשלטו", "75%"]
@@ -176,10 +177,13 @@ def test_the_readiness_bar_shows_every_part_and_loses_the_cap_after_the_simulati
     with running(app) as url:
         page = sign_in(browser, url)
         to_home(page)
+        page.wait_for_selector("#nearest-test")
+        assert page.locator(".required").count() == 0                                                     # the simulation is taken
+        page.click("#nearest-test .strip-main")
+        page.wait_for_selector("#test-card .rd-part")
         vals = {p: page.locator(f".rd-part[data-part={p}] .rd-val").inner_text() for p in "MES"}
         assert vals == {"M": "100%", "E": "70", "S": "90"}
         assert page.locator(".rd-note").count() == 0 and "מוכנים" in page.inner_text(".rd-label")
-        assert page.locator(".required").count() == 0                                                     # the simulation is taken
 
 
 def test_home_shows_only_the_closest_test_and_the_other_tests_are_on_its_card(browser, bank):
@@ -191,7 +195,7 @@ def test_home_shows_only_the_closest_test_and_the_other_tests_are_on_its_card(br
         to_home(page)
         assert page.get_attribute("#nearest-test", "data-test") == str(near["id"]) and page.get_attribute("#today-task", "href") == f"#/exam/{near['id']}/1"
         assert page.locator("#other-tests").count() == 0 and page.locator("#notifications").count() == 0                       # only what is critical
-        page.click("#nearest-test a[href^='#/test/']")
+        page.click("#nearest-test .strip-main")
         page.wait_for_selector("#other-tests")
         assert page.get_attribute("#other-tests a", "href") == f"#/test/{far['id']}"
 
@@ -506,8 +510,15 @@ def test_the_whole_countdown_from_setting_a_test_to_the_review(browser, bank, mo
         task = lambda: student.get_attribute("#today-task", "href")
         reload_home = lambda: (student.goto(url + "#/subject/math"), student.reload(), student.wait_for_selector(".tabs"), student.wait_for_selector("#today-task"))
 
+        def on_card(read):                                                                                      # the readiness is on the test's card
+            student.click("#nearest-test .strip-main")
+            student.wait_for_selector("#test-card .rd-part")
+            got = read()
+            reload_home()
+            return got
+
         assert task() == f"#/skill/{skills[0]}" and "לסיים את המסלול" in student.inner_text("#today-task")        # 12 days: finish the path
-        assert "סימולציה" in student.inner_text(".rd-note")                                                      # the bar says it is capped until the simulation
+        assert "סימולציה" in on_card(lambda: student.inner_text(".rd-note"))                                     # the bar says it is capped until the simulation
         for i in skills:                                                                                        # the path is finished
             store.save_progress(KID_ID, i, started_at="then", mastered_at="then")
         reload_home()
@@ -524,7 +535,8 @@ def test_the_whole_countdown_from_setting_a_test_to_the_review(browser, bank, mo
         reload_home()
         assert task() == f"#/sim/{test['id']}" and student.locator(f".required[data-required='{test['id']}']").count() == 1
         vals = lambda: {p: student.locator(f".rd-part[data-part={p}] .rd-val").inner_text() for p in "MES"}
-        assert vals()["E"] == "100" and vals()["S"] == "—"
+        got = on_card(vals)
+        assert got["E"] == "100" and got["S"] == "—"
         student.click("#today-task")
         answer_in_browser(student, bank, store, "simulation", str(test["id"]), [True, True, True, True, False, False])
         assert student.inner_text("#qz-grade b") == "67"
@@ -533,7 +545,7 @@ def test_the_whole_countdown_from_setting_a_test_to_the_review(browser, bank, mo
         advance(2)                                                                                              # 3 days left: review what failed
         reload_home()
         assert task() in failed and student.locator(".required").count() == 0                                   # a failed skill is today's review
-        assert vals()["S"] == "67" and student.locator(".rd-note").count() == 0           # the cap is gone after the simulation
+        assert on_card(lambda: (vals()["S"], student.locator(".rd-note").count())) == ("67", 0)          # the cap is gone after the simulation
         teacher.reload()
         teacher.click("#teacher-tabs [data-tab='tests']")
         teacher.wait_for_selector(".test-row")
@@ -541,35 +553,6 @@ def test_the_whole_countdown_from_setting_a_test_to_the_review(browser, bank, mo
 
 
 # --- readiness-tooltip: the number explains itself ---
-
-def test_the_readiness_tooltip_opens_on_tap_closes_three_ways_says_the_three_lines_and_fits_a_phone(browser, bank):
-    app, store, klass, lessons = world(bank)
-    add_test(store, klass, lessons, 7)
-    with running(app) as url:
-        page = sign_in(browser, url)
-        to_home(page)
-        page.wait_for_selector("#nearest-test [data-info]")
-        button, tip = page.locator("#nearest-test [data-info]"), page.locator("#nearest-test .tip")
-        assert button.get_attribute("aria-label") == "איך המדד מחושב" and tip.is_hidden()
-        button.click()
-        assert tip.is_visible() and button.get_attribute("aria-expanded") == "true"
-        text = tip.inner_text()
-        assert "שליטה (50%)" in text and "מבחני תרגול (20%)" in text and "סימולציה (30%)" in text and "לא נספר" in text and "לא עובר 80" in text
-        box = tip.bounding_box()
-        assert box["x"] >= 0 and box["x"] + box["width"] <= PHONE["width"]
-        no_sideways_scroll(page)
-        button.click()                                                                       # a second tap closes it (the mouse is moved away: hovering would show it)
-        page.mouse.move(5, 5)
-        assert tip.is_hidden() and button.get_attribute("aria-expanded") == "false"
-        button.click()
-        page.click("#nearest-test h2")                                                       # a tap elsewhere closes it
-        assert tip.is_hidden() and button.get_attribute("aria-expanded") == "false"
-        button.click()
-        page.mouse.move(5, 5)
-        page.keyboard.press("Escape")                                                        # so does Escape
-        assert tip.is_hidden() and button.get_attribute("aria-expanded") == "false"
-        assert not page.errors
-
 
 def test_the_tooltip_is_on_the_tests_card_too_and_opens_on_hover_with_a_mouse(browser, bank):
     app, store, klass, lessons = world(bank)
