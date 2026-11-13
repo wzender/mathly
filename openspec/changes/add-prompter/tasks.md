@@ -14,6 +14,7 @@
 
 - [x] 3.1 Port `static/prompter.js` from mathly1 and add the developer screen's card (`static/prompter_card.js`). Verify with `test_prompter_browser.py` on a phone and a desktop: save, the draft kept across a reload, the AI outline, the full-screen view, delete, and a failed outline.
 - [x] 3.2 Update PRD DEV-2 and move the prompter out of `add-developer-tools`. Verify that `openspec validate add-prompter --strict` and `openspec validate add-developer-tools --strict` pass.
+- [x] 3.3 Add the libretto view (`static/libretto.js`): one cue at a time, Italian above English, dim on black, the place kept. Verify with a browser test.
 
 ## Workflow follow-up
 

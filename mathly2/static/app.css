@@ -658,3 +658,4 @@ ul.students li [dir="ltr"] { overflow-wrap: anywhere; min-width: 0; }
 .pr-list li[aria-current="true"] .pr-pick { background: color-mix(in srgb, var(--accent) 15%, transparent); border-radius: 8px; }
 .pr-form textarea { min-height: 180px; }
 .pr-actions { flex-wrap: wrap; }
+.pr-help pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: 8px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }

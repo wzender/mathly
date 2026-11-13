@@ -84,3 +84,45 @@ def test_a_failed_outline_says_why_and_keeps_the_text(browser):
         page.click("#pr-make-outline")
         page.wait_for_function("document.getElementById('pr-msg').classList.contains('error')")
         assert page.input_value("#pr-body") == "שלום כיתה"
+
+
+LIBRETTO = """Libretto
+# a test text, not the opera's words
+Act 1 — First scene || Act 1 — First scene
+TENORE: Prima riga || First line
+(entra il soprano) || (the soprano enters)
+SOPRANO: Seconda riga || Second line
+"""
+
+
+def test_a_libretto_shows_one_line_at_a_time_italian_above_english_on_a_dim_black_screen(browser):
+    app = create_app(Settings(developers=frozenset({DEV})), store=InMemoryStore(), ai_client=FakeAI())
+    with running(app) as url:
+        page = browser.new_page(viewport={"width": 1024, "height": 768})
+        open_prompter(page, url)
+        page.fill("#pr-body", LIBRETTO)
+        page.click("#pr-show")
+        page.wait_for_selector(".mxl[role=dialog]")
+        assert page.locator(".mxp").count() == 0                                  # not the scrolling prompter
+        assert page.evaluate("getComputedStyle(document.querySelector('.mxl')).backgroundColor") == "rgb(0, 0, 0)"
+        page.wait_for_timeout(300)
+        assert float(page.evaluate("getComputedStyle(document.querySelector('.mxl-cue')).opacity")) <= 0.6   # dim by default
+        assert page.inner_text(".mxl-where") == "1 / 4"
+        page.keyboard.press("Space")
+        assert page.inner_text(".mxl-who") == "TENORE"
+        assert page.inner_text(".mxl-it") == "Prima riga" and page.inner_text(".mxl-en") == "First line"
+        assert page.evaluate("document.querySelector('.mxl-it').getBoundingClientRect().top < document.querySelector('.mxl-en').getBoundingClientRect().top")
+        assert "Seconda" not in page.inner_text(".mxl-next") and "entra" in page.inner_text(".mxl-next")
+        page.mouse.click(900, 400)                                                # a tap on the right: next
+        assert page.get_attribute(".mxl-cue", "class") == "mxl-cue direction"
+        page.mouse.click(100, 400)                                                # a tap on the left: back
+        assert page.inner_text(".mxl-it") == "Prima riga"
+        page.keyboard.press("ArrowDown")                                          # dimmer
+        page.wait_for_timeout(300)
+        assert float(page.evaluate("getComputedStyle(document.querySelector('.mxl-cue')).opacity")) < 0.6
+        page.keyboard.press("Escape")
+        page.keyboard.press("Escape")                                             # the first may only leave full screen
+        page.wait_for_selector(".mxl", state="detached")
+        page.click("#pr-show")                                                    # the place is kept
+        page.wait_for_selector(".mxl")
+        assert page.inner_text(".mxl-it") == "Prima riga"

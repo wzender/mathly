@@ -30,6 +30,13 @@ function editor() {
   return `<form id="pr-form" class="pr-form">
     <label for="pr-title">כותרת (לא חובה)</label><input id="pr-title" maxlength="120" value="${esc(c.title || "")}" dir="auto">
     <label for="pr-body">הטקסט</label><textarea id="pr-body" rows="10" dir="auto" placeholder="אפשר לכתוב Slide 1 — כותרת בתחילת כל שקף, כדי להציג שקף אחר שקף">${esc(c.body || "")}</textarea>
+    <details class="pr-help"><summary>ליברטו (אופרה): שורה אחר שורה, איטלקית ואנגלית, במסך חשוך</summary>
+      <p>כותבים <b dir="ltr">Libretto</b> בשורה הראשונה. אחר כך שורה לכל קטע, למשל:</p>
+      <pre dir="ltr">Libretto
+Act 1 — In the garret
+RODOLFO: [Italian] || [English]
+(stage direction) || (in English)</pre>
+      <p>במסך: רווח, חץ ימינה או לחיצה בצד ימין – השורה הבאה; חץ שמאלה או לחיצה בצד שמאל – חזרה; ↑/↓ בהירות; +/− גודל; Esc יציאה. המקום בליברטו נשמר.</p></details>
     <details ${c.outline ? "open" : ""}><summary>ראשי פרקים</summary>
       <textarea id="pr-outline" rows="6" dir="auto" placeholder="שורות שמתחילות ב־• מוצגות כתזכורות">${esc(c.outline || "")}</textarea></details>
     <p class="hrow pr-actions">
@@ -56,6 +63,11 @@ async function show(which) {
   read();
   const text = which === "outline" ? current.outline : current.body;
   if (!text.trim()) { say(which === "outline" ? "אין ראשי פרקים להצגה" : "אין טקסט להצגה", true); return; }
+  const libretto = await import("./libretto.js");
+  if (which === "body" && libretto.isLibretto(text)) {                 // an opera's words: one line at a time, dim (libretto.js)
+    if (!libretto.open(text)) say("בליברטו אין שורות להצגה", true);
+    return;
+  }
   if (!window.MathlyPrompter) await import("./prompter.js");
   window.MathlyPrompter.open(text);
 }
