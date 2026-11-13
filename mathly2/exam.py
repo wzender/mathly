@@ -12,17 +12,19 @@ def _round(x: float) -> int:
 
 
 def draw(bank, lessons: list[str], states: dict[str, str], n: int, *, share: float = 0.0, weak_before: set[str] | None = None,
-         used: dict[str, int] | None = None, rng: random.Random | None = None) -> dict:
+         used: dict[str, int] | None = None, rng: random.Random | None = None, include_unstarted: bool = False) -> dict:
     """{"questions": [{skill_id, key}], "weak": [skill ids], "practice_first": [skill ids]}.
 
     Covered skills are those of `lessons` that have questions. A skill in the not-started state is never drawn: it is listed in
     `practice_first`. A weak skill is a started covered skill in the learning state, or one in `weak_before` (answered wrong in an
-    earlier exercise test of this real test). Weak skills give one question each, up to `round(n * share)`; the rest comes from the
+    earlier exercise test of this real test). With `include_unstarted`, not-started skills are drawn too (and still listed in `practice_first`). Weak skills give one question each, up to `round(n * share)`; the rest comes from the
     other skills one per skill round after round (least-used questions first, ties random), then from the weak ones again."""
     used, rng, weak_before = used or {}, rng or random.Random(), weak_before or set()
     covered = [s["id"] for s in bank.skills if s["unit"] in lessons and bank.question_keys(s["id"])]
     started = [i for i in covered if states.get(i, "not_started") != "not_started"]
     practice_first = [i for i in covered if i not in started]
+    if include_unstarted:
+        started = covered
     weak = [i for i in started if states.get(i) == "learning" or i in weak_before]
     other = [i for i in started if i not in weak]
     pools = {i: sorted(bank.question_keys(i), key=lambda key: (used.get(key, 0), rng.random())) for i in started}

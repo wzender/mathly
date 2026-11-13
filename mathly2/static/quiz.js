@@ -30,9 +30,10 @@ export async function start(lessonId) {
   location.replace(`#/quiz/${encodeURIComponent(lessonId)}/${encodeURIComponent(data.id)}`);
 }
 
-/** An exercise test (1 or 2) of a real test, or its simulation: the same, with the attempt's id put in the address. */
-export async function startExam(testId, number) {
-  const data = await api(`/api/tests/${encodeURIComponent(testId)}/exercise/${encodeURIComponent(number)}/start`, { method: "POST" });
+/** An exercise test (1 or 2) of a real test, or its simulation: the same, with the attempt's id put in the address.
+ *  `allSkills` (address `#/exam/<test>/<n>/all`) also draws the skills not started yet. */
+export async function startExam(testId, number, allSkills = false) {
+  const data = await api(`/api/tests/${encodeURIComponent(testId)}/exercise/${encodeURIComponent(number)}/start${allSkills ? "?all_skills=true" : ""}`, { method: "POST" });
   location.replace(`#/exam/${encodeURIComponent(testId)}/${encodeURIComponent(number)}/${encodeURIComponent(data.id)}`);
 }
 

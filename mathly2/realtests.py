@@ -307,7 +307,7 @@ def test_card(test_id: int, request: Request, user: dict = Depends(learner)) -> 
 
 # ---- starting an exercise test or the simulation (reading, answering and submitting use the /api/attempts routes) ----
 
-def _start(request: Request, user: dict, test: dict, kind: str, scope: str, share: float) -> dict:
+def _start(request: Request, user: dict, test: dict, kind: str, scope: str, share: float, include_unstarted: bool = False) -> dict:
     """Resume the student's open attempt of this scope, else draw a new one (questions weighted toward weak skills when `share`)."""
     from .quizzes import view
     store, bank, now = request.app.state.store, request.app.state.bank, clock.now()
@@ -316,7 +316,8 @@ def _start(request: Request, user: dict, test: dict, kind: str, scope: str, shar
     for row in mine:
         if attempts.is_open(row) or kind == "simulation":           # open: resume; the simulation is taken once, so its result comes back
             return view(request, row)
-    drawn = exam.draw(bank, test["lessons"], facts["states"], test["questions"], share=share, weak_before=facts["weak_before"], used=facts["used"])
+    drawn = exam.draw(bank, test["lessons"], facts["states"], test["questions"], share=share, weak_before=facts["weak_before"], used=facts["used"],
+                      include_unstarted=include_unstarted)
     if not drawn["questions"]:
         raise HTTPException(409, "עוד לא התחלתם מיומנויות בשיעורים של המבחן. קודם מתרגלים במסלול.")
     row = store.create_attempt(user["id"], kind, scope, now, now + timedelta(minutes=test["minutes"]), drawn["questions"])
@@ -324,11 +325,13 @@ def _start(request: Request, user: dict, test: dict, kind: str, scope: str, shar
 
 
 @router.post("/tests/{test_id}/exercise/{number}/start")
-def start_exercise(test_id: int, number: int, request: Request, user: dict = Depends(learner)) -> dict:
+def start_exercise(test_id: int, number: int, request: Request, user: dict = Depends(learner),
+                   all_skills: bool = Query(False, description="the simulation's material: every skill of the test's lessons, started or not, evenly")) -> dict:
     if number not in exam.EXERCISE_SHARE:
         raise HTTPException(404, "מבחן התרגול לא נמצא")
     test = _student_test(request, user, test_id)
-    return _start(request, user, test, "exercise_test", f"{test_id}:{number}", exam.EXERCISE_SHARE[number])
+    share = 0.0 if all_skills else exam.EXERCISE_SHARE[number]        # all_skills: drawn like the simulation (an even spread, no weak share)
+    return _start(request, user, test, "exercise_test", f"{test_id}:{number}", share, all_skills)
 
 
 @router.post("/tests/{test_id}/simulation/start")

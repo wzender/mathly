@@ -60,6 +60,12 @@ def test_a_not_started_skill_is_never_drawn_and_is_listed_to_practise_first(bank
     assert not set(per_skill(got)) & set(skills[5:])
 
 
+def test_include_unstarted_draws_the_not_started_skills_too(bank):
+    lessons, skills = lessons_and_skills(bank)
+    got = exam.draw(bank, lessons, states(skills), 12, share=0.6, include_unstarted=True, rng=random.Random(11))
+    assert len(got["questions"]) == 12 and got["practice_first"] == skills
+
+
 def test_a_skill_answered_wrong_in_an_earlier_exercise_test_counts_as_weak(bank):
     lessons, skills = lessons_and_skills(bank)
     st = states(skills, mastered=skills)                       # everything mastered: nothing weak by state

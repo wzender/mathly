@@ -343,6 +343,15 @@ def test_an_exercise_test_with_nothing_started_is_refused_and_a_weak_skill_is_re
     assert start_ex(client, test["id"], 3).status_code == 404
 
 
+def test_an_exercise_test_with_all_skills_starts_even_when_nothing_is_started(world):
+    client, store, lessons = world
+    test = set_test(client, lessons, days=14, questions=6).json()
+    got = client.post(f"/api/tests/{test['id']}/exercise/1/start?all_skills=true", headers=auth(KID))
+    assert got.status_code == 200 and len(got.json()["questions"]) == 6
+    bank, lessons_of_test = client.app.state.bank, set(lessons[:2])
+    assert all(bank.skill(q["skill_id"])["unit"] in lessons_of_test for q in store.get_attempt(got.json()["id"])["questions"])
+
+
 def test_the_simulation_is_refused_8_days_before_with_its_opening_date(world):
     client, store, lessons = world
     test = set_test(client, lessons, days=14).json()

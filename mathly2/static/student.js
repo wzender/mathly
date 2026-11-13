@@ -50,10 +50,11 @@ export async function show(me, view) {
         exercise.close();
         const [kind, ...rest] = where.slice(1).split("/").map(decodeURIComponent);
         const [test, second, third] = rest;
-        const attempt = kind === "exam" ? third : second;
+        const allSkills = kind === "exam" && third === "all";                       // "/exam/<test>/<n>/all": not an attempt id
+        const attempt = kind === "exam" ? (allSkills ? undefined : third) : second;
         if (!document.getElementById("path") && !document.getElementById("test-card")) await (await import("./testcard.js")).show(view, test);   // a link or a reload: the test's card first
         if (attempt) await quiz.open(attempt);
-        else if (kind === "exam") await quiz.startExam(test, second);
+        else if (kind === "exam") await quiz.startExam(test, second, allSkills);
         else await quiz.startSimulation(test);
       } else if (where.startsWith("/test/")) {
         exercise.close(); quiz.close();

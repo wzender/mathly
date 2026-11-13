@@ -43,7 +43,9 @@ export async function show(view, id) {
     <section class="card"><h3>התוכנית</h3>${planList(test)}</section>
     <section class="card"><h3>מבחני תרגול</h3>${exercises(test)}
       ${test.practice_first.length ? `<p id="practice-first"><b>כדאי לתרגל קודם:</b> ${test.practice_first.map(s => `<a class="ex-chip link" href="#/skill/${esc(s.id)}">${fmt(s.name)}</a>`).join(" ")}</p>
-        <p class="muted">אלה מיומנויות שעוד לא התחלתם, ולכן אין להן שאלות במבחני התרגול.</p>` : ""}</section>
+        <p class="muted">אלה מיומנויות שעוד לא התחלתם, ולכן אין להן שאלות במבחני התרגול.</p>
+        <p id="all-skills">${test.exercise_tests.map(e => `<a class="button" href="#/exam/${test.id}/${e.number}/all">מבחן תרגול ${e.number} על כל החומר</a>`).join(" ")}</p>
+        <p class="muted">"על כל החומר": שאלות מכל הנושאים של המבחן, כמו במבחן הסימולציה, גם ממיומנויות שעוד לא התחלתם.</p>` : ""}</section>
     <section class="card"><h3>מבחן סימולציה</h3>${simulation(test)}</section>
     ${others.length ? `<section class="card"><h3>מבחנים נוספים</h3><ul class="plain" id="other-tests">${others.map(t => `<li><a href="#/test/${t.id}">${shortDate(t.date)} · ${t.lessons.map(l => fmt(l.name)).join(", ")}</a>
       <span class="muted">${daysText(t.days_left)} · מוכנות ${t.readiness.number}</span></li>`).join("")}</ul></section>` : ""}`);
