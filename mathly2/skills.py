@@ -8,7 +8,7 @@ import logging
 from fastapi import Query, APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from . import attempts, clock, comets, quiz, reads
+from . import attempts, clock, comets, quiz, reads, rounds
 from .access import learner
 from .learning import (DAILY_GOAL, MASTERED, current_round, is_faded, is_mastered, last_counted, next_in_round, next_skill, skill_state, streak,
                        today_progress)
@@ -225,8 +225,9 @@ def lesson_rows(request: Request, user: dict, subject: str = "math") -> tuple[li
     """The student's lessons with their skills' states, whether each is completed (all skills mastered or its quiz passed) and behind the curriculum,
     and its quiz state. Shared by the path and the home. Returns (lessons, the skills in the bank's order, the skill states)."""
     store, here, uid = request.app.state.store, reads.of(request), user["id"]
-    here.prefetch(("progress_of", uid), ("last_answered", uid), ("attempts_of", uid, "quiz"), ("curriculum",))
+    here.prefetch(("progress_of", uid), ("last_answered", uid), ("attempts_of", uid, "quiz"), ("attempts_of", uid, rounds.KIND), ("curriculum",))
     states = {p["skill_id"]: skill_state(p) for p in here.progress_of(uid)}
+    round_facts = rounds.facts(here.attempts_of(uid, rounds.KIND))
     last, today = here.last_answered(uid), clock.school_day()
     quizzes_facts = quiz.facts(store, request.app.state.bank, uid, clock.now(), here)
     shown, dates = visible_lesson_ids(request, user), here.curriculum()
@@ -246,8 +247,27 @@ def lesson_rows(request: Request, user: dict, subject: str = "math") -> tuple[li
         lessons.append({"id": lesson["id"], "name": lesson["name"], "skills": skills, "mastered": mastered,
                         "completed": completed, "passed": passed, "due_date": due.isoformat() if due else None,
                         "behind": bool(due and due < today and not completed),
+                        "stars": rounds.stars([sk["state"] for sk in skills], round_facts.get(lesson["id"], {}).get("best")),
+                        "round_open": bool(round_facts.get(lesson["id"], {}).get("open")),
                         "quiz": {"best": fact.get("best"), "open": bool(fact.get("open")), "due_at": fact["open"]["due_at"].isoformat() if fact.get("open") and fact["open"]["due_at"] else None}})
     return lessons, order, states
+
+
+def lesson_map(request: Request, user: dict, subject: str = "math") -> dict:
+    """The home's map: every lesson with its stars, the next lesson to play, the stars collected and the daily goal with the streak.
+    The next lesson: the one with an open round, else the earliest behind the curriculum, else the first with fewer than three stars."""
+    here, uid, today = reads.of(request), user["id"], clock.school_day()
+    lessons, _, _ = lesson_rows(request, user, subject)
+    playable = [l for l in lessons if l["skills"]]
+    rows = [{"id": l["id"], "name": l["name"], "number": i + 1, "stars": l["stars"], "mastered": l["mastered"], "total": len(l["skills"]),
+             "completed": l["completed"], "behind": l["behind"], "due_date": l["due_date"], "round_open": l["round_open"]}
+            for i, l in enumerate(playable)]
+    behind = sorted((r for r in rows if r["behind"]), key=lambda r: (r["due_date"], r["number"]))
+    nxt = (next((r for r in rows if r["round_open"]), None) or (behind[0] if behind else None)
+           or next((r for r in rows if r["stars"] < 3), None))
+    daily = here.daily_correct(uid)
+    return {"lessons": rows, "next": nxt["id"] if nxt else None, "stars": sum(r["stars"] for r in rows), "max_stars": 3 * len(rows),
+            "perfect": sum(1 for r in rows if r["stars"] == 3), "today": today_progress(daily, today), "streak": streak(daily, today)}
 
 
 def behind_lessons(request: Request, user: dict, subject: str = "math") -> list[dict]:
@@ -275,7 +295,8 @@ def subject_param(request: Request, user: dict, subject: str) -> str:
 def path(request: Request, user: dict = Depends(learner), subject: str = Query("math", max_length=40)) -> dict:
     here, uid = reads.of(request), user["id"]
     subject = subject_param(request, user, subject)
-    here.prefetch(("progress_of", uid), ("last_answered", uid), ("daily_correct", uid), ("recent_skills", uid, RECENT), ("attempts_of", uid, "quiz"), ("curriculum",))
+    here.prefetch(("progress_of", uid), ("last_answered", uid), ("daily_correct", uid), ("recent_skills", uid, RECENT), ("attempts_of", uid, "quiz"),
+                  ("attempts_of", uid, rounds.KIND), ("curriculum",))
     lessons, order, states = lesson_rows(request, user, subject)
     today = clock.school_day()
     daily = here.daily_correct(uid)

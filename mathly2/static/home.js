@@ -1,9 +1,11 @@
-// The student's home for a subject: the nearest test with its readiness and one task for today, the required simulation,
-// the other tests, and a button that continues the path.
+// The student's home for a subject: a game board. The stars collected and a big play button for the next lesson, the map of the lessons
+// (each with its stars: a round finished, 8 of 10, every skill mastered), then the nearest test with its readiness and today's task, the new
+// assignments, the required simulation, and a link to the path for going deeper.
 import { swr } from "./api.js";
 import * as aiSheet from "./ai_sheet.js";
 import { esc, fmt } from "./math.js";
-import { backToSubjects, daysText, forSubject, pathHref, shortDate, tabs } from "./ui.js";
+import { owl } from "./sky.js";
+import { backToSubjects, daysText, forSubject, goalBar, pathHref, shortDate, tabs } from "./ui.js";
 
 /** One part of the readiness number as a row in plain Hebrew: its name, what the number is, and its value ("—" when there is none yet). */
 const part = (id, name, what, value, unit = "") => `<li class="rd-part" data-part="${id}"><span class="grow"><b>${name}</b> <span class="muted">${what}</span></span><b class="rd-val">${value === null ? "—" : value + unit}</b></li>`;
@@ -94,14 +96,6 @@ function assignmentsCard(all) {
 /** A grade as a chip inside the link it belongs to: the bare number, or "-" when there is none. */
 const chip = grade => `<span class="grade-chip${grade === null || grade === undefined ? " none" : ""}" data-best>${grade === null || grade === undefined ? "-" : grade}</span>`;
 
-/** Every lesson behind the curriculum, short: its name, its date and one link to its quiz with the best grade as a chip in it. */
-function behindCard(lessons) {
-  if (!lessons?.length) return "";
-  return `<section class="card" id="behind-card"><h2>שיעורים בפיגור</h2>
-    <ul class="plain behind-list">${lessons.map(l => `<li class="behind-row" data-lesson="${esc(l.id)}"><span class="grow"><b>${fmt(l.name)}</b> <span class="late">⚠ עד ${shortDate(l.due_date)}</span></span>
-      <a class="button with-chip" data-way="quiz" href="#/quiz/${encodeURIComponent(l.id)}">בוחן ${chip(l.quiz.best)}</a></li>`).join("")}</ul></section>`;
-}
-
 /** The nearest test's practice tests that were taken and are below 87 (13 of 15): to take again, inside the test's own card. */
 function weakTests(tests) {
   if (!tests?.length) return "";
@@ -120,18 +114,72 @@ function aiCard(ai) {
       <span class="tag st-${esc(r.state)}">${esc(aiSheet.stateWord(r.state))}</span> ${r.skill ? fmt(r.skill.name) : "תרגיל מצולם"}</button></li>`).join("")}</ul>` : ""}</section>`;
 }
 
+/* ---------- the lessons map: the home's game board ---------- */
+
+const ROW = 128;                                  // px between two lessons on the map
+const XS = [50, 76, 50, 24];                      // each lesson's place across the map, in %: a winding trail
+const starsText = n => "★".repeat(n) + "☆".repeat(3 - n);
+const starsLabel = n => n === 3 ? "שלושה כוכבים, מושלם" : n === 0 ? "אין עדיין כוכבים" : n === 1 ? "כוכב אחד" : "שני כוכבים";
+export const roundHref = id => `#/round/${encodeURIComponent(id)}`;
+
+/** The trail that joins the lessons: one curve per pair, gold after a perfect lesson, blue after a lesson with stars, faint otherwise. */
+function trailSvg(lessons) {
+  const h = lessons.length * ROW;
+  const pt = i => [XS[i % XS.length], i * ROW + 40];
+  const parts = lessons.slice(0, -1).map((l, i) => {
+    const [x0, y0] = pt(i), [x1, y1] = pt(i + 1), m = (y0 + y1) / 2;
+    return `<path class="${l.stars === 3 ? "gold" : l.stars ? "on" : ""}" d="M${x0} ${y0}C${x0} ${m} ${x1} ${m} ${x1} ${y1}"/>`;
+  }).join("");
+  return `<svg class="map-trail" viewBox="0 0 100 ${h}" preserveAspectRatio="none" aria-hidden="true">${parts}</svg>`;
+}
+
+function lessonNode(l, i, next) {
+  const isNext = l.id === next, perfect = l.stars === 3;
+  const marks = [l.behind ? `<span class="lmark late">⏰ עד ${shortDate(l.due_date)}</span>` : "", l.round_open ? `<span class="lmark open">◐ באמצע סבב</span>` : ""].join("");
+  const label = `שיעור ${l.number}: ${plainText(l.name)}. ${starsLabel(l.stars)}${l.behind ? `. בפיגור, היה אמור להסתיים ב־${shortDate(l.due_date)}` : ""}${l.round_open ? ". באמצע סבב" : ""}${isNext ? ". ממשיכים כאן" : ""}`;
+  return `<a class="lnode s${l.stars}${perfect ? " perfect" : ""}${isNext ? " next" : ""}${l.behind ? " behind" : ""}" href="${roundHref(l.id)}" data-lesson="${esc(l.id)}" data-stars="${l.stars}"
+      style="left:${XS[i % XS.length]}%;top:${i * ROW}px" aria-label="${esc(label)}">
+    <span class="disc" aria-hidden="true">${perfect ? "👑" : l.number}${isNext ? `<span class="perch">${owl(34)}</span>` : ""}</span>
+    <span class="lstars" aria-hidden="true">${starsText(l.stars)}</span>
+    <span class="lname">${fmt(l.name)}</span>${marks}</a>`;
+}
+
+const plainText = text => String(text ?? "").replace(/\$/g, "");
+
+/** The header and the play button: the stars collected, the lessons perfected, the daily goal and the streak. */
+function quest(map) {
+  const next = map.lessons.find(l => l.id === map.next);
+  const play = next ? `<a class="play" id="play" href="${roundHref(next.id)}"><span class="play-icon" aria-hidden="true">▶</span>
+      <span class="grow"><small>${next.round_open ? "להמשיך את הסבב" : next.behind ? "להשלים" : next.stars ? "לעוד כוכב" : "השיעור הבא"}</small><b>${fmt(next.name)}</b></span>
+      <span class="lstars" aria-label="${starsLabel(next.stars)}">${starsText(next.stars)}</span></a>`
+    : `<p class="all-perfect" id="play">👑 כל השיעורים מושלמים! אפשר להעמיק במסלול.</p>`;
+  return `<section class="quest" id="quest" aria-label="המסע שלי">
+    <div class="quest-top">${owl(56)}<div class="grow"><h2>המסע שלי</h2>
+      <p class="quest-stats"><span id="stars-count">⭐ ${map.stars} מתוך ${map.max_stars}</span><span id="perfect-count">👑 ${map.perfect} מושלמים</span>${map.streak ? `<span>🔥 ${map.streak}</span>` : ""}</p></div></div>
+    ${goalBar(map.today)}${play}</section>`;
+}
+
+function lessonMap(map) {
+  if (!map.lessons.length) return "";
+  return `<section class="lesson-map" id="lesson-map" aria-label="מפת השיעורים" style="height:${map.lessons.length * ROW}px">${trailSvg(map.lessons)}
+    ${map.lessons.map((l, i) => lessonNode(l, i, map.next)).join("")}</section>
+    <p class="map-key muted">★ סבב הושלם · ★★ 8 מתוך 10 · ★★★ כל המיומנויות נשלטו (שני ימים טובים)</p>`;
+}
+
 export const show = view => swr([forSubject("/api/home"), "/api/assignments", "/api/ai/status"], ([data, assignments, ai]) => draw(view, data, assignments, ai));
+
+let scrolled = false;
 
 function draw(view, data, assignments, ai) {
   const [first] = data.tests;
   const required = data.tests.filter(t => t.simulation.required);
   view(`${tabs("home")}${backToSubjects()}
-    ${first ? nearest(first, data.task, data.next_skill, data.weak_tests) : `<section class="card" id="no-test"><h2>הבית</h2>
-      <p class="muted">המורה עוד לא קבע מבחן. בינתיים אפשר להמשיך במסלול.</p></section>`}
-    ${behindCard(data.behind)}${assignmentsCard(assignments)}${aiCard(ai)}
     ${required.map(t => `<a class="required" href="#/sim/${t.id}" data-required="${t.id}"><b>חובה</b> מבחן סימולציה למבחן ב־${shortDate(t.date)}<span aria-hidden="true">‹</span></a>`).join("")}
-    <p>${data.next_skill ? `<a class="primary-link" id="continue-path" href="#/skill/${encodeURIComponent(data.next_skill.id)}">להמשיך במסלול: ${fmt(data.next_skill.name)} <span aria-hidden="true">‹</span></a>`
-      : `<a class="primary-link" id="continue-path" href="${pathHref()}">למסלול: כל הכוכבים פתוחים לתרגול <span aria-hidden="true">‹</span></a>`}</p>`);
+    ${quest(data.map)}${assignmentsCard(assignments)}${lessonMap(data.map)}
+    ${first ? nearest(first, data.task, data.next_skill, data.weak_tests) : ""}
+    ${aiCard(ai)}
+    <p><a class="primary-link" id="continue-path" href="${pathHref()}">להעמקה: כל המיומנויות, אחת־אחת <span aria-hidden="true">‹</span></a></p>`);
+  if (!scrolled) { scrolled = true; document.querySelector(".lnode.next")?.scrollIntoView?.({ block: "nearest" }); }
   document.getElementById("ai-new")?.addEventListener("click", () => aiSheet.open());
   document.querySelectorAll("[data-ai-open]").forEach(b => b.addEventListener("click", () => aiSheet.open({ id: b.dataset.aiOpen })));
 }

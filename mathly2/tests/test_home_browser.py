@@ -81,8 +81,8 @@ def test_the_card_opens_home_and_each_tab_opens_its_screen(browser, bank):
         page = sign_in(browser, url)
         to_home(page)
         assert page.evaluate("location.hash") == "#/subject/math" and page.locator(".tabs a[aria-current='page']").inner_text() == "בית"
-        assert page.locator(".tabs a").all_inner_texts() == ["בית", "מסלול", "הגשות", "ציונים", "האוסף", "חזרה"]
-        for href, marker in (("#/subject/math/path", ".orbit"), ("#/submissions", "#submissions"), ("#/grades", "#grades"), ("#/collection", "#collection"), ("#/review", "#review"), ("#/subject/math", "#no-test")):
+        assert page.locator(".tabs a").all_inner_texts() == ["בית", "העמקה", "הגשות", "ציונים", "האוסף", "חזרה"]
+        for href, marker in (("#/subject/math/path", ".orbit"), ("#/submissions", "#submissions"), ("#/grades", "#grades"), ("#/collection", "#collection"), ("#/review", "#review"), ("#/subject/math", "#lesson-map")):
             page.click(f".tabs a[href='{href}']")
             page.wait_for_selector(marker)
         assert page.errors == []
@@ -119,14 +119,15 @@ def test_a_link_to_a_skill_still_opens_the_path_with_its_sheet(browser, bank):
 
 # --- 3.2 home ---
 
-def test_with_no_test_home_says_so_and_continues_the_path(browser, bank):
+def test_with_no_test_home_shows_the_map_and_a_link_to_the_path(browser, bank):
     app, _, _, lessons = world(bank)
-    first = covered(bank, lessons)[0]
     with running(app) as url:
         page = sign_in(browser, url)
         to_home(page)
-        assert "עוד לא קבע מבחן" in page.inner_text("#no-test") and page.locator("#nearest-test").count() == 0
-        assert page.get_attribute("#continue-path", "href") == f"#/skill/{first}"
+        page.wait_for_selector("#lesson-map")
+        assert page.locator("#nearest-test").count() == 0
+        assert page.get_attribute("#continue-path", "href") == "#/subject/math/path"
+        assert page.get_attribute("#play", "href") == f"#/round/{lessons[0]}"
         no_sideways_scroll(page)
 
 

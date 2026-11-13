@@ -19,10 +19,11 @@ export const pathHref = () => `#/subject/${encodeURIComponent(subject)}/path`;
 /** A student API address for the current subject ("/api/path" -> "/api/path?subject=math"). */
 export const forSubject = url => `${url}${url.includes("?") ? "&" : "?"}subject=${encodeURIComponent(subject)}`;
 
-/** The student's tab bar, fixed at the bottom of the screen (the CSS places it): home, path, grades, collection. */
+/** The student's tab bar, fixed at the bottom of the screen (the CSS places it): home (the lessons map), the path ("העמקה": going deeper,
+ *  skill by skill), submissions, grades, collection, review. */
 export const tabs = active => `<nav class="tabs" aria-label="תפריט התלמיד">
   <a href="${homeHref()}" ${active === "home" ? 'aria-current="page"' : ""}>בית</a>
-  <a href="${pathHref()}" ${active === "path" ? 'aria-current="page"' : ""}>מסלול</a>
+  <a href="${pathHref()}" ${active === "path" ? 'aria-current="page"' : ""}>העמקה</a>
   <a href="#/submissions" ${active === "submissions" ? 'aria-current="page"' : ""}>הגשות</a>
   <a href="#/grades" ${active === "grades" ? 'aria-current="page"' : ""}>ציונים</a>
   <a href="#/collection" ${active === "collection" ? 'aria-current="page"' : ""}>האוסף</a>

@@ -274,9 +274,10 @@ def home(request: Request, user: dict = Depends(learner), subject: str = Query("
     the required simulation, and the next skill of the path."""
     here, today, uid = reads.of(request), clock.school_day(), user["id"]
     class_ids = [c["id"] for c in here.classes_of_student(user["email"])]
-    from .skills import RECENT, behind_lessons, subject_param
+    from . import rounds
+    from .skills import RECENT, behind_lessons, lesson_map, subject_param
     subject = subject_param(request, user, subject)
-    here.prefetch(("tests_of_classes", class_ids), ("recent_skills", uid, RECENT), ("attempts_of", uid, "quiz"), ("curriculum",), *_student_reads(uid))       # the tests and the student's facts: one wait
+    here.prefetch(("tests_of_classes", class_ids), ("recent_skills", uid, RECENT), ("attempts_of", uid, "quiz"), ("attempts_of", uid, rounds.KIND), ("curriculum",), ("daily_correct", uid), *_student_reads(uid))       # the tests and the student's facts: one wait
     tests = [t for t in here.tests_of_classes(class_ids) if t["date"] >= today and t.get("subject_id", "math") == subject]
     cards = [card(request, user["id"], t, today) for t in tests]
     nearest = cards[0] if cards else None
@@ -285,7 +286,7 @@ def home(request: Request, user: dict = Depends(learner), subject: str = Query("
     return {"tests": cards, "task": {"test_id": nearest["id"], **_with_skill_name(request, nearest["task"])} if nearest else None,
             "required_simulations": [{"test_id": c["id"], "date": c["date"], "days_left": c["days_left"]} for c in cards if c["simulation"]["required"]],
             "next_skill": {"id": next_id, "name": next_skill_row["name"]} if next_skill_row else None,
-            "behind": behind_lessons(request, user, subject), "subject": subject,
+            "behind": behind_lessons(request, user, subject), "subject": subject, "map": lesson_map(request, user, subject),
             "weak_tests": [{"test_id": c["id"], "date": c["date"], "days_left": c["days_left"], "number": e["number"], "best": e["best"], "open": e["open"]}
                            for c in cards[:1] for e in c["exercise_tests"] if e["best"] is not None and e["best"] < attempts.PASS_GRADE]}   # the nearest test's card only
 

@@ -17,42 +17,6 @@ def seed(app, store, bank, lessons):
     store.set_lesson_dates({lessons[0]: today - timedelta(days=2), lessons[1]: today - timedelta(days=9)})
 
 
-def test_the_card_lists_the_lessons_behind_in_date_order_each_with_only_the_quiz_link(browser, bank):
-    app, store, klass, lessons = world(bank)
-    seed(app, store, bank, lessons)
-    q = store.create_attempt(KID_ID, "quiz", lessons[0], clock.now() - timedelta(hours=2), clock.now() - timedelta(hours=1), [])
-    store.save_attempt(q["id"], submitted_at=clock.now() - timedelta(hours=1), grade=80)
-    with running(app) as url:
-        page = sign_in(browser, url)
-        to_home(page)
-        page.wait_for_selector("#behind-card")
-        rows = page.locator("#behind-card li")
-        assert rows.count() == 2 and rows.nth(0).get_attribute("data-lesson") == lessons[1] and rows.nth(1).get_attribute("data-lesson") == lessons[0]     # the earlier date first
-        assert page.locator("#behind-card [data-way=skills]").count() == 0 and page.locator("#behind-card a").count() == 2                                 # only the quiz links
-        mine = page.locator(f"#behind-card li[data-lesson='{lessons[0]}']")
-        link = mine.locator("[data-way=quiz]")
-        assert link.get_attribute("href") == f"#/quiz/{lessons[0]}" and link.inner_text().split() == ["בוחן", "80"]
-        assert link.locator(".grade-chip[data-best]").inner_text() == "80" and rows.nth(0).locator("[data-way=quiz] .grade-chip").inner_text() == "-"   # a chip inside the link
-        chip, button = link.locator(".grade-chip").bounding_box(), link.bounding_box()
-        assert button["x"] <= chip["x"] and chip["x"] + chip["width"] <= button["x"] + button["width"] and chip["y"] >= button["y"]   # attached, not floating beside it
-        assert "13" not in page.inner_text("#behind-card") and "מתוך" not in page.inner_text("#behind-card")                       # nothing explains the pass line
-        assert "⚠" in mine.inner_text() and "מיומנויות" not in page.inner_text("#behind-card")
-        no_sideways_scroll(page)
-        assert not page.errors
-
-
-def test_the_quiz_link_opens_the_quiz(browser, bank):
-    app, store, klass, lessons = world(bank)
-    seed(app, store, bank, lessons)
-    with running(app) as url:
-        page = sign_in(browser, url)
-        to_home(page)
-        page.wait_for_selector("#behind-card")
-        page.click(f"#behind-card li[data-lesson='{lessons[1]}'] [data-way=quiz]")
-        page.wait_for_selector("#qz-q")
-        assert page.evaluate("location.hash").startswith(f"#/quiz/{lessons[1]}/")
-
-
 def test_practice_tests_below_87_are_inside_the_nearest_test_card_with_the_grade_in_the_button(browser, bank):
     app, store, klass, lessons = world(bank)
     test = store.create_test(klass["id"], clock.school_day() + timedelta(days=10), lessons[:1], "t@school.test", created_at=clock.now() - timedelta(days=20))

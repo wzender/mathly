@@ -7,12 +7,14 @@ from . import attempts
 from .attempts import QUIZ_SIZE
 
 
-def draw(bank, lesson_id: str, used: dict[str, int] | None = None, rng: random.Random | None = None, size: int = QUIZ_SIZE) -> list[dict]:
+def draw(bank, lesson_id: str, used: dict[str, int] | None = None, rng: random.Random | None = None, size: int = QUIZ_SIZE,
+         skill_ids: set[str] | None = None) -> list[dict]:
     """[{skill_id, key}] in a shuffled order. Skills without questions are left out. Each skill gets `size // k` questions and the
     remainder goes to distinct skills picked at random, so quotas differ by at most one. Within a skill the least-used questions come
-    first (`used`: how often the student had each question key in earlier quizzes of this lesson), ties in random order."""
+    first (`used`: how often the student had each question key in earlier quizzes of this lesson), ties in random order. `skill_ids`: draw
+    only from these skills of the lesson (a lesson round leaves out the mastered ones)."""
     used, rng = used or {}, rng or random.Random()
-    skills = [s for s in bank.skills if s["unit"] == lesson_id and bank.question_keys(s["id"])]
+    skills = [s for s in bank.skills if s["unit"] == lesson_id and bank.question_keys(s["id"]) and (skill_ids is None or s["id"] in skill_ids)]
     if not skills:
         return []
     quota = {s["id"]: size // len(skills) for s in skills}

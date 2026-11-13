@@ -51,8 +51,8 @@ function lesson(l, next) {
 
 export function pathHtml(path) {
   return `${tabs("path")}${backToSubjects()}
-    <section class="card path-top" id="path"><h2>המסלול שלי</h2>
-    <p class="muted">כל השיעורים פתוחים, בכל סדר. הינשוף מציע איפה להמשיך, אבל אפשר ללחוץ על כל כוכב.</p>${goalBar(path.today, path.streak)}${behindNote(path.behind)}</section>
+    <section class="card path-top" id="path"><h2>העמקה: המסלול המלא</h2>
+    <p class="muted">כאן מתרגלים כל מיומנות לבד, לעומק. את השיעורים משחקים במפה שבבית.</p>${goalBar(path.today, path.streak)}${behindNote(path.behind)}</section>
     <div class="trail">
       <div class="mark start">${owl(44)}<b>התחלה</b></div>
       ${path.lessons.map(l => lesson(l, path.next)).join("")}

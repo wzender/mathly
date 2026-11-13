@@ -9,6 +9,7 @@ import * as home from "./home.js";
 import * as phone from "./phone.js";
 import * as path from "./path.js";
 import * as quiz from "./quiz.js";
+import * as lessonRound from "./round.js";
 import { route as onRoute } from "./router.js";
 
 export async function show(me, view) {
@@ -23,8 +24,15 @@ export async function show(me, view) {
     phone.stopComputer();                                      // a page that was waiting for the phone's photo is left
     const raw = location.hash.replace(/^#/, "");
     const where = raw.startsWith("/") ? raw : "/";          // no address, or the sign-in service's "#access_token=…": the first screen
+    if (!where.startsWith("/round/")) lessonRound.close();
     try {
-      if (where.startsWith("/skill/")) {
+      if (where.startsWith("/round/")) {                                     // a lesson's round over the home (a link or a reload: the home first)
+        exercise.close(); quiz.close();
+        const data = await lessonRound.start(decodeURIComponent(where.slice(7)));
+        setSubject(data.subject_id);
+        if (!document.getElementById("lesson-map")) await home.show(view);
+        await lessonRound.show(data);
+      } else if (where.startsWith("/skill/")) {
         quiz.close();
         lastSkill = decodeURIComponent(where.slice(7));
         if (!document.getElementById("path")) {                            // a link or a reload: the skill's subject's path first, then the sheet

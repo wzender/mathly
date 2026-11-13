@@ -15,7 +15,7 @@ from .access import RoleResolver, learner, permissions_of
 from .auth import DevAuthenticator, SupabaseAuthenticator, current_user
 from .bank import Bank, load_bank
 
-from . import accounts, ai, ai_help, assignments, classes, cleanup, content, progress, quizzes, reads, realtests, review, skills, status, subjects, worksheets, written
+from . import accounts, ai, ai_help, assignments, classes, cleanup, content, progress, quizzes, reads, realtests, review, rounds, skills, status, subjects, worksheets, written
 from .config import Settings, load_settings
 from .cached import CachedStore
 from .store import InMemoryStore, StoreUnavailable, SupabaseStore
@@ -83,6 +83,7 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     app.include_router(classes.curriculum)
     app.include_router(accounts.router)
     app.include_router(skills.router)
+    app.include_router(rounds.router)
     app.include_router(quizzes.router)
     app.include_router(realtests.router)
     app.include_router(progress.router)

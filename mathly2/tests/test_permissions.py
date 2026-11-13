@@ -41,6 +41,9 @@ NEEDS = {   # (method, path) -> permission
     ("PUT", "/api/tests/{test_id}"): "class.teach",
     ("DELETE", "/api/tests/{test_id}"): "class.teach",
     ("GET", "/api/home"): "path.use",
+    ("POST", "/api/lessons/{lesson_id}/round/start"): "path.use",
+    ("GET", "/api/rounds/{round_id}"): "path.use",
+    ("POST", "/api/rounds/{round_id}/answer"): "path.use",
     ("POST", "/api/tests/{test_id}/exercise/{number}/start"): "path.use",
     ("POST", "/api/tests/{test_id}/simulation/start"): "path.use",
     ("GET", "/api/tests/{test_id}"): "path.use",
@@ -131,7 +134,7 @@ def world():
 
 
 def call(client, method, path, email):
-    url = path.format(skill_id="t_ext", lesson_id="t", attempt_id="x", test_id="1", number="1", picture_id="x", assignment_id="1", submission_id="1", request_id="x", class_id="1", subject_id="math", index="0", email="someone@school.test", role="teacher")
+    url = path.format(skill_id="t_ext", lesson_id="t", attempt_id="x", round_id="x", test_id="1", number="1", picture_id="x", assignment_id="1", submission_id="1", request_id="x", class_id="1", subject_id="math", index="0", email="someone@school.test", role="teacher")
     sends = method in ("POST", "PUT", "PATCH")
     return client.request(method, url, headers={"Authorization": f"Bearer dev:{email}"}, json={} if sends else None)
 
