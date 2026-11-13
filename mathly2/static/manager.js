@@ -12,9 +12,15 @@ const tabs = () => `<div class="subtabs" id="mgr-tabs" role="group" aria-label="
     `<button type="button" data-tab="${id}" aria-pressed="${tab === id || (tab === "lesson" && id === "subjects")}">${label}</button>`).join("")}</div>`;
 
 async function render() {
-  if (tab === "edit") subjects = (await api("/api/subjects")).subjects;
-  const body = tab === "classes" ? await classesView() : tab === "students" ? await studentsView() : tab === "curriculum" ? await curriculumView()
-    : tab === "subjects" ? await subjectsTab.view() : tab === "lesson" ? `<div id="lesson-slot"></div>` : editorView();
+  let body, failed = false;
+  try {   // a tab whose data cannot be read says so, instead of the click doing nothing
+    if (tab === "edit") subjects = (await api("/api/subjects")).subjects;
+    body = tab === "classes" ? await classesView() : tab === "students" ? await studentsView() : tab === "curriculum" ? await curriculumView()
+      : tab === "subjects" ? await subjectsTab.view() : tab === "lesson" ? `<div id="lesson-slot"></div>` : editorView();
+  } catch (e) {
+    failed = true;
+    body = `<p class="error" role="alert" id="tab-error">לא הצלחנו לפתוח את הלשונית: ${esc(e.message)}</p>`;
+  }
   draw(`<section id="mgr"><h2>מנהל כיתות</h2>${tabs()}${note()}${body}</section>`);
   document.getElementById("mgr-tabs").addEventListener("click", event => {
     const next = event.target.closest("[data-tab]")?.dataset.tab;
@@ -23,6 +29,7 @@ async function render() {
     draft = null;
     go(next);
   });
+  if (failed) { flash = { message: "", error: "" }; return; }
   if (tab === "classes") wireClasses();
   if (tab === "curriculum") wireCurriculum();
   const openLesson = id => { lessonId = id; go("lesson"); };

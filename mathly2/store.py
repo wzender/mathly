@@ -729,6 +729,17 @@ class InMemoryStore:
             row.update({k: (dict(v) if k == "answers" else v) for k, v in fields.items()})
             return _copy_attempt(row)
 
+    def save_open_answers(self, attempt_id: str, answers: dict) -> dict | None:
+        """Save the answers only while the attempt is still open, in one step; None once it was submitted (the grade stands)."""
+        with self._lock:
+            row = self._attempts.get(str(attempt_id))
+            if row is None:
+                raise KeyError(attempt_id)
+            if row["submitted_at"] is not None:
+                return None
+            row["answers"] = dict(answers)
+            return _copy_attempt(row)
+
     def attempts_of(self, user_id: str, kind: str, scope: str | None = None) -> list[dict]:
         """A student's attempts of one kind (of one scope, when given), oldest first."""
         with self._lock:
@@ -1436,6 +1447,14 @@ class SupabaseStore:
         if not rows:
             raise KeyError(attempt_id)
         return _attempt_row(rows[0])
+
+    def save_open_answers(self, attempt_id: str, answers: dict) -> dict | None:
+        rows = self._request("PATCH", "m2_attempts", {"id": self._eq(attempt_id), "submitted_at": "is.null"}, {"answers": answers}, returning=True)
+        if rows:
+            return _attempt_row(rows[0])
+        if self.get_attempt(attempt_id) is None:
+            raise KeyError(attempt_id)
+        return None
 
     def attempts_of(self, user_id: str, kind: str, scope: str | None = None) -> list[dict]:
         params = {"user_id": self._eq(user_id), "kind": self._eq(kind), "select": "*", "order": "started_at"}

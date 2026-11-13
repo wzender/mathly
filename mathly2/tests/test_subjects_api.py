@@ -36,6 +36,19 @@ def test_a_manager_creates_renames_and_lists_subjects_with_math_fixed_first():
     assert [s["name"] for s in c.app.state.bank.subjects] == ["מתמטיקה", "ביולוגיה"]                 # the served bank knows it at once
 
 
+def test_the_subjects_tab_still_opens_when_the_subjects_tables_cannot_be_read():
+    c, store = world()
+
+    def missing(*_a, **_k):
+        raise RuntimeError("relation m2_subjects does not exist")
+    store.subjects = missing
+    answer = c.get("/api/subjects", headers=auth(MGR))
+    assert answer.status_code == 200
+    body = answer.json()
+    assert [s["id"] for s in body["subjects"]] == ["math"] and body["subjects"][0]["file_lessons"]
+    assert "m2_subjects" in body["content_error"]                                               # the tab shows why
+
+
 def test_subject_names_are_unique_ignoring_case_and_need_a_listed_icon():
     c, _ = world()
     assert c.post("/api/subjects", json={"name": "Science", "icon": "⚗"}, headers=auth(MGR)).status_code == 201

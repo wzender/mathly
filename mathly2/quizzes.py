@@ -114,7 +114,9 @@ def attempt_answer(attempt_id: str, body: AnswerBody, request: Request, user: di
     ref = next((q for q in row["questions"] if q["key"] == body.key), None)
     if ref is None or bank.grade(ref["skill_id"], body.key, body.choice) is None:
         raise HTTPException(422, "תשובה לא חוקית")
-    saved = store.save_attempt(row["id"], answers={**row["answers"], body.key: body.choice})
+    saved = store.save_open_answers(row["id"], {**row["answers"], body.key: body.choice})
+    if saved is None:                                    # submitted between the read and the save: the answer came too late
+        raise HTTPException(409, "הזמן נגמר והבוחן הוגש")
     return {"saved": len(saved["answers"]), "of": len(saved["questions"])}
 
 

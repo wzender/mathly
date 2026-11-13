@@ -238,3 +238,35 @@ def test_thirteen_of_fifteen_passes_twelve_does_not_and_a_pass_stays(world):
     take(client, bank, lesson, [True] * 6 + [False] * 9)                                   # 40: worse
     assert lesson_row()["passed"] is True and lesson_row()["completed"] is True
     assert all(s["state"] == "not_started" for s in lesson_row()["skills"])                # the skills themselves are untouched
+
+
+def test_an_answer_that_lands_while_the_quiz_is_submitted_is_refused_and_the_grade_matches_the_answers(world):
+    """The last answer's save still on its way when the student hands in: it must not slip in after the grading, or the result says
+    "all right" beside a grade that counted it wrong."""
+    from mathly2 import attempts, clock
+    client, store, bank = world
+    attempt = start(client, lesson_id(bank)).json()
+    *first, last = attempt["questions"]
+    for question in first:
+        assert answer(client, attempt, bank, question["key"]).status_code == 200
+    save = store.save_open_answers
+
+    def submitted_meanwhile(attempt_id, answers):     # the submit request wins the race, between the answer's read and its save
+        attempts.submit(store, bank, store.get_attempt(attempt_id), clock.now())
+        return save(attempt_id, answers)
+    store.save_open_answers = submitted_meanwhile
+    assert answer(client, attempt, bank, last["key"]).status_code == 409
+    got = client.get(f"/api/attempts/{attempt['id']}", headers=auth(KID)).json()
+    assert got["right"] == len(first) and got["grade"] == attempts.percent(len(first), len(attempt["questions"]))
+    assert [s["missed"] for s in got["lost_skills"]] == [1]
+
+
+def test_a_submit_keeps_the_answers_it_graded(world):
+    from mathly2 import attempts, clock
+    client, store, bank = world
+    attempt = start(client, lesson_id(bank)).json()
+    assert answer(client, attempt, bank, attempt["questions"][0]["key"]).status_code == 200
+    row = store.get_attempt(attempt["id"])
+    store.save_attempt(attempt["id"], answers={**row["answers"], attempt["questions"][1]["key"]: 0})   # saved after the submit read the row
+    saved = attempts.submit(store, bank, row, clock.now())
+    assert saved["answers"] == row["answers"] and saved["grade"] == attempts.percent(1, len(attempt["questions"]))

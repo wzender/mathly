@@ -103,6 +103,7 @@ async function tick() {
 async function finish(submit) {
   const id = attempt.id;
   try {
+    if (submit) await saving;
     const data = submit ? await api(`/api/attempts/${id}/submit`, { method: "POST" }) : await api(`/api/attempts/${id}`);
     if (data.state === "open") { setTimeout(() => layer && finish(false), 1000); return; }      // a hair early on the device: ask again
     show(data);
@@ -141,13 +142,17 @@ function renderQuestion() {
   window.MathlyBoard?.mount(layer, `quiz:${attempt.id}:${question.key}`, { question: () => q("#qz-q") });
 }
 
+let saving = Promise.resolve();   // the answer saves still on their way to the server
+
 async function choose(button) {
   const question = attempt.questions[at], index = Number(button.dataset.i), before = attempt.answers[question.key];
   attempt.answers[question.key] = index;
   layer.querySelectorAll(".qz-choice").forEach(b => { const on = Number(b.dataset.i) === index; b.classList.toggle("picked", on); b.setAttribute("aria-pressed", String(on)); });
   q(`.qz-dot[data-go="${at}"]`)?.classList.add("done");
+  const id = attempt.id, save = saving.then(() => api(`/api/attempts/${id}/answers`, { method: "PUT", body: { key: question.key, choice: index } }));
+  saving = save.catch(() => {});      // one save at a time, and a submit waits for the last one (else it is graded without it)
   try {
-    await api(`/api/attempts/${attempt.id}/answers`, { method: "PUT", body: { key: question.key, choice: index } });
+    await save;
   } catch (error) {
     if (error instanceof ApiError && error.status === 409) return finish(false);                // time ran out: the server already submitted
     if (before === undefined) delete attempt.answers[question.key]; else attempt.answers[question.key] = before;

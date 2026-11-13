@@ -68,7 +68,7 @@ def settle(store, bank, row: dict, now: datetime) -> dict:
     if not is_overdue(row, now):
         return row
     value, _ = grade(bank, row["questions"], row["answers"])
-    saved = store.save_attempt(row["id"], submitted_at=row["due_at"], timed_out=True, grade=value)
+    saved = store.save_attempt(row["id"], submitted_at=row["due_at"], timed_out=True, grade=value, answers=row["answers"])
     add_wrong_to_review(store, bank, saved, row["due_at"])
     return saved
 
@@ -81,7 +81,7 @@ def submit(store, bank, row: dict, now: datetime) -> dict:
     if is_overdue(row, now):
         return settle(store, bank, row, now)
     value, _ = grade(bank, row["questions"], row["answers"])
-    saved = store.save_attempt(row["id"], submitted_at=now, timed_out=False, grade=value)
+    saved = store.save_attempt(row["id"], submitted_at=now, timed_out=False, grade=value, answers=row["answers"])   # the answers it was graded on
     add_wrong_to_review(store, bank, saved, now)
     return saved
 

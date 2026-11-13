@@ -68,12 +68,18 @@ def list_subjects(request: Request, user: dict = Depends(need("content.manage"))
     """Every subject in order with its lessons: math's file lessons (fixed) and the lessons kept in the database."""
     store, bank = _store(request), request.app.state.bank
     by_subject: dict[str, list[dict]] = {}
-    for row in store.lessons_of():
-        by_subject.setdefault(row["subject_id"], []).append(lesson_summary(row))
-    return {"icons": list(ICONS), "content_error": getattr(request.app.state, "content_error", None),
+    error = getattr(request.app.state, "content_error", None)
+    try:
+        subjects = store.subjects()
+        for row in store.lessons_of():
+            by_subject.setdefault(row["subject_id"], []).append(lesson_summary(row))
+    except Exception as exc:     # the subjects tables cannot be read: show math from the file and say why, rather than fail the tab
+        subjects, by_subject = bank.subjects, {}
+        error = error or str(exc) or type(exc).__name__
+    return {"icons": list(ICONS), "content_error": error,
             "subjects": [{**{k: s[k] for k in ("id", "name", "icon")}, "fixed": s["id"] == "math",
                           "file_lessons": [{"id": u["id"], "name": u["name"]} for u in request.app.state.base_bank.lessons] if s["id"] == "math" else [],
-                          "lessons": by_subject.get(s["id"], [])} for s in store.subjects()],
+                          "lessons": by_subject.get(s["id"], [])} for s in subjects],
             "served_lessons": len(bank.lessons)}
 
 
