@@ -27,7 +27,7 @@ export function parse(text) {
     const en = rest.join("||").trim();
     let it = left.trim(), who = "";
     if (HEADING.test(it)) return { kind: "heading", who: "", it, en };
-    const named = it.match(/^([^:()]{1,40}):\s*(.*)$/);
+    const named = it.match(/^([^:()]{1,80}):\s*(.*)$/);
     if (named && named[1] === named[1].toUpperCase() && /\p{L}/u.test(named[1])) { who = named[1].trim(); it = named[2].trim(); }
     return { kind: /^\(.*\)$/.test(it) ? "direction" : "line", who, it, en };
   }).filter(c => c.it || c.en);

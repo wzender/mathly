@@ -126,3 +126,36 @@ def test_a_libretto_shows_one_line_at_a_time_italian_above_english_on_a_dim_blac
         page.click("#pr-show")                                                    # the place is kept
         page.wait_for_selector(".mxl")
         assert page.inner_text(".mxl-it") == "Prima riga"
+
+
+def test_la_boheme_is_added_with_one_button_and_opens_at_act_one_in_italian_and_english(browser):
+    app = create_app(Settings(developers=frozenset({DEV})), store=InMemoryStore(), ai_client=FakeAI())
+    with running(app) as url:
+        page = browser.new_page(viewport={"width": 1024, "height": 768})
+        open_prompter(page, url)
+        page.click("[data-ready='libretti/la-boheme.txt']")
+        page.wait_for_selector("#pr-list li")
+        assert "La bohème" in page.inner_text("#pr-list") and page.locator("[data-ready]").count() == 0   # added once
+        page.click("#pr-show")
+        page.wait_for_selector(".mxl")
+        assert page.text_content(".mxl-it") == "Quadro Primo — In soffitta" and page.inner_text(".mxl-en") == "Act One — In the garret"
+        page.keyboard.press("Space")
+        assert page.inner_text(".mxl-who") == "MARCELLO" and page.inner_text(".mxl-it").startswith("Questo Mar Rosso")
+        assert page.inner_text(".mxl-en")                                          # every line has its English
+        page.keyboard.press("End")
+        assert page.inner_text(".mxl-who") == "RODOLFO" and page.inner_text(".mxl-it") == "Mimì... Mimì!..."
+
+
+def test_the_la_boheme_file_has_four_acts_and_every_cue_has_a_singer_italian_and_english():
+    from pathlib import Path
+    lines = [l for l in (Path(__file__).parent.parent / "static/libretti/la-boheme.txt").read_text(encoding="utf-8").splitlines()
+             if l.strip() and not l.startswith("#")]
+    assert lines[0] == "Libretto" and len("\n".join(lines)) < 100_000                  # fits one prompter text
+    acts = [l for l in lines if l.startswith("Quadro")]
+    assert len(acts) == 4
+    for line in lines[1:]:
+        if line in acts:
+            continue
+        who, rest = line.split(": ", 1)
+        italian, english = rest.split(" || ")
+        assert who == who.upper() and italian.strip() and english.strip(), line
