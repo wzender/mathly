@@ -114,9 +114,10 @@ export async function show(me, view) {
         <div class="ac-range" role="group" aria-label="טווח">${[7, 30].map(d =>
           `<button type="button" data-range="${d}" aria-pressed="${d === range}">${d} ימים</button>`).join("")}</div></div>
       <div id="ac-body" aria-live="polite"><p class="muted">טוענים…</p></div></section>
+    <section class="card" id="prompter" aria-label="פרומפטר"></section>
     <section class="card" id="developer"><h2>מפתח</h2>
       <p>יש לך את כל ההרשאות: אפשר לפתוח את המסכים של כל התפקידים מהכפתורים למעלה.</p>
-      <p class="muted">כלי המפתח (פרומפטר, מעבדה, עלות ה־AI) יתווספו בשלבים הבאים.</p>
+      <p class="muted">עוד כלי מפתח (מעבדה, עלות ה־AI) יתווספו בשלבים הבאים.</p>
       <p class="muted" dir="ltr">${esc(me.email)}</p></section>`);
   document.getElementById("st-refresh").addEventListener("click", () => { load(); loadActivity(); });
   document.querySelector("#activity .ac-range").addEventListener("click", event => {
@@ -126,5 +127,5 @@ export async function show(me, view) {
     document.querySelectorAll("#activity [data-range]").forEach(b => b.setAttribute("aria-pressed", String(b === button)));
     loadActivity();
   });
-  await Promise.all([load(), loadActivity()]);
+  await Promise.all([load(), loadActivity(), import("./prompter_card.js").then(m => m.mount(document.getElementById("prompter")))]);
 }
