@@ -652,3 +652,13 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .rd-mastered { font-weight: 700; color: var(--sky-gold); }
 .rd-almost { color: var(--sky-aurora); }
 .rd-result .ex-missed { text-align: start; }
+
+/* The developer's prompter card (prompter_card.js); the full-screen prompter brings its own styles (prompter.js). */
+.pr-layout { display: grid; gap: 12px; }
+@media (min-width: 900px) { .pr-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: start; } }
+.pr-list li { padding: 0; }
+.pr-pick { width: 100%; text-align: start; border: 0; background: none; padding: 10px 6px; min-height: 44px; }
+.pr-list li[aria-current="true"] .pr-pick { background: color-mix(in srgb, var(--accent) 15%, transparent); border-radius: 8px; }
+.pr-form textarea { min-height: 180px; }
+.pr-actions { flex-wrap: wrap; }
+.pr-help pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: 8px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }

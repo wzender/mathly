@@ -1,0 +1,1028 @@
+Libretto
+# La bohème — Giacomo Puccini. Libretto: Luigi Illica and Giuseppe Giacosa (1896, public domain); Italian text from opera-guide.ch.
+# English: a new line-by-line translation for this app. One line is one cue: SINGER: Italian || English.
+# Stage directions are left out.
+
+Quadro Primo — In soffitta || Act One — In the garret
+MARCELLO: Questo Mar Rosso – mi ammollisce e assidera / come se addosso – mi piovesse in stille. || This Red Sea soaks me and freezes me / as if it were dripping right onto me.
+MARCELLO: Per vendicarmi, affogo un Faraon! || For revenge, I'll drown a Pharaoh!
+MARCELLO: Che fai? || What are you doing?
+RODOLFO: Nei cieli bigi / guardo fumar dai mille || In the grey skies / I watch Paris smoking
+RODOLFO: comignoli Parigi || from a thousand chimneys
+RODOLFO: e penso a quel poltrone / di un vecchio caminetto ingannatore || and I think of that idler, / that lying old stove of ours,
+RODOLFO: che vive in ozio come un gran signore. || who lives in leisure like a great lord.
+MARCELLO: Le sue rendite oneste / da un pezzo non riceve. || It's been ages / since he got his honest income.
+RODOLFO: Quelle sciocche foreste / che fan sotto la neve? || What are those silly forests / doing under the snow?
+MARCELLO: Rodolfo, io voglio dirti un mio pensier profondo: / ho un freddo cane. || Rodolfo, I want to share a deep thought: / I'm freezing like a dog.
+RODOLFO: Ed io, Marcel, non ti nascondo / che non credo al sudore della fronte. || And I, Marcello, won't hide from you / that I don't believe in honest sweat.
+MARCELLO: Ho diacciate / le dita quasi ancora le tenessi immollate || My fingers are frozen, / as if I still had them soaking
+MARCELLO: giù in quella gran ghiacciaia che è il cuore di Musetta... || down in that great icebox, Musetta's heart...
+RODOLFO: L'amore è un caminetto che sciupa troppo... || Love is a stove that burns through too much fuel...
+MARCELLO: ... e in fretta! || ... and too fast!
+RODOLFO: ... dove l'uomo è fascina... || ... where the man is the kindling...
+MARCELLO: ... e la donna è l'alare... || ... and the woman the andiron...
+RODOLFO: ... l'una brucia in un soffio... || ... one burns up in a flash...
+MARCELLO: ... e l'altro sta a guardare. || ... and the other just stands and watches.
+RODOLFO: Ma intanto qui si gela... || Meanwhile, we're freezing in here...
+MARCELLO: ... e si muore d'inedia!... || ... and dying of hunger!...
+RODOLFO: Fuoco ci vuole... || We need a fire...
+MARCELLO: Aspetta... sacrifichiam la sedia! || Wait... let's sacrifice the chair!
+RODOLFO: Eureka! || Eureka!
+MARCELLO: Trovasti? || Found something?
+RODOLFO: Sì. Aguzza / l'ingegno. L'idea vampi in fiamma. || Yes. Sharpen / your wits. Let the idea burst into flame.
+MARCELLO: Bruciamo il Mar Rosso? || Shall we burn the Red Sea?
+RODOLFO: No. Puzza / la tela dipinta. Il mio dramma, || No. Painted canvas / stinks. My drama,
+RODOLFO: I'ardente mio dramma ci scaldi. || my fiery drama will warm us.
+MARCELLO: Vuoi leggerlo forse? Mi geli. || You mean to read it? You're chilling me.
+RODOLFO: No, in cener la carta si sfaldi / e l'estro rivoli ai suoi cieli. || No, let the paper crumble to ash / and inspiration fly back to its heavens.
+RODOLFO: Al secol gran danno minaccia... / E Roma in periglio... || A great loss threatens the age... / Rome is in peril...
+MARCELLO: Gran cor! || What a noble heart!
+RODOLFO: A te l'atto primo. || Here's Act One for you.
+MARCELLO: Qua. || Give it here.
+RODOLFO: Straccia. || Tear it.
+MARCELLO: Accendi. || Light it.
+RODOLFO, MARCELLO: Che lieto baglior! || What a cheerful blaze!
+COLLINE: Già dell'Apocalisse appariscono i segni. / In giorno di vigilia non si accettano pegni! || Already the signs of the Apocalypse appear: / no pawning on Christmas Eve!
+COLLINE: Una fiammata! || A blaze!
+RODOLFO: Zitto, si dà il mio dramma. || Quiet, my drama is playing.
+MARCELLO: ... al fuoco. || ... to the fire.
+COLLINE: Lo trovo scintillante. || I find it sparkling.
+RODOLFO: Vivo. || Lively.
+COLLINE: Ma dura poco. || But it doesn't last.
+RODOLFO: La brevità, gran pregio. || Brevity — a great virtue.
+COLLINE: Autore, a me la sedia. || Author, give me the chair.
+MARCELLO: Presto. Questi intermezzi fan morire d'inedia. || Hurry. These intervals are starving us.
+RODOLFO: Atto secondo. || Act Two.
+MARCELLO: Non far sussurro. || Not a whisper.
+COLLINE: Pensier profondo! || A deep thought!
+MARCELLO: Giusto color! || Just the right colour!
+RODOLFO: In quell'azzurro – guizzo languente / Sfuma un'ardente – scena d'amor. || In that blue, a dying flicker — / a burning love scene fades away.
+COLLINE: Scoppietta un foglio. || A page crackles.
+MARCELLO: Là c'eran baci! || There were kisses there!
+RODOLFO: Tre atti or voglio – d'un colpo udir. || Now I want to hear / three acts at once.
+COLLINE: Tal degli audaci – I'idea s'integra. || Thus a bold idea / comes to its fulfilment.
+TUTTI: Bello in allegra – vampa svanir. || Lovely to vanish / in a merry blaze.
+MARCELLO: Oh! Dio... già s'abbassa la fiamma. || Oh, God... the flame is dying down already.
+COLLINE: Che vano, che fragile dramma! || What a hollow, flimsy drama!
+MARCELLO: Già scricchiola, increspasi, muore. || It's crackling, curling up, dying.
+COLLINE, MARCELLO: Abbasso, abbasso l'autore. || Down with the author, down with him!
+RODOLFO: Legna! || Firewood!
+MARCELLO: Sigari! || Cigars!
+COLLINE: Bordò! || Bordeaux!
+TUTTI: Le dovizie d'una fiera / il destin ci destinò. || Fate has sent us / the riches of a fair!
+SCHAUNARD: La Banca di Francia / per voi si sbilancia. || The Bank of France / is going broke for you.
+COLLINE: Raccatta, raccatta! || Pick them up, pick them up!
+MARCELLO: Son pezzi di latta!... || They're bits of tin!...
+SCHAUNARD: Sei sordo?... Sei lippo? / Quest'uomo chi è? || Are you deaf?... Blind? / Who's this man?
+RODOLFO: Luigi Filippo! / M'inchino al mio Re! || Louis-Philippe! / I bow to my King!
+TUTTI: Sta Luigi Filippo ai nostri pie' || Louis-Philippe lies at our feet!
+SCHAUNARD: Or vi dirò: quest'oro, o meglio argento, / ha la sua brava storia... || Now I'll tell you: this gold — or rather, silver — / has quite a story...
+MARCELLO: Riscaldiamo / il camino! || Let's warm up / the stove!
+COLLINE: Tanto freddo ha sofferto. || It's suffered so much cold.
+SCHAUNARD: Un inglese... un signor... lord o milord / che sia, voleva un musicista... || An Englishman... a gentleman... a lord or milord, / whatever — wanted a musician...
+MARCELLO: Via! / Prepariamo la tavola! || Come on! / Let's set the table!
+SCHAUNARD: Io? volo! || Me? I'll fly there!
+RODOLFO: L'esca dov'è? || Where's the tinder?
+COLLINE: Là. || There.
+MARCELLO: Qua. || Here.
+SCHAUNARD: E mi presento. / M'accetta: gli domando... || So I present myself. / He takes me on. I ask him...
+COLLINE: Arrosto freddo! || Cold roast!
+MARCELLO: Pasticcio dolce! || Sweet pastry!
+SCHAUNARD: A quando le lezioni?... / Risponde: «Incominciam... || When do lessons start?... / He answers: "We begin...
+SCHAUNARD: Guardare!» (e un pappagallo m'addita al primo piano), / poi soggiunge: «Voi suonare || Look!" (and points to a parrot on the first floor), / then adds: "You play
+SCHAUNARD: finché quello morire!». || until that one die!"
+RODOLFO: Fulgida folgori la sala splendida. || Let the splendid hall gleam with dazzling light!
+MARCELLO: Or le candele! || Now the candles!
+SCHAUNARD: E fu così: / Suonai tre lunghi dì... || And so it went: / I played for three long days...
+SCHAUNARD: Allora usai l'incanto / di mia presenza bella... || Then I used the charm / of my handsome presence...
+SCHAUNARD: Affascinai l'ancella... / Gli propinai prezzemolo!... || I bewitched the maid... / I fed it parsley!...
+SCHAUNARD: Lorito allargò l'ali, / Lorito il becco aprì, || Polly spread his wings, / Polly opened his beak,
+SCHAUNARD: da Socrate morì! || and died like Socrates!
+COLLINE: Pasticcio dolce! || Sweet pastry!
+MARCELLO: Mangiar senza tovaglia? || Eat without a tablecloth?
+RODOLFO: Un'idea... || An idea...
+COLLINE, MARCELLO: Il «Costituzional!» || The "Constitutionnel"!
+RODOLFO: Ottima carta... / Si mangia e si divora un'appendice ! || Excellent paper... / You eat — and devour a serial!
+COLLINE: Chi?!... || Who?!...
+SCHAUNARD: Che il diavolo vi porti tutti quanti! || The devil take the lot of you!
+SCHAUNARD: Ed or che fate? || And now what are you doing?
+SCHAUNARD: No! Queste cibarie / sono la salmeria || No! These provisions / are our stores
+SCHAUNARD: pei dì futuri / tenebrosi e oscuri. || for the days ahead, / so dark and gloomy.
+SCHAUNARD: Pranzare in casa / il dì della vigilia || Dine at home / on Christmas Eve,
+SCHAUNARD: mentre il Quartier Latino le sue vie / addobba di salsicce e leccornie? || while the Latin Quarter decks its streets / with sausages and treats?
+SCHAUNARD: Quando un olezzo di frittelle imbalsama / le vecchie strade? || When the smell of fritters perfumes / the old streets?
+MARCELLO, RODOLFO, COLLINE: La vigilia di Natal! || Christmas Eve!
+SCHAUNARD: Là le ragazze cantano contente / ed han per eco ognuna uno studente! || There the girls sing happily, / and each has a student for an echo!
+SCHAUNARD: Un po' di religione, o miei signori: / si beva in casa, ma si pranzi fuori. || A little piety, my good sirs: / let's drink at home, but dine out.
+BENOÎT: Si può? || May I?
+MARCELLO: Chi è là? || Who's there?
+BENOÎT: Benoît! || Benoît!
+MARCELLO: Il padrone di casa! || The landlord!
+SCHAUNARD: Uscio sul muso. || Shut the door in his face.
+COLLINE: Non c'è nessuno. || There's nobody here.
+SCHAUNARD: È chiuso. || It's closed.
+BENOÎT: Una parola. || Just one word.
+SCHAUNARD: Sola! || Only one!
+BENOÎT: Affitto ! || The rent!
+MARCELLO: Olà ! / Date una sedia. || Hey there! / Give him a chair.
+RODOLFO: Presto. || Quickly.
+BENOÎT: Non occorre. Vorrei... || No need. I'd like...
+SCHAUNARD: Segga. || Sit down.
+MARCELLO: Vuol bere? || Will you have a drink?
+BENOÎT: Grazie. || Thank you.
+RODOLFO, COLLINE: Tocchiamo. || Cheers.
+BENOÎT: Questo / è l'ultimo trimestre . || This / is the last quarter's rent.
+MARCELLO: Ne ho piacere. || I'm glad to hear it.
+BENOÎT: E quindi... || And so...
+SCHAUNARD: Ancora un sorso. || Another sip.
+BENOÎT: Grazie. || Thank you.
+I QUATTRO: Alla sua salute! || To your health!
+BENOÎT: A lei ne vengo / perché il trimestre scorso || I've come to you / because last quarter
+BENOÎT: mi promise... || you promised me...
+MARCELLO: Promisi ed or mantengo. || I promised, and now I keep my word.
+RODOLFO: Che fai?... || What are you doing?...
+SCHAUNARD: Sei pazzo? || Are you mad?
+MARCELLO: Ha visto? Or via, / resti un momento in nostra compagnia. || You see? Now, come, / stay a while in our company.
+MARCELLO: Dica: quant'anni ha, / caro signor Benoît? || Tell us: how old are you, / dear Monsieur Benoît?
+BENOÎT: Gli anni?... Per carità! || My age?... Oh, please!
+RODOLFO: Su e giù la nostra età. || Our age, more or less.
+BENOÎT: Di più, molto di più. || More, much more.
+COLLINE: Ha detto su e giù. || He said more or less.
+MARCELLO: L'altra sera al Mabil... || The other night at the Mabille...
+BENOÎT: Eh?! || Eh?!
+MARCELLO: L'hanno colto / in peccato d'amore. || They caught him / in the act of love.
+BENOÎT: Io? || Me?
+MARCELLO: Neghi. || Deny it.
+BENOÎT: Un caso. || A fluke.
+MARCELLO: Bella donna! || A lovely woman!
+BENOÎT: Ah! molto. || Ah! Very.
+SCHAUNARD: Briccone ! || You rascal!
+COLLINE: Seduttore ! || Seducer!
+RODOLFO: Briccone ! || You rascal!
+MARCELLO: Una quercia!... un cannone! il crin ricciuto / e fulvo. || An oak!... A cannon! Curly hair, / and red.
+RODOLFO: L'uomo ha buon gusto. || The man has good taste.
+MARCELLO: Ei gongolava arzillo, pettoruto. || He was gloating, so spry, chest puffed out.
+BENOÎT: Son vecchio, ma robusto. || I'm old, but sturdy.
+COLLINE, SCHAUNARD, RODOLFO: Ei gongolava arzuto e pettorillo. || He was gloating, so puffy, chest spried out.
+MARCELLO: E a lui cedea la femminil virtù. || And feminine virtue yielded to him.
+BENOÎT: Timido in gioventù, / ora me ne ripago... È uno svago || Shy in my youth, / now I make up for it... It's a pastime,
+BENOÎT: qualche donnetta allegra... e... un po'... || a merry little woman... and... a bit...
+BENOÎT: Non dico una balena, / o un mappamondo, || I don't mean a whale, / or a globe of the world,
+BENOÎT: o un Viso tondo / da luna piena, || or a round face / like a full moon,
+BENOÎT: ma magra, proprio magra, no e poi no! / Le donne magre sono grattacapi || but skinny, really skinny — no, no, never! / Skinny women are a headache,
+BENOÎT: e spesso... sopraccapi... / e son piene di doglie, || and often... a heartache... / and they're full of aches,
+BENOÎT: per esempio... mia moglie... || for example... my wife...
+MARCELLO: Quest'uomo ha moglie / e sconce voglie || This man has a wife / and filthy lusts
+MARCELLO: ha nel cor! || in his heart!
+GLI ALTRI: Orror ! || Horrors!
+RODOLFO: E ammorba, e appesta / la nostra onesta || And he poisons and pollutes / our honest
+RODOLFO: magion! || home!
+GLI ALTRI: Fuor! || Out!
+MARCELLO: Si abbruci dello zucchero. || Burn some sugar!
+COLLINE: Si discacci il reprobo. || Throw out the sinner!
+SCHAUNARD: È la morale offesa che vi scaccia! || Outraged morality drives you out!
+BENOÎT: Io di... || I say...
+RODOLFO, COLLINE: Silenzio! || Silence!
+BENOÎT: Miei signori... || Gentlemen...
+TUTTI: Silenzio ! . . . || Silence!...
+TUTTI: Via signore! Via di qua! || Out, sir! Out of here!
+TUTTI: ... e buona sera a Vostra signoria. || ... and a very good evening to Your Lordship.
+TUTTI: Ah! ah! ah! ah! || Ha! ha! ha! ha!
+MARCELLO: Ho pagato il trimestre. || I've paid the quarter's rent.
+SCHAUNARD: Al Quartiere Latino ci attende Momus. || In the Latin Quarter, Momus awaits us.
+MARCELLO: Viva chi spende! || Long live the one who pays!
+SCHAUNARD: Dividiamo il bottino! || Let's split the loot!
+RODOLFO, SCHAUNARD: Dividiam! || Let's split it!
+MARCELLO: Là ci sono beltà scese dal cielo. / Or che sei ricco, bada alla decenza! || There are beauties sent down from heaven. / Now that you're rich, mind your manners!
+MARCELLO: Orso, ravviati il pelo. || Bear, tidy up your fur.
+COLLINE: Farò la conoscenza / la prima volta d'un barbitonsore. || For the first time, I'll make / the acquaintance of a barber.
+COLLINE: Guidatemi al ridicolo / oltraggio d'un rasoio. || Lead me to the ridiculous / outrage of a razor.
+MARCELLO, SCHAUNARD, COLLINE: Andiamo. || Let's go.
+RODOLFO: Io resto / per terminar l'articolo || I'm staying / to finish the article
+RODOLFO: di fondo del Castoro. || for the front page of The Beaver.
+MARCELLO: Fa presto. || Be quick.
+RODOLFO: Cinque minuti. Conosco il mestiere. || Five minutes. I know the trade.
+COLLINE: Ti aspetterem dabbasso dal portiere. || We'll wait for you downstairs by the porter.
+MARCELLO: Se tardi, udrai che coro! || If you're late, you'll hear a chorus!
+RODOLFO: Cinque minuti. || Five minutes.
+SCHAUNARD: Taglia corta la coda al tuo Castoro! || Cut your Beaver's tail short!
+MARCELLO: Occhio alla scala. Tienti / alla ringhiera. || Mind the stairs. Hold on / to the railing.
+RODOLFO: Adagio! || Careful!
+COLLINE: È buio pesto. || It's pitch dark.
+SCHAUNARD: Maledetto portier! || Damn porter!
+COLLINE: Accidenti! || Blast it!
+RODOLFO: Colline, sei morto? || Colline, are you dead?
+COLLINE: Non ancor! || Not yet!
+MARCELLO: Vien presto! || Come quickly!
+RODOLFO: Non sono in vena. || I'm not in the mood.
+RODOLFO: Chi è là? || Who's there?
+MIMÌ: Scusi. || Excuse me.
+RODOLFO: Una donna! || A woman!
+MIMÌ: Di grazia, mi si è spento il lume. || Please — my candle has gone out.
+RODOLFO: Ecco. || Here.
+MIMÌ: Vorrebbe... ? || Would you...?
+RODOLFO: S'accomodi un momento. || Come in and sit a moment.
+MIMÌ: Non occorre. || There's no need.
+RODOLFO: La prego, entri. || Please, come in.
+RODOLFO: Si sente male? || Are you unwell?
+MIMÌ: No... nulla. || No... it's nothing.
+RODOLFO: Impallidisce ! || You're turning pale!
+MIMÌ: Il respir... Quelle scale... || My breath... those stairs...
+RODOLFO: Ed ora come faccio?... || And now what do I do?...
+RODOLFO: Così ! || Like this!
+RODOLFO: Che viso da malata! || What a sickly face!
+RODOLFO: Si sente meglio? || Do you feel better?
+MIMÌ: Sì. || Yes.
+RODOLFO: Qui c'è tanto freddo. Segga vicino al fuoco. || It's so cold in here. Sit by the fire.
+RODOLFO: Aspetti.. un po' di vino... || Wait... a little wine...
+MIMÌ: Grazie... || Thank you...
+RODOLFO: A lei. || Here you are.
+MIMÌ: Poco, poco. || Just a little.
+RODOLFO: Così? || Like this?
+MIMÌ: Grazie. || Thank you.
+RODOLFO: (Che bella bambina!) || (What a lovely girl!)
+MIMÌ: Ora permetta / che accenda il lume. È tutto passato. || Now allow me / to light my candle. It's all passed.
+RODOLFO: Tanta fretta? || In such a hurry?
+MIMÌ: Sì. || Yes.
+MIMÌ: Grazie. Buona sera. || Thank you. Good evening.
+RODOLFO: Buona sera. || Good evening.
+MIMÌ: Oh! sventata! / La chiave della stanza || Oh! How careless! / The key to my room —
+MIMÌ: dove l'ho lasciata? || where did I leave it?
+RODOLFO: Non stia sull'uscio; il lume vacilla al vento. || Don't stand in the doorway; the draught makes the candle flicker.
+MIMÌ: Oh Dio! Torni ad accenderlo. || Oh God! Light it again.
+RODOLFO: Oh Dio!... Anche il mio s'è spento! || Oh God!... Mine has gone out too!
+MIMÌ: E la chiave ove sarà?... || And where can the key be?...
+RODOLFO: Buio pesto! || Pitch dark!
+MIMÌ: Disgraziata! || How unlucky!
+RODOLFO: Ove sarà? || Where can it be?
+MIMÌ: Importuna è la vicina... || What a nuisance your neighbour is...
+RODOLFO: Ma le pare?... || Not at all!...
+MIMÌ: Importuna è la vicina... || What a nuisance your neighbour is...
+RODOLFO: Cosa dice, ma le pare! || What are you saying? Not at all!
+MIMÌ: Cerchi. || Look for it.
+RODOLFO: Cerco. || I'm looking.
+MIMÌ: Ove sarà?... || Where can it be?...
+RODOLFO: Ah ! || Ah!
+MIMÌ: L'ha trovata?... || Have you found it?...
+RODOLFO: No ! || No!
+MIMÌ: Mi parve... || I thought...
+RODOLFO: In verità... || Honestly...
+MIMÌ: Cerca? || Are you looking?
+RODOLFO: Cerco! || I'm looking!
+MIMÌ: Ah! || Ah!
+RODOLFO: Che gelida manina! / Se la lasci riscaldar. || Your tiny hand is frozen! / Let me warm it for you.
+RODOLFO: Cercar che giova? Al buio non si trova. / Ma per fortuna è una notte di luna, || What's the use of searching? We'll never find it in the dark. / But luckily there's a moon tonight,
+RODOLFO: e qui la luna l'abbiamo vicina. / Aspetti, signorina, || and here the moon is our neighbour. / Wait, signorina,
+RODOLFO: le dirò con due parole / chi son, che faccio e come vivo. Vuole? || and I'll tell you in a couple of words / who I am, what I do, how I live. Shall I?
+RODOLFO: Chi son? Sono un poeta. / Che cosa faccio? Scrivo. || Who am I? I'm a poet. / What do I do? I write.
+RODOLFO: E come vivo? Vivo. / In povertà mia lieta || And how do I live? I live. / In my happy poverty
+RODOLFO: scialo da gran signore / rime ed inni d'amore. || I squander like a lord / rhymes and hymns of love.
+RODOLFO: Per sogni, per chimere / e per castelli in aria || In dreams, in fancies, / and in castles in the air,
+RODOLFO: l'anima ho milionaria. / Talor dal mio forziere || I have a millionaire's soul. / Sometimes from my strongbox
+RODOLFO: ruban tutti i gioielli / due ladri: gli occhi belli. || two thieves steal every jewel: / a pair of lovely eyes.
+RODOLFO: V'entrar con voi pur ora / ed i miei sogni usati || They came in with you just now, / and my usual dreams,
+RODOLFO: e i bei sogni miei / tosto son dileguati. || my lovely dreams, / vanished at once.
+RODOLFO: Ma il furto non m'accora, / poiché vi ha preso stanza || But the theft doesn't grieve me, / for in their place
+RODOLFO: la dolce speranza! / Or che mi conoscete, || sweet hope has moved in! / Now that you know me,
+RODOLFO: parlate voi. Chi siete? / Via piaccia dir? || it's your turn to speak. Who are you? / Will you tell me?
+MIMÌ: Sì. / Mi chiamano Mimì, || Yes. / They call me Mimì,
+MIMÌ: ma il mio nome è Lucia. / La storia mia || but my name is Lucia. / My story
+MIMÌ: è breve. A tela o a seta / ricamo in casa e fuori... || is short. On linen or silk / I embroider, at home and out...
+MIMÌ: Son tranquilla e lieta / ed è mio svago || I'm calm and content, / and my pastime is
+MIMÌ: far gigli e rose. / Mi piaccion quelle cose || making lilies and roses. / I love those things
+MIMÌ: che han sì dolce malìa, / che parlano d'amor, di primavere, || that have such sweet magic, / that speak of love, of springtimes,
+MIMÌ: di sogni e di chimere, / quelle cose che han nome poesia... || of dreams and fancies, / those things called poetry...
+MIMÌ: Lei m'intende? || Do you understand me?
+RODOLFO: Sì. || Yes.
+MIMÌ: Mi chiamano Mimì, / il perché non so. || They call me Mimì, / I don't know why.
+MIMÌ: Sola, mi fo / il pranzo da me stessa. || Alone, I make / my own dinner.
+MIMÌ: Non vado sempre a messa, / ma prego assai il Signore. || I don't always go to Mass, / but I pray to the Lord a lot.
+MIMÌ: Vivo sola, soletta / là in una bianca cameretta: || I live alone, all alone, / there in a little white room:
+MIMÌ: guardo sui tetti e in cielo; / ma quando vien lo sgelo || I look out on the rooftops and the sky; / but when the thaw comes,
+MIMÌ: il primo sole è mio / il primo bacio dell'aprile è mio! || the first sunshine is mine, / April's first kiss is mine!
+MIMÌ: Germoglia in un vaso una rosa... / Foglia a foglia la spio! || A rose is budding in a vase... / I watch it, leaf by leaf!
+MIMÌ: Cosi gentile / il profumo d'un fiore! || So delicate, / the scent of a flower!
+MIMÌ: Ma i fior ch'io faccio, ahimè! non hanno odore. / Altro di me non le saprei narrare. || But the flowers I make, alas, have no scent. / There's nothing more I can tell you about me.
+MIMÌ: Sono la sua vicina / che la vien fuori d'ora a importunare. || I'm just your neighbour, / bothering you at this odd hour.
+SCHAUNARD: Ehi! Rodolfo! || Hey! Rodolfo!
+COLLINE: Rodolfo! || Rodolfo!
+MARCELLO: Olà. Non senti? || Hey there. Can't you hear?
+MARCELLO: Lumaca ! || Slowcoach!
+COLLINE: Poetucolo! || Poetaster!
+SCHAUNARD: Accidenti / al pigro! || Curse / the lazybones!
+RODOLFO: Scrivo ancor tre righe a volo. || Just three more quick lines.
+MIMÌ: Chi sono? || Who are they?
+RODOLFO: Amici. || Friends.
+SCHAUNARD: Sentirai le tue. || You'll hear about it!
+MARCELLO: Che te ne fai lì solo? || What are you doing up there alone?
+RODOLFO: Non sono solo. Siamo in due. / Andate da Momus, tenete il posto, || I'm not alone. There are two of us. / Go to Momus, keep us a seat,
+RODOLFO: ci saremo tosto. || we'll be there soon.
+MARCELLO, SCHAUNARD, COLLINE: Momus, Momus, Momus, / zitti e discreti andiamocerle via. || Momus, Momus, Momus, / quiet and discreet, let's be off.
+MARCELLO, SCHAUNARD, COLLINE: Momus, Momus, Momus, il poeta / trovò la poesia. || Momus, Momus, Momus, the poet / has found his poetry.
+RODOLFO: O soave fanciulla, o dolce viso / di mite circonfuso alba lunar || O lovely girl, O sweet face / bathed in soft moonlight,
+RODOLFO: in te, vivo ravviso / il sogno ch'io vorrei sempre sognar! || in you I see alive / the dream I'd dream forever!
+RODOLFO: Fremon già nell'anima / le dolcezze estreme, || Already the soul is trembling / with the sweetest bliss,
+RODOLFO: nel bacio freme amor! || love trembles in a kiss!
+MIMÌ: Ah! tu sol comandi, amor!... || Ah! Love, you alone command!...
+RODOLFO: Fremon già nell'anima / le dolcezze estreme. || Already the soul is trembling / with the sweetest bliss.
+MIMÌ: (Oh! come dolci scendono / le sue lusinghe al core... || (Oh! How sweetly his flattery / sinks into my heart...
+MIMÌ: tu sol comandi, amore!...) || love, you alone command!...)
+RODOLFO: Nel bacio freme amor! || Love trembles in a kiss!
+MIMÌ: No, per pietà! || No, please!
+RODOLFO: Sei mia! || You're mine!
+MIMÌ: V'aspettan gli amici... || Your friends are waiting...
+RODOLFO: Già mi mandi via? || Sending me away already?
+MIMÌ: Vorrei dir... ma non oso... || I'd like to say... but I don't dare...
+MIMÌ: Se venissi con voi? || What if I came with you?
+RODOLFO: Che?... Mimì? || What?... Mimì?
+RODOLFO: Sarebbe così dolce restar qui. / C'è freddo fuori. || It would be so sweet to stay here. / It's cold outside.
+MIMÌ: Vi starò vicina!... || I'll stay close to you!...
+RODOLFO: E al ritorno? || And when we come back?
+MIMÌ: Curioso! || Nosy!
+RODOLFO: Dammi il braccio, mia piccina. || Give me your arm, my little one.
+MIMÌ: Obbedisco, signor! || As you command, sir!
+RODOLFO: Che m'ami di'... || Tell me you love me...
+MIMÌ: Io t'amo! || I love you!
+RODOLFO: Amore ! || My love!
+MIMÌ: Amor! || Love!
+
+Quadro Secondo — Al Quartiere Latino || Act Two — In the Latin Quarter
+VENDITORI: Aranci, datteri! Caldi i marroni! / Ninnoli, croci. Torroni! Panna montata! || Oranges, dates! Hot chestnuts! / Trinkets, crosses! Nougat! Whipped cream!
+VENDITORI: Caramelle! La crostata! Fringuelli / passeri! Fiori alle belle! || Sweets! Tarts! Finches, / sparrows! Flowers for the pretty ladies!
+LA FOLLA: Quanta folla! Su, corriam! Che chiasso! / Stringiti a me. Date il passo. || What a crowd! Come on, let's run! What a din! / Hold on to me. Make way!
+DAL CAFFÈ: Presto qua! Camerier! Un bicchier! / Corri! Birra! Da ber! Un caffè! || Over here, quick! Waiter! A glass! / Hurry! Beer! Something to drink! A coffee!
+VENDITORI: Latte di cocco! Giubbe! Carote! || Coconut milk! Jackets! Carrots!
+LA FOLLA: Quanta folla, su, partiam! || What a crowd! Come on, let's go!
+SCHAUNARD: Falso questo Re! / Pipa e corno quant'è? || This king is out of tune! / How much for the pipe and horn?
+COLLINE: un poco usato... / ma è serio e a buon mercato... || A little worn… / but solid, and cheap…
+RODOLFO: Andiamo. || Let's go.
+MIMÌ: Andiamo per la cuffietta? || Are we going for the bonnet?
+RODOLFO: Tienti al mio braccio stretta... || Hold my arm tight…
+MIMÌ: A te mi stringo... / Andiamo ! || I'm holding on to you… / Let's go!
+MARCELLO: Io pur mi sento in vena di gridar: / Chi vuol, donnine allegre, un po' d'amor! || I feel like shouting too: / Merry ladies, who wants a little love?
+MARCELLO: Facciamo insieme a vendere e a comprar! || Let's buy and sell together!
+UN VENDITORE: Prugne di Tours! || Plums from Tours!
+MARCELLO: Io dò ad un soldo il vergine mio cuor! || My virgin heart, going for a penny!
+SCHAUNARD: Fra spintoni e testate accorrendo / affretta la folla e si diletta || Shoving and butting, the crowd / rushes along, enjoying itself,
+SCHAUNARD: nel provar gioie matte... insoddisfatte... || chasing wild pleasures… never satisfied…
+ALCUNE VENDITRICE: Ninnoli, spillette! / Datteri e caramelle! || Trinkets, brooches! / Dates and sweets!
+VENDITORI: Fiori alle belle! || Flowers for the pretty ladies!
+COLLINE: Copia rara, anzi unica: / la grammatica Runica! || A rare copy, unique in fact: / a Runic grammar!
+SCHAUNARD: Uomo onesto! || An honest man!
+MARCELLO: A cena! || To supper!
+SCHAUNARD, COLLINE: Rodolfo? || Where's Rodolfo?
+MARCELLO: Entrò da una modista. || He went into a milliner's.
+RODOLFO: Vieni, gli amici aspettano. || Come, our friends are waiting.
+VENDITORI: Panna montata! || Whipped cream!
+MIMÌ: Mi sta bene questa cuffietta rosa? || Does this pink bonnet suit me?
+MONELLI: Latte di cocco! || Coconut milk!
+VENDITORI: Oh, la crostata! / Panna montata! || Oh, the tarts! / Whipped cream!
+DAL CAFFÈ: Camerier! / Un bicchier! || Waiter! / A glass!
+DAL CAFFÈ: Presto, olà! / Ratafià! || Quick, hey there! / Ratafia!
+RODOLFO: Sei bruna e quel color ti dona. || You're dark-haired, and that color suits you.
+MIMÌ: Bel vezzo di corallo! || What a lovely coral necklace!
+RODOLFO: Ho uno zio milionario. Se fa senno il buon Dio, / voglio comprarti un vezzo assai più bel! || I have a millionaire uncle. If the good Lord sees sense, / I'll buy you a far lovelier necklace!
+MONELLI: Ah! Ah! Ah! Ah! || Ha! Ha! Ha! Ha!
+SARTINE, STUDENTI: Ah! Ah! Ah!... || Ha! Ha! Ha!…
+BORGHESI: Facciam coda alla gente! / Ragazze, state attente! || Let's follow the crowd! / Girls, be careful!
+BORGHESI: Che chiasso! Quanta folla! / Pigliam via Mazzarino! || What a racket! What a crowd! / Let's take Rue Mazarine!
+BORGHESI: Io soffoco, partiamo! / Vedi il Caffè è vicin! || I'm suffocating, let's go! / Look, the café is close by!
+BORGHESI: Andiamo là da Momus! || Let's go over to Momus!
+VENDITORI: Aranci, datteri, ninnoli, fior! || Oranges, dates, trinkets, flowers!
+RODOLFO: Chi guardi? || Who are you looking at?
+COLLINE: Odio il profano volgo al par d'Orazio. || Like Horace, I loathe the vulgar crowd.
+MIMÌ: Sei geloso? || Are you jealous?
+RODOLFO: All'uom felice sta il sospetto accanto. || Suspicion stands beside the happy man.
+SCHAUNARD: Ed io, quando mi sazio, / vo' abbondanza di spazio... || And when I eat my fill, / I want plenty of room…
+MIMÌ: Sei felice? || Are you happy?
+MARCELLO: Vogliamo una cena prelibata. || We want an exquisite supper.
+RODOLFO: Ah, sì, tanto! / E tu? || Oh yes, so happy! / And you?
+MIMÌ: Sì, tanto! || Yes, so happy!
+STUDENTI, SARTINE: Là da Momus! / Andiamo! || Over to Momus! / Let's go!
+MARCELLO, SCHAUNARD, COLLINE: Lesto! || Quickly!
+PARPIGNOL: Ecco i giocattoli di Parpignol! || Here come Parpignol's toys!
+RODOLFO: Due posti. || Two seats.
+COLLINE: Finalmente ! || At last!
+RODOLFO: Eccoci qui / Questa è Mimì, || Here we are. / This is Mimì,
+RODOLFO: gaia fioraia. / Il suo venir completa || a cheerful flower girl. / Her coming completes
+RODOLFO: la bella compagnia, / perché son io il poeta, || our fine company, / for I am the poet
+RODOLFO: essa la poesia. / Dal mio cervel sbocciano i canti, || and she is poetry. / From my brain songs blossom,
+RODOLFO: dalle sue dita sbocciano i fior; / dall'anime esultanti || from her fingers flowers blossom; / from joyful souls
+RODOLFO: sboccia l'amor. || love blossoms.
+MARCELLO, SCHAUNARD, COLLINE: Ah! Ah! Ah! Ah! || Ha! Ha! Ha! Ha!
+MARCELLO: Dio, che concetti rari! || Lord, what rare conceits!
+COLLINE: «Digna est intrari » || “She is worthy to enter.”
+SCHAUNARD: «Ingrediat si necessit» || “Let her enter, if need be.”
+COLLINE: Io non dò che un accessit! || I'll grant no more than an honorable mention!
+PARPIGNOL: Ecco i giocattoli di Parpignol! || Here come Parpignol's toys!
+COLLINE: Salame! || Salami!
+BAMBINE, RAGAZZI: Parpignol, Parpignol! || Parpignol, Parpignol!
+BAMBINE, RAGAZZI: Ecco Parpignol, Parpignol! / Col carretto tutto fior! || Here's Parpignol, Parpignol! / With his cart all full of flowers!
+BAMBINE, RAGAZZI: Ecco Parpignol, Parpignol! / Voglio la tromba, il cavallin, || Here's Parpignol, Parpignol! / I want the trumpet, the little horse,
+BAMBINE, RAGAZZI: il tambur, tamburel... / Voglio il cannon, voglio il frustin, || the drum, the tambourine… / I want the cannon, I want the whip,
+BAMBINE, RAGAZZI: ... dei soldati il drappel. || …the troop of soldiers.
+SCHAUNARD: Cervo arrosto! || Roast venison!
+MARCELLO: Un tacchino! || A turkey!
+SCHAUNARD: Vin del Reno! || Rhine wine!
+COLLINE: Vin da tavola! || Table wine!
+SCHAUNARD: Aragosta senza crosta! || Lobster, shelled!
+MAMME: Ah! razza di furfanti indemoniati, / che ci venite a fare in questo loco? || Oh, you pack of little devils, / what are you doing here?
+MAMME: A casa, a letto! Via, brutti sguaiati, / gli scappellotti vi parranno poco! || Home, to bed! Off with you, rascals, / or a few smacks will be the least of it!
+MAMME: A casa, a letto, / razza di furfanti, a letto! || Home, to bed, / you pack of rascals, to bed!
+UN RAGAZZO: Vo' la tromba, il cavallin!... || I want the trumpet, the little horse!…
+RODOLFO: E tu, Mimì, che vuoi? || And you, Mimì, what would you like?
+MIMÌ: La crema. || The custard.
+SCHAUNARD: E gran sfarzo. C'è una dama! || And make it grand. There's a lady with us!
+BAMBINE, RAGAZZI: Viva Parpignol, Parpignol! || Hurrah for Parpignol, Parpignol!
+BAMBINE, RAGAZZI: Il tambur! Tamburel! || The drum! The tambourine!
+BAMBINE, RAGAZZI: Dei soldati il drappel! || The troop of soldiers!
+MARCELLO: Signorina Mimì, che dono raro / le ha fatto il suo Rodolfo? || Mademoiselle Mimì, what rare gift / has your Rodolfo given you?
+MIMÌ: Una cuffietta / a pizzi, tutta rosa, ricamata; || A bonnet / trimmed with lace, all pink, embroidered;
+MIMÌ: coi miei capelli bruni ben si fonde. / Da tanto tempo tal cuffietta è cosa desiata!... || it goes so well with my dark hair. / I've longed for a bonnet like this for so long!…
+MIMÌ: Egli ha letto quel che il core asconde... / Ora colui che legge dentro a un cuore || He read what my heart was hiding… / Whoever can read inside a heart
+MIMÌ: sa l'amore ed è... lettore. || knows love, and is… a reader.
+SCHAUNARD: Esperto professore... || An expert professor…
+COLLINE: ... che ha già diplomi e non son armi prime / le sue rime... || …who already holds diplomas; his rhymes / are no beginner's work…
+SCHAUNARD: ... tanto che sembra ver ciò ch'egli esprime!... || …so much so that what he says seems true!…
+MARCELLO: O bella età d'inganni e d'utopie! / Si crede, spera, e tutto bello appare! || O lovely age of illusions and dreams! / You believe, you hope, and all looks beautiful!
+RODOLFO: La più divina delle poesie / è quella, amico, che c'insegna amare! || The most divine of all poems, my friend, / is the one that teaches us to love!
+MIMÌ: Amare è dolce ancora più del miele... || Love is sweeter even than honey…
+MARCELLO: ... secondo il palato è miele, o fiele!... || …honey or gall, depending on the taste!…
+MIMÌ: O Dio! ... l'ho offeso! || Oh God!… I've offended him!
+RODOLFO: È in lutto, o mia Mimì. || He's in mourning, my Mimì.
+SCHAUNARD, COLLINE: Allegri, e un toast!... || Cheer up, and a toast!…
+MARCELLO: Qua del liquor!... || Some liquor here!…
+MIMÌ, RODOLFO, MARCELLO: E via i pensier, alti i bicchier! / Beviam! || Away with cares, glasses high! / Let's drink!
+TUTTI: Beviam ! || Let's drink!
+MARCELLO: Ch'io beva del tossico! || Let me drink poison!
+RODOLFO, SCHAUNARD, COLLINE: Oh! || Oh!
+MARCELLO: Essa! || It's her!
+RODOLFO, SCHAUNARD, COLLINE: Musetta! || Musetta!
+BOTTEGAIE: To'! – Lei! – Sì! – To'! – Lei! – Musetta! / Siamo in auge! – Che toeletta! || Look! – Her! – Yes! – Look! – Her! – Musetta! / She's riding high! – What an outfit!
+ALCINDORO: Come un facchino... / correr di qua... di là... || Like a porter… / running here… running there…
+ALCINDORO: No! No! non ci sta... / non ne posso più! || No! No! This won't do… / I can't take any more!
+MUSETTA: Vien, Lulù! / Vien, Lulù! || Come, Lulu! / Come, Lulu!
+SCHAUNARD: Quel brutto coso / mi par che sudi! || That ugly thing / looks like he's sweating!
+ALCINDORO: Come! qui fuori? / Qui? || What! Out here? / Here?
+MUSETTA: Siedi, Lulù! || Sit down, Lulu!
+ALCINDORO: Tali nomignoli, / prego, serbateli || Such pet names, / please, save them
+ALCINDORO: al tu per tu! || for when we're alone!
+MUSETTA: Non farmi il Barbablù! || Don't play Bluebeard with me!
+COLLINE: È il vizio contegnoso... || It's vice in a sober suit…
+MARCELLO: Colla casta Susanna! || With chaste Susanna!
+MIMÌ: È pur ben vestita! || She's certainly well dressed!
+RODOLFO: Gli angeli vanno nudi. || Angels go naked.
+MIMÌ: La conosci! Chi è? || You know her! Who is she?
+MARCELLO: Domandatelo a me. / Il suo nome è Musetta; || Ask me. / Her name is Musetta;
+MARCELLO: cognome: Tentazione! / Per sua vocazione || surname: Temptation! / By vocation
+MARCELLO: fa la Rosa dei venti; / gira e muta soventi || she's a weathervane; / she turns and often changes
+MARCELLO: e d'amanti e d'amore. / E come la civetta || both lovers and loves. / And like the screech owl,
+MARCELLO: è uccello sanguinario; / il suo cibo ordinario || she's a bird of prey; / her usual food
+MARCELLO: è il cuore... Mangia il cuore!... / Per questo io non ne ho più... || is the heart… She eats hearts!… / That's why I have none left…
+MARCELLO: Passatemi il ragù! || Pass me the stew!
+MUSETTA: (Marcello mi vide... / Non mi guarda, il vile! || (Marcello saw me… / He won't look at me, the coward!
+MUSETTA: Quel Schaunard che ride! / Mi fan tutti una bile! || That Schaunard, laughing! / They all make me furious!
+MUSETTA: Se potessi picchiar, / se potessi graffiar! || If only I could hit someone, / if only I could scratch!
+MUSETTA: Ma non ho sottomano / che questo pellican! || But all I have at hand / is this old pelican!
+MUSETTA: Aspetta!) || Just wait!)
+MUSETTA: Ehi! Camerier! || Hey! Waiter!
+MUSETTA: Cameriere! Questo piatto / ha una puzza di rifritto! || Waiter! This dish / reeks of grease, fried twice over!
+ALCINDORO: No, Musetta... / Zitta zitta! || No, Musetta… / Hush, hush!
+MUSETTA: (Non si volta.) || (He won't turn around.)
+ALCINDORO: Zitta! zitta! zitta! / Modi, garbo! || Hush! Hush! Hush! / Manners, decorum!
+MUSETTA: (Ah, non si volta!) || (Ah, he won't turn around!)
+ALCINDORO: A chi parli?... || Who are you talking to?…
+COLLINE: Questo pollo è un poema! || This chicken is a poem!
+MUSETTA: (Ora lo batto, lo batto!) || (Now I'll beat him, I'll beat him!)
+ALCINDORO: Con chi parli?... || Who are you talking to?…
+SCHAUNARD: Il vino è prelibato. || The wine is exquisite.
+MUSETTA: Al cameriere! / Non seccar! || To the waiter! / Don't pester me!
+MUSETTA: Voglio fare il mio piacere.... || I want to do as I please…
+ALCINDORO: Parla pian / parla pian! || Talk quietly, / talk quietly!
+MUSETTA: ... vo' far quel che mi pare! / Non seccar. || …I'll do whatever I like! / Don't pester me.
+SARTINE: Guarda, guarda chi si vede, / proprio lei, Musetta! || Look, look who's here, / it's her, Musetta!
+STUDENTI: Con quel vecchio che balbetta... || With that stammering old man…
+SARTINE, STUDENTI: ... proprio lei, Musetta! || …it's her, Musetta!
+SARTINE, STUDENTI: Ah, ah, ah, ah! || Ha, ha, ha, ha!
+MUSETTA: (Che sia geloso / di questa mummia?) || (Could he be jealous / of this mummy?)
+ALCINDORO: La convenienza... / il grado... la virtù... || Propriety… / my rank… virtue…
+MUSETTA: ...(Vediam se mi resta / tanto poter su lui da farlo cedere!) || …(Let's see if I still have / enough power over him to make him give in!)
+SCHAUNARD: La commedia è stupenda! || This comedy is marvelous!
+MUSETTA: Tu non mi guardi! || You're not looking at me!
+ALCINDORO: Vedi bene che ordino!... || Can't you see I'm ordering?…
+SCHAUNARD: La commedia è stupenda! || This comedy is marvelous!
+COLLINE: Stupenda ! || Marvelous!
+RODOLFO: Sappi per tuo governo / che non darei perdono in sempiterno. || Know this, for your own good: / I would never, ever forgive.
+SCHAUNARD: Essa all'un parla / perché l'altro intenda. || She talks to one / so the other will understand.
+MIMÌ: Io t'amo tanto, / e son tutta tua!... || I love you so much, / and I'm all yours!…
+MIMÌ: Ché mi parli di perdono? || Why do you talk to me of forgiving?
+COLLINE: E l'altro invan crudel... / finge di non capir, ma sugge miel!... || And the other, cruel in vain… / pretends not to understand, but drinks in the honey!…
+MUSETTA: Ma il tuo cuore martella! || But your heart is pounding!
+ALCINDORO: Parla piano. || Keep your voice down.
+MUSETTA: Quando men vo soletta per la via, / la gente sosta e mira || When I walk alone down the street, / people stop and stare
+MUSETTA: e la bellezza mia tutta ricerca in me / da capo a pie'... || and look me over for all my beauty / from head to toe…
+MARCELLO: Legatemi alla seggiola! || Tie me to my chair!
+ALCINDORO: Quella gente che dirà? || What will those people say?
+MUSETTA: ... ed assaporo allor la bramosia / sottil, che da gli occhi traspira || …and then I savor the subtle longing / that shines from their eyes,
+MUSETTA: e dai palesi vezzi intender sa / alle occulte beltà. || that can tell from charms on show / the beauties that are hidden.
+MUSETTA: Così l'effluvio del desìo tutta m'aggira, / felice mi fa! || So the scent of desire surrounds me, / and it makes me happy!
+ALCINDORO: (Quel canto scurrile / mi muove la bile!) || (That vulgar song / makes my blood boil!)
+MUSETTA: E tu che sai, che memori e ti struggi / da me tanto rifuggi? || And you, who know, who remember and pine, / why do you run from me so?
+MUSETTA: So ben: le angoscie tue non le vuoi dir, / ma ti senti morir! || I know: you won't speak of your torment, / but you feel you're dying!
+MIMÌ: Io vedo ben... / che quella poveretta, || I can see clearly… / that the poor girl
+MIMÌ: tutta invaghita di Marcel, / tutta invaghita ell'è! || is head over heels for Marcello, / head over heels, she is!
+ALCINDORO: Quella gente che dirà? || What will those people say?
+RODOLFO: Marcello un dì l'amò. || Marcello loved her once.
+SCHAUNARD: Ah, Marcello cederà! || Ah, Marcello will give in!
+COLLINE: Chi sa mai quel che avverrà! || Who knows what will happen!
+RODOLFO: La fraschetta l'abbandonò / per poi darsi a miglior vita. || The flirt left him / for a better life.
+SCHAUNARD: Trovan dolce al pari il laccio... || They find the snare equally sweet…
+COLLINE: Santi numi, in simil briga... || Heavens above, in such a tangle…
+SCHAUNARD: ... chi lo tende e chi ci dà. || …the one who sets it, and the one caught in it.
+COLLINE: ... mai Colline intopperà! || …Colline will never be trapped!
+MUSETTA: (Ah! Marcello smania... || (Ah! Marcello is frantic…
+ALCINDORO: Parla pian! / Zitta, zitta! || Talk quietly! / Hush, hush!
+MUSETTA: Marcello è vinto!) / Sò ben le angoscie tue || Marcello is beaten!) / I know your torment well,
+MUSETTA: non le vuoi dir. / Ah! ma ti senti morir. || you won't speak of it. / Ah, but you feel you're dying.
+ALCINDORO: Modi, garbo! / Zitta, zitta! || Manners, decorum! / Hush, hush!
+MUSETTA: Io voglio fare il mio piacere! / Voglio far quel che mi par, || I want to do as I please! / I'll do whatever I like,
+MUSETTA: non seccar! non seccar! || don't pester me! Don't pester me!
+MIMÌ: Quell'infelice / mi muove a pietà! || That unhappy girl / moves me to pity!
+COLLINE: (Essa è bella, io non son cieco, / ma piaccionmi assai più || (She's beautiful, I'm not blind, / but I much prefer
+COLLINE: una pipa e un testo greco!) || a pipe and a Greek text!)
+MIMÌ: T'amo! / Quell'infelice mi muove a pietà! || I love you! / That unhappy girl moves me to pity!
+MIMÌ: L'amor ingeneroso è tristo amor! / Quell'infelice mi muove a pietà! || Ungenerous love is a sad love! / That unhappy girl moves me to pity!
+RODOLFO: Mimì ! / È fiacco amor quel che le offese || Mimì! / It's a feeble love that cannot
+RODOLFO: vendicar non sa! / Non risorge spento amor! || avenge its wrongs! / Love, once dead, never rises again!
+SCHAUNARD: (Quel bravaccio a momenti cederà! / Stupenda è la commedia! || (That braggart will give in any moment! / This comedy is marvelous!
+SCHAUNARD: Marcello cederà!) || Marcello will give in!)
+SCHAUNARD: Se tal vaga persona, / ti trattasse a tu per tu, || If a lovely creature like that / got close and personal with you,
+SCHAUNARD: la tua scienza brontolona / manderesti a Belzebù! || you'd send your grumbling learning / straight to Beelzebub!
+MUSETTA: (Or convien liberarsi del vecchio!) || (Now to get rid of the old man!)
+MUSETTA: Ahi! || Ow!
+ALCINDORO: Che c'è? || What is it?
+MUSETTA: Qual dolore, qual bruciore! || Oh, the pain, it burns!
+ALCINDORO: Dove? || Where?
+MUSETTA: Al pie'! || My foot!
+MARCELLO: Gioventù mia, / tu non sei morta, || My youth, / you are not dead,
+MARCELLO: né di te morto è il sovvenir! || nor is the memory of you!
+MUSETTA: Sciogli, slaccia, rompi, straccia! / Te ne imploro... || Untie it, unlace it, break it, tear it! / I beg you…
+MUSETTA: Laggiù c'è un calzolaio. || There's a shoemaker down there.
+ALCINDORO: Imprudente ! || Reckless girl!
+SCHAUNARD, COLLINE, RODOLFO: La commedia è stupenda! || This comedy is marvelous!
+MARCELLO: Se tu battessi alla mia porta, / t'andrebbe il mio core ad aprir! || If you came knocking at my door, / my heart would go and open it!
+MUSETTA: Corri presto! / Ne vòglio un altro paio. || Run, quickly! / I want another pair.
+MUSETTA: Ahi! che fitta, / maledetta scarpa stretta! || Ow, it stabs! / This damned tight shoe!
+ALCINDORO: Quella gente che dirà? || What will those people say?
+MUSETTA: Or la levo... || I'll take it off…
+ALCINDORO: Ma il mio grado! || But my rank!
+MUSETTA: Eccola qua. || There it is.
+MIMÌ: Io vedo ben / ell'è invaghita di Marcello! || I can see it clearly: / she's in love with Marcello!
+ALCINDORO: Vuoi ch'io comprometta? / Aspetta ! Musetta! Vo'. || Do you want to compromise me? / Wait! Musetta! I'm going.
+MUSETTA: Corri, va, corri. / Presto, va! va! || Run, go, run. / Quickly, go! Go!
+MUSETTA: Marcello! || Marcello!
+MARCELLO: Sirena! || Siren!
+SCHAUNARD: Siamo all'ultima scena! || We've reached the final scene!
+RODOLFO, SCHAUNARD, COLLINE: Il conto? || The bill?
+SCHAUNARD: Così presto? || So soon?
+COLLINE: Chi l'ha richiesto? || Who asked for it?
+SCHAUNARD: Vediam ! || Let's see!
+RODOLFO, COLLINE: Caro ! || Expensive!
+MONELLI: La Ritirata! || The Tattoo!
+SARTINE, STUDENTI: La Ritirata! || The Tattoo!
+COLLINE, SCHAUNARD, RODOLFO: Fuori il danaro! || Out with the money!
+SCHAUNARD: Colline, Rodolfo e tu / Marcel? || Colline, Rodolfo, and you, / Marcello?
+MARCELLO: Siamo all'asciutto || We're broke.
+SCHAUNARD: Come? || What?
+RODOLFO: Ho trenta soldi in tutto! || I've got thirty sous in all!
+COLLINE, SCHAUNARD, MARCELLO: Come? Non ce n'è più? || What? There's none left?
+SCHAUNARD: Ma il mio tesoro ov'è? || But where's my treasure?
+MUSETTA: Il mio conto date a me. || Give me my bill.
+MUSETTA: Bene! / Presto, sommate || Good! / Quick, add up
+MUSETTA: quello con questo! || that one with this one!
+MUSETTA: Paga il signor che stava qui con me! || The gentleman who was here with me will pay!
+RODOLFO, MARCELLO, SCHAUNARD, COLLINE: Paga il signor! || The gentleman will pay!
+COLLINE: Paga il signor! || The gentleman will pay!
+SCHAUNARD: Paga il signor! || The gentleman will pay!
+MARCELLO: ... il Signor! || …the gentleman!
+MUSETTA: E dove s'è seduto / ritrovi il mio saluto! || And where he sat, / let him find my farewell!
+RODOLFO, MARCELLO, SCHAUNARD, COLLINE: E dove s'è seduto || And where he sat,
+RODOLFO, MARCELLO, SCHAUNARD, COLLINE: ritrovi il mio saluto! || let him find my farewell!
+BORGHESI: La Ritirata! || The Tattoo!
+MONELLI: S'avvicina per di qua!? || Is it coming this way?!
+SARTINE, STUDENTI: No, di là! || No, that way!
+MONELLI: S'avvicinan per di là! || They're coming that way!
+SARTINE, STUDENTI: Vien di qua! || It's coming this way!
+BORGHESI, VENDITORI: Largo ! Largo ! || Make way! Make way!
+RAGAZZI: Voglio veder! Voglio sentir! / Mamma, voglio veder! || I want to see! I want to hear! / Mama, I want to see!
+RAGAZZI: Papà, voglio sentir! / Vo' veder la Ritirata! || Papa, I want to hear! / I want to see the Tattoo!
+MAMME: Lisetta, vuoi tacer? / Tonio, la vuoi finir? || Lisetta, will you be quiet? / Tonio, will you stop it?
+MAMME: Vuoi tacer, la vuoi finir? || Will you be quiet, will you stop it?
+SARTINE, BORGHESI: S'avvicinano di qua! || They're coming this way!
+LA FOLLA, I VENDITORI: Sì, di qua! || Yes, this way!
+MONELLI: Come sarà arrivata / la seguiremo al passo! || When it arrives, / we'll march along behind it!
+MARCELLO: Giunge la Ritirata! || Here comes the Tattoo!
+MARCELLO, COLLINE: Che il vecchio non ci veda || Don't let the old man see us
+MARCELLO, COLLINE: fuggir colla sua preda! || run off with his prize!
+MARCELLO, SCHAUNARD, COLLINE: Quella folla serrata || Let that packed crowd
+MARCELLO, SCHAUNARD, COLLINE: il nascondiglio appresti! || give us a hiding place!
+MIMÌ, MUSETTA, RODOLFO, MARCELLO, SCHAUNARD, COLLINE: Lesti, lesti, lesti! || Quick, quick, quick!
+VENDITORI: In quel rullio tu senti / la patria maestà! || In that drumroll you hear / the majesty of the homeland!
+LA FOLLA: Largo, largo, eccoli qua! / In fila! || Make way, make way, here they are! / In line!
+LA FOLLA, I VENDITORI: Ecco il Tambur Maggior! || Here's the Drum Major!
+LA FOLLA, I VENDITORI: Più fier d'un antico guerrier! / Il Tamburo Maggior! Gli Zappator, olà! || Prouder than a warrior of old! / The Drum Major! The Sappers, hurrah!
+LA FOLLA, I VENDITORI: La Ritirata è qua! / Eccolo là! Il bel Tambur Maggior! || The Tattoo is here! / There he is! The handsome Drum Major!
+LA FOLLA, I VENDITORI: La canna d'ôr, tutto splendor! / Che guarda, passa, va! || The golden baton, all splendor! / He looks, passes, moves on!
+RODOLFO, MARCELLO, SCHAUNARD, COLLINE: Viva Musetta! || Long live Musetta!
+RODOLFO, MARCELLO, SCHAUNARD, COLLINE: Cuor birichin! / Gloria ed onor, || Mischievous heart! / Glory and honor,
+RODOLFO, MARCELLO, SCHAUNARD, COLLINE: onor e gloria / del quartier latin! || honor and glory / of the Latin Quarter!
+LA FOLLA, I VENDITORI: Tutto splendor! || All splendor!
+LA FOLLA, I VENDITORI: Di Francia è il più bell'uom! / Il bel Tambur Maggior || He's the handsomest man in France! / The handsome Drum Major
+LA FOLLA, I VENDITORI: Eccolo là! / Che guarda, passa; va! || There he is! / He looks, passes, moves on!
+
+Quadro Terzo — La barriera d'Enfer || Act Three — The Barrière d'Enfer
+SPAZZINI: Ohè, là, le guardie!... Aprite!... Ohè, là! / Quelli di Gentilly!... Siam gli spazzini!... || Hey there, guards!... Open up!... Hey there! / We're from Gentilly!... We're the street sweepers!...
+SPAZZINI: Fiocca la neve... Ohè, là!... Qui s'agghiaccia! || The snow keeps falling... Hey there!... We're freezing out here!
+UN DOGANIERE: Vengo! || Coming!
+VOCI INTERNE: Chi nel ber trovò il piacer / nel suo bicchier, || He who found pleasure in drinking / found it in his glass,
+VOCI INTERNE: ah! d'una bocca nell'ardor, / trovò l'amor! || ah! but on ardent lips / he found love!
+MUSETTA: Ah! Se nel bicchiere sta il piacer, / in giovin bocca sta l'amor! || Ah! If pleasure lies in the glass, / love lies on young lips!
+VOCI INTERNE: Trallerallè... / Eva e Noè! || Tra-la-la... / Eve and Noah!
+LATTIVENDOLE: Hopplà! Hopplà! || Hup! Hup!
+DOGANIERE: Son già le lattivendole! || The milkmaids are here already!
+CARRETTIERI: Hopplà ! || Hup!
+LATTIVENDOLE: Hopplà ! || Hup!
+LATTIVENDOLE: Buon giorno! || Good morning!
+CONTADINE: - Burro e cacio! / - Polli ed uova! || Butter and cheese! / Chickens and eggs!
+CONTADINE: - Voi da che parte andate? / - A San Michele! || Which way are you going? / To Saint-Michel!
+CONTADINE: - Ci troverem più tardi? / - A mezzodì! || Shall we meet up later? / At noon!
+MIMÌ: Sa dirmi, scusi, qual'è l'osteria... || Excuse me, can you tell me which is the tavern...
+MIMÌ: dove un pittor lavora? || where a painter is working?
+SERGENTE: Eccola. || There it is.
+MIMÌ: Grazie . || Thank you.
+MIMÌ: O buona donna, mi fate il favore / di cercarmi il pittore || Good woman, would you do me the favour / of finding me the painter
+MIMÌ: Marcello? Ho da parlargli. Ho tanta fretta. / Ditegli, piano, che Mimì lo aspetta. || Marcello? I must speak to him. I'm in a hurry. / Tell him, quietly, that Mimì is waiting.
+SERGENTE: Ehi, quel panier! || Hey, that basket!
+DOGANIERE: Vuoto! || Empty!
+SERGENTE: Passi! || Let her through!
+MARCELLO: Mimì?! || Mimì?!
+MIMÌ: Son io. Speravo di trovarti qui. || It's me. I hoped I'd find you here.
+MARCELLO: È ver. Siam qui da un mese / di quell'oste alle spese. || That's right. We've been here a month / at the innkeeper's expense.
+MARCELLO: Musetta insegna il canto ai passeggeri; / Io pingo quel guerrier || Musetta teaches the guests to sing; / I'm painting that soldier
+MARCELLO: sulla facciata. || on the front of the building.
+MARCELLO: È freddo. Entrate. || It's cold. Come inside.
+MIMÌ: C'è / Rodolfo? || Is / Rodolfo there?
+MARCELLO: Sì. || Yes.
+MIMÌ: Non posso entrar. || I can't go in.
+MARCELLO: Perché? || Why not?
+MIMÌ: O buon Marcello, aiuto! || Oh, dear Marcello, help me!
+MARCELLO: Cos'è avvenuto? || What's happened?
+MIMÌ: Rodolfo m'ama. Rodolfo m'ama / mi fugge e si strugge per gelosia. || Rodolfo loves me. Rodolfo loves me, / yet he runs from me, eaten up with jealousy.
+MIMÌ: Un passo, un detto, / un vezzo, un fior lo mettono in sospetto... || A step, a word, / a smile, a flower makes him suspicious...
+MIMÌ: Onde corrucci ed ire. / Talor la notte fingo di dormire || Then come the sulks and the rages. / Some nights I pretend to sleep
+MIMÌ: e in me lo sento fiso / spiarmi i sogni in viso. || and I feel him staring, / spying on the dreams in my face.
+MIMÌ: Mi grida ad ogni istante: / Non fai per me, prenditi un altro amante. || He shouts at me all the time: / You're not for me, go find another lover.
+MIMÌ: Ahimè! In lui parla il rovello; / lo so, ma che rispondergli, Marcello? || Alas! It's his anger talking; / I know, but how do I answer him, Marcello?
+MARCELLO: Quando s'è come voi non si vive in compagnia. / Son lieve a Musetta ed ella è lieve || When people are like you two, they can't live together. / I take Musetta lightly, and she takes
+MARCELLO: a me, perché ci amiamo in allegria... / Canti e risa, ecco il fior || me lightly, because our love is a merry one... / Songs and laughter, that's the flower
+MARCELLO: d'invariabile amor! || of a love that never changes!
+MIMÌ: Dite bene. Lasciarci conviene. / Aiutateci voi; noi s'è provato || You're right. We ought to part. / Help us; we've tried
+MIMÌ: più volte, ma invano. / Fate voi per il meglio. || many times, but in vain. / Do whatever is best.
+MARCELLO: Sta ben! Ora lo sveglio. || Very well! I'll wake him now.
+MIMÌ: Dorme? || He's asleep?
+MARCELLO: E piombato qui / un'ora avanti l'alba; s'assopì || He burst in here / an hour before dawn and dozed off
+MARCELLO: sopra una panca. || on a bench.
+MARCELLO: Guardate... || Look...
+MARCELLO: Che tosse! || What a cough!
+MIMÌ: Da ieri ho l'ossa rotte. / Fuggì da me stanotte || Since yesterday I've ached all over. / He ran out on me last night,
+MIMÌ: dicendomi: È finita. / A giorno sono uscita || telling me: It's over. / At daybreak I went out
+MIMÌ: e me ne venni a questa / volta. || and came looking for you / here.
+MARCELLO: Si desta... / s'alza, mi cerca... viene. || He's waking... / he's getting up, looking for me... he's coming.
+MIMÌ: Ch'ei non mi veda! || He mustn't see me!
+MARCELLO: Or rincasate... / Mimì... per carità, || Now go home... / Mimì... for pity's sake,
+MARCELLO: non fate scene qua! || don't make a scene here!
+RODOLFO: Marcello. Finalmente! / Qui niun ci sente. || Marcello. At last! / No one can hear us here.
+RODOLFO: Io voglio separarmi da Mimì. || I want to split up with Mimì.
+MARCELLO: Sei volubil così? || Are you really so fickle?
+RODOLFO: Già un'altra volta credetti morto il mio cor, / ma di quegli occhi azzurri allo splendor || Once before I thought my heart was dead, / but in the light of those blue eyes
+RODOLFO: esso è risorto. / Ora il tedio l'assale. || it came back to life. / Now boredom has it in its grip.
+MARCELLO: E gli vuoi rinnovare il funerale? || And you want to hold its funeral all over again?
+RODOLFO: Per sempre! || For good!
+MARCELLO: Cambia metro. / Dei pazzi è l'amor tetro || Change your tune. / Gloomy love is for madmen,
+MARCELLO: che lacrime distilla. / Se non ride e sfavilla || the kind that wrings out tears. / If it doesn't laugh and sparkle,
+MARCELLO: l'amore è fiacco e roco. / Tu sei geloso. || love is weak and hoarse. / You're jealous.
+RODOLFO: Un poco. || A little.
+MARCELLO: Collerico, lunatico, imbevuto / di pregiudizi, noioso, cocciuto! || Hot-tempered, moody, stuffed / with prejudice, tiresome, stubborn!
+MIMÌ: (Or lo fa incollerir! Me poveretta!) || (Now he's making him angry! Poor me!)
+RODOLFO: Mimì è una civetta / che frascheggia con tutti. Un moscardino || Mimì is a flirt / who toys with everyone. Some dandy
+RODOLFO: di Viscontino / le fa l'occhio di triglia. || of a little viscount / makes eyes at her.
+RODOLFO: Ella sgonnella e scopre la caviglia / con un far promettente e lusinghier. || She swishes her skirts and shows her ankle / in a teasing, promising way.
+MARCELLO: Lo devo dir? Non mi sembri sincer. || Shall I say it? I don't think you're being honest.
+RODOLFO: Ebbene no, non lo son. Invan nascondo / la mia vera tortura. || All right, no, I'm not. In vain I hide / my real torment.
+RODOLFO: Amo Mimì sovra ogni cosa al mondo, / io l'amo, ma ho paura, ma ho paura ! || I love Mimì more than anything in the world, / I love her, but I'm afraid, I'm afraid!
+RODOLFO: Mimì è tanto malata! / Ogni dì più declina. || Mimì is so very ill! / Every day she grows weaker.
+RODOLFO: La povera piccina / è condannata! || The poor little thing / is doomed!
+MARCELLO: Mimì? || Mimì?
+MIMÌ: Che vuol dire? || What does he mean?
+RODOLFO: Una terribil tosse / l'esil petto le scuote || A terrible cough / shakes her frail chest
+RODOLFO: e già le smunte gote / di sangue ha rosse... || and her pale cheeks / are already flushed with blood...
+MARCELLO: Povera Mimì! || Poor Mimì!
+MIMÌ: Ahimè, morire! || Alas, to die!
+RODOLFO: La mia stanza è una tana / squallida... || My room is a wretched / hole...
+RODOLFO: il fuoco ho spento. / V'entra e l'aggira il vento || the fire has gone out. / The north wind gets in
+RODOLFO: di tramontana. / Essa canta e sorride || and swirls around it. / She sings and smiles
+RODOLFO: e il rimorso m'assale. / Me, cagion del fatale || and remorse overwhelms me. / I'm the cause of the deadly
+RODOLFO: mal che l'uccide! / Mimì di serra è fiore. || illness that is killing her! / Mimì is a hothouse flower.
+RODOLFO: Povertà l'ha sfiorita; / per richiamarla in vita || Poverty has made her wilt; / to bring her back to life
+RODOLFO: non basta amore! || love is not enough!
+MARCELLO: Che far dunque? / Oh, qual pietà! || What can be done, then? / Oh, how pitiful!
+MARCELLO: Poveretta ! / Povera Mimì! || Poor girl! / Poor Mimì!
+MIMÌ: O mia vita! || Oh, my life!
+MIMÌ: Ahimè! È finita / O mia vita! È finita || Alas! It's over / Oh, my life! It's over
+MIMÌ: Ahimè, morir! || Alas, to die!
+RODOLFO: Che? Mimì! Tu qui? / M'hai sentito? || What? Mimì! You here? / Did you hear me?
+MARCELLO: Ella dunque ascoltava? || So she was listening?
+RODOLFO: Facile alla paura / per nulla io m'arrovello. || I scare easily, / I torment myself over nothing.
+RODOLFO: Vien là nel tepor! || Come inside where it's warm!
+MIMÌ: No, quel tanfo mi soffoca! || No, that stale air chokes me!
+RODOLFO: Ah, Mimì! || Ah, Mimì!
+MARCELLO: È Musetta / che ride. || That's Musetta / laughing.
+MARCELLO: Con chi ride? Ah, la civetta! / Imparerai. || Who's she laughing with? Ah, the flirt! / You'll learn your lesson.
+MIMÌ: Addio. || Goodbye.
+RODOLFO: Che! Vai? || What? You're going?
+MIMÌ: D'onde lieta uscì / al tuo grido d'amore, || To the place she happily left / at your call of love,
+MIMÌ: torna sola Mimì / al solitario nido. || Mimì goes back alone, / back to her lonely nest.
+MIMÌ: Ritorna un'altra volta / a intesser finti fior. || She goes back once more / to stitching artificial flowers.
+MIMÌ: Addio, senza rancor. / - Ascolta, ascolta. || Goodbye, no hard feelings. / Listen, listen.
+MIMÌ: Le poche robe aduna che lasciai / sparse. Nel mio cassetto || Gather up the few things I left / lying around. In my drawer
+MIMÌ: stan chiusi quel cerchietto / d'or e il libro di preghiere. || you'll find that little gold / bracelet and my prayer book.
+MIMÌ: Involgi tutto quanto in un grembiale / e manderò il portiere... || Wrap it all up in an apron / and I'll send the porter...
+MIMÌ: - Bada, sotto il guanciale / c'è la cuffietta rosa. || Mind you, under the pillow / there's my little pink bonnet.
+MIMÌ: Se... vuoi... serbarla a ricordo d'amor!... / Addio, senza rancor. || If... you want... keep it to remember our love!... / Goodbye, no hard feelings.
+RODOLFO: Dunque è proprio finita? / Te ne vai, te ne vai, la mia piccina?! || So it's really over? / You're leaving, leaving, my little one?!
+RODOLFO: Addio, sogni d'amor!... || Farewell, dreams of love!...
+MIMÌ: Addio, dolce svegliare alla mattina! || Farewell, sweet waking in the morning!
+RODOLFO: Addio, sognante vita... || Farewell, life of dreams...
+MIMÌ: Addio, rabbuffi e gelosie! || Farewell, scolding and jealousy!
+RODOLFO: ... che un tuo sorriso acqueta! || ... that one smile of yours could calm!
+MIMÌ: Addio, sospetti!... || Farewell, suspicions!...
+MARCELLO: Baci... || Kisses...
+MIMÌ: Pungenti amarezze! || Stinging bitterness!
+RODOLFO: Ch'io da vero poeta / rimavo con carezze! || That like a true poet / I rhymed with caresses!
+MIMÌ, RODOLFO: Soli d'inverno è cosa da morire! || To be alone in winter is enough to make you die!
+MIMÌ, RODOLFO: Soli! Mentre a primavera / c'è compagno il sol! || Alone! While in spring / the sun keeps us company!
+MARCELLO: Che facevi, che dicevi / presso al fuoco a quel signore? || What were you doing, what were you saying / by the fire with that gentleman?
+MUSETTA: Che vuoi dir? || What do you mean?
+MIMÌ: Niuno è solo l'april. || No one is alone in April.
+MARCELLO: Al mio venire / hai mutato colore. || When I came in / you changed colour.
+MUSETTA: Quel signore mi diceva: / Ama il ballo, signorina? || That gentleman was asking me: / Do you like dancing, miss?
+RODOLFO: Si parla coi gigli e le rose. || We talk with the lilies and roses.
+MARCELLO: Vana, frivola, civetta! || Vain, frivolous flirt!
+MUSETTA: Arrossendo rispondeva: / Ballerei sera e mattina. || Blushing, I answered: / I'd dance night and day.
+MARCELLO: Quel discorso asconde mire disoneste. || That talk hides dishonest intentions.
+MIMÌ: Esce dai nidi un cinguettio gentile... || From the nests comes a gentle twittering...
+MUSETTA: Voglio piena libertà! || I want complete freedom!
+MARCELLO: Io t'acconcio per le feste / se ti colgo a incivettire! || I'll give you what for / if I catch you flirting!
+MIMÌ, RODOLFO: Al fiorir di primavera || When spring is in flower
+MIMÌ, RODOLFO: c'è compagno il sol! / Chiacchieran le fontane || the sun keeps us company! / The fountains murmur,
+MIMÌ, RODOLFO: la brezza della sera. || the evening breeze
+MUSETTA: Ché mi gridi? Ché mi canti? / All'altar non siamo uniti. || Why shout at me? Why lecture me? / We're not married at the altar.
+MARCELLO: Bada, sotto il mio cappello / non ci stan certi ornamenti... || Careful, under my hat / there won't be any horns...
+MUSETTA: Io detesto quegli amanti / che la fanno da mariti... || I can't stand those lovers / who act like husbands...
+MARCELLO: Io non faccio da zimbello / ai novizi intraprendenti. || I won't be made a laughing-stock / by bold young upstarts.
+MIMÌ, RODOLFO: Balsami stende sulle doglie umane. || spreads balm on human sorrows.
+MUSETTA: Fo all'amor con chi mi piace! || I'll make love with whoever I please!
+MARCELLO: Vana, frivola, civetta! || Vain, frivolous flirt!
+MUSETTA: Non ti garba? Ebbene, pace. / ma Musetta se ne va. || You don't like it? Well then, peace. / Musetta is leaving.
+MARCELLO: Ve n'andate? Vi ringrazio: || You're leaving? Thank you:
+MARCELLO: or son ricco divenuto. Vi saluto. || now I've become a rich man. Good day to you.
+MIMÌ, RODOLFO: Vuoi che spettiam || Shall we wait
+MIMÌ, RODOLFO: la primavera ancor? || for spring to come again?
+MUSETTA: Musetta se ne va || Musetta is leaving
+MUSETTA: sì, se ne va! Vi saluto. / Signor: addio! || yes, she's leaving! Good day to you. / Sir: farewell!
+MUSETTA: vi dico con piacer. || I say it with pleasure.
+MARCELLO: Son servo e me ne vo! || Your servant, and I'm off!
+MUSETTA: Pittore da bottega! || Sign painter!
+MARCELLO: Vipera ! || Viper!
+MUSETTA: Rospo ! || Toad!
+MARCELLO: Strega ! || Witch!
+MIMÌ: Sempre tua per la vita... || Yours forever, all my life...
+RODOLFO: Ci lasceremo... || We'll part...
+MIMÌ: Ci lasceremo alla stagion dei fior... || We'll part when the flowers return...
+RODOLFO: ... alla stagion dei fior... || ... when the flowers return...
+MIMÌ: Vorrei che eterno / durasse il verno! || I wish the winter / would last forever!
+MIMÌ, RODOLFO: Ci lascerem alla stagion dei fior! || We'll part when the flowers return!
+
+Quadro Quarto — In soffitta || Act Four — In the Garret
+MARCELLO: In un coupé? || In a carriage?
+RODOLFO: Con pariglia e livree. / Mi salutò ridendo. To', Musetta! || With a pair of horses and liveried footmen. / She laughed and waved. "Well, well, Musetta!"
+RODOLFO: Le dissi: – e il cuor? – «Non batte o non lo sento / grazie al velluto che il copre». || I asked: "And your heart?" — "It doesn't beat, or I can't feel it / under all this velvet."
+MARCELLO: Ci ho gusto / davver ! || I'm truly / delighted!
+RODOLFO: (Loiola, va! Ti rodi e ridi.) || (Liar! You're laughing while it eats you up.)
+MARCELLO: Non batte? Bene! Io pur vidi... || It doesn't beat? Fine! I saw someone too...
+RODOLFO: Musetta? || Musetta?
+MARCELLO: Mimì. || Mimì.
+RODOLFO: L'hai vista? || You saw her?
+RODOLFO: Oh, guarda! || Oh, really!
+MARCELLO: Era in carrozza / vestita come una regina. || She was in a carriage, / dressed like a queen.
+RODOLFO: Evviva ! / Ne son contento. || Splendid! / I'm glad for her.
+MARCELLO: (Bugiardo, si strugge d'amor.) || (Liar, he's pining with love.)
+RODOLFO: Lavoriam. || Back to work.
+MARCELLO: Lavoriam. || Back to work.
+RODOLFO: Che penna infame! || What a wretched pen!
+MARCELLO: Che infame pennello! || What a wretched brush!
+RODOLFO: (O Mimì tu più non torni. / O giorni belli, || (Oh Mimì, you won't come back. / Oh, lovely days,
+RODOLFO: piccole mani, odorosi capelli, / collo di neve! || little hands, fragrant hair, / snow-white neck!
+RODOLFO: Ah! Mimì, mia breve gioventù! || Ah, Mimì, my brief youth!
+RODOLFO: E tu, cuffietta lieve, / che sotto il guancial partendo ascose, || And you, little bonnet, / that she hid under the pillow when she left,
+RODOLFO: tutta sai la nostra felicità, / vien sul mio cuor! || you know all our happiness — / come to my heart!
+RODOLFO: Sul mio cuor morto, poich'è morto amor.) || To my dead heart, for love is dead.)
+MARCELLO: (Io non so come sia / che il mio pennel lavori || (I don't know how it is / that my brush keeps working
+MARCELLO: ed impasti colori / contro la voglia mia. || and mixing colours / against my will.
+MARCELLO: Se pingere mi piace / o cieli o terre o inverni o primavere, || If I want to paint / skies or lands, winters or springs,
+MARCELLO: egli mi traccia due pupille nere / e una bocca procace, || it draws me two dark eyes / and a teasing mouth,
+MARCELLO: e n'esce di Musetta / e il viso ancor... || and out comes Musetta's / face again...
+MARCELLO: E n'esce di Musetta / il viso tutto vezzi e tutto frode. || And out comes Musetta's / face, all charm and all deceit.
+MARCELLO: Musetta intanto gode / e il mio cuor vil la chiama || Meanwhile Musetta enjoys herself, / and my cowardly heart calls her
+MARCELLO: e aspetta il vil mio cuor...) || and waits for her, my cowardly heart...)
+RODOLFO: Che ora sia? / E Schaunard non torna? || What time is it? / Isn't Schaunard back yet?
+MARCELLO: L'ora del pranzo di ieri. || Time for yesterday's dinner.
+SCHAUNARD: Eccoci. || Here we are.
+RODOLFO: Ebben? || Well?
+MARCELLO: Ebben? || Well?
+MARCELLO: Del pan? || Bread?
+COLLINE: È un piatto degno di Demostene: / un 'aringa... || A dish worthy of Demosthenes: / a herring...
+SCHAUNARD: ... salata. || ...a salted one.
+COLLINE: Il pranzo è in tavola. || Dinner is served.
+MARCELLO: Questa è cuccagna / da Berlingaccio. || What a feast — / it's like Carnival!
+SCHAUNARD: Or lo sciampagna / mettiamo in ghiaccio. || Now let's put / the champagne on ice.
+RODOLFO: Scelga, o barone; / trota o salmone? || Your choice, Baron: / trout or salmon?
+MARCELLO: Duca, una lingua / di pappagallo? || Duke, a parrot's / tongue?
+SCHAUNARD: Grazie, m'impingua. / Stasera ho un ballo. || No thanks, it's fattening. / I have a ball tonight.
+RODOLFO: Già sazio? || Full already?
+COLLINE: Ho fretta. / Il Re m'aspetta || I'm in a hurry. / The King awaits me.
+MARCELLO: C'è qualche trama? || Is there a plot?
+RODOLFO: Qualche mister? || Some secret?
+RODOLFO: Qualche mister? || Some secret?
+MARCELLO: Qualche mister? || Some secret?
+COLLINE: Il Re mi chiama / al Minister. || The King summons me / to the Ministry.
+RODOLFO, SCHAUNARD, MARCELLO: Bene! || Splendid!
+COLLINE: Però... / vedrò... Guizot! || But... / I'll be seeing... Guizot!
+SCHAUNARD: Porgimi il nappo. || Pass me the goblet.
+MARCELLO: Sì, bevi, io pappo! || Yes, you drink, I'll eat!
+SCHAUNARD: Mi sia permesso al nobile consesso... || May I be permitted, noble assembly...
+RODOLFO, COLLINE: Basta! || Enough!
+MARCELLO: Fiacco ! || Feeble!
+COLLINE: Che decotto! || What swill!
+MARCELLO: Leva il tacco! || Get out of here!
+COLLINE: Dammi il gotto! || Give me the cup!
+SCHAUNARD: M'ispira irresistibile / l'estro della romanza!... || I feel an irresistible urge / to sing a ballad!...
+GLI ALTRI: No! || No!
+SCHAUNARD: Azione coreografica / allora?... || A dance number, / then?...
+GLI ALTRI: Sì! Sì!... || Yes! Yes!...
+SCHAUNARD: La danza / con musica vocale! || Dancing / with vocal accompaniment!
+COLLINE: Si sgombrino le sale... || Clear the ballroom...
+COLLINE: Gavotta. || A gavotte.
+MARCELLO: Minuetto. || A minuet.
+RODOLFO: Pavanella. || A pavane.
+SCHAUNARD: Fandango. || A fandango.
+COLLINE: Propongo la quadriglia. || I propose the quadrille.
+RODOLFO: Mano alle dame. || Take your ladies.
+COLLINE: Io détto! || I'll call it!
+SCHAUNARD: Lallera, lallera, lallera, là. || Lallera, lallera, lallera, là.
+RODOLFO: Vezzosa damigella... || Charming young lady...
+MARCELLO: Rispetti la modestia. || Please respect my modesty.
+MARCELLO: La prego. || I beg you.
+SCHAUNARD: Lallera, lallera, lallera, là. || Lallera, lallera, lallera, là.
+COLLINE: Balancez. || Balancez.
+MARCELLO: Lallera, lallera, lallera, || Lallera, lallera, lallera,
+SCHAUNARD: Prima c'è il Rondò. || First comes the Rondo.
+COLLINE: No, bestia !! || No, you brute!!
+SCHAUNARD: Che modi da lacchè! || What lackey's manners!
+COLLINE: Se non erro, / lei m'oltraggia. || If I'm not mistaken, / you insult me.
+COLLINE: Snudi il ferro. || Draw your sword.
+SCHAUNARD: Pronti. || Ready.
+SCHAUNARD: Assaggia. / Il tuo sangue io voglio ber. || Have a taste. / I want to drink your blood.
+COLLINE: Uno di noi qui si sbudella. || One of us will be gutted here.
+SCHAUNARD: Apprestate una barella. || Get a stretcher ready.
+COLLINE: Apprestate un cimiter. || Get a graveyard ready.
+RODOLFO, MARCELLO: Mentre incalza / la tenzone, || While the duel / rages on,
+RODOLFO, MARCELLO: gira e balza / Rigodone. || round and round / the rigadoon!
+MARCELLO: Musetta || Musetta
+MUSETTA: C'è Mimì... || It's Mimì...
+MUSETTA: C'è Mimì che mi segue e che sta male. || Mimì is with me, and she's very ill.
+RODOLFO: Ov'è? || Where is she?
+MUSETTA: Nel far le scale / più non si resse. || Climbing the stairs, / she couldn't hold up.
+RODOLFO: Ah! || Ah!
+SCHAUNARD: Noi accostiam / quel lettuccio. || Let's bring / that little bed over.
+RODOLFO: Là. || There.
+RODOLFO: Da bere. || Something to drink.
+MIMÌ: Rodolfo! || Rodolfo!
+RODOLFO: Zitta, riposa. || Hush, rest.
+MIMÌ: O mio Rodolfo! / Mi vuoi qui con te? || Oh, my Rodolfo! / Do you want me here with you?
+RODOLFO: Ah! mia Mimì, / sempre, sempre ! || Ah, my Mimì, / always, always!
+MUSETTA: Intesi dire che Mimì, fuggita / dal Viscontino, era in fin di vita. || I heard that Mimì had left / the young Viscount and was dying.
+MUSETTA: Dove stia? Cerca, cerca... la veggo / passar per via || Where could she be? I searched and searched... then I saw her / in the street,
+MUSETTA: trascinandosi a stento. / Mi dice: «Più non reggo... || barely dragging herself along. / She said: "I can't go on...
+MUSETTA: Muoio! lo sento... || I'm dying! I can feel it...
+MUSETTA: Voglio morir con lui! Forse m'aspetta... / M'accompagni, Musetta?...» || I want to die with him! Maybe he's waiting for me... / Will you take me, Musetta?..."
+MARCELLO: Sst. || Shh.
+MIMÌ: Mi sento assai meglio... / lascia ch'io guardi intorno. || I feel much better... / let me look around.
+MIMÌ: Ah, come si sta bene qui! / Si rinasce, ancor sento la vita qui... || Ah, how good it is here! / I'm reborn, I can feel life here again...
+MIMÌ: No! tu non mi lasci più! || No! You won't leave me again!
+RODOLFO: Benedetta bocca, / tu ancor mi parli! || Blessed lips, / you speak to me again!
+MUSETTA: Che ci avete in casa? || What do you have in the house?
+MARCELLO: Nulla ! || Nothing!
+MUSETTA: Non caffè? Non vino? || No coffee? No wine?
+MARCELLO: Nulla! Ah! miseria! || Nothing! Ah, this poverty!
+SCHAUNARD: Fra mezz'ora è morta! || She'll be dead within half an hour!
+MIMÌ: Ho tanto freddo!... / Se avessi un manicotto! Queste mie mani || I'm so cold!... / If only I had a muff! These hands of mine —
+MIMÌ: riscaldare non si potranno mai? || will they never get warm?
+RODOLFO: Qui nelle mie! Taci! / Il parlar ti stanca. || Here, in mine! Hush! / Talking tires you.
+MIMÌ: Ho un po' di tosse! / Ci sono avvezza. || I have a little cough! / I'm used to it.
+MIMÌ: Buon giorno, Marcello, / Schaunard, Colline... buon giorno. || Good morning, Marcello, / Schaunard, Colline... good morning.
+MIMÌ: Tutti qui, tutti qui / sorridenti a Mimì. || All of you here, / smiling at Mimì.
+RODOLFO: Non parlar, non parlar. || Don't talk, don't talk.
+MIMÌ: Parlo piano, / non temere, Marcello, || I'm speaking softly, / don't worry. Marcello,
+MIMÌ: date retta: è assai buona Musetta. || listen to me: Musetta is very kind.
+MARCELLO: Lo so, lo so. || I know, I know.
+MUSETTA: A te, vendi, riporta / qualche cordial, manda un dottore!... || Here, sell these, and bring back / some cordial — send for a doctor!...
+RODOLFO: Riposa. || Rest.
+MIMÌ: Tu non mi lasci? || You won't leave me?
+RODOLFO: No! No! || No! No!
+MUSETTA: Ascolta! / Forse è l'ultima volta || Listen! / It may be the last time
+MUSETTA: che ha espresso un desiderio, poveretta! / Pel manicotto io vo. Con te verrò. || the poor thing ever asks for anything! / I'll go for the muff. — I'll come with you.
+MARCELLO: Sei buona, o mia Musetta. || You're good, my Musetta.
+COLLINE: Vecchia zimarra, senti, / io resto al pian, tu ascendere || Listen, old coat: / I stay down here, but you must now climb
+COLLINE: il sacro monte or devi. / Le mie grazie ricevi. || the sacred mount. / Accept my thanks.
+COLLINE: Mai non curvasti il logoro / dorso ai ricchi ed ai potenti. || You never bent your worn-out back / to the rich and the powerful.
+COLLINE: Passâr nelle tue tasche / come in antri tranquilli || Into your pockets, / as into quiet caves,
+COLLINE: filosofi e poeti. / Ora che i giorni lieti || went philosophers and poets. / Now that the happy days
+COLLINE: fuggîr, ti dico: addio, / fedele amico mio. || have fled, I say farewell to you, / my faithful friend.
+COLLINE: Addio, addio. || Farewell, farewell.
+COLLINE: Schaunard, ognuno per diversa via || Schaunard, each in our own way,
+COLLINE: mettiamo insiem due atti di pietà; / io... questo! || let's do two acts of kindness together: / mine is... this!
+COLLINE: E tu... || And you...
+COLLINE: lasciali soli là!... || leave them alone in there!...
+SCHAUNARD: Filosofo, ragioni! || Philosopher, you're right!
+SCHAUNARD: È ver!... Vo via! || It's true!... I'm going!
+MIMÌ: Sono andati? Fingevo di dormire / perché volli con te sola restare. || Have they gone? I was pretending to sleep / because I wanted to be alone with you.
+MIMÌ: Ho tante cose che ti voglio dire, / o una sola, ma grande come il mare, || I have so many things to tell you, / or just one, but as vast as the sea,
+MIMÌ: come il mare profonda ed infinita... || as deep and endless as the sea...
+MIMÌ: Sei il mio amore e tutta la mia vita! || You are my love and my whole life!
+RODOLFO: Ah, Mimì, / mia bella Mimì! || Ah, Mimì, / my beautiful Mimì!
+MIMÌ: Son bella ancora? || Am I still beautiful?
+RODOLFO: Bella come un'aurora. || Beautiful as the dawn.
+MIMÌ: Hai sbagliato il raffronto. / Volevi dir: bella come un tramonto. || You chose the wrong image. / You meant: beautiful as the sunset.
+MIMÌ: «Mi chiamano Mimì, / il perché non so...». || "They call me Mimì, / I don't know why..."
+RODOLFO: Tornò al nido la rondine e cinguetta. || The swallow has come back to her nest and is singing.
+MIMÌ: La mia cuffietta... / Ah! || My bonnet... / Ah!
+MIMÌ: Te lo rammenti quando sono entrata / la prima volta, là? || Do you remember when I came in / that first time, over there?
+RODOLFO: Se lo rammento! || Do I remember!
+MIMÌ: Il lume si era spento... || The candle had gone out...
+RODOLFO: Eri tanto turbata! / Poi smarristi la chiave... || You were so flustered! / Then you lost your key...
+MIMÌ: E a cercarla / tastoni ti sei messo!... || And you went groping / in the dark to find it!...
+RODOLFO: ...e cerca, cerca... || ...and searching, searching...
+MIMÌ: Mio bel signorino, / posso ben dirlo adesso: || My fine young gentleman, / I can say it now:
+MIMÌ: lei la trovò assai presto... || you found it very quickly...
+RODOLFO: Aiutavo il destino... || I was helping fate along...
+MIMÌ: Era buio; e il mio rossor non si vedeva... || It was dark, and you couldn't see me blush...
+MIMÌ: «Che gelida manina... / Se la lasci riscaldar!...» || "What a frozen little hand... / Let me warm it for you!..."
+MIMÌ: Era buio / e la man tu mi prendevi... || It was dark, / and you took my hand...
+RODOLFO: Oh Dio! Mimì! || Oh God! Mimì!
+SCHAUNARD: Che avvien? || What's happening?
+MIMÌ: Nulla. Sto bene. || Nothing. I'm fine.
+RODOLFO: Zitta, per carità. || Hush, for pity's sake.
+MIMÌ: Sì, sì, perdona, / ora sarò buona. || Yes, yes, forgive me, / I'll be good now.
+MUSETTA: Dorme? || Is she asleep?
+RODOLFO: Riposa. || She's resting.
+MARCELLO: Ho veduto il dottore! / Verrà; gli ho fatto fretta. || I saw the doctor! / He's coming; I told him to hurry.
+MARCELLO: Ecco il cordial. || Here's the cordial.
+MIMÌ: Chi parla? || Who's speaking?
+MUSETTA: Io, Musetta. || It's me, Musetta.
+MIMÌ: Oh, come è bello e morbido! Non più / le mani allividite. Il tepore || Oh, how lovely and soft it is! No more / frozen hands. The warmth
+MIMÌ: le abbellirà... || will make them pretty...
+MIMÌ: Sei tu / che me lo doni? || Is it you / who gives it to me?
+MUSETTA: Sì. || Yes.
+MIMÌ: Tu, spensierato! / Grazie. Ma costerà. || You, so reckless with money! / Thank you. But it must have cost a lot.
+MIMÌ: Piangi? Sto bene... / Pianger così, perché? || Are you crying? I'm fine... / Why cry like that?
+MIMÌ: Qui.. amor... sempre con te! / Le mani... al caldo... e... dormire. || Here... love... always with you! / My hands... warm... and... to sleep.
+RODOLFO: Che ha detto / il medico? || What did / the doctor say?
+MARCELLO: Verrà. || He's coming.
+MUSETTA: Madonna benedetta, / fate la grazia a questa poveretta || Blessed Madonna, / grant this poor girl your grace,
+MUSETTA: che non debba morire. || don't let her die.
+MUSETTA: Qui ci vuole un riparo / perché la fiamma sventola. || We need a shade here / because the flame is flickering.
+MUSETTA: Così. || There.
+MUSETTA: E che possa guarire. / Madonna santa, io sono || And let her get well. / Holy Madonna, I am
+MUSETTA: indegna di perdono, / mentre invece Mimì || unworthy of forgiveness, / but Mimì
+MUSETTA: è un angelo del cielo. || is an angel from heaven.
+RODOLFO: Io spero ancora. Vi pare che sia / grave? || I still have hope. Do you think it's / serious?
+MUSETTA: Non credo. || I don't think so.
+SCHAUNARD: Marcello, è spirata... || Marcello, she's gone...
+COLLINE: Musetta, a voi! || Musetta, here, for you!
+COLLINE: Come va?... || How is she?...
+RODOLFO: Vedi?... È tranquilla. || You see?... She's peaceful.
+RODOLFO: Che vuol dire / quell'andare e venire, || What do they mean, / all this coming and going,
+RODOLFO: quel guardarmi così... || the way you're looking at me...
+MARCELLO: Coraggio ! || Courage!
+RODOLFO: Mimì... Mimì!... || Mimì... Mimì!...

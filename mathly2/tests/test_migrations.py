@@ -522,3 +522,21 @@ def test_browser_roles_cannot_read_subjects_or_lessons(db, role):
     for table in ("m2_subjects", "m2_lessons"):
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             as_role(db, role, f"select * from public.{table}")
+
+
+# --- the prompter (add-prompter) ---
+
+def test_the_server_keeps_prompter_texts_and_worksheet_and_prompter_usage(db):
+    uid = "00000000-0000-0000-0000-0000000000aa"
+    as_role(db, "service_role", f"insert into public.m2_prompter_texts(user_id, title, body) values ('{uid}', 'שיעור', 'Slide 1 — פתיחה')")
+    assert as_role(db, "service_role", "select title, outline from public.m2_prompter_texts") == [("שיעור", None)]
+    with pytest.raises(psycopg.errors.CheckViolation):
+        as_role(db, "service_role", f"insert into public.m2_prompter_texts(user_id, title, body) values ('{uid}', '', 'x')")
+    for kind in ("worksheet", "prompter"):                                      # the old check refused worksheet's records
+        as_role(db, "service_role", f"insert into public.m2_ai_usage(feature, model) values ('{kind}', 'claude-opus-5-5')")
+
+
+@pytest.mark.parametrize("role", ["authenticated", "anon"])
+def test_browser_roles_cannot_read_prompter_texts(db, role):
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        as_role(db, role, "select * from public.m2_prompter_texts")
