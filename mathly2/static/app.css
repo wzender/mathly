@@ -695,3 +695,5 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .qz-review .spin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 1s linear infinite; vertical-align: middle; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .work-ai { margin: 4px 0 8px; }
+.work-ai-panel p { margin: 4px 0; }
+.work-ai-panel button { margin-top: 6px; }

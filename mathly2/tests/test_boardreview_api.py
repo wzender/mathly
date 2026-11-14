@@ -166,3 +166,37 @@ def test_a_test_handed_in_before_the_key_was_set_is_reviewed_when_the_teacher_op
     client.app.state.reviewer = fake                                              # the key is set now
     got = client.get(f"/api/teaching/work/{attempt['id']}", headers=auth(TEACHER)).json()
     assert len(fake.calls) == 1 and got["ai_summary"] and any(q["ai"] for q in got["questions"])
+
+
+def test_the_teacher_sees_the_ai_state_and_can_run_it_again_or_on_a_quiz():
+    fake = FakeReviewer(fail="rate_limited")
+    client, store, bank, test, _ = make(fake)
+    attempt, _ = hand_in(client, bank, test)
+    view = client.get(f"/api/teaching/work/{attempt['id']}", headers=auth(TEACHER)).json()
+    assert view["ai"] == {"available": True, "state": "failed", "reason": "rate_limited", "summary": None}
+    assert client.get(f"/api/teaching/work/{attempt['id']}", headers=auth(TEACHER)).json()["ai"]["state"] == "failed"   # opening does not retry
+    fake.fail = None
+    again = client.post(f"/api/teaching/work/{attempt['id']}/review", headers=auth(TEACHER)).json()
+    assert again["ai"]["state"] == "done" and again["ai"]["summary"] and len(fake.calls) == 2
+    lesson = test["lessons"][0]
+    quiz = client.post(f"/api/lessons/{lesson}/quiz/start", headers=auth(KID)).json()
+    for q in quiz["questions"]:
+        client.put(f"/api/attempts/{quiz['id']}/answers", headers=auth(KID), json={"key": q["key"], "choice": 0})
+    send_work(client, quiz["id"], quiz["questions"][0]["key"])
+    client.post(f"/api/attempts/{quiz['id']}/submit", headers=auth(KID))
+    assert client.get(f"/api/teaching/work/{quiz['id']}", headers=auth(TEACHER)).json()["ai"]["state"] is None   # a quiz: only when asked
+    assert client.post(f"/api/teaching/work/{quiz['id']}/review", headers=auth(TEACHER)).json()["ai"]["state"] == "done"
+    assert client.post(f"/api/teaching/work/{quiz['id']}/review", headers=auth(KID)).status_code == 403
+
+
+def test_no_key_says_so_and_a_missing_column_does_not_break_the_result():
+    client, store, bank, test, _ = make(None)
+    attempt, result = hand_in(client, bank, test)
+    assert client.get(f"/api/teaching/work/{attempt['id']}", headers=auth(TEACHER)).json()["ai"]["available"] is False
+    assert client.post(f"/api/teaching/work/{attempt['id']}/review", headers=auth(TEACHER)).status_code == 409
+    client.app.state.reviewer = FakeReviewer()
+    real = store.save_attempt
+    store.save_attempt = lambda i, **f: (_ for _ in ()).throw(RuntimeError("no column review")) if "review" in f else real(i, **f)
+    got = client.get(f"/api/attempts/{attempt['id']}", headers=auth(KID))
+    assert got.status_code == 200 and got.json()["review"] == {"state": "failed"}
+    assert client.get(f"/api/teaching/work/{attempt['id']}", headers=auth(TEACHER)).json()["ai"]["reason"] == "database"

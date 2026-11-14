@@ -199,18 +199,28 @@ def start_in_thread(app, attempt_id: str) -> None:
     threading.Thread(target=run, args=(app, attempt_id), name="board-review", daemon=True).start()
 
 
-def ensure(app, row: dict) -> dict:
-    """For a handed-in practice test or simulation: start its review if it has none yet (or a lost one). Returns the row as it is now."""
-    if row["kind"] not in REVIEWED or row["submitted_at"] is None or getattr(app.state, "reviewer", None) is None:
+def ensure(app, row: dict, force: bool = False) -> dict:
+    """For a handed-in practice test or simulation: start its review if it has none yet (or a lost one). Returns the row as it is now.
+    `force` (the teacher asked): any graded attempt, and again after a failed or a finished review."""
+    if row["submitted_at"] is None or getattr(app.state, "reviewer", None) is None:
+        return row
+    if not force and row["kind"] not in REVIEWED:
         return row
     review = row.get("review")
-    if review and not (review.get("state") == "pending" and clock.now() - datetime.fromisoformat(review["at"]) > STALE):
+    lost = review and review.get("state") == "pending" and clock.now() - datetime.fromisoformat(review["at"]) > STALE
+    if review and not lost and not (force and review.get("state") != "pending"):
         return row
     with _running_lock:
         if row["id"] in _running:
             return row
         _running.add(row["id"])
-    row = app.state.store.save_attempt(row["id"], review={"state": "pending", "at": clock.now().isoformat()})
+    try:
+        row = app.state.store.save_attempt(row["id"], review={"state": "pending", "at": clock.now().isoformat()})
+    except Exception:                                   # e.g. the review column's migration was not run: the result still shows
+        log.exception("board review could not be saved")
+        with _running_lock:
+            _running.discard(row["id"])
+        return {**row, "review": {"state": "failed", "reason": "database"}}
     app.state.run_review(app, row["id"])
     return app.state.store.get_attempt(row["id"]) or row
 

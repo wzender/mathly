@@ -7,7 +7,29 @@ import { pictureUrl } from "./media.js";
 
 const KINDS = { quiz: "בוחן", exercise_test: "מבחן תרגול", simulation: "סימולציה" };
 const POINTS = [[null, "אוטומטי"], [0, "0"], [0.5, "½"], [1, "מלא"]];
-let ctx;
+let ctx, poll = null;
+
+const REASONS = {
+  api_key_invalid: "המפתח של Gemini לא תקין. בדקו את GEMINI_API_KEY בשרת.",
+  permission: "למפתח של Gemini אין הרשאה למודל הזה.",
+  model_not_found: "המודל לא נמצא. בדקו את GEMINI_MODEL בשרת.",
+  rate_limited: "נגמרה המכסה החינמית של Gemini לעכשיו. נסו שוב מאוחר יותר.",
+  no_connection: "השרת לא הצליח להתחבר ל־Gemini.",
+  database: "לא ניתן לשמור את הבדיקה: חסרה במסד הנתונים העמודה review (המיגרציה 20261121090000_m2_board_review.sql).",
+  bad_request: "Gemini דחה את הבקשה.", incomplete: "התשובה של Gemini נקטעה.", bad_output: "Gemini החזיר תשובה לא תקינה.",
+};
+
+/** The AI panel: whether it can run, its state, why it failed, and the button that starts it (again). */
+function aiPanel(data) {
+  const ai = data.ai || {};
+  if (!ai.available) return `<div class="card work-ai-panel" id="work-ai"><p class="muted">🤖 בדיקה עם AI לא מוגדרת בשרת: חסר GEMINI_API_KEY.</p></div>`;
+  const button = label => `<button type="button" id="work-ai-run">${label}</button>`;
+  const body = ai.state === "pending" ? `<p role="status">🤖 ה־AI בודק את הדרך… (עד דקה בערך)</p>`
+    : ai.state === "failed" ? `<p class="error" role="alert">🤖 הבדיקה עם AI נכשלה. ${esc(REASONS[ai.reason] || "")}</p>${button("לנסות שוב")}`
+    : ai.state === "done" ? `<p>🤖 <b>סיכום ה־AI:</b> ${ai.summary ? fmt(ai.summary) : "לא היו לוחות לבדוק."}</p><p class="muted">הצעה בלבד: הנקודות שלכם קובעות.</p>${button("לבדוק שוב עם AI")}`
+    : `<p class="muted">🤖 עוד לא נבדק עם AI.</p>${button("בדיקה עם AI")}`;
+  return `<div class="card work-ai-panel" id="work-ai" data-state="${esc(ai.state || "none")}">${body}</div>`;
+}
 
 /** The list: the ones not checked yet first. */
 export async function show(context) {
@@ -41,18 +63,37 @@ function questionCard(q, i) {
 }
 
 /** One attempt: every question with the choice and the board; the points buttons; save. */
-async function open(id, note = "") {
-  const data = await api(`/api/teaching/work/${encodeURIComponent(id)}`);
+async function open(id, note = "", given = null, keep = null) {
+  clearTimeout(poll);
+  const data = given || await api(`/api/teaching/work/${encodeURIComponent(id)}`);
+  if (keep) data.questions.forEach(q => { if (q.key in keep) q.credit = keep[q.key]; });       // points picked but not saved yet stay picked
   const chosen = Object.fromEntries(data.questions.map(q => [q.key, q.credit ?? null]));
   ctx.draw(`${ctx.tabs("work")}<section id="work-check" data-attempt="${esc(data.id)}"><p><button type="button" id="work-back">‹ לרשימה</button></p>
     <h2>${fmt(data.title)}</h2><p class="muted" dir="ltr">${esc(data.student)}</p>
     <p>ציון: <b id="work-grade">${data.grade}</b>${data.checked_at ? ` <span class="muted">· נבדק</span>` : ""}</p>
     ${note ? `<p class="ex-note" role="status">${esc(note)}</p>` : ""}
+    ${aiPanel(data)}
     ${data.questions.map(questionCard).join("")}
     <p class="work-save"><button type="button" class="primary" id="work-save">שמירת הנקודות</button></p></section>`);
   ctx.wire();
   document.querySelectorAll("#work-check img[data-picture]").forEach(async img => { try { img.src = await pictureUrl(img.dataset.picture); img.hidden = false; } catch { img.replaceWith(Object.assign(document.createElement("p"), { className: "muted", textContent: "התמונה לא זמינה" })); } });
-  document.getElementById("work-back").addEventListener("click", () => show(ctx));
+  document.getElementById("work-back").addEventListener("click", () => { clearTimeout(poll); show(ctx); });
+  document.getElementById("work-ai-run")?.addEventListener("click", async event => {
+    event.target.disabled = true;
+    try { await open(id, "", await api(`/api/teaching/work/${encodeURIComponent(id)}/review`, { method: "POST" }), chosen); }
+    catch (error) { event.target.disabled = false; event.target.insertAdjacentHTML("afterend", `<p class="error" role="alert">${esc(error.message || "משהו השתבש")}</p>`); }
+  });
+  if (data.ai?.state === "pending") {                                   // ask again until the AI is done, then redraw with the picks kept
+    const wait = () => { poll = setTimeout(async () => {
+      if (document.getElementById("work-check")?.dataset.attempt !== data.id) return;
+      let now;
+      try { now = await api(`/api/teaching/work/${encodeURIComponent(id)}`); } catch { return wait(); }
+      if (document.getElementById("work-check")?.dataset.attempt !== data.id) return;
+      if (now.ai?.state === "pending") return wait();
+      open(id, "", now, chosen);
+    }, 4000); };
+    wait();
+  }
   document.querySelectorAll(".work-q").forEach(card => card.addEventListener("click", event => {
     const b = event.target.closest("[data-points]");
     if (!b) return;

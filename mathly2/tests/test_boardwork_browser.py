@@ -144,3 +144,43 @@ def test_after_a_practice_test_the_student_sees_the_review_of_the_way(browser, b
         text = page.inner_text("#qz-review")
         assert "משוב על הדרך" in text and "שאלה 1" in text and "חלק מהדרך נכון" in text and "בדקו סימן" in text
         assert page.errors == []
+
+
+def test_the_teacher_sees_why_the_ai_failed_and_runs_it_again(browser, bank):
+    from datetime import timedelta
+    from mathly2 import clock
+    from mathly2.tests.test_boardreview_api import FakeReviewer
+    lessons = [l["id"] for l in bank.lessons][:2]
+    store = InMemoryStore()
+    klass = store.create_class("setup", "A", lessons=lessons, teacher_email=TEACHER)
+    store.add_member(klass["id"], KID)
+    test = store.create_test(klass["id"], clock.school_day() + timedelta(days=9), lessons, TEACHER, created_at=clock.now() - timedelta(days=20))
+    fake = FakeReviewer(fail="rate_limited")
+    app = create_app(Settings(teachers=frozenset({TEACHER})), bank=bank, store=store, reviewer=fake)
+    with running(app) as url:
+        page = sign_in(browser, url, f"#/exam/{test['id']}/1/all")
+        page.wait_for_selector("#qz-q")
+        page.click("[data-board-toggle]")
+        page.wait_for_selector(".mx-board.full canvas")
+        draw_line(page)
+        page.click(".mx-board .mx-board-back")
+        page.locator(".qz-choice").first.click()
+        page.wait_for_selector(".qz-choice.picked")
+        page.click("#qz-submit")
+        page.click("#qz-yes")
+        page.wait_for_selector("#qz-review[data-state='failed']", timeout=15000)
+        attempt = store.attempts_of(KID_ID, "exercise_test")[0]
+
+        teacher = teacher_page(browser, url)
+        teacher.click("#teacher-tabs [data-tab='work']")
+        teacher.click(f"[data-open='{attempt['id']}']")
+        teacher.wait_for_selector("#work-ai[data-state='failed']")
+        assert "המכסה החינמית" in teacher.inner_text("#work-ai")
+        second = attempt["questions"][1]["key"]
+        teacher.click(f".work-q[data-key='{second}'] [data-points='0.5']")                           # picked, not saved yet
+        fake.fail = None
+        teacher.click("#work-ai-run")
+        teacher.wait_for_selector("#work-ai[data-state='done']", timeout=15000)
+        assert "סיכום ה־AI" in teacher.inner_text("#work-ai") and teacher.locator(".work-q .work-ai").count() == 1
+        assert teacher.get_attribute(f".work-q[data-key='{second}'] [data-points='0.5']", "aria-pressed") == "true"   # the pick stayed
+        assert teacher.errors == []

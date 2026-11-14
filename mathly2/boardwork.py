@@ -143,13 +143,29 @@ def teacher_view(request: Request, row: dict) -> dict:
     student = next((m["email"] for c in store.classes() for m in store.members(c["id"]) if m["user_id"] == row["user_id"]), "")
     return {"id": row["id"], "kind": row["kind"], "title": _title(request, row), "student": student, "grade": row["grade"],
             "submitted_at": _iso(row["submitted_at"]), "checked_at": _iso(row.get("checked_at")), "checked_by": row.get("checked_by"),
-            "questions": questions, "ai_summary": (row.get("review") or {}).get("summary")}
+            "questions": questions, "ai_summary": (row.get("review") or {}).get("summary"), "ai": _ai_state(request, row)}
+
+
+def _ai_state(request: Request, row: dict) -> dict:
+    """The AI review as the teacher sees it: can it run here (a key is set), its state, and why it failed."""
+    review = row.get("review") or {}
+    return {"available": getattr(request.app.state, "reviewer", None) is not None, "state": review.get("state"),
+            "reason": review.get("reason"), "summary": review.get("summary")}
 
 
 @router.get("/teaching/work/{attempt_id}")
 def work_open(attempt_id: str, request: Request, user: dict = Depends(need("class.teach"))) -> dict:
     from . import boardreview
     return teacher_view(request, boardreview.ensure(request.app, _graded_attempt(request, user, attempt_id)))   # opening it starts a missing AI review
+
+
+@router.post("/teaching/work/{attempt_id}/review")
+def work_review(attempt_id: str, request: Request, user: dict = Depends(need("class.teach"))) -> dict:
+    """The teacher asks for the AI review (again): after a failure, for a lesson quiz, or for a fresh look."""
+    from . import boardreview
+    if getattr(request.app.state, "reviewer", None) is None:
+        raise HTTPException(409, "בדיקה עם AI לא מוגדרת בשרת: חסר GEMINI_API_KEY")
+    return teacher_view(request, boardreview.ensure(request.app, _graded_attempt(request, user, attempt_id), force=True))
 
 
 class Credit(BaseModel):
