@@ -363,6 +363,17 @@ def test_the_simulation_is_refused_8_days_before_with_its_opening_date(world):
     assert store.attempts_of(uid(KID), "simulation") == []                    # nothing was started
 
 
+def test_the_simulation_with_nothing_started_is_refused_and_all_skills_is_the_bypass(world):
+    client, store, lessons = world
+    test = set_test(client, lessons, days=14).json()
+    client.set_time(MON + 12 * DAY)                                           # two days left: open, and nothing practiced
+    refused = start_sim(client, test["id"])
+    assert refused.status_code == 409 and "עוד לא התחלתם" in refused.json()["detail"]
+    got = client.post(f"/api/tests/{test['id']}/simulation/start?all_skills=true", headers=auth(KID))
+    assert got.status_code == 200 and got.json()["kind"] == "simulation" and len(got.json()["questions"]) == 12
+    assert start_sim(client, test["id"]).json()["id"] == got.json()["id"]     # then it resumes like any simulation
+
+
 def test_the_simulation_has_the_tests_length_can_be_taken_once_and_shows_its_result_again(world):
     client, store, lessons = world
     test = set_test(client, lessons, days=14).json()                          # 12 questions, 45 minutes

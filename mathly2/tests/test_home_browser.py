@@ -361,6 +361,19 @@ def test_the_simulation_before_its_window_says_when_it_opens_and_does_not_start(
         assert store.attempts_of(KID_ID, "simulation") == []
 
 
+def test_the_simulation_with_nothing_practiced_offers_a_bypass_on_all_the_material(browser, bank):
+    app, store, klass, lessons = world(bank)
+    test = add_test(store, klass, lessons, 2, questions=6, minutes=45)                                     # two days left, nothing started
+    with running(app) as url:
+        page = sign_in(browser, url, f"#/sim/{test['id']}")
+        page.wait_for_selector("#sim-bypass")
+        assert "עוד לא התחלתם" in page.inner_text("[role=alert]") and store.attempts_of(KID_ID, "simulation") == []
+        page.click("#sim-bypass")
+        page.wait_for_selector("#qz-q")
+        assert "מבחן סימולציה" in page.inner_text(".mx-sheet") and page.locator(".qz-dot").count() == 6
+        assert len(store.attempts_of(KID_ID, "simulation")) == 1
+
+
 # --- 3.5 the grades screen has exercise tests and simulations ---
 
 def test_exercise_tests_and_the_simulation_appear_on_the_grades_screen(browser, bank):

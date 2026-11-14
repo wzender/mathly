@@ -339,7 +339,8 @@ def start_exercise(test_id: int, number: int, request: Request, user: dict = Dep
 
 
 @router.post("/tests/{test_id}/simulation/start")
-def start_simulation(test_id: int, request: Request, user: dict = Depends(learner)) -> dict:
+def start_simulation(test_id: int, request: Request, user: dict = Depends(learner),
+                     all_skills: bool = Query(False, description="a bypass: every skill of the test's lessons, started or not")) -> dict:
     test = _student_test(request, user, test_id)
     today = clock.school_day()
     p = plan_for(test)
@@ -347,4 +348,4 @@ def start_simulation(test_id: int, request: Request, user: dict = Depends(learne
     if not existing and not countdown.sim_open(( test["date"] - today).days, p):
         opens = test["date"] - timedelta(days=p["sim"])
         raise HTTPException(409, f"מבחן הסימולציה ייפתח ב־{opens.day}.{opens.month}" if today < opens else "מבחן הסימולציה נסגר")
-    return _start(request, user, test, "simulation", str(test_id), 0.0)
+    return _start(request, user, test, "simulation", str(test_id), 0.0, all_skills)

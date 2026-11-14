@@ -38,8 +38,9 @@ export async function startExam(testId, number, allSkills = false) {
   location.replace(`#/exam/${encodeURIComponent(testId)}/${encodeURIComponent(number)}/${encodeURIComponent(data.id)}`);
 }
 
-export async function startSimulation(testId) {
-  const data = await api(`/api/tests/${encodeURIComponent(testId)}/simulation/start`, { method: "POST" });
+/** `allSkills` (address `#/sim/<test>/all`): the bypass when no skill of the test is started yet, drawn from all the material. */
+export async function startSimulation(testId, allSkills = false) {
+  const data = await api(`/api/tests/${encodeURIComponent(testId)}/simulation/start${allSkills ? "?all_skills=true" : ""}`, { method: "POST" });
   location.replace(`#/sim/${encodeURIComponent(testId)}/${encodeURIComponent(data.id)}`);
 }
 

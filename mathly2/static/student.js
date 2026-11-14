@@ -58,12 +58,12 @@ export async function show(me, view) {
         exercise.close();
         const [kind, ...rest] = where.slice(1).split("/").map(decodeURIComponent);
         const [test, second, third] = rest;
-        const allSkills = kind === "exam" && third === "all";                       // "/exam/<test>/<n>/all": not an attempt id
-        const attempt = kind === "exam" ? (allSkills ? undefined : third) : second;
+        const allSkills = kind === "exam" ? third === "all" : second === "all";      // "/exam/<test>/<n>/all", "/sim/<test>/all": not an attempt id
+        const attempt = allSkills ? undefined : kind === "exam" ? third : second;
         if (!document.getElementById("path") && !document.getElementById("test-card")) await (await import("./testcard.js")).show(view, test);   // a link or a reload: the test's card first
         if (attempt) await quiz.open(attempt);
         else if (kind === "exam") await quiz.startExam(test, second, allSkills);
-        else await quiz.startSimulation(test);
+        else await quiz.startSimulation(test, allSkills);
       } else if (where.startsWith("/test/")) {
         exercise.close(); quiz.close();
         await (await import("./testcard.js")).show(view, decodeURIComponent(where.slice(6)));
@@ -93,7 +93,11 @@ export async function show(me, view) {
       }
     } catch (error) {
       if (error.status === 401) throw error;
-      view(`<section class="card"><p class="error" role="alert">${esc(error.message || "משהו השתבש")}</p></section>`);
+      const sim = where.match(/^\/sim\/([^/]+)$/);                         // the simulation with nothing started yet: a bypass on all the material
+      const bypass = sim && error.status === 409 && /עוד לא התחלתם/.test(error.message || "")
+        ? `<p><a class="button primary" id="sim-bypass" href="#/sim/${sim[1]}/all">להתחיל בכל זאת, על כל החומר</a></p>
+           <p class="muted">מבחן סימולציה עושים פעם אחת, והציון נשמר.</p>` : "";
+      view(`<section class="card"><p class="error" role="alert">${esc(error.message || "משהו השתבש")}</p>${bypass}</section>`);
     }
     if (!where.startsWith("/skill/") && !exercise.isOpen()) { /* the path scrolls itself */ }
   }
