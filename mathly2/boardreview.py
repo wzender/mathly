@@ -111,7 +111,7 @@ class GeminiReviewer:
             return None
         return pick_model(names, self.model)
 
-    def review(self, items: list[dict]) -> dict:
+    def review(self, items: list[dict], on_event=lambda step, **info: None) -> dict:
         body = json.dumps({"contents": [{"role": "user", "parts": self._parts(items)}],
                            "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json", "responseSchema": SCHEMA}}).encode()
         with self._lock:
@@ -122,7 +122,10 @@ class GeminiReviewer:
                 except urllib.error.HTTPError as exc:
                     detail = exc.read().decode("utf-8", "replace")[:500]
                     if exc.code == 429 and attempt < RETRIES:
-                        self.sleep(_retry_after(detail, 20 * (attempt + 1)))
+                        wait = _retry_after(detail, 20 * (attempt + 1))
+                        on_event("busy", seconds=round(wait))
+                        self.sleep(wait)
+                        on_event("sent")
                         continue
                     if exc.code == 404 and not getattr(self, "_switched", False):
                         other = self._another_model()
@@ -206,15 +209,27 @@ def _items(app, row: dict) -> tuple[list[dict], dict]:
 
 
 def run(app, attempt_id: str) -> None:
-    """Review one handed-in attempt and store the result on it. Never raises: a failure is stored as {"state": "failed"}."""
+    """Review one handed-in attempt and store the result on it. Never raises: a failure is stored as {"state": "failed"}.
+    While it runs, its steps are stored on the pending review (`events`: boards found, sent, the AI busy and waiting), for the screens."""
     store = app.state.store
+    started = clock.now().isoformat()
+    events: list[dict] = []
+
+    def event(step: str, **info) -> None:
+        events.append({"step": step, "at": clock.now().isoformat(), **info})
+        try:
+            store.save_attempt(attempt_id, review={"state": "pending", "at": started, "events": list(events)})
+        except Exception:                                  # the steps are a courtesy: never fail the review for them
+            log.warning("could not save a review step")
     try:
         row = store.get_attempt(attempt_id)
         items, keys = _items(app, row)
+        event("boards", count=len(items), total=len(row["questions"]))
         if not items:
             result = {"state": "done", "summary": None, "questions": {}}
         else:
-            got = app.state.reviewer.review(items)
+            event("sent")
+            got = app.state.reviewer.review(items, on_event=event)
             questions = {}
             for q in got.get("questions", []):
                 key = keys.get(q.get("n"))
@@ -271,6 +286,8 @@ def student_view(row: dict) -> dict | None:
     review = row.get("review")
     if not review:
         return None
+    if review["state"] == "pending":
+        return {"state": "pending", "at": review.get("at"), "events": review.get("events", [])}
     if review["state"] != "done":
         return {"state": review["state"]}
     return {"state": "done", "summary": review.get("summary"), "questions": review.get("questions", {})}

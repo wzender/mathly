@@ -7,6 +7,7 @@ import { figures } from "./figures.js";
 import { esc, fmt } from "./math.js";
 import { pathHref, shuffled } from "./ui.js";
 import { hasWork, sendWork } from "./boardwork.js";
+import { stepsHtml } from "./reviewsteps.js";
 
 const LIVE_AT = new Set([300, 60, 10, 0]);        // seconds left at which the timer is announced to a screen reader
 
@@ -202,7 +203,7 @@ function reviewHtml(r) {
   const review = r.review;
   if (!review) return "";
   if (review.state === "pending") return `<section class="qz-review" id="qz-review" data-state="pending"><h4>משוב על הדרך</h4>
-    <p class="muted"><span class="spin" aria-hidden="true"></span> בודקים את הדרך שכתבתם בלוח… זה לוקח כדקה.</p></section>`;
+    <p class="muted">ה־AI עובר על הדרך שכתבתם בלוח. אפשר להמשיך לקרוא את התוצאה, המשוב יופיע כאן.</p>${stepsHtml(review)}</section>`;
   if (review.state === "failed") return `<section class="qz-review" id="qz-review" data-state="failed"><h4>משוב על הדרך</h4><p class="muted">לא הצלחנו לבדוק את הדרך הפעם. המורה יראו את הלוחות.</p></section>`;
   const rows = (r.keys || []).map((key, i) => [i + 1, review.questions[key]]).filter(([, q]) => q);
   return `<section class="qz-review" id="qz-review" data-state="done"><h4>משוב על הדרך</h4>

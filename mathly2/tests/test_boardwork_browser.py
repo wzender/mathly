@@ -184,3 +184,47 @@ def test_the_teacher_sees_why_the_ai_failed_and_runs_it_again(browser, bank):
         assert "סיכום ה־AI" in teacher.inner_text("#work-ai") and teacher.locator(".work-q .work-ai").count() == 1
         assert teacher.get_attribute(f".work-q[data-key='{second}'] [data-points='0.5']", "aria-pressed") == "true"   # the pick stayed
         assert teacher.errors == []
+
+
+def test_while_the_ai_works_the_student_and_the_teacher_see_its_steps(browser, bank):
+    import threading
+    from datetime import timedelta
+    from mathly2 import clock
+    from mathly2.tests.test_boardreview_api import FakeReviewer
+    release = threading.Event()
+
+    class Slow(FakeReviewer):
+        def review(self, items, on_event=lambda step, **info: None):
+            on_event("busy", seconds=30)
+            release.wait(30)
+            return super().review(items, on_event)
+    lessons = [l["id"] for l in bank.lessons][:2]
+    store = InMemoryStore()
+    klass = store.create_class("setup", "A", lessons=lessons, teacher_email=TEACHER)
+    store.add_member(klass["id"], KID)
+    test = store.create_test(klass["id"], clock.school_day() + timedelta(days=9), lessons, TEACHER, created_at=clock.now() - timedelta(days=20))
+    app = create_app(Settings(teachers=frozenset({TEACHER})), bank=bank, store=store, reviewer=Slow())
+    with running(app) as url:
+        page = sign_in(browser, url, f"#/exam/{test['id']}/1/all")
+        page.wait_for_selector("#qz-q")
+        page.click("[data-board-toggle]")
+        page.wait_for_selector(".mx-board.full canvas")
+        draw_line(page)
+        page.click(".mx-board .mx-board-back")
+        page.locator(".qz-choice").first.click()
+        page.wait_for_selector(".qz-choice.picked")
+        page.click("#qz-submit")
+        page.click("#qz-yes")
+        page.wait_for_selector("#qz-review[data-state='pending'] .rv-steps li.rv-now:has-text('עמוס')", timeout=15000)
+        assert "נמצאו לוח אחד" in page.inner_text("#qz-review") and page.locator(".rv-elapsed").count() == 1
+        attempt = store.attempts_of(KID_ID, "exercise_test")[0]
+
+        teacher = teacher_page(browser, url)
+        teacher.click("#teacher-tabs [data-tab='work']")
+        teacher.click(f"[data-open='{attempt['id']}']")
+        teacher.wait_for_selector("#work-ai[data-state='pending'] .rv-steps")
+        assert "עמוס" in teacher.inner_text("#work-ai")
+        release.set()
+        page.wait_for_selector("#qz-review[data-state='done']", timeout=15000)
+        teacher.wait_for_selector("#work-ai[data-state='done']", timeout=15000)
+        assert page.errors == [] and teacher.errors == []

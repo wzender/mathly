@@ -4,6 +4,7 @@ import { api } from "./api.js";
 import { figures } from "./figures.js";
 import { esc, fmt } from "./math.js";
 import { pictureUrl } from "./media.js";
+import { stepsHtml } from "./reviewsteps.js";
 
 const KINDS = { quiz: "בוחן", exercise_test: "מבחן תרגול", simulation: "סימולציה" };
 const POINTS = [[null, "אוטומטי"], [0, "0"], [0.5, "½"], [1, "מלא"]];
@@ -24,7 +25,7 @@ function aiPanel(data) {
   const ai = data.ai || {};
   if (!ai.available) return `<div class="card work-ai-panel" id="work-ai"><p class="muted">🤖 בדיקה עם AI לא מוגדרת בשרת: חסר GEMINI_API_KEY.</p></div>`;
   const button = label => `<button type="button" id="work-ai-run">${label}</button>`;
-  const body = ai.state === "pending" ? `<p role="status">🤖 ה־AI בודק את הדרך… (עד דקה בערך)</p>`
+  const body = ai.state === "pending" ? `<p><b>🤖 בדיקה עם AI</b></p>${stepsHtml(ai)}`
     : ai.state === "failed" ? `<p class="error" role="alert">🤖 הבדיקה עם AI נכשלה. ${esc(REASONS[ai.reason] || "")}${ai.model ? ` <span dir="ltr">(${esc(ai.model)})</span>` : ""}</p>${button("לנסות שוב")}`
     : ai.state === "done" ? `<p>🤖 <b>סיכום ה־AI:</b> ${ai.summary ? fmt(ai.summary) : "לא היו לוחות לבדוק."}</p><p class="muted">הצעה בלבד: הנקודות שלכם קובעות.</p>${button("לבדוק שוב עם AI")}`
     : `<p class="muted">🤖 עוד לא נבדק עם AI.</p>${button("בדיקה עם AI")}`;
@@ -89,7 +90,10 @@ async function open(id, note = "", given = null, keep = null) {
       let now;
       try { now = await api(`/api/teaching/work/${encodeURIComponent(id)}`); } catch { return wait(); }
       if (document.getElementById("work-check")?.dataset.attempt !== data.id) return;
-      if (now.ai?.state === "pending") return wait();
+      if (now.ai?.state === "pending") {                                 // the new steps, in the box only
+        document.getElementById("work-ai")?.replaceWith(Object.assign(document.createElement("div"), { innerHTML: aiPanel(now) }).firstElementChild);
+        return wait();
+      }
       open(id, "", now, chosen);
     }, 4000); };
     wait();

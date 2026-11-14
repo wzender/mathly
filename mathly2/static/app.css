@@ -692,8 +692,16 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .qz-review-list li p { margin: 4px 0; }
 .qz-review-list li.v-correct .tag { border-color: var(--ok, #15803d); }
 .qz-review-list li.v-wrong .tag { border-color: var(--danger); }
-.qz-review .spin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 1s linear infinite; vertical-align: middle; }
+.qz-review .spin, .rv-steps .spin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 1s linear infinite; vertical-align: middle; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .work-ai { margin: 4px 0 8px; }
 .work-ai-panel p { margin: 4px 0; }
 .work-ai-panel button { margin-top: 6px; }
+
+/* the steps of an AI review while it runs */
+.rv-steps { margin: 6px 0; }
+.rv-steps li { display: flex; gap: 8px; align-items: center; padding: 3px 0; }
+.rv-steps li.rv-done { color: var(--muted); }
+.rv-steps li.rv-now { font-weight: 600; }
+.rv-steps .rv-ok { color: var(--ok, #15803d); }
+.rv-time { margin: 2px 0 0; font-size: .9em; }

@@ -21,7 +21,7 @@ class FakeReviewer:
     def __init__(self, fail=None):
         self.calls, self.fail = [], fail
 
-    def review(self, items):
+    def review(self, items, on_event=lambda step, **info: None):
         self.calls.append(items)
         if self.fail:
             raise boardreview.ReviewFailure(self.fail)
@@ -174,7 +174,7 @@ def test_the_teacher_sees_the_ai_state_and_can_run_it_again_or_on_a_quiz():
     client, store, bank, test, _ = make(fake)
     attempt, _ = hand_in(client, bank, test)
     view = client.get(f"/api/teaching/work/{attempt['id']}", headers=auth(TEACHER)).json()
-    assert view["ai"] == {"available": True, "state": "failed", "reason": "rate_limited", "summary": None, "model": None}
+    assert {k: view["ai"][k] for k in ("available", "state", "reason", "summary")} == {"available": True, "state": "failed", "reason": "rate_limited", "summary": None}
     assert client.get(f"/api/teaching/work/{attempt['id']}", headers=auth(TEACHER)).json()["ai"]["state"] == "failed"   # opening does not retry
     fake.fail = None
     again = client.post(f"/api/teaching/work/{attempt['id']}/review", headers=auth(TEACHER)).json()
@@ -223,3 +223,34 @@ def test_a_model_not_found_falls_back_to_a_flash_model_the_key_has():
 def test_pick_model_prefers_stable_full_and_new():
     assert boardreview.pick_model(["gemini-3-flash-preview", "gemini-2.5-flash-lite", "gemini-2.5-flash"]) == "gemini-2.5-flash"
     assert boardreview.pick_model(["gemini-2.5-pro", "gemini-2.5-flash-preview-tts"]) is None
+
+
+def test_while_it_runs_the_review_stores_its_steps_for_the_screens():
+    seen = []
+
+    class Watching(FakeReviewer):
+        def review(self, items, on_event=lambda step, **info: None):
+            seen.append(boardreview.student_view(store.get_attempt(attempt_id)))
+            on_event("busy", seconds=8)
+            seen.append(boardreview.student_view(store.get_attempt(attempt_id)))
+            on_event("sent")
+            return super().review(items, on_event)
+    fake = Watching()
+    client, store, bank, test, _ = make(None)
+    attempt, _ = hand_in(client, bank, test, boards=2)
+    attempt_id = attempt["id"]
+    client.app.state.reviewer = fake
+    client.get(f"/api/attempts/{attempt_id}", headers=auth(KID))
+    assert [e["step"] for e in seen[0]["events"]] == ["boards", "sent"] and seen[0]["events"][0]["count"] == 2
+    assert seen[0]["state"] == "pending" and seen[0]["at"]
+    assert seen[1]["events"][-1] == {**seen[1]["events"][-1], "step": "busy", "seconds": 8}
+    assert store.get_attempt(attempt_id)["review"]["state"] == "done"
+
+
+def test_gemini_says_when_it_waits_for_the_free_tier():
+    steps = []
+    reviewer = boardreview.GeminiReviewer("key", sleep=lambda s: None)
+    replies = [http_error(429, json.dumps({"error": {"details": [{"retryDelay": "7s"}]}}).encode()), answer({"summary": "s", "questions": []})]
+    reviewer._call = lambda body: (lambda r: (_ for _ in ()).throw(r) if isinstance(r, Exception) else r)(replies.pop(0))
+    reviewer.review(items(), on_event=lambda step, **info: steps.append((step, info)))
+    assert steps == [("busy", {"seconds": 8}), ("sent", {})]
