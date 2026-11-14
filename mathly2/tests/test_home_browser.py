@@ -13,6 +13,7 @@ from mathly2.config import Settings
 from mathly2.main import create_app
 from mathly2.store import InMemoryStore
 from mathly2.tests.serve import offline_formulas, only, running
+from mathly2.tests.serve import board_written
 
 KID, TEACHER = "kid@school.test", "t@school.test"
 KID_ID = str(uuid.uuid5(uuid.NAMESPACE_DNS, KID))
@@ -475,7 +476,8 @@ def test_a_refused_test_shows_why_and_keeps_what_was_typed(browser, bank):
 # --- 5.1 the whole countdown ---
 
 def answer_in_browser(page, bank, store, kind, scope, rights):
-    """Answer the open attempt on screen right or wrong, one flag per question, moving with "next"; then submit."""
+    """Answer the open attempt on screen right or wrong, one flag per question, moving with "next"; then submit. The board counts as written on."""
+    board_written(page)
     page.wait_for_selector("#qz-q")
     refs = store.attempts_of(KID_ID, kind, scope)[-1]["questions"]
     for n, ok in enumerate(rights):

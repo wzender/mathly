@@ -253,6 +253,21 @@ def lesson_rows(request: Request, user: dict, subject: str = "math") -> tuple[li
     return lessons, order, states
 
 
+def when_due(rows: list[dict], today) -> str | None:
+    """Mark each lesson by its date in the curriculum: "past" (its date has gone by), "current" (the first lesson whose date is today or
+    later) or "later" (after it, or with no date). With no dated lesson every mark is None. Returns the current lesson's id, if any."""
+    dated = [r for r in rows if r["due_date"]]
+    if not dated:
+        for r in rows:
+            r["when"] = None
+        return None
+    coming = sorted((r for r in dated if r["due_date"] >= today.isoformat()), key=lambda r: (r["due_date"], r["number"]))
+    current = coming[0]["id"] if coming else None
+    for r in rows:
+        r["when"] = "current" if r["id"] == current else "past" if r["due_date"] and r["due_date"] < today.isoformat() else "later"
+    return current
+
+
 def lesson_map(request: Request, user: dict, subject: str = "math") -> dict:
     """The home's map: every lesson with its stars, the next lesson to play, the stars collected and the daily goal with the streak.
     The next lesson: the one with an open round, else the earliest behind the curriculum, else the first with fewer than three stars."""
@@ -265,8 +280,9 @@ def lesson_map(request: Request, user: dict, subject: str = "math") -> dict:
     behind = sorted((r for r in rows if r["behind"]), key=lambda r: (r["due_date"], r["number"]))
     nxt = (next((r for r in rows if r["round_open"]), None) or (behind[0] if behind else None)
            or next((r for r in rows if r["stars"] < 3), None))
+    current = when_due(rows, today)
     daily = here.daily_correct(uid)
-    return {"lessons": rows, "next": nxt["id"] if nxt else None, "stars": sum(r["stars"] for r in rows), "max_stars": 3 * len(rows),
+    return {"lessons": rows, "next": nxt["id"] if nxt else None, "current": current, "stars": sum(r["stars"] for r in rows), "max_stars": 3 * len(rows),
             "perfect": sum(1 for r in rows if r["stars"] == 3), "today": today_progress(daily, today), "streak": streak(daily, today)}
 
 

@@ -663,6 +663,19 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .pr-actions { flex-wrap: wrap; }
 .pr-help pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: 8px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }
 
+/* The home's lessons by date (home.js board): the current lesson on its own, past and coming lessons folded under it. */
+.lesson-groups { margin-block: 10px 6px; display: grid; gap: 8px; }
+.lnow { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 14px; background: color-mix(in srgb, var(--sky-aurora) 10%, transparent); border: 1px solid color-mix(in srgb, var(--sky-aurora) 35%, transparent); }
+.lnow-title { margin: 0; font-size: 15px; flex: none; }
+.lnow-title .muted { display: block; font-size: 13px; font-weight: 400; }
+.lnow .lnode { flex-direction: row; gap: 10px; flex: 1; justify-content: flex-start; }
+.lnow .lnode .lname { font-weight: 700; font-size: 16px; color: var(--text); white-space: normal; margin: 0; }
+.lnow .lnode .lstars { order: 3; margin-inline-start: auto; }
+.lfold { border-radius: 12px; background: color-mix(in srgb, var(--text) 5%, transparent); }
+.lfold > summary { display: flex; align-items: center; gap: 8px; padding: 10px 12px; min-height: 44px; cursor: pointer; font-weight: 600; }
+.lfold .lesson-board { margin: 0; padding: 0 8px 8px; }
+.lfold-late { color: var(--sky-danger); font-size: 14px; }
+
 /* ---------- the work on the board: the student's prompt and the teacher's check (board-work) ---------- */
 .qz-need-work { border-color: var(--sky-gold); }
 .work-list li { flex-wrap: wrap; }

@@ -13,7 +13,7 @@ from mathly2.bank import load_bank
 from mathly2.config import Settings
 from mathly2.main import create_app
 from mathly2.store import InMemoryStore
-from mathly2.tests.serve import offline_formulas, only, running
+from mathly2.tests.serve import board_written, offline_formulas, only, running
 
 KID = "kid@school.test"
 KID_ID = str(uuid.uuid5(uuid.NAMESPACE_DNS, KID))
@@ -61,7 +61,7 @@ def seed_attempt(store, bank, lesson, grade=None, minutes_left=None, answers=Non
 
 
 def path_page(browser, url, where="", viewport=PHONE):
-    page = offline_formulas(browser.new_page(viewport=viewport))
+    page = board_written(offline_formulas(browser.new_page(viewport=viewport)))           # these tests are not about the work on the board
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(url + where)
