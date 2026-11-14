@@ -6,6 +6,7 @@ import { clear as clearComet, cross as crossComet } from "./comets.js";
 import { esc, fmt } from "./math.js";
 import * as aiSheet from "./ai_sheet.js";
 import { pathHref, shuffled } from "./ui.js";
+import { sendWorkQuietly } from "./boardwork.js";
 
 
 const COUNTDOWN = 3;   // seconds before the next question after a right answer
@@ -213,6 +214,7 @@ async function answer(button) {
   }
   buttons.forEach(b => b.classList.remove("pending", "dim"));
   button.removeAttribute("aria-busy");
+  sendWorkQuietly(`${skill.id}:${question.key}`, "practice", question.key);              // the board of this answer, for the teacher
   Object.assign(skill, { round: result.round, state: result.state, correct_in_row: result.correct_in_row, today: result.today });
   updateProgress();
   const feedback = q("#ex-fb");

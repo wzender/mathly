@@ -15,7 +15,7 @@ from .access import RoleResolver, learner, permissions_of
 from .auth import DevAuthenticator, SupabaseAuthenticator, current_user
 from .bank import Bank, load_bank
 
-from . import accounts, ai, ai_help, assignments, classes, cleanup, content, progress, prompter, quizzes, reads, realtests, review, rounds, skills, status, subjects, worksheets, written
+from . import accounts, ai, ai_help, assignments, boardreview, boardwork, classes, cleanup, content, progress, prompter, quizzes, reads, realtests, review, rounds, skills, status, subjects, worksheets, written
 from .config import Settings, load_settings
 from .cached import CachedStore
 from .store import InMemoryStore, StoreUnavailable, SupabaseStore
@@ -36,7 +36,7 @@ class FreshStaticFiles(StaticFiles):
 log = logging.getLogger("mathly2")
 
 
-def create_app(settings: Settings | None = None, bank: Bank | None = None, store=None, authenticator=None, picture_store=None, pusher=None, ai_client=None) -> FastAPI:
+def create_app(settings: Settings | None = None, bank: Bank | None = None, store=None, authenticator=None, picture_store=None, pusher=None, ai_client=None, reviewer=None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         # Against the real database the pictures are tidied every hour (nothing runs without Supabase, so local runs and tests are quiet).
@@ -63,6 +63,8 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     app.state.pusher = pusher or Pusher(app.state.store, settings.vapid_private_key, default_subject(settings))
     app.state.notify_request = written.notify_new_request
     app.state.ai = ai_client or ai.make_ai(settings)
+    app.state.reviewer = reviewer or boardreview.make_reviewer(settings)    # the AI review of the way in tests; None without GEMINI_API_KEY
+    app.state.run_review = boardreview.start_in_thread                     # in the background (tests may run it inline)
     app.state.worksheet_files = (SupabasePictures(settings.supabase_url, settings.supabase_secret, "m2-worksheets")
                                  if settings.supabase_on else MemoryPictures())
     app.state.run_worksheet = worksheets.submit                 # drafting in the background (tests may run it inline)
@@ -84,6 +86,7 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     app.include_router(accounts.router)
     app.include_router(skills.router)
     app.include_router(rounds.router)
+    app.include_router(boardwork.router)
     app.include_router(quizzes.router)
     app.include_router(realtests.router)
     app.include_router(progress.router)

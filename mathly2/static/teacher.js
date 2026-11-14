@@ -10,6 +10,7 @@ const tabs = active => `<div class="subtabs" id="teacher-tabs" role="group" aria
   <button type="button" data-tab="tests" aria-pressed="${active === "tests"}">מבחנים <span class="tab-count" data-count="tests"></span></button>
   <button type="button" data-tab="assignments" aria-pressed="${active === "assignments"}">משימות <span class="tab-count" data-count="assignments"></span></button>
   <button type="button" data-tab="inbox" aria-pressed="${active === "inbox"}">תיבת בדיקה <span class="tab-count" data-count="inbox"></span></button>
+  <button type="button" data-tab="work" aria-pressed="${active === "work"}">בדיקת דרך <span class="tab-count" data-count="work"></span></button>
   <button type="button" data-tab="progress" aria-pressed="${active === "progress"}">התקדמות <span class="tab-count" data-count="progress"></span></button>
   <button type="button" data-tab="ai" aria-pressed="${active === "ai"}">AI <span class="tab-count" data-count="ai"></span></button></div>`;
 
@@ -26,7 +27,7 @@ async function fillCounts() {
 
 function wireTabs() {
   fillCounts();
-  const screens = { classes: showClasses, tests: showTests, assignments: () => work().then(m => m.showAssignments(context)), inbox: () => work().then(m => m.showInbox(context)), progress: () => import("./teacher_progress.js").then(m => m.show(context)), ai: () => import("./teacher_ai.js").then(m => m.show(context)) };
+  const screens = { classes: showClasses, tests: showTests, assignments: () => work().then(m => m.showAssignments(context)), inbox: () => work().then(m => m.showInbox(context)), work: () => import("./teacher_boardwork.js").then(m => m.show(context)), progress: () => import("./teacher_progress.js").then(m => m.show(context)), ai: () => import("./teacher_ai.js").then(m => m.show(context)) };
   document.querySelectorAll("#teacher-tabs [data-tab]").forEach(b => b.addEventListener("click", () => screens[b.dataset.tab]()));
 }
 

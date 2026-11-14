@@ -428,4 +428,9 @@ def teaching_counts(request: Request, user: dict = Depends(need("class.teach")))
     students = len({m["email"] for i in ids for m in here.members(i)})
     ai_waiting = len(store.ai_requests(class_ids=ids, kinds=["photo", "check"], states=["waiting"])) if ids else 0
     again = len(store.ai_requests(class_ids=ids, kinds=["again"], states=["waiting"])) if ids else 0          # students asking to look again are in the inbox
-    return {"classes": len(classes), "tests": len(tests), "assignments": len(assignments), "inbox": waiting + again, "progress": students, "ai": ai_waiting}
+    from .boardwork import GRADED
+    ids_of_students = list({m["user_id"] for i in ids for m in here.members(i) if m["user_id"]})
+    to_check = sum(1 for kind in GRADED for rows in (store.attempts_of_users(ids_of_students, kind) if ids_of_students else {}).values()
+                   for r in rows if r["submitted_at"] and not r.get("checked_at"))                # handed-in quizzes and tests whose way is not checked yet
+    return {"classes": len(classes), "tests": len(tests), "assignments": len(assignments), "inbox": waiting + again, "progress": students, "ai": ai_waiting,
+            "work": to_check}

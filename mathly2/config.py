@@ -27,6 +27,8 @@ class Settings:
     answer_bucket: str = "m2-answers"                               # the private bucket for answer pictures (not mathly1's)
     anthropic_key: str = ""                                         # the AI is unavailable without it (a send fails with "missing key")
     math_model: str = ""                                            # empty: the default model in ai.py
+    gemini_key: str = ""                                            # the AI review of the way in tests (boardreview.py); none without it
+    gemini_model: str = ""                                          # empty: the default (free tier) model in boardreview.py
     cache_seconds: float = 30                                       # how long slow-changing reads are remembered; 0 is off
     vapid_private_key: str = ""                                     # the server's push key; push notifications are off without it
     vapid_subject: str = ""                                         # a contact the push services may write to ("mailto:...")
@@ -60,6 +62,8 @@ def load_settings(env_file: Path | None = None) -> Settings:
         answer_bucket=env("MATHLY_M2_ANSWER_BUCKET") or "m2-answers",
         anthropic_key=env("ANTHROPIC_API_KEY"),
         math_model=env("MATH_MODEL"),
+        gemini_key=env("GEMINI_API_KEY"),
+        gemini_model=env("GEMINI_MODEL"),
         cache_seconds=float(env("MATHLY_CACHE_SECONDS") or 30),
         vapid_private_key=env("VAPID_PRIVATE_KEY"),
         vapid_subject=env("VAPID_SUBJECT"),

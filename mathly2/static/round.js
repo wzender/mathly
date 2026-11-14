@@ -5,6 +5,7 @@ import { figures } from "./figures.js";
 import { esc, fmt } from "./math.js";
 import { loadBoard } from "./exercise.js";
 import { homeHref, shuffled } from "./ui.js";
+import { sendWorkQuietly } from "./boardwork.js";
 
 const COUNTDOWN = 2;   // seconds before the next question after a right answer
 let layer = null, round = null, timer = null, streak = 0;
@@ -132,6 +133,7 @@ async function answer(button) {
   }
   buttons.forEach(b => b.classList.remove("pending", "dim"));
   button.removeAttribute("aria-busy");
+  sendWorkQuietly(`round:${round.id}:${round.question.key}`, round.id, round.question.key);   // the board of this answer, for the teacher
   const following = result.round;
   round = { ...round, results: following.results, state: following.state };
   updateProgress();

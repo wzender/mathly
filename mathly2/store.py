@@ -46,11 +46,12 @@ PROGRESS_FIELDS = ("current_key", "current_helped", "started_at", "mastered_at",
 PROGRESS_DEFAULTS = {"current_key": None, "current_helped": False, "started_at": None, "mastered_at": None, "round_start": None}
 
 
-ATTEMPT_FIELDS = {"answers", "submitted_at", "timed_out", "grade"}
+ATTEMPT_FIELDS = {"answers", "submitted_at", "timed_out", "grade", "credit", "checked_at", "checked_by", "review"}
 
 
 def _copy_attempt(row: dict) -> dict:
-    return {**row, "questions": [dict(q) for q in row["questions"]], "answers": dict(row["answers"])}
+    return {**row, "questions": [dict(q) for q in row["questions"]], "answers": dict(row["answers"]), "credit": dict(row.get("credit") or {}),
+            "review": copy.deepcopy(row.get("review"))}
 
 
 def _when(value):
@@ -64,7 +65,8 @@ def _when(value):
 def _attempt_row(row: dict) -> dict:
     """A database row as the in-memory store gives it: real datetimes, plain lists and dicts."""
     return {**row, "started_at": _when(row["started_at"]), "due_at": _when(row["due_at"]), "submitted_at": _when(row.get("submitted_at")),
-            "questions": list(row.get("questions") or []), "answers": dict(row.get("answers") or {})}
+            "questions": list(row.get("questions") or []), "answers": dict(row.get("answers") or {}), "credit": dict(row.get("credit") or {}),
+            "checked_at": _when(row.get("checked_at")), "checked_by": row.get("checked_by"), "review": row.get("review")}
 
 
 TEST_FIELDS = {"date", "lessons", "note", "questions", "minutes", "subject_id"}
@@ -100,7 +102,7 @@ def _test_row(row: dict) -> dict:
             "created_at": _when(row["created_at"]), "removed_at": _when(row.get("removed_at"))}
 
 
-PICTURE_KINDS = ("page", "answer", "help")
+PICTURE_KINDS = ("page", "answer", "help", "work")
 SUBMISSION_FIELDS = {"pictures", "state", "late", "handed_at", "grade", "teacher_note", "checked_at", "checked_by"}
 REQUEST_FIELDS = {"state", "picture_id"}
 AI_FIELDS = {"state", "picture_id", "skill_id", "snapshot", "result", "teacher_note", "failure", "budget", "sent_by", "sent_at", "done_at"}
@@ -137,6 +139,7 @@ class InMemoryStore:
         self._answers: list[dict] = []
         self._comets: dict[str, dict[str, str]] = {}       # user_id -> {comet_id: caught_at}
         self._attempts: dict[str, dict] = {}                # attempt id -> row
+        self._work: dict[tuple, dict] = {}                  # (user id, ref, question key) -> the board's picture for that answer
         self._reward: dict[str, dict] = {}                 # user_id -> {last_comet_day, last_catch_day}
         self._tests: dict[int, dict] = {}                   # test id -> row
         self._pictures: dict[str, dict] = {}
@@ -461,7 +464,23 @@ class InMemoryStore:
             return {"assignments": sorted(a["id"] for a in self._assignments.values() if pid in a["pages"]),
                     "submissions": sorted(s["id"] for s in self._submissions.values() if pid in s["pictures"]),
                     "requests": sorted(r["id"] for r in self._requests.values() if r["picture_id"] == pid),
-                    "ai_requests": sorted(r["id"] for r in self._ai.values() if r["picture_id"] == pid)}
+                    "ai_requests": sorted(r["id"] for r in self._ai.values() if r["picture_id"] == pid),
+                    "work": sorted(f"{w['ref']}:{w['question_key']}" for w in self._work.values() if w["picture_id"] == pid)}
+
+    # --- the work on the board: one picture per student, attempt (or "practice") and question ---
+
+    def save_work(self, user_id: str, ref: str, question_key: str, skill_id: str, picture_id: str, at: datetime | None = None) -> str | None:
+        """Keep this picture as the work for the answer. Returns the picture it replaced (nothing refers to it any more), or None."""
+        with self._lock:
+            old = self._work.get((user_id, ref, question_key))
+            self._work[(user_id, ref, question_key)] = {"user_id": user_id, "ref": ref, "question_key": question_key, "skill_id": skill_id,
+                                                        "picture_id": str(picture_id), "saved_at": at or datetime.now(timezone.utc)}
+            return old["picture_id"] if old and old["picture_id"] != str(picture_id) else None
+
+    def work_of(self, user_id: str, ref: str) -> dict[str, str]:
+        """The question keys of an attempt (or "practice") that have work, each with its picture id."""
+        with self._lock:
+            return {w["question_key"]: w["picture_id"] for (u, r, _), w in self._work.items() if u == user_id and r == ref}
 
     def create_assignment(self, class_id: int, title: str, due_date: date, created_by: str, kind: str, *, note: str = "", pages=(),
                           quiz_lesson: str | None = None, test_id: int | None = None, exercise_number: int | None = None,
@@ -712,7 +731,8 @@ class InMemoryStore:
 
     def create_attempt(self, user_id: str, kind: str, scope: str, started_at: datetime, due_at: datetime, questions: list[dict]) -> dict:
         row = {"id": str(uuid.uuid4()), "user_id": user_id, "kind": kind, "scope": scope, "started_at": started_at, "due_at": due_at,
-               "submitted_at": None, "timed_out": False, "grade": None, "questions": [dict(q) for q in questions], "answers": {}}
+               "submitted_at": None, "timed_out": False, "grade": None, "questions": [dict(q) for q in questions], "answers": {},
+               "credit": {}, "checked_at": None, "checked_by": None, "review": None}
         with self._lock:
             self._attempts[row["id"]] = row
             return _copy_attempt(row)
@@ -731,7 +751,7 @@ class InMemoryStore:
             row = self._attempts.get(str(attempt_id))
             if row is None:
                 raise KeyError(attempt_id)
-            row.update({k: (dict(v) if k == "answers" else v) for k, v in fields.items()})
+            row.update({k: (dict(v) if k in ("answers", "credit") else v) for k, v in fields.items()})
             return _copy_attempt(row)
 
     def save_open_answers(self, attempt_id: str, answers: dict) -> dict | None:
@@ -1267,7 +1287,21 @@ class SupabaseStore:
         return {"assignments": sorted(r["id"] for r in self._request("GET", "m2_assignments", {"pages": f"cs.{{{pid}}}", "select": "id"})),
                 "submissions": sorted(r["id"] for r in self._request("GET", "m2_submissions", {"pictures": f"cs.{{{pid}}}", "select": "id"})),
                 "requests": sorted(r["id"] for r in self._request("GET", "m2_photo_requests", {"picture_id": self._eq(pid), "select": "id"})),
-                "ai_requests": sorted(r["id"] for r in self._request("GET", "m2_ai_requests", {"picture_id": self._eq(pid), "select": "id"}))}
+                "ai_requests": sorted(r["id"] for r in self._request("GET", "m2_ai_requests", {"picture_id": self._eq(pid), "select": "id"})),
+                "work": sorted(f"{r['ref']}:{r['question_key']}" for r in self._request("GET", "m2_work", {"picture_id": self._eq(pid), "select": "ref,question_key"}))}
+
+    def save_work(self, user_id: str, ref: str, question_key: str, skill_id: str, picture_id: str, at: datetime | None = None) -> str | None:
+        where = {"user_id": self._eq(user_id), "ref": self._eq(ref), "question_key": self._eq(question_key), "select": "picture_id"}
+        old = self._request("GET", "m2_work", where)
+        body = {"user_id": user_id, "ref": ref, "question_key": question_key, "skill_id": skill_id, "picture_id": str(picture_id),
+                "saved_at": (at or datetime.now(timezone.utc)).isoformat()}
+        self._request("POST", "m2_work", {"on_conflict": "user_id,ref,question_key"}, body, returning=False, upsert=True)
+        before = str(old[0]["picture_id"]) if old else None
+        return before if before and before != str(picture_id) else None
+
+    def work_of(self, user_id: str, ref: str) -> dict[str, str]:
+        rows = self._request("GET", "m2_work", {"user_id": self._eq(user_id), "ref": self._eq(ref), "select": "question_key,picture_id"})
+        return {r["question_key"]: str(r["picture_id"]) for r in rows}
 
     def create_assignment(self, class_id: int, title: str, due_date: date, created_by: str, kind: str, *, note: str = "", pages=(),
                           quiz_lesson: str | None = None, test_id: int | None = None, exercise_number: int | None = None,
