@@ -25,7 +25,7 @@ function draw(view, { quizzes, exercise_tests: exercises = [], simulations = [],
     ${quizzes.length ? `<h3>בחנים</h3><ul class="plain grades" id="quiz-grades">${quizzes.map(g => row({ attrs: `data-lesson="${esc(g.lesson.id)}"`, href: `#/quiz/${esc(g.lesson.id)}`,
       title: fmt(g.lesson.name), best: g.best, attempts: g.attempts, last: g.last })).join("")}</ul>` : ""}
     ${exercises.length ? `<h3>מבחני תרגול</h3><ul class="plain grades" id="exercise-grades">${exercises.map(g => row({ attrs: `data-test="${g.test.id}" data-number="${g.number}"`,
-      href: `#/test/${g.test.id}`, title: testTitle(g.test, g.number === 3 ? "מבחן תרגול: נושאים לחיזוק" : `מבחן תרגול ${g.number}`), best: g.best, attempts: g.attempts, last: g.last })).join("")}</ul>` : ""}
+      href: `#/test/${g.test.id}`, title: testTitle(g.test, g.title || `מבחן תרגול ${g.number}`), best: g.best, attempts: g.attempts, last: g.last })).join("")}</ul>` : ""}
     ${assignments.length ? `<h3>משימות</h3><ul class="plain grades" id="assignment-grades">${assignments.map(g => `<li data-assignment="${g.assignment.id}">
         <a href="#/assignment/${g.assignment.id}"><b>${fmt(g.assignment.title)}</b>${g.assignment.removed ? " (הוסרה)" : ""}</a>
         <span class="gr-num" aria-label="הציון ${g.grade}">${g.grade}</span>

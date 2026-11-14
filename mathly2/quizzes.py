@@ -41,7 +41,10 @@ def _test_info(request: Request, row: dict) -> dict:
     test_id, _, number = row["scope"].partition(":")
     test = request.app.state.store.get_test(int(test_id)) if test_id.isdigit() else None
     names = [l["name"] for l in request.app.state.bank.lessons if test and l["id"] in test["lessons"]]
+    from .exam import TITLES, mode_of_scope
+    mode = mode_of_scope(row["scope"]) if row["kind"] == "exercise_test" else None
     return {"id": int(test_id) if test_id.isdigit() else None, "number": int(number) if number.isdigit() else None,
+            "mode": mode, "title": TITLES[mode] if mode else "מבחן סימולציה",
             "date": test["date"].isoformat() if test else None, "lessons": names, "minutes": test["minutes"] if test else None}
 
 
@@ -63,8 +66,9 @@ def view(request: Request, row: dict) -> dict:
     row = boardreview.ensure(request.app, row)                          # a practice test or the simulation: the AI reviews the way
     result = attempts.result(bank, row)
     result.pop("lesson", None)
+    from .realtests import readiness_change
     return {**base, "state": "submitted", **result, "submitted_at": _iso(row["submitted_at"]), "review": boardreview.student_view(row),
-            "keys": [q["key"] for q in row["questions"]]}
+            "keys": [q["key"] for q in row["questions"]], "readiness": readiness_change(request, row)}
 
 
 _view = view
@@ -157,7 +161,9 @@ def grades(request: Request, user: dict = Depends(learner), subject: str = Query
         for row in here.attempts_of(uid, kind):
             row = attempts.settle(store, bank, row, now)
             if not attempts.is_open(row):
-                groups.setdefault((kind, row["scope"]), []).append(row)
+                from .exam import mode_of_scope
+                key = row["scope"] if kind == "simulation" else f"{row['scope'].split(':')[0]}:{mode_of_scope(row['scope'])}"   # by mode
+                groups.setdefault((kind, key), []).append(row)
     exercise, simulations = [], []
     for (kind, scope), rows in groups.items():
         test_id, _, number = scope.partition(":")
@@ -167,7 +173,8 @@ def grades(request: Request, user: dict = Depends(learner), subject: str = Query
         item = {"test": _test_ref(request, test), "best": max(r["grade"] for r in rows), "attempts": len(rows),
                 "last": _iso(max(r["submitted_at"] for r in rows))}
         if kind == "exercise_test":
-            exercise.append({**item, "number": int(number)})
+            from .exam import NUMBER_OF, TITLES
+            exercise.append({**item, "number": NUMBER_OF[number], "mode": number, "title": TITLES[number]})
         else:
             simulations.append(item)
     exercise.sort(key=lambda g: (g["test"]["date"], g["test"]["id"], g["number"]))

@@ -115,8 +115,11 @@ def class_progress(class_id: int, request: Request, period: int | None = None, u
         for m in members:
             facts = facts_for(request, m["user_id"], nearest, today)
             ready = readiness_for(facts)
-            rows.append({"email": m["email"], "signed_in": bool(m["user_id"]), "readiness": ready, "mastery": ready["parts"]["M"],
-                         "practice": ready["parts"]["E"], "simulation": ready["parts"]["S"]})
+            covered = len(facts["covered"])
+            rows.append({"email": m["email"], "signed_in": bool(m["user_id"]), "readiness": ready,
+                         "mastery": round(100 * facts["mastered"] / covered) if covered else None,          # shown beside it; not part of it
+                         "practice": ready["practice_best"], "simulation": ready["simulation_best"],
+                         "practices": ready["practices"], "simulations": ready["simulations"]})
         names = {l["id"]: l["name"] for l in bank.lessons}
         test = {"id": nearest["id"], "date": nearest["date"].isoformat(), "days_left": (nearest["date"] - today).days,
                 "lessons": [names.get(i, i) for i in nearest["lessons"]], "students": rows}

@@ -27,9 +27,10 @@ function lessonsView(data) {
 function readiness(data) {
   const t = data.test;
   if (!t) return `<p class="muted" id="no-test">עוד לא נקבע מבחן קרוב לכיתה הזו.</p>`;
-  const rows = t.students.map(s => `<tr data-student="${esc(s.email)}">${who(s)}<td><b>${s.readiness.number}</b> · ${esc(s.readiness.label)}</td><td>${dash(s.mastery)}${s.mastery === null ? "" : "%"}</td><td>${dash(s.practice)}</td><td>${dash(s.simulation)}</td></tr>`).join("");
+  const rows = t.students.map(s => `<tr data-student="${esc(s.email)}">${who(s)}<td><b>${s.readiness.number}</b> · ${esc(s.readiness.label)}</td><td>${dash(s.mastery)}${s.mastery === null ? "" : "%"}</td><td>${dash(s.practice)}${s.practices ? ` <span class="muted">(${s.practices})</span>` : ""}</td><td>${dash(s.simulation)}${s.simulations ? ` <span class="muted">(${s.simulations})</span>` : ""}</td></tr>`).join("");
   return `<p>מבחן ב־${shortDate(t.date)} (${t.days_left === 0 ? "היום" : `בעוד ${t.days_left} ימים`}): ${t.lessons.map(esc).join(", ")}</p>
-    <div class="tablewrap" tabindex="0" role="region" aria-label="מוכנות"><table class="hm"><thead><tr><th class="sticky">תלמיד</th><th>מוכנות</th><th>שליטה</th><th>תרגול</th><th>סימולציה</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="tablewrap" tabindex="0" role="region" aria-label="מוכנות"><table class="hm"><thead><tr><th class="sticky">תלמיד</th><th>מוכנות</th><th>שליטה</th><th>תרגול: הטוב (כמה)</th><th>סימולציה: הטוב (כמה)</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="muted">המוכנות עולה רק ממבחני תרגול וסימולציות. השליטה במסלול מוצגת לידה ולא נכללת בה.</p>`;
 }
 
 function page(ctx, classes, data) {

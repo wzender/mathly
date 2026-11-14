@@ -7,6 +7,15 @@ import random
 EXERCISE_SHARE = {1: 0.6, 2: 0.3}      # the share of questions that come from weak skills in exercise test 1 and 2; the simulation has none
 FOCUS = 3                               # the exercise test on the weak topics: only the skills that lost points or are still being learned
 FOCUS_SIZE = 15
+BALANCED, MANUAL = 1, 4                 # practice tests by mode (the number in the attempt's scope "<test>:<n>"); 2 is an older balanced one
+MODE_OF = {1: "balanced", 2: "balanced", FOCUS: "focus", MANUAL: "manual"}
+NUMBER_OF = {"balanced": BALANCED, "focus": FOCUS, "manual": MANUAL}
+TITLES = {"balanced": "מבחן תרגול מאוזן", "focus": "מבחן תרגול ממוקד", "manual": "מבחן תרגול בבחירה"}
+
+
+def mode_of_scope(scope: str) -> str:
+    _, _, number = scope.partition(":")
+    return MODE_OF.get(int(number), "balanced") if number.isdigit() else "balanced"
 
 
 def _round(x: float) -> int:
@@ -60,7 +69,7 @@ def draw(bank, lessons: list[str], states: dict[str, str], n: int, *, share: flo
 
 
 def draw_focus(bank, weak: list[str], n: int = FOCUS_SIZE, used: dict[str, int] | None = None, rng: random.Random | None = None) -> list[dict]:
-    """`n` questions from the weak skills only, one per skill round after round (least-used questions first)."""
+    """`n` questions from these skills only (the weak ones, or the ones the student picked), one per skill round after round (least-used first)."""
     used, rng = used or {}, rng or random.Random()
     pools = {i: sorted(bank.question_keys(i), key=lambda key: (used.get(key, 0), rng.random())) for i in weak if bank.question_keys(i)}
     order, taken, seen = rng.sample(list(pools), len(pools)), [], set()

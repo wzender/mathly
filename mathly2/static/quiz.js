@@ -39,16 +39,31 @@ export async function startExam(testId, number, allSkills = false) {
   location.replace(`#/exam/${encodeURIComponent(testId)}/${encodeURIComponent(number)}/${encodeURIComponent(data.id)}`);
 }
 
-/** `allSkills` (address `#/sim/<test>/all`): the bypass when no skill of the test is started yet, drawn from all the material. */
+/** A simulation on request (an open one resumes). `allSkills` is kept for old addresses (`#/sim/<test>/all`). */
 export async function startSimulation(testId, allSkills = false) {
   const data = await api(`/api/tests/${encodeURIComponent(testId)}/simulation/start${allSkills ? "?all_skills=true" : ""}`, { method: "POST" });
   location.replace(`#/sim/${encodeURIComponent(testId)}/${encodeURIComponent(data.id)}`);
 }
 
 /** What the sheet is called, who it is about and where closing it leads, by kind. */
-const FOCUS = 3;                                     // the exercise test on the weak topics
-const names = a => a.kind === "exercise_test" ? (a.test.number === FOCUS ? { title: "מבחן תרגול: נושאים לחיזוק", again: "עוד מבחן על הנושאים" } : { title: `מבחן תרגול ${a.test.number}`, again: "מבחן חוזר" })
+const FOCUS = 3;                                     // the practice test on the hard skills
+const names = a => a.kind === "exercise_test" ? { title: a.test.title || "מבחן תרגול", again: "" }        // a test: the readiness block offers the next one
   : a.kind === "simulation" ? { title: "מבחן סימולציה", again: "" } : { title: "בוחן", again: "בוחן חוזר" };
+
+/** What the test did to the readiness number: the gain big, the bar growing from before to after, a new level, the next one, and the
+ *  two ways to go on raising it. */
+function readinessHtml(r) {
+  const x = r.readiness;
+  if (!x) return "";
+  const test = r.test.id;
+  return `<section class="qz-ready${x.gain ? " up" : ""}" id="qz-ready" data-gain="${x.gain}">
+    ${x.gain ? `<p class="qz-gain" aria-hidden="true">+${x.gain}</p><p><b>המוכנות למבחן עלתה ל־${x.after}!</b></p>`
+      : `<p><b>המוכנות נשארה ${x.after}.</b> <span class="muted">ציון מעל ${x.after} יעלה אותה.</span></p>`}
+    ${x.level_up ? `<p class="qz-level">🎉 רמה חדשה: ${esc(x.label)}!</p>` : ""}
+    <div class="bar rd-bar" role="progressbar" aria-label="מוכנות ${x.after} מתוך 100" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${x.after}"><i style="width:${x.before}%" data-to="${x.after}"></i></div>
+    <p class="muted">${x.next ? `עוד ${x.next.left} לרמה "${esc(x.next.name)}"` : "הרמה הגבוהה ביותר! 🏆"}</p>
+    <p class="qz-more"><a class="button primary" id="qz-more-sim" href="#/sim/${test}">⏱ עוד סימולציה</a> <a class="button" id="qz-more-practice" href="#/test/${test}/practice">📝 מבחן תרגול</a></p></section>`;
+}
 const chip = a => a.kind === "quiz" ? fmt(a.lesson.name) : a.test.lessons.map(fmt).join(", ");
 const leaveTo = () => !attempt || attempt.kind === "quiz" ? pathHref() : `#/test/${attempt.test.id}`;
 
@@ -241,11 +256,12 @@ function renderResult() {
   q(".mx-sheet").innerHTML = `${heading(`תוצאת ${names(r).title}`)}
     <div class="qz-result"><p class="qz-grade" id="qz-grade" aria-label="הציון ${r.grade}"><b>${r.grade}</b><span>מתוך 100</span></p>
       <p>${r.right === 1 ? "תשובה נכונה אחת" : `${r.right} תשובות נכונות`} מתוך ${r.total}${r.timed_out ? ". הזמן נגמר והבוחן הוגש כמו שהוא." : ""}</p>
-      <p class="muted" id="qz-best"></p>${r.kind === "simulation" ? `<p class="muted">מבחן סימולציה אפשר לעשות פעם אחת.</p>` : ""}</div>
+      <p class="muted" id="qz-best"></p></div>
+    ${readinessHtml(r)}
     ${r.lost_skills.length ? `<h4>איפה אפשר להשתפר</h4><ul class="plain" id="qz-lost">${r.lost_skills.map(s =>
       `<li><a href="#/skill/${esc(s.id)}">${fmt(s.name)}</a><span class="muted">${s.missed} ${s.missed === 1 ? "שאלה שגויה" : "שאלות שגויות"}</span></li>`).join("")}</ul>
       <p class="muted">אפשר לתרגל את המיומנות ואז לנסות שוב.</p>
-      ${r.kind !== "quiz" && r.test.number !== FOCUS ? `<p><a class="button" id="qz-focus" href="#/exam/${esc(r.test.id)}/${FOCUS}">🎯 מבחן תרגול על הנושאים לחיזוק (15 שאלות)</a></p>` : ""}` : `<p id="qz-perfect">כל התשובות נכונות. כל הכבוד!</p>`}
+      ${r.kind !== "quiz" && r.test.number !== FOCUS ? `<p><a class="button" id="qz-focus" href="#/exam/${esc(r.test.id)}/${FOCUS}">🎯 מבחן תרגול ממוקד על מה שהיה קשה (15 שאלות)</a></p>` : ""}` : `<p id="qz-perfect">כל התשובות נכונות. כל הכבוד!</p>`}
     ${r.missed.length ? `<h4>הטעויות</h4><ol class="qz-missed" id="qz-missed">${r.missed.map(m => `<li><p class="ex-text" dir="auto">${fmt(m.question)}</p>
       ${m.picked ? `<p class="muted">בחרתם: <span dir="auto">${fmt(m.picked)}</span></p>` : `<p class="muted">לא ענו על השאלה.</p>`}
       ${m.mistake ? `<p><b>${esc(m.mistake.name)}</b>${m.mistake.tip ? `<br>${fmt(m.mistake.tip)}` : ""}</p>` : ""}</li>`).join("")}</ol>` : ""}
@@ -253,7 +269,9 @@ function renderResult() {
     <p class="qz-actions">${r.missed.length ? `<a class="button primary" id="qz-retry" href="#/retry/${esc(r.id)}">🔁 חזרה על השאלות שטעיתי (${r.missed.length})</a> ` : ""}${names(r).again ? `<button type="button" class="${r.missed.length ? "" : "primary"}" id="qz-retake">${names(r).again}</button> ` : ""}<button type="button" data-close>${r.kind === "quiz" ? "חזרה למסלול" : "חזרה למבחן"}</button></p>`;
   if (r.review?.state === "pending") waitForReview(r.id);
   const best = r.kind === "quiz" ? api(`/api/lessons/${encodeURIComponent(r.lesson.id)}/quiz`).then(f => f.best === null ? "" : `הציון של השיעור: ${f.best}`)
-    : r.kind === "exercise_test" ? api(`/api/tests/${encodeURIComponent(r.test.id)}`).then(t => `הציון הטוב במבחן התרגול: ${t.exercise_tests[r.test.number - 1].best ?? ""}`) : Promise.resolve("");
+    : Promise.resolve("");
+  const grow = q("#qz-ready .rd-bar i");
+  if (grow) setTimeout(() => { grow.style.width = `${grow.dataset.to}%`; }, 300);
   best.then(text => { if (text && q("#qz-best")) q("#qz-best").textContent = text; }).catch(() => {});
 }
 
@@ -272,7 +290,8 @@ function onClick(event) {
     if (target.closest("#qz-back")) { q("#qz-warn").innerHTML = ""; warned = false; return; }
   } else if (target.closest("#qz-retake")) {
     at = 0;
-    const again = attempt.kind === "quiz" ? start(attempt.lesson.id) : startExam(attempt.test.id, attempt.test.number);
+    const again = attempt.kind === "quiz" ? start(attempt.lesson.id) : attempt.kind === "simulation" ? startSimulation(attempt.test.id)
+      : startExam(attempt.test.id, attempt.test.number);
     again.catch(error => { q(".qz-actions").insertAdjacentHTML("afterend", `<p class="error" role="alert">${esc(error.message)}</p>`); });
   }
 }

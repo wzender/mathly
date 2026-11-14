@@ -69,11 +69,13 @@ export async function show(me, view) {
         const attempt = allSkills ? undefined : kind === "exam" ? third : second;
         if (!document.getElementById("path") && !document.getElementById("test-card")) await (await import("./testcard.js")).show(view, test);   // a link or a reload: the test's card first
         if (attempt) await quiz.open(attempt);
+        else if (kind === "exam" && second === "4") location.replace(`#/test/${encodeURIComponent(test)}/practice`);   // picked skills: choose them first
         else if (kind === "exam") await quiz.startExam(test, second, allSkills);
         else await quiz.startSimulation(test, allSkills);
       } else if (where.startsWith("/test/")) {
         exercise.close(); quiz.close();
-        await (await import("./testcard.js")).show(view, decodeURIComponent(where.slice(6)));
+        const [testId, part] = where.slice(6).split("/").map(decodeURIComponent);      // "/test/<id>/practice": straight to the practice test's choice
+        await (await import("./testcard.js")).show(view, testId, part === "practice" ? "practice" : "");
       } else if (where === "/review") {
         exercise.close(); quiz.close();
         await (await import("./review.js")).show(view);

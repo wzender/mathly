@@ -143,7 +143,7 @@ def test_the_tests_tab_shows_who_took_the_simulation_and_names_those_who_did_not
     assert listed["simulation"]["taken"] == 22 and listed["simulation"]["total"] == 25
     assert sorted(listed["simulation"]["missing"]) == sorted([KID, KID2, "s22@school.test"])
     taken = next(s for s in listed["students"] if s["email"] == "s0@school.test")
-    assert taken["simulation_taken"] is True and taken["readiness"]["parts"]["S"] == 70
+    assert taken["simulation_taken"] is True and taken["readiness"]["simulation_best"] == 70 and taken["readiness"]["number"] == 42
     assert [c["class"]["name"] for c in tab] == ["A"] and tab[0]["class"]["lessons"]
 
 
@@ -166,75 +166,8 @@ def finished(store, test_id, kind, scope, grade, who=KID, questions=None):
 def test_with_no_test_home_has_only_the_next_skill(world):
     client, _, _ = world
     home = client.get("/api/home", headers=auth(KID)).json()
-    assert home["tests"] == [] and home["task"] is None and home["required_simulations"] == []
+    assert home["tests"] == [] and "task" not in home
     assert home["next_skill"]["id"] and home["next_skill"]["name"]
-
-
-def test_nine_days_before_the_test_todays_task_is_exercise_test_1(world):
-    client, _, lessons = world
-    test = set_test(client, lessons, days=9).json()
-    home = client.get("/api/home", headers=auth(KID)).json()
-    assert home["task"]["kind"] == "ex1" and home["task"]["test_id"] == test["id"]
-    assert home["tests"][0]["days_left"] == 9 and home["tests"][0]["exercise_tests"][0]["best"] is None
-
-
-def test_twelve_days_ahead_the_task_is_finishing_the_path_with_the_next_covered_skill(world):
-    client, _, lessons = world
-    set_test(client, lessons, days=12)
-    task = client.get("/api/home", headers=auth(KID)).json()["task"]
-    assert task["kind"] == "path" and task["skill"] and task["skill_name"]
-
-
-def test_four_days_before_the_simulation_is_required_until_it_is_taken(world):
-    client, store, lessons = world
-    set_test_ = set_test(client, lessons, days=14).json()
-    client.set_time(MON + 10 * DAY)                                          # four days left
-    home = client.get("/api/home", headers=auth(KID)).json()
-    assert home["task"]["kind"] == "sim" and [r["test_id"] for r in home["required_simulations"]] == [set_test_["id"]]
-    assert home["tests"][0]["simulation"]["required"] is True and home["tests"][0]["simulation"]["open_now"] is True
-    finished(store, set_test_["id"], "simulation", str(set_test_["id"]), 70)
-    home = client.get("/api/home", headers=auth(KID)).json()
-    assert home["required_simulations"] == [] and home["tests"][0]["simulation"]["taken"] is True and home["tests"][0]["simulation"]["grade"] == 70
-
-
-def test_two_tests_give_the_task_of_the_closer_one(world):
-    client, _, lessons = world
-    far = set_test(client, lessons, days=10).json()
-    near = set_test(client, lessons, days=4).json()
-    home = client.get("/api/home", headers=auth(KID)).json()
-    assert [t["id"] for t in home["tests"]] == [near["id"], far["id"]]
-    assert home["task"]["test_id"] == near["id"] and home["task"]["kind"] == "ex1"       # set 4 days ahead: the short plan starts with exercise test 1 today
-
-
-def test_readiness_shows_the_parts_that_exist_and_caps_before_the_simulation(world):
-    client, store, lessons = world
-    test = set_test(client, lessons, days=14).json()
-    skills = covered(client.app.state.bank, lessons[:2])
-    master(store, skills[:6])                                                # M = 6 of 8 = 75
-    home = client.get("/api/home", headers=auth(KID)).json()["tests"][0]["readiness"]
-    assert home["number"] == 75 and home["parts"] == {"M": 75, "E": None, "S": None} and home["waiting_for_simulation"] is True
-    finished(store, test["id"], "exercise_test", f"{test['id']}:1", 60)
-    finished(store, test["id"], "exercise_test", f"{test['id']}:2", 80)
-    ready = client.get("/api/home", headers=auth(KID)).json()["tests"][0]["readiness"]
-    assert ready["parts"] == {"M": 75, "E": 70, "S": None} and ready["number"] == 74       # (50*75 + 20*70) / 70
-    master(store, skills[6:])
-    finished(store, test["id"], "simulation", str(test["id"]), 90)
-    full = client.get("/api/home", headers=auth(KID)).json()["tests"][0]["readiness"]
-    assert full["parts"] == {"M": 100, "E": 70, "S": 90} and full["number"] == 91 and full["capped"] is False and full["label"] == "מוכנים"
-
-
-def test_the_card_has_the_plan_the_exercise_tests_and_what_to_practise_first(world):
-    client, store, lessons = world
-    test = set_test(client, lessons, days=14).json()
-    skills = covered(client.app.state.bank, lessons[:2])
-    master(store, skills[:2])
-    store.save_progress(uid(KID), skills[2], started_at="then")              # learning; the other five are not started
-    card = client.get(f"/api/tests/{test['id']}", headers=auth(KID)).json()
-    assert [s["id"] for s in card["plan"]] == ["path", "ex1", "ex2", "sim", "review"] and card["plan"][1]["day"] == 9
-    assert [e["number"] for e in card["exercise_tests"]] == [1, 2] and card["questions"] == 12 and card["minutes"] == 45
-    assert [s["id"] for s in card["practice_first"]] == skills[3:] and all(s["name"] for s in card["practice_first"])
-    sim = card["simulation"]
-    assert sim["open_now"] is False and sim["opens_in_days"] == 9 and sim["opens_on"] == (clock.now() + 9 * DAY).date().isoformat() and sim["taken"] is False
 
 
 def test_a_student_of_another_class_and_a_missing_test_give_404(world):
@@ -310,24 +243,6 @@ def test_an_exercise_test_can_start_early_and_resumes_while_open(world):
     assert start_ex(client, test["id"], 2).json()["id"] != first["id"]        # exercise test 2 is its own attempt
 
 
-def test_a_retake_draws_new_questions_and_the_best_grade_counts(world):
-    client, store, lessons = world
-    test = set_test(client, lessons, days=14, questions=6).json()
-    started(client, store, lessons)
-    first = start_ex(client, test["id"]).json()
-    keys = {q["key"] for q in first["questions"]}
-    low = answer_all(client, client.app.state.bank, first, [True, True, False, False, False, False])
-    assert low["grade"] == 33 and low["kind"] == "exercise_test"
-    second = start_ex(client, test["id"]).json()
-    assert second["id"] != first["id"] and not keys & {q["key"] for q in second["questions"]}
-    high = answer_all(client, client.app.state.bank, second, [True] * 6)
-    assert high["grade"] == 100
-    card = client.get(f"/api/tests/{test['id']}", headers=auth(KID)).json()
-    assert card["exercise_tests"][0]["best"] == 100 and card["exercise_tests"][0]["attempts"] == 2
-    answer_all(client, client.app.state.bank, start_ex(client, test["id"]).json(), [False] * 6)       # a worse third try
-    assert client.get(f"/api/tests/{test['id']}", headers=auth(KID)).json()["exercise_tests"][0]["best"] == 100
-
-
 def test_the_result_links_the_weak_skills_found_without_right_answers(world):
     client, store, lessons = world
     test = set_test(client, lessons, days=14, questions=6).json()
@@ -344,75 +259,6 @@ def test_an_exercise_test_with_nothing_started_draws_all_the_material_and_a_weak
     assert start_ex(client, test["id"], 4).status_code == 404
 
 
-def test_an_exercise_test_with_all_skills_starts_even_when_nothing_is_started(world):
-    client, store, lessons = world
-    test = set_test(client, lessons, days=14, questions=6).json()
-    got = client.post(f"/api/tests/{test['id']}/exercise/1/start?all_skills=true", headers=auth(KID))
-    assert got.status_code == 200 and len(got.json()["questions"]) == 6
-    bank, lessons_of_test = client.app.state.bank, set(lessons[:2])
-    assert all(bank.skill(q["skill_id"])["unit"] in lessons_of_test for q in store.get_attempt(got.json()["id"])["questions"])
-
-
-def test_the_simulation_is_refused_8_days_before_with_its_opening_date(world):
-    client, store, lessons = world
-    test = set_test(client, lessons, days=14).json()
-    started(client, store, lessons)
-    client.set_time(MON + 6 * DAY)                                            # 8 days left; it opens 5 days before the test
-    early = start_sim(client, test["id"])
-    assert early.status_code == 409 and "ייפתח" in early.json()["detail"]
-    assert store.attempts_of(uid(KID), "simulation") == []                    # nothing was started
-
-
-def test_the_simulation_with_nothing_started_is_refused_and_all_skills_is_the_bypass(world):
-    client, store, lessons = world
-    test = set_test(client, lessons, days=14).json()
-    client.set_time(MON + 12 * DAY)                                           # two days left: open, and nothing practiced
-    refused = start_sim(client, test["id"])
-    assert refused.status_code == 409 and "עוד לא התחלתם" in refused.json()["detail"]
-    got = client.post(f"/api/tests/{test['id']}/simulation/start?all_skills=true", headers=auth(KID))
-    assert got.status_code == 200 and got.json()["kind"] == "simulation" and len(got.json()["questions"]) == 12
-    assert start_sim(client, test["id"]).json()["id"] == got.json()["id"]     # then it resumes like any simulation
-
-
-def test_the_simulation_has_the_tests_length_can_be_taken_once_and_shows_its_result_again(world):
-    client, store, lessons = world
-    test = set_test(client, lessons, days=14).json()                          # 12 questions, 45 minutes
-    started(client, store, lessons)
-    client.set_time(MON + 10 * DAY)                                           # four days left: open
-    sim = start_sim(client, test["id"]).json()
-    assert sim["kind"] == "simulation" and len(sim["questions"]) == 12
-    assert datetime.fromisoformat(sim["due_at"]) - datetime.fromisoformat(sim["now"]) == timedelta(minutes=45)
-    assert start_sim(client, test["id"]).json()["id"] == sim["id"]            # open: it resumes
-    done = answer_all(client, client.app.state.bank, sim, [True] * 8 + [False] * 4)
-    assert done["grade"] == 67
-    again = start_sim(client, test["id"]).json()
-    assert again["state"] == "submitted" and again["id"] == sim["id"] and again["grade"] == 67      # a second try shows the result
-    assert len(store.attempts_of(uid(KID), "simulation")) == 1
-
-
-def test_the_skills_the_simulation_failed_are_the_review_tasks_of_the_last_days(world):
-    client, store, lessons = world
-    test = set_test(client, lessons, days=14).json()
-    started(client, store, lessons)
-    client.set_time(MON + 10 * DAY)
-    sim = start_sim(client, test["id"]).json()
-    result = answer_all(client, client.app.state.bank, sim, [False] * 12)
-    failed = [s["id"] for s in result["lost_skills"]]
-    assert failed
-    client.set_time(MON + 11 * DAY)                                           # three days left
-    card = client.get(f"/api/tests/{test['id']}", headers=auth(KID)).json()
-    assert [s["id"] for s in card["simulation"]["review"]] == failed and card["simulation"]["taken"] is True
-    task = client.get("/api/home", headers=auth(KID)).json()["task"]
-    assert task["kind"] == "review" and task["skill"] == failed[0] and task["skill_name"]
-    # practising that skill after the simulation takes it off the list: the next failed one is the task
-    store.add_answer(uid(KID), failed[0], "k", True, True, None, clock.school_day())
-    after = client.get("/api/home", headers=auth(KID)).json()["task"]
-    if len(failed) > 1:
-        assert after["kind"] == "review" and after["skill"] == failed[1]
-    else:
-        assert after["kind"] == "mixed_review"
-
-
 # --- 2.4 the grades ---
 
 def test_the_grades_list_each_tests_best_exercise_grades_and_the_simulation(world):
@@ -423,11 +269,11 @@ def test_the_grades_list_each_tests_best_exercise_grades_and_the_simulation(worl
     bank = client.app.state.bank
     answer_all(client, bank, start_ex(client, test["id"]).json(), [True] * 3 + [False] * 3)                  # 50
     answer_all(client, bank, start_ex(client, test["id"]).json(), [True] * 5 + [False])                      # 83
-    answer_all(client, bank, start_ex(client, test["id"], 2).json(), [True] * 6)                             # 100
+    answer_all(client, bank, start_ex(client, test["id"], 3).json(), [True] * 6)                             # 6 of 15: 40, the focus mode
     client.set_time(MON + 10 * DAY)
     answer_all(client, bank, start_sim(client, test["id"]).json(), [True] * 3 + [False] * 3)                  # 50 (6 questions)
     got = client.get("/api/grades", headers=auth(KID)).json()
-    assert [(g["number"], g["best"], g["attempts"]) for g in got["exercise_tests"]] == [(1, 83, 2), (2, 100, 1)]
+    assert [(g["title"], g["best"], g["attempts"]) for g in got["exercise_tests"]] == [("מבחן תרגול מאוזן", 83, 2), ("מבחן תרגול ממוקד", 40, 1)]
     assert [(g["best"], g["attempts"]) for g in got["simulations"]] == [(50, 1)]
     assert got["exercise_tests"][0]["test"]["id"] == test["id"] and got["exercise_tests"][0]["test"]["lessons"] and got["quizzes"] == []
 
@@ -490,24 +336,99 @@ def test_a_test_with_no_mistakes_has_nothing_to_retry(world):
     assert client.post(f"/api/attempts/{done['id']}/retry/start", headers=auth(KID)).status_code == 409
 
 
-def test_the_weak_topics_test_has_15_questions_only_from_the_skills_that_lost_points(world):
+
+# --- readiness, practice tests by mode and simulations on demand ---
+
+def practice(client, test_id, mode, skills=None, who=KID):
+    return client.post(f"/api/tests/{test_id}/practice/start", json={"mode": mode, "skills": skills or []}, headers=auth(who))
+
+
+def card_of(client, test_id, who=KID):
+    return client.get(f"/api/tests/{test_id}", headers=auth(who)).json()
+
+
+def test_readiness_moves_only_with_tests_never_with_the_path(world):
+    client, store, lessons = world
+    test = set_test(client, lessons, days=14).json()
+    master(store, covered(client.app.state.bank, lessons[:2]))                       # the whole material mastered on the path
+    ready = card_of(client, test["id"])["readiness"]
+    assert ready["number"] == 0 and ready["label"] == "מתחילים" and ready["can_add"]["simulation"] == 60
+    finished(store, test["id"], "exercise_test", f"{test['id']}:1", 80)
+    assert card_of(client, test["id"])["readiness"]["number"] == 24
+    finished(store, test["id"], "simulation", str(test["id"]), 90)
+    ready = card_of(client, test["id"])["readiness"]
+    assert ready["number"] == 64 and ready["practice_best"] == 80 and ready["simulation_best"] == 90 and ready["simulations"] == 1
+
+
+def test_the_card_offers_three_practice_modes_simulations_and_the_trail_of_gains(world):
+    client, store, lessons = world
+    test = set_test(client, lessons, days=14).json()
+    card = card_of(client, test["id"])
+    assert set(card["practice"]) == {"balanced", "focus", "manual"} and card["practice"]["focus"]["skills"] == []
+    assert len(card["practice"]["manual"]["skills"]) == len(covered(client.app.state.bank, lessons[:2])) and card["simulation"]["taken"] == 0
+    assert "plan" not in card and "task" not in card and card["trail"] == []
+    finished(store, test["id"], "exercise_test", f"{test['id']}:1", 50)
+    finished(store, test["id"], "simulation", str(test["id"]), 10)                  # below the number after the first: no gain
+    trail = card_of(client, test["id"])["trail"]
+    assert [(t["kind"], t["gain"]) for t in trail] == [("simulation", 0), ("exercise_test", 15)] and trail[1]["title"] == "מבחן תרגול מאוזן"
+
+
+def test_a_balanced_practice_test_draws_all_the_material_even_unstarted_and_resumes(world):
+    client, store, lessons = world
+    test = set_test(client, lessons, days=14, questions=6).json()
+    first = practice(client, test["id"], "balanced")
+    assert first.status_code == 200 and len(first.json()["questions"]) == 6 and first.json()["test"]["mode"] == "balanced"
+    assert practice(client, test["id"], "balanced").json()["id"] == first.json()["id"]
+    assert card_of(client, test["id"])["practice"]["balanced"]["open"] == first.json()["id"]
+
+
+def test_a_manual_practice_test_has_only_the_picked_skills_and_moves_readiness_less(world):
+    client, store, lessons = world
+    bank = client.app.state.bank
+    test = set_test(client, lessons, days=14, questions=6).json()
+    picked = covered(bank, lessons[:2])[:2]
+    got = practice(client, test["id"], "manual", picked + ["not-a-skill"])
+    assert got.status_code == 200 and {q["skill_id"] for q in store.get_attempt(got.json()["id"])["questions"]} <= set(picked)
+    assert practice(client, test["id"], "manual", []).status_code == 422
+    done = answer_all(client, bank, got.json(), [True] * 6)
+    assert done["readiness"] == {**done["readiness"], "before": 0, "after": 15, "gain": 15}     # 15% of the gap, a balanced one 30%
+
+
+def test_a_focus_practice_test_is_15_questions_from_the_skills_that_lost_points(world):
     client, store, lessons = world
     bank = client.app.state.bank
     test = set_test(client, lessons, days=14).json()
-    client.set_time(MON + 12 * DAY)
-    assert client.get(f"/api/tests/{test['id']}", headers=auth(KID)).json()["focus"]["skills"] == []
-    assert start_ex(client, test["id"], 3).status_code == 409                          # nothing weak yet
-    sim = client.post(f"/api/tests/{test['id']}/simulation/start?all_skills=true", headers=auth(KID)).json()
+    assert practice(client, test["id"], "focus").status_code == 409                   # nothing weak yet
+    sim = client.post(f"/api/tests/{test['id']}/simulation/start", headers=auth(KID)).json()
     done = answer_all(client, bank, sim, [True] * 8 + [False] * 4)
     lost = {s["id"] for s in done["lost_skills"]}
-    card = client.get(f"/api/tests/{test['id']}", headers=auth(KID)).json()
-    assert {s["id"] for s in card["focus"]["skills"]} == lost and card["focus"]["size"] == 15 and card["focus"]["best"] is None
-    focus = start_ex(client, test["id"], 3).json()
-    assert focus["kind"] == "exercise_test" and focus["test"]["number"] == 3 and len(focus["questions"]) == 15
-    assert {q["skill_id"] for q in store.get_attempt(focus["id"])["questions"]} <= lost
-    assert len({q["key"] for q in store.get_attempt(focus["id"])["questions"]}) == 15                    # no question twice
-    assert start_ex(client, test["id"], 3).json()["id"] == focus["id"]                                   # open: it resumes
-    answer_all(client, bank, focus, [True] * 15)
-    card = client.get(f"/api/tests/{test['id']}", headers=auth(KID)).json()
-    assert card["focus"]["best"] == 100 and card["focus"]["attempts"] == 1
-    assert [e["number"] for e in card["exercise_tests"]] == [1, 2] and all(e["best"] is None for e in card["exercise_tests"])   # not exercise test 1 or 2
+    assert {s["id"] for s in card_of(client, test["id"])["practice"]["focus"]["skills"]} == lost
+    focus = practice(client, test["id"], "focus").json()
+    rows = store.get_attempt(focus["id"])["questions"]
+    assert len(rows) == 15 and {q["skill_id"] for q in rows} <= lost and len({q["key"] for q in rows}) == 15
+    assert focus["test"]["title"] == "מבחן תרגול ממוקד"
+
+
+def test_simulations_are_on_demand_timed_all_the_material_and_count_more(world):
+    client, store, lessons = world
+    bank = client.app.state.bank
+    test = set_test(client, lessons, days=30).json()                                  # a month ahead: still open
+    sim = client.post(f"/api/tests/{test['id']}/simulation/start", headers=auth(KID)).json()
+    assert sim["kind"] == "simulation" and len(sim["questions"]) == 12
+    assert datetime.fromisoformat(sim["due_at"]) - datetime.fromisoformat(sim["now"]) == timedelta(minutes=45)
+    assert client.post(f"/api/tests/{test['id']}/simulation/start", headers=auth(KID)).json()["id"] == sim["id"]    # open: resumes
+    done = answer_all(client, bank, sim, [True] * 12)
+    assert done["readiness"] == {**done["readiness"], "before": 0, "after": 60, "gain": 60, "level_up": True}
+    second = client.post(f"/api/tests/{test['id']}/simulation/start", headers=auth(KID)).json()
+    assert second["id"] != sim["id"] and second["state"] == "open"                   # another one on request
+    assert not {q["key"] for q in sim["questions"]} & {q["key"] for q in second["questions"]} or len(covered(bank, lessons[:2])) < 12
+    card = card_of(client, test["id"])
+    assert card["simulation"]["open"] == second["id"] and card["simulation"]["taken"] == 1 and card["simulation"]["best"] == 100
+
+
+def test_old_practice_addresses_still_start_a_balanced_or_focus_test(world):
+    client, store, lessons = world
+    test = set_test(client, lessons, days=14, questions=6).json()
+    assert start_ex(client, test["id"], 1).json()["test"]["mode"] == "balanced"
+    assert start_ex(client, test["id"], 2).json()["test"]["mode"] == "balanced"
+    assert start_ex(client, test["id"], 4).status_code == 404 and start_ex(client, test["id"], 9).status_code == 404

@@ -67,7 +67,7 @@ def test_home_is_a_map_of_the_lessons_with_stars_and_a_play_button(browser, bank
         first, late = page.locator(f".lnode[data-lesson='{lessons[0]}']"), page.locator(f".lnode[data-lesson='{lessons[2]}']")
         assert first.get_attribute("data-stars") == "3" and "👑" in first.text_content()
         assert "⏰" in late.text_content()
-        assert page.locator("#stars-count").inner_text() == f"⭐ 3 מתוך {3 * len(lessons)}"
+        assert page.locator("#stars-count").inner_text() == f"⭐ 3/{3 * len(lessons)}"
         assert page.locator("#play").get_attribute("href") == f"#/round/{lessons[2]}"            # the behind lesson comes first
         assert page.locator(".lnode.next").get_attribute("data-lesson") == lessons[2]
         assert page.locator(".tabs a").nth(1).inner_text() == "העמקה" and page.locator("#behind-card").count() == 0
@@ -131,7 +131,7 @@ def test_home_is_one_screen_with_every_lesson_a_test_and_an_assignment(browser, 
         to_home(page)
         page.wait_for_selector("#lesson-map")
         page.wait_for_selector("#assignments")
-        assert page.locator(".lnode").count() == len(lessons) and page.locator("#nearest-test #today-task").count() == 1
+        assert page.locator(".lnode").count() == len(lessons) and page.locator("#nearest-test #home-sim").count() == 1
         assert page.evaluate("document.documentElement.scrollHeight <= window.innerHeight")                    # nothing to scroll
         no_sideways_scroll(page)
         shot(page, "home-one-screen")

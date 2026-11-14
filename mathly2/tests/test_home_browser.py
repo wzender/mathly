@@ -131,60 +131,7 @@ def test_with_no_test_home_shows_the_map_and_a_link_to_the_path(browser, bank):
         no_sideways_scroll(page)
 
 
-def test_nine_days_before_the_test_the_button_opens_exercise_test_1_with_the_readiness_bar(browser, bank):
-    app, store, klass, lessons = world(bank)
-    skills = covered(bank, lessons)
-    for i in skills[:6]:
-        store.save_progress(KID_ID, i, started_at="then", mastered_at="then")                            # M = 6 of 8
-    test = add_test(store, klass, lessons, 9)
-    with running(app) as url:
-        page = sign_in(browser, url)
-        to_home(page)
-        assert "בעוד 9 ימים" in page.inner_text("#nearest-test h2") and "מוכנות 75" in page.inner_text("#nearest-test")      # one strip on home
-        assert page.get_attribute("#today-task", "href") == f"#/exam/{test['id']}/1" and "מבחן תרגול 1" in page.inner_text("#today-task")
-        page.click("#nearest-test .strip-main")                                                                       # the bar is on the test's card
-        page.wait_for_selector("#test-card")
-        bar = page.locator("#test-card [role=progressbar]")
-        assert bar.get_attribute("aria-valuenow") == "75" and "75" in bar.get_attribute("aria-label")
-        part = lambda p: page.locator(f".rd-part[data-part={p}]")
-        assert part("M").inner_text().split() == ["שליטה", "אחוז", "המיומנויות", "שנשלטו", "75%"]
-        assert "מבחני תרגול" in part("E").inner_text() and "ממוצע הציונים הטובים ביותר" in part("E").inner_text() and part("E").locator(".rd-val").inner_text() == "—"
-        assert "סימולציה" in part("S").inner_text() and "הציון במבחן הסימולציה" in part("S").inner_text() and part("S").locator(".rd-val").inner_text() == "—"
-        assert not any(f" {letter} " in f" {page.inner_text('.rd-parts')} " for letter in "MES")                 # no letters
-        assert "עוד לא עשיתם מבחן סימולציה" in page.inner_text(".rd-note")
-        no_sideways_scroll(page)
 
-
-def test_four_days_before_the_test_the_simulation_is_required_on_home(browser, bank):
-    app, store, klass, lessons = world(bank)
-    test = add_test(store, klass, lessons, 4)
-    with running(app) as url:
-        page = sign_in(browser, url)
-        to_home(page)
-        required = page.locator(f".required[data-required='{test['id']}']")
-        assert required.count() == 1 and "חובה" in required.inner_text() and required.get_attribute("href") == f"#/sim/{test['id']}"
-        assert page.get_attribute("#today-task", "href") == f"#/sim/{test['id']}"
-
-
-def test_the_readiness_bar_shows_every_part_and_loses_the_cap_after_the_simulation(browser, bank):
-    app, store, klass, lessons = world(bank)
-    for i in covered(bank, lessons):
-        store.save_progress(KID_ID, i, started_at="then", mastered_at="then")
-    test = add_test(store, klass, lessons, 3)
-    now = clock.now()
-    for scope, kind, grade in ((f"{test['id']}:1", "exercise_test", 60), (f"{test['id']}:2", "exercise_test", 80), (str(test["id"]), "simulation", 90)):
-        row = store.create_attempt(KID_ID, kind, scope, now - timedelta(days=1), now - timedelta(days=1) + timedelta(minutes=45), [])
-        store.save_attempt(row["id"], submitted_at=now - timedelta(days=1) + timedelta(minutes=5), grade=grade)
-    with running(app) as url:
-        page = sign_in(browser, url)
-        to_home(page)
-        page.wait_for_selector("#nearest-test")
-        assert page.locator(".required").count() == 0                                                     # the simulation is taken
-        page.click("#nearest-test .strip-main")
-        page.wait_for_selector("#test-card .rd-part")
-        vals = {p: page.locator(f".rd-part[data-part={p}] .rd-val").inner_text() for p in "MES"}
-        assert vals == {"M": "100%", "E": "70", "S": "90"}
-        assert page.locator(".rd-note").count() == 0 and "מוכנים" in page.inner_text(".rd-label")
 
 
 def test_home_shows_only_the_closest_test_and_the_other_tests_are_on_its_card(browser, bank):
@@ -194,7 +141,7 @@ def test_home_shows_only_the_closest_test_and_the_other_tests_are_on_its_card(br
     with running(app) as url:
         page = sign_in(browser, url)
         to_home(page)
-        assert page.get_attribute("#nearest-test", "data-test") == str(near["id"]) and page.get_attribute("#today-task", "href") == f"#/exam/{near['id']}/1"
+        assert page.get_attribute("#nearest-test", "data-test") == str(near["id"]) and page.get_attribute("#home-sim", "href") == f"#/sim/{near['id']}"
         assert page.locator("#other-tests").count() == 0 and page.locator("#notifications").count() == 0                       # only what is critical
         page.click("#nearest-test .strip-main")
         page.wait_for_selector("#other-tests")
@@ -215,55 +162,7 @@ def finished(store, scope, kind, grade, questions=None, answers=None):
     return store.save_attempt(row["id"], submitted_at=now - timedelta(days=1) + timedelta(minutes=9), grade=grade, answers=answers or {})
 
 
-def test_a_fresh_card_shows_the_plan_the_exercise_tests_what_to_practise_first_and_when_the_simulation_opens(browser, bank):
-    app, store, klass, lessons = world(bank)
-    skills = covered(bank, lessons)
-    store.save_progress(KID_ID, skills[0], started_at="then", mastered_at="then")
-    test = add_test(store, klass, lessons, 14, questions=10, minutes=30)
-    with running(app) as url:
-        page = card_page(browser, url, test["id"])
-        assert "10 שאלות · 30 דקות" in page.inner_text("#test-card") and "בעוד 14 ימים" in page.inner_text("#test-card h2")
-        steps = page.locator("#plan li")
-        assert steps.count() == 5 and [steps.nth(i).get_attribute("data-step") for i in range(5)] == ["path", "ex1", "ex2", "sim", "review"]
-        assert "עד 9 ימים לפני" in steps.nth(0).inner_text() and "בערך 9 ימים לפני" in steps.nth(1).inner_text() and "בערך 5 ימים לפני" in steps.nth(3).inner_text()
-        assert page.locator("#plan li.done").count() == 0
-        assert page.locator("#exercises li").count() == 2 and "עוד לא נעשה" in page.inner_text("#exercises li >> nth=0")
-        assert page.get_attribute("#exercises li[data-exercise='2'] a", "href") == f"#/exam/{test['id']}/2" and "התחלה" in page.inner_text("#exercises li >> nth=1")
-        assert page.locator("#practice-first a").count() == 7                                           # eight covered skills, one started
-        assert "ייפתח ב־" in page.inner_text("#sim-closed") and page.locator("#sim-start").count() == 0
-        no_sideways_scroll(page)
 
-
-def test_exercise_tests_show_their_best_grade_and_offer_a_retake_or_to_continue(browser, bank):
-    app, store, klass, lessons = world(bank)
-    test = add_test(store, klass, lessons, 10)
-    finished(store, f"{test['id']}:1", "exercise_test", 55)
-    finished(store, f"{test['id']}:1", "exercise_test", 80)
-    now = clock.now()
-    store.create_attempt(KID_ID, "exercise_test", f"{test['id']}:2", now, now + timedelta(minutes=45), [])        # exercise test 2 is open
-    with running(app) as url:
-        page = card_page(browser, url, test["id"])
-        one, two = page.locator("#exercises li[data-exercise='1']"), page.locator("#exercises li[data-exercise='2']")
-        assert "הציון הטוב: 80" in one.inner_text() and "2 ניסיונות" in one.inner_text() and "שוב" in one.locator("a").inner_text()
-        assert "להמשיך" in two.locator("a").inner_text()
-        assert page.locator("#plan li[data-step='ex1'].done").count() == 1 and page.locator("#plan li[data-step='ex2'].done").count() == 0
-
-
-def test_an_open_simulation_is_required_and_a_taken_one_shows_its_grade_and_review_skills(browser, bank):
-    app, store, klass, lessons = world(bank)
-    skills = covered(bank, lessons)
-    test = add_test(store, klass, lessons, 4)
-    with running(app) as url:
-        page = card_page(browser, url, test["id"])
-        assert page.locator("#simulation .req").count() == 1 and page.get_attribute("#sim-start", "href") == f"#/sim/{test['id']}"
-        assert "התחלה" in page.inner_text("#sim-start")
-        questions = [{"skill_id": skills[0], "key": bank.question_keys(skills[0])[0]}, {"skill_id": skills[1], "key": bank.question_keys(skills[1])[0]}]
-        finished(store, str(test["id"]), "simulation", 0, questions=questions)                          # nothing answered: both skills failed
-        page.reload()
-        page.wait_for_selector("#simulation[data-taken='true']")
-        assert page.inner_text("#sim-grade") == "0" and page.locator("#sim-start").count() == 0
-        assert [a.get_attribute("href") for a in page.locator("#sim-review a").all()] == [f"#/skill/{skills[0]}", f"#/skill/{skills[1]}"]
-        assert page.locator("#plan li[data-step='sim'].done").count() == 1
 
 
 def test_a_test_of_another_class_or_a_missing_one_shows_an_error(browser, bank):
@@ -291,46 +190,21 @@ def test_an_exercise_test_runs_with_the_tests_length_and_no_timer_and_links_its_
         page = sign_in(browser, url, f"#/exam/{test['id']}/1")
         page.wait_for_selector("#qz-q")
         assert page.evaluate("location.hash").startswith(f"#/exam/{test['id']}/1/")                         # the address names the attempt
-        assert "מבחן תרגול 1" in page.inner_text(".mx-sheet") and page.locator(".qz-dot").count() == 6
+        assert "מבחן תרגול מאוזן" in page.inner_text(".mx-sheet") and page.locator(".qz-dot").count() == 6
         assert page.locator("#qz-timer").count() == 0                                                         # only the simulation is timed
         sheet = page.inner_text(".mx-sheet")
         assert not any(bank.skill(i)["name"] in sheet for i in skills)                                       # no skill names, no feedback
         page.click("#qz-submit")
         page.click("#qz-yes")
         page.wait_for_selector("#qz-grade")
-        assert page.inner_text("#qz-grade b") == "0" and "תוצאת מבחן תרגול 1" in page.inner_text(".mx-sheet")
+        assert page.inner_text("#qz-grade b") == "0" and "תוצאת מבחן תרגול מאוזן" in page.inner_text(".mx-sheet")
         links = [a.get_attribute("href") for a in page.locator("#qz-lost a").all()]
         assert links and all(h.startswith("#/skill/") and h[8:] in skills for h in links)                    # weak skills link to their stars
-        assert page.locator("#qz-retake").inner_text() == "מבחן חוזר"
-        page.click("#qz-retake")                                                                             # a retake is a new attempt
-        page.wait_for_selector("#qz-q")
-        assert len(store.attempts_of(KID_ID, "exercise_test", f"{test['id']}:1")) == 2
-        page.click(".mx-x")
+        assert "המוכנות נשארה 0" in page.inner_text("#qz-ready") and page.locator("#qz-retake").count() == 0
+        page.click(".qz-actions [data-close]")
         page.wait_for_selector("#test-card")                                                                 # closing leads back to the test's card
         assert page.evaluate("location.hash") == f"#/test/{test['id']}"
 
-
-def test_the_simulation_can_be_taken_once_and_a_second_visit_shows_the_result(browser, bank):
-    app, store, klass, lessons = world(bank)
-    started_skills(store, bank, lessons)
-    test = add_test(store, klass, lessons, 4, questions=6, minutes=45)
-    with running(app) as url:
-        page = sign_in(browser, url, f"#/sim/{test['id']}")
-        page.wait_for_selector("#qz-q")
-        assert "מבחן סימולציה" in page.inner_text(".mx-sheet") and page.locator(".qz-dot").count() == 6
-        assert page.inner_text("#qz-timer").startswith("44:") or page.inner_text("#qz-timer") == "45:00"        # the test's minutes
-        page.click("#qz-submit")
-        page.click("#qz-yes")
-        page.wait_for_selector("#qz-grade")
-        assert page.locator("#qz-retake").count() == 0 and "פעם אחת" in page.inner_text(".qz-result")
-        page.goto(url + f"#/sim/{test['id']}")                                                               # opening it again
-        page.reload()
-        page.wait_for_selector("#qz-grade")
-        assert page.inner_text("#qz-grade b") == "0" and page.locator("#qz-q").count() == 0
-        assert len(store.attempts_of(KID_ID, "simulation")) == 1
-        page.click(".qz-actions [data-close]")
-        page.wait_for_selector("#test-card")
-        assert page.inner_text("#sim-grade") == "0"
 
 
 def test_when_the_simulations_countdown_reaches_zero_it_is_handed_in_as_it_stands(browser, bank):
@@ -350,28 +224,6 @@ def test_when_the_simulations_countdown_reaches_zero_it_is_handed_in_as_it_stand
         assert page.inner_text("#qz-grade b") == "0" and "הזמן נגמר" in page.inner_text(".qz-result")
 
 
-def test_the_simulation_before_its_window_says_when_it_opens_and_does_not_start(browser, bank):
-    app, store, klass, lessons = world(bank)
-    started_skills(store, bank, lessons)
-    test = add_test(store, klass, lessons, 14)
-    with running(app) as url:
-        page = sign_in(browser, url, f"#/sim/{test['id']}")
-        page.wait_for_selector("[role=alert]")
-        assert "ייפתח" in page.inner_text("[role=alert]") and page.locator("#qz-q").count() == 0
-        assert store.attempts_of(KID_ID, "simulation") == []
-
-
-def test_the_simulation_with_nothing_practiced_offers_a_bypass_on_all_the_material(browser, bank):
-    app, store, klass, lessons = world(bank)
-    test = add_test(store, klass, lessons, 2, questions=6, minutes=45)                                     # two days left, nothing started
-    with running(app) as url:
-        page = sign_in(browser, url, f"#/sim/{test['id']}")
-        page.wait_for_selector("#sim-bypass")
-        assert "עוד לא התחלתם" in page.inner_text("[role=alert]") and store.attempts_of(KID_ID, "simulation") == []
-        page.click("#sim-bypass")
-        page.wait_for_selector("#qz-q")
-        assert "מבחן סימולציה" in page.inner_text(".mx-sheet") and page.locator(".qz-dot").count() == 6
-        assert len(store.attempts_of(KID_ID, "simulation")) == 1
 
 
 def test_after_the_simulation_the_wrong_questions_are_answered_again_in_a_round(browser, bank):
@@ -402,12 +254,13 @@ def test_after_the_simulation_the_wrong_questions_are_answered_again_in_a_round(
         page.click("#rd-result [data-close]")
         page.wait_for_selector("#test-card")
         assert page.locator(".round-layer").count() == 0 and page.errors == []
-        page.wait_for_selector("#focus[data-ready='true']")                                             # the weak topics now have their own test
-        page.click("#focus-start")
+        page.check("#practice input[value='focus']")                                                     # the hard skills now have their own test
+        assert page.locator("#focus-skills .ex-chip").count() > 0
+        page.click("#practice-start")
         page.wait_for_selector("#qz-q")
-        assert "נושאים לחיזוק" in page.inner_text(".mx-sheet h3") and 0 < page.locator(".qz-dot").count() <= 15
+        assert "מבחן תרגול ממוקד" in page.inner_text(".mx-sheet h3") and 0 < page.locator(".qz-dot").count() <= 15
         focus = store.attempts_of(KID_ID, "exercise_test")[0]
-        lost = {q["skill_id"] for q in store.attempts_of(KID_ID, "simulation")[0]["questions"]}
+        lost = {q["skill_id"] for q in store.attempts_of(KID_ID, "simulation")[0]["questions"]} | set(covered(bank, lessons)[:5])   # or still learning
         assert focus["scope"].endswith(":3") and {q["skill_id"] for q in focus["questions"]} <= lost and page.errors == []
 
 
@@ -427,8 +280,7 @@ def test_exercise_tests_and_the_simulation_appear_on_the_grades_screen(browser, 
         page = sign_in(browser, url, "#/grades")
         page.wait_for_selector("#exercise-grades")
         one = page.locator(f"#exercise-grades li[data-test='{test['id']}'][data-number='1']")
-        assert one.locator(".gr-num").inner_text() == "80" and "2 ניסיונות" in one.inner_text() and "מבחן תרגול 1" in one.inner_text()
-        assert page.locator(f"#exercise-grades li[data-test='{test['id']}'][data-number='2'] .gr-num").inner_text() == "70"
+        assert one.locator(".gr-num").inner_text() == "80" and "3 ניסיונות" in one.inner_text() and "מבחן תרגול מאוזן" in one.inner_text()   # 1 and the old 2: balanced
         assert page.locator(f"#simulation-grades li[data-test='{test['id']}'] .gr-num").inner_text() == "65"
         gone = page.locator(f"#exercise-grades li[data-test='{removed['id']}']")
         assert gone.locator(".gr-num").inner_text() == "90" and "הוסר" in gone.inner_text()               # a removed test keeps its grade and name
@@ -505,7 +357,7 @@ def test_the_tab_shows_who_has_not_taken_the_simulation_and_each_students_readin
         assert "a@school.test" in missing and "b@school.test" in missing and KID not in missing
         assert page.locator(".readiness-table tbody tr").count() == 3
         mine = page.locator(f".readiness-table tr:has-text('{KID}')")
-        assert "28" in mine.inner_text() and "75" in mine.inner_text() and "0%" in mine.inner_text()        # M 0 and S 75: (30*75) / 80
+        assert "45 · " in mine.inner_text() and "1 · הטוב 75" in mine.inner_text()                           # one simulation of 75: 60% of the way
 
 
 def test_a_refused_test_shows_why_and_keeps_what_was_typed(browser, bank):
@@ -544,76 +396,71 @@ def answer_in_browser(page, bank, store, kind, scope, rights):
     return refs
 
 
-def test_the_whole_countdown_from_setting_a_test_to_the_review(browser, bank, monkeypatch):
-    app, store, klass, lessons = world(bank)
-    moment = {"now": clock.now()}
-    monkeypatch.setattr(clock, "now", lambda: moment["now"])
-    advance = lambda days: moment.update(now=moment["now"] + timedelta(days=days))
-    skills = covered(bank, lessons)
-    with running(app) as url:
-        teacher = teacher_page(browser, url)                                                                   # the teacher sets a test 12 days ahead, 6 questions
-        teacher.click(".set-test summary")
-        teacher.fill("[name=date]", iso(12))
-        teacher.fill("[name=questions]", "6")
-        teacher.click(".set-test button[type=submit]")
-        teacher.wait_for_selector(".test-row")
-        test = store.tests_of_classes([klass["id"]])[0]
-        student = sign_in(browser, url)
-        to_home(student)
-        task = lambda: student.get_attribute("#today-task", "href")
-        reload_home = lambda: (student.goto(url + "#/subject/math"), student.reload(), student.wait_for_selector(".tabs"), student.wait_for_selector("#today-task"))
-
-        def on_card(read):                                                                                      # the readiness is on the test's card
-            student.click("#nearest-test .strip-main")
-            student.wait_for_selector("#test-card .rd-part")
-            got = read()
-            reload_home()
-            return got
-
-        assert task() == f"#/skill/{skills[0]}" and "לסיים את המסלול" in student.inner_text("#today-task")        # 12 days: finish the path
-        assert "סימולציה" in on_card(lambda: student.inner_text(".rd-note"))                                     # the bar says it is capped until the simulation
-        for i in skills:                                                                                        # the path is finished
-            store.save_progress(KID_ID, i, started_at="then", mastered_at="then")
-        reload_home()
-        assert task() == f"#/exam/{test['id']}/1"                                                               # next: exercise test 1, early
-        student.click("#today-task")
-        answer_in_browser(student, bank, store, "exercise_test", f"{test['id']}:1", [True] * 6)
-        assert student.inner_text("#qz-grade b") == "100"
-        advance(3)                                                                                              # 9 days left
-        reload_home()
-        assert task() == f"#/exam/{test['id']}/2"                                                               # exercise test 2
-        student.click("#today-task")
-        answer_in_browser(student, bank, store, "exercise_test", f"{test['id']}:2", [True] * 6)
-        advance(4)                                                                                              # 5 days left: the simulation opens
-        reload_home()
-        assert task() == f"#/sim/{test['id']}" and student.locator(f".required[data-required='{test['id']}']").count() == 1
-        vals = lambda: {p: student.locator(f".rd-part[data-part={p}] .rd-val").inner_text() for p in "MES"}
-        got = on_card(vals)
-        assert got["E"] == "100" and got["S"] == "—"
-        student.click("#today-task")
-        answer_in_browser(student, bank, store, "simulation", str(test["id"]), [True, True, True, True, False, False])
-        assert student.inner_text("#qz-grade b") == "67"
-        failed = [a.get_attribute("href") for a in student.locator("#qz-lost a").all()]
-        assert failed
-        advance(2)                                                                                              # 3 days left: review what failed
-        reload_home()
-        assert task() in failed and student.locator(".required").count() == 0                                   # a failed skill is today's review
-        assert on_card(lambda: (vals()["S"], student.locator(".rd-note").count())) == ("67", 0)          # the cap is gone after the simulation
-        teacher.reload()
-        teacher.click("#teacher-tabs [data-tab='tests']")
-        teacher.wait_for_selector(".test-row")
-        assert "1 מתוך 1 עשו סימולציה" in teacher.inner_text(".sim-count")
-
 
 # --- readiness-tooltip: the number explains itself ---
 
-def test_the_tooltip_is_on_the_tests_card_too_and_opens_on_hover_with_a_mouse(browser, bank):
+
+
+# --- readiness: the home's block, the test's page, practice tests by mode and simulations on request ---
+
+def test_home_shows_the_readiness_and_two_clear_buttons_that_raise_it(browser, bank):
     app, store, klass, lessons = world(bank)
-    test = add_test(store, klass, lessons, 7)
+    test = add_test(store, klass, lessons, 2)
     with running(app) as url:
-        page = sign_in(browser, url, f"#/test/{test['id']}")
-        to_home_card = page.wait_for_selector("[data-info]")
-        page.hover("[data-info]")
-        assert page.locator(".tip").first.is_visible() and "50%" in page.locator(".tip").first.inner_text()
-        page.mouse.move(5, 5)
-        assert page.locator(".tip").first.is_hidden()
+        page = sign_in(browser, url)
+        to_home(page)
+        strip = page.locator("#nearest-test")
+        assert "מבחן בעוד 2 ימים" in strip.inner_text() and "מוכנות למבחן" in strip.inner_text()
+        assert strip.locator(".rd-num").inner_text() == "0" and "מתחילים" in strip.inner_text() and 'עוד 40 לרמה "בדרך"' in strip.inner_text()
+        assert page.get_attribute("#nearest-test .strip-main", "href") == f"#/test/{test['id']}"
+        assert "מבחן תרגול" in page.inner_text("#home-practice") and "+30" in page.inner_text("#home-practice") and "+60" in page.inner_text("#home-sim")
+        assert page.get_attribute("#home-practice", "href") == f"#/test/{test['id']}/practice"
+        page.click("#home-practice")                                                                # straight to choosing a practice test
+        page.wait_for_selector("#practice .modes")
+        assert page.evaluate("document.getElementById('practice').getBoundingClientRect().top") < 200
+        no_sideways_scroll(page)
+
+
+def test_a_simulation_on_request_raises_readiness_with_a_level_up_and_another_can_follow(browser, bank):
+    app, store, klass, lessons = world(bank)
+    test = add_test(store, klass, lessons, 30, questions=4, minutes=20)                                 # a month ahead: no window
+    with running(app) as url:
+        page = sign_in(browser, url)
+        to_home(page)
+        page.click("#home-sim")
+        page.wait_for_selector("#qz-timer")
+        assert "מבחן סימולציה" in page.inner_text(".mx-sheet") and page.locator(".qz-dot").count() == 4
+        answer_in_browser(page, bank, store, "simulation", str(test["id"]), [True] * 4)
+        page.wait_for_selector("#qz-ready.up")
+        assert page.inner_text(".qz-gain") == "+60" and "עלתה ל־60" in page.inner_text("#qz-ready") and "רמה חדשה: בדרך" in page.inner_text("#qz-ready")
+        page.wait_for_function("document.querySelector('#qz-ready .rd-bar i').style.width === '60%'")   # the bar grows to the new number
+        page.click("#qz-more-sim")                                                                   # another one, on request
+        page.wait_for_selector("#qz-timer")
+        assert len(store.attempts_of(KID_ID, "simulation")) == 2 and page.errors == []
+
+
+def test_the_tests_page_has_three_practice_modes_and_the_trail_of_gains(browser, bank):
+    app, store, klass, lessons = world(bank)
+    skills = covered(bank, lessons)
+    test = add_test(store, klass, lessons, 10, questions=4)
+    finished(store, f"{test['id']}:1", "exercise_test", 50)
+    with running(app) as url:
+        page = card_page(browser, url, test["id"])
+        page.wait_for_function("document.querySelector('#test-card .rd-num').textContent === '15'")
+        assert [m.get_attribute("data-mode") for m in page.locator("#practice .mode").all()] == ["balanced", "focus", "manual"]
+        assert page.locator("#practice input[value='focus']").is_disabled()                          # nothing hard yet (no questions in that one)
+        assert "+15" in page.inner_text("#trail") and "מבחן תרגול מאוזן" in page.inner_text("#trail")
+        page.check("#practice input[value='manual']")
+        assert page.locator("#manual-skills").is_visible() and page.locator("#manual-skills input").count() == len(skills)
+        page.click("#practice-start")
+        assert "בחרו לפחות" in page.inner_text("#practice-error")
+        page.check(f"#manual-skills input[value='{skills[0]}']")
+        page.click("#practice-start")
+        page.wait_for_selector("#qz-q")
+        row = store.attempts_of(KID_ID, "exercise_test", f"{test['id']}:4")[0]
+        assert "מבחן תרגול בבחירה" in page.inner_text(".mx-sheet h3") and {q["skill_id"] for q in row["questions"]} == {skills[0]}
+        page.click(".mx-x")
+        page.wait_for_selector("#practice")
+        page.click("#rd-how summary")
+        assert "סימולציה סוגר 60%" in page.inner_text("#rd-how") and page.errors == []
+        no_sideways_scroll(page)

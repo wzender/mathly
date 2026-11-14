@@ -633,7 +633,7 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .today-btn { flex: 0 1 auto; max-width: 58%; min-height: 44px; display: flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 14px;
   color: var(--accent-text); background: var(--accent); }
 .today-btn small { font-weight: 600; opacity: .8; }
-.hchips { display: flex; flex-wrap: wrap; gap: 6px; margin-block: 8px; }
+.hchips { display: flex; flex-wrap: wrap; gap: 6px; margin-block: 4px; }
 .hchips-ai { display: contents; }
 .hchip { margin: 0; display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
   color: var(--text); text-decoration: none; font-size: 14px; font-weight: 600; }
@@ -711,3 +711,59 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .rv-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 6px 0; }
 .rv-bar i { display: block; height: 100%; background: var(--accent); transition: width .4s; }
 .work-ai-run { font-size: .9em; padding: 4px 10px; }
+
+/* ---------- readiness: the home's test block, the test's page, the gain on a result ---------- */
+.test-strip { flex-direction: column; align-items: stretch; gap: 4px; padding: 6px 10px; margin-block: 4px; }
+.test-strip .strip-main { flex-direction: row; align-items: center; gap: 10px; }
+.test-strip .strip-main .grow { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.test-strip .strip-main small { font-size: 12px; }
+.strip-more { font-size: 18px; color: var(--accent); }
+.test-strip .readiness { margin: 0; }
+.test-strip .rd-num { font-size: 30px; line-height: 1; min-width: 1.4em; text-align: center; }
+.test-strip .rd-bar { height: 5px; margin: 3px 0 0; }
+.rd-top { align-items: center; }
+.rd-next { font-size: 13px; }
+.rd-up { display: inline-block; margin-inline-start: 6px; padding: 0 6px; border-radius: 999px; background: var(--sky-gold); color: #111; font-weight: 800; font-size: 13px;
+  animation: rd-pop .6s cubic-bezier(.2, 1.6, .4, 1) .9s both; }
+.rd-bar { position: relative; }
+.rd-bar i { transition: width .9s cubic-bezier(.2, .8, .2, 1); }
+.rd-bar s { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); opacity: .35; text-decoration: none; }
+.readiness.grew .rd-num { animation: rd-pop .5s cubic-bezier(.2, 1.6, .4, 1); }
+.rd-how-line { margin: 0; font-size: 13px; }
+.test-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.test-btn { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 44px; padding: 4px 6px; border-radius: 12px; text-decoration: none; white-space: nowrap; font-size: 14px;
+  font-weight: 800; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+.test-btn.sim { background: var(--accent); border-color: var(--accent); color: var(--on-accent, #fff); }
+.test-btn small { font-weight: 800; font-size: 12px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--sky-gold) 30%, transparent); }
+.gain-hint { display: block; font-size: 12px; font-weight: 700; opacity: .85; }
+.big-btn { min-height: 52px; min-width: 220px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; }
+.rd-how summary { cursor: pointer; color: var(--accent); font-weight: 700; margin-top: 6px; }
+.rd-how ul { margin: 6px 0 0; padding-inline-start: 20px; font-size: 14px; }
+.modes { display: grid; gap: 8px; margin-block: 8px; }
+.mode { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.mode.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.mode.off { opacity: .55; cursor: default; }
+.mode input { margin-top: 4px; }
+#focus-skills { display: flex; flex-wrap: wrap; gap: 6px; margin-block: 6px; }
+#focus-skills[hidden], #manual-skills[hidden] { display: none; }
+#manual-skills { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin-block: 6px; }
+.pick-lesson { margin: 8px 0 2px; font-weight: 700; }
+.pick { display: flex; gap: 6px; align-items: center; min-height: 40px; }
+.trail li a { display: flex; gap: 8px; align-items: center; padding: 8px 0; text-decoration: none; color: var(--text); border-bottom: 1px solid var(--line); }
+.trail .grow { flex: 1; min-width: 0; }
+.gain { min-width: 44px; text-align: center; font-weight: 800; color: var(--sky-gold); }
+.gain.zero { color: var(--muted); font-weight: 600; }
+.qz-ready { text-align: center; margin-block: 12px; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: color-mix(in srgb, var(--sky-gold) 8%, var(--surface)); }
+.qz-ready p { margin: 4px 0; }
+.qz-gain { font-size: 48px; line-height: 1; font-weight: 900; color: var(--sky-gold); text-shadow: 0 0 18px color-mix(in srgb, var(--sky-gold) 60%, transparent);
+  animation: rd-pop .7s cubic-bezier(.2, 1.6, .4, 1) .2s both; }
+.qz-level { font-size: 18px; font-weight: 800; color: var(--sky-gold); animation: rd-pop .6s cubic-bezier(.2, 1.6, .4, 1) .9s both; }
+.qz-more { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+@media (prefers-reduced-motion: reduce) { .rd-up, .qz-gain, .qz-level, .readiness.grew .rd-num { animation: none; } .rd-bar i { transition: none; } }
+.quest-stats .hchips { display: contents; }
+.quest-stats .hchip, .quest-stats .hchips-ai .hchip { min-height: 30px; padding: 3px 8px; font-size: 14px; font-weight: 700; border-radius: 999px; }
+.quest-stats { gap: 4px; }
+.quest-stats span { padding: 3px 8px; }
+.quest-stats .hchips { padding: 0; border: 0; background: none; }
+.mode > span { flex: 1; min-width: 0; }
+.mode input { flex: none; width: 20px; height: 20px; }

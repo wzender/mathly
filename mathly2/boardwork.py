@@ -89,8 +89,8 @@ def _title(request: Request, row: dict) -> str:
     test_id, _, number = row["scope"].partition(":")
     test = store.get_test(int(test_id)) if test_id.isdigit() else None
     when = f" ({test['date'].day}.{test['date'].month})" if test else ""
-    from .exam import FOCUS
-    name = ("מבחן תרגול: נושאים לחיזוק" if number == str(FOCUS) else f"מבחן תרגול {number}") if row["kind"] == "exercise_test" else "מבחן סימולציה"
+    from .exam import TITLES, mode_of_scope
+    name = TITLES[mode_of_scope(row["scope"])] if row["kind"] == "exercise_test" else "מבחן סימולציה"
     return name + when
 
 

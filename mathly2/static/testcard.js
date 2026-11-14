@@ -1,63 +1,107 @@
-// One real test: its plan with the recommended days, the readiness bar, the two exercise tests, the simulation and what to practise first.
+// One real test: the readiness number and what moves it, a simulation on request (all the material, timed, no choice), a practice test on
+// request in one of three modes (balanced, focused on the skills that were hard, or skills picked by hand), and the trail of the tests
+// handed in with what each one added.
 import { api } from "./api.js";
 import { esc, fmt } from "./math.js";
-import { readinessBar } from "./home.js";
+import { countUp, readinessMeter } from "./home.js";
 import { daysText, forSubject, homeHref, setSubject, shortDate, tabs } from "./ui.js";
 
-const STEP_NAMES = { path: "לסיים את המסלול של השיעורים", ex1: "מבחן תרגול 1", ex2: "מבחן תרגול 2", sim: "מבחן סימולציה", review: "חזרה על מה שנפל בסימולציה" };
+const MODES = [
+  ["balanced", "⚖️ מאוזן", "שאלות מכל החומר של המבחן, באופן שווה."],
+  ["focus", "🎯 ממוקד", "15 שאלות רק מהמיומנויות שהתקשיתם בהן במבחנים."],
+  ["manual", "✋ בחירה ידנית", "אתם בוחרים את המיומנויות."],
+];
+const STATE = { mastered: "👑", learning: "◐", not_started: "○" };
 
-function planList(test) {
-  return `<ol class="plan" id="plan">${test.plan.map(step => {
-    const when = step.id === "path" ? `עד ${step.until} ימים לפני` : step.id === "review" ? `${step.day} ימים לפני ועד המבחן` : `בערך ${step.day} ימים לפני`;
-    return `<li class="${step.done ? "done" : ""}" data-step="${step.id}"><span class="mark" aria-hidden="true">${step.done ? "✓" : "○"}</span>
-      <span><b>${STEP_NAMES[step.id]}</b><br><span class="muted">${when} · ${step.done ? "בוצע" : "עוד לא"}</span></span></li>`;
-  }).join("")}</ol><p class="muted">הימים הם המלצה: אפשר להתחיל כל שלב קודם או אחר כך.</p>`;
+/** How the number moves, in plain words. */
+const HOW = `<details class="rd-how" id="rd-how"><summary>איך מעלים את המוכנות?</summary><ul>
+  <li>כל מבחן שהציון בו גבוה מהמוכנות מעלה אותה: מבחן תרגול סוגר 30% מהפער, <b>מבחן סימולציה סוגר 60%</b>, ומבחן בבחירה ידנית 15%.</li>
+  <li>ציון נמוך מהמוכנות לא מוריד אותה.</li>
+  <li>רק מבחנים נספרים. תרגול במסלול ובהעמקה עוזר להצליח בהם, אבל לא משנה את המספר.</li></ul></details>`;
+
+function simulationCard(test) {
+  const s = test.simulation, gain = test.readiness.can_add.simulation;
+  return `<section class="card test-action" id="simulation"><h3>⏱ מבחן סימולציה</h3>
+    <p class="muted">כמו המבחן האמיתי: ${test.questions} שאלות מכל החומר, ${test.minutes} דקות. את השאלות בוחרת האפליקציה.</p>
+    <p><a class="button primary big-btn" id="sim-start" href="#/sim/${test.id}${s.open ? `/${esc(s.open)}` : ""}">${s.open ? "להמשיך את הסימולציה" : "בקשת מבחן סימולציה"}
+      ${s.open || !gain ? "" : `<small class="gain-hint">עד +${gain} מוכנות</small>`}</a></p>
+    ${s.taken ? `<p class="muted" id="sim-done">עשיתם ${s.taken === 1 ? "סימולציה אחת" : `${s.taken} סימולציות`} · הציון הטוב: <b id="sim-best">${s.best}</b></p>` : ""}</section>`;
 }
 
-function exercises(test) {
-  return `<ul class="plain" id="exercises">${test.exercise_tests.map(e => `<li data-exercise="${e.number}">
-    <span><b>מבחן תרגול ${e.number}</b><br><span class="muted">${e.best === null ? "עוד לא נעשה" : `הציון הטוב: ${e.best} · ${e.attempts} ${e.attempts === 1 ? "ניסיון" : "ניסיונות"}`}</span></span>
-    <a class="button" href="#/exam/${test.id}/${e.number}">${e.open ? "להמשיך" : e.attempts ? "שוב" : "התחלה"}</a></li>`).join("")}</ul>`;
+function practiceCard(test) {
+  const p = test.practice, gain = test.readiness.can_add;
+  const lessons = [...new Set(p.manual.skills.map(s => s.lesson))];
+  const radio = ([mode, title, what]) => {
+    const off = mode === "focus" && !p.focus.skills.length;
+    return `<label class="mode${off ? " off" : ""}" data-mode="${mode}"><input type="radio" name="mode" value="${mode}"${mode === "balanced" ? " checked" : ""}${off ? " disabled" : ""}>
+      <span><b>${title}</b>${p[mode].open ? ` <span class="tag">באמצע</span>` : ""}<br><span class="muted">${off ? "יופיע אחרי מבחן שבו היו טעויות." : what}</span></span></label>`;
+  };
+  return `<section class="card test-action" id="practice"><h3>📝 מבחן תרגול</h3>
+    <p class="muted">אתם בוחרים על מה להתאמן. בלי שעון.</p>
+    <div class="modes" role="radiogroup" aria-label="סוג מבחן התרגול">${MODES.map(radio).join("")}</div>
+    <div id="focus-skills" class="chips" hidden>${p.focus.skills.map(s => `<span class="ex-chip">${fmt(s.name)}</span>`).join(" ")}</div>
+    <fieldset id="manual-skills" hidden><legend>בחרו מיומנויות</legend>${lessons.map(lesson => `<p class="muted pick-lesson">${fmt(lesson)}</p>
+      ${p.manual.skills.filter(s => s.lesson === lesson).map(s => `<label class="pick"><input type="checkbox" value="${esc(s.id)}"> <span aria-hidden="true">${STATE[s.state] || ""}</span> ${fmt(s.name)}</label>`).join("")}`).join("")}</fieldset>
+    <p><button type="button" class="primary big-btn" id="practice-start">בקשת מבחן תרגול <small class="gain-hint">עד +${gain.practice} מוכנות</small></button></p>
+    <p class="error" id="practice-error" role="alert" hidden></p></section>`;
 }
 
-/** The practice test on the weak topics: 15 questions from the skills that lost points (or are still being learned). */
-function focus(test) {
-  const f = test.focus;
-  if (!f) return "";
-  if (!f.skills.length) return `<div id="focus" data-ready="false"><p class="muted">🎯 ${f.attempts ? "אין כרגע נושאים לחיזוק. כל הכבוד!" : "אחרי מבחן תרגול או סימולציה יופיע כאן מבחן על הנושאים שצריך לחזק."}</p></div>`;
-  return `<div id="focus" data-ready="true"><p><b>🎯 מבחן תרגול על הנושאים לחיזוק</b> <span class="muted">· ${f.size} שאלות</span></p>
-    <p class="focus-skills">${f.skills.map(s => `<a class="ex-chip link" href="#/skill/${esc(s.id)}">${fmt(s.name)}</a>`).join(" ")}</p>
-    ${f.best === null ? "" : `<p class="muted">הציון הטוב: ${f.best} · ${f.attempts} ${f.attempts === 1 ? "ניסיון" : "ניסיונות"}</p>`}
-    <p><a class="button primary" id="focus-start" href="#/exam/${test.id}/${f.number}">${f.open ? "להמשיך" : f.attempts ? "עוד מבחן על הנושאים" : "התחלה"}</a></p></div>`;
+function trailCard(test) {
+  if (!test.trail.length) return "";
+  return `<section class="card" id="trail"><h3>המבחנים שעשיתם</h3><ol class="plain trail">${test.trail.map(t => `<li data-kind="${t.kind}">
+      <a href="${t.kind === "simulation" ? `#/sim/${test.id}/${esc(t.attempt)}` : `#/exam/${test.id}/${t.number}/${esc(t.attempt)}`}"><span class="grow"><b>${esc(t.title)}</b>
+      <span class="muted"> · ${shortDate(t.at.slice(0, 10))}</span></span><span class="tag">ציון ${t.grade}</span>
+      <span class="gain${t.gain ? "" : " zero"}">${t.gain ? `+${t.gain}` : "±0"}</span></a></li>`).join("")}</ol></section>`;
 }
 
-function simulation(test) {
-  const s = test.simulation;
-  const lead = s.taken ? `<p>הציון: <b id="sim-grade">${s.grade}</b></p>${s.review.length ? `<p>מיומנויות לחזרה:</p><ul class="plain" id="sim-review">${s.review.map(r =>
-        `<li><a href="#/skill/${esc(r.id)}">${fmt(r.name)}</a></li>`).join("")}</ul>` : `<p class="muted">אין מיומנויות לחזרה. כל הכבוד!</p>`}
-      <p><a class="button" href="#/sim/${test.id}">לתוצאה</a></p>`
-    : s.open_now ? `<p><b class="req">חובה</b> המבחן פתוח עד יום המבחן. אפשר לעשות אותו פעם אחת.</p>
-      <p><a class="button primary" id="sim-start" href="#/sim/${test.id}">${s.in_progress ? "להמשיך" : "התחלה"}</a></p>`
-    : `<p id="sim-closed">מבחן הסימולציה ייפתח ב־${shortDate(s.opens_on)} (בעוד ${s.opens_in_days} ימים). אפשר לעשות אותו פעם אחת.</p>`;
-  return `<div id="simulation" data-taken="${s.taken}">${lead}</div>`;
+/** The mode's extra part (the hard skills, the skills to pick) and what the button says; the button asks for the test. */
+function wire(test) {
+  const card = document.getElementById("practice");
+  const mode = () => card.querySelector("input[name=mode]:checked").value;
+  const sync = () => {
+    const m = mode(), resume = m !== "manual" && test.practice[m].open;
+    card.querySelector("#focus-skills").hidden = m !== "focus";
+    card.querySelector("#manual-skills").hidden = m !== "manual";
+    card.querySelectorAll(".mode").forEach(l => l.classList.toggle("on", l.dataset.mode === m));
+    const gain = test.readiness.can_add[m === "manual" ? "manual" : "practice"];
+    document.getElementById("practice-start").innerHTML = resume ? "להמשיך את המבחן"
+      : `בקשת מבחן תרגול${gain ? ` <small class="gain-hint">עד +${gain} מוכנות</small>` : ""}`;
+  };
+  card.addEventListener("change", sync);
+  sync();
+  document.getElementById("practice-start").addEventListener("click", async event => {
+    const button = event.currentTarget, error = document.getElementById("practice-error"), m = mode();
+    const skills = [...card.querySelectorAll("#manual-skills input:checked")].map(i => i.value);
+    if (m === "manual" && !skills.length) { error.textContent = "בחרו לפחות מיומנות אחת."; error.hidden = false; return; }
+    button.disabled = true;
+    error.hidden = true;
+    try {
+      const data = await api(`/api/tests/${test.id}/practice/start`, { method: "POST", body: { mode: m, skills } });
+      location.hash = `#/exam/${test.id}/${data.test.number}/${encodeURIComponent(data.id)}`;
+    } catch (e) {
+      button.disabled = false;
+      error.textContent = e.message || "משהו השתבש";
+      error.hidden = false;
+    }
+  });
 }
 
-export async function show(view, id) {
+/** `focus`: a section to scroll to ("practice" from the home's button). */
+export async function show(view, id, focus = "") {
   const test = await api(`/api/tests/${encodeURIComponent(id)}`);
   setSubject(test.subject_id);                                         // a test belongs to one subject: its home and tab bar follow it
   const home = await api(forSubject("/api/home"));
   const others = home.tests.filter(t => t.id !== test.id);
   view(`${tabs("home")}<p><a class="back" href="${homeHref()}">‹ הבית</a></p>
     <section class="card" id="test-card" data-test="${test.id}"><h2>מבחן ב־${shortDate(test.date)} <span class="muted">(${daysText(test.days_left)})</span></h2>
-      <p class="muted">${test.lessons.map(l => fmt(l.name)).join(", ")}${test.note ? ` · ${esc(test.note)}` : ""}<br>${test.questions} שאלות · ${test.minutes} דקות</p>
-      ${readinessBar(test.readiness)}</section>
-    <section class="card"><h3>התוכנית</h3>${planList(test)}</section>
-    <section class="card"><h3>מבחני תרגול</h3>${exercises(test)}${focus(test)}
-      ${test.practice_first.length ? `<p id="practice-first"><b>כדאי לתרגל קודם:</b> ${test.practice_first.map(s => `<a class="ex-chip link" href="#/skill/${esc(s.id)}">${fmt(s.name)}</a>`).join(" ")}</p>
-        <p class="muted">אלה מיומנויות שעוד לא התחלתם, ולכן אין להן שאלות במבחני התרגול.</p>
-        <p id="all-skills">${test.exercise_tests.map(e => `<a class="button" href="#/exam/${test.id}/${e.number}/all">מבחן תרגול ${e.number} על כל החומר</a>`).join(" ")}</p>
-        <p class="muted">"על כל החומר": שאלות מכל הנושאים של המבחן, כמו במבחן הסימולציה, גם ממיומנויות שעוד לא התחלתם.</p>` : ""}</section>
-    <section class="card"><h3>מבחן סימולציה</h3>${simulation(test)}</section>
+      <p class="muted">${test.lessons.map(l => fmt(l.name)).join(", ")}${test.note ? ` · ${esc(test.note)}` : ""}</p>
+      ${readinessMeter(test)}${HOW}</section>
+    ${simulationCard(test)}
+    ${practiceCard(test)}
+    ${trailCard(test)}
     ${others.length ? `<section class="card"><h3>מבחנים נוספים</h3><ul class="plain" id="other-tests">${others.map(t => `<li><a href="#/test/${t.id}">${shortDate(t.date)} · ${t.lessons.map(l => fmt(l.name)).join(", ")}</a>
       <span class="muted">${daysText(t.days_left)} · מוכנות ${t.readiness.number}</span></li>`).join("")}</ul></section>` : ""}`);
+  wire(test);
+  countUp();
+  if (focus) document.getElementById(focus)?.scrollIntoView({ block: "start" });
 }

@@ -1,5 +1,6 @@
-"""Real tests: a teacher sets one for a class; every student of the class gets a countdown, two exercise tests, one simulation and a
-readiness number from it. Nothing is created per student: it is all derived from the test, the student's skill states and their attempts."""
+"""Real tests: a teacher sets one for a class; every student of the class can ask for practice tests (balanced, focused on the weak skills,
+or on skills they pick) and simulations (all the material, timed, as many as they like), and has a readiness number that only these tests
+move (readiness.py). Nothing is created per student: it is all derived from the test, the student's skill states and their attempts."""
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -8,7 +9,7 @@ from datetime import date as Day
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from . import attempts, clock, countdown, exam, readiness, reads
+from . import attempts, clock, exam, readiness, reads
 from .access import allowed, learner, need
 from .learning import MASTERED, next_skill, skill_state
 
@@ -68,95 +69,89 @@ def _student_reads(user_id: str) -> list[tuple]:
     return [("progress_of", user_id), ("last_answered", user_id), ("attempts_of", user_id, "exercise_test"), ("attempts_of", user_id, "simulation")]
 
 
+def _kind_of(row: dict) -> str:
+    """How a handed-in test moves readiness: simulation, practice, or manual (a practice test on skills the student picked)."""
+    if row["kind"] == "simulation":
+        return "simulation"
+    return "manual" if exam.mode_of_scope(row["scope"]) == "manual" else "practice"
+
+
 def facts_for(request: Request, user_id: str | None, test: dict, today: date) -> dict:
-    """Everything the plan, the readiness meter and the draws need about one student and one test."""
+    """Everything the card, the readiness number and the draws need about one student and one test."""
     store, bank, now, here = request.app.state.store, request.app.state.bank, clock.now(), reads.of(request)
     covered = _covered(bank, test)
     if user_id:
-        here.prefetch(*_student_reads(user_id))                      # the four reads together (done once per request: a second test reuses them)
+        here.prefetch(*_student_reads(user_id))                      # the reads together (done once per request: a second test reuses them)
     states = {p["skill_id"]: skill_state(p) for p in here.progress_of(user_id)} if user_id else {}
-    last = here.last_answered(user_id) if user_id else {}
     tid = str(test["id"])
 
     def mine(kind: str) -> list[dict]:
         rows = here.attempts_of(user_id, kind) if user_id else []
         return [attempts.settle(store, bank, r, now) for r in rows if r["scope"] == tid or r["scope"].startswith(tid + ":")]
 
-    exercise, focus = {1: [], 2: []}, []
-    for row in mine("exercise_test"):
-        number = int(row["scope"].split(":")[1])
-        (focus if number == exam.FOCUS else exercise[number]).append(row)
-    simulation = next(iter(mine("simulation")), None)
-    submitted = lambda rows: [r for r in rows if not attempts.is_open(r)]
-    best = {n: max((r["grade"] for r in submitted(rows)), default=None) for n, rows in exercise.items()}
-    weak_before = {s["id"] for rows in exercise.values() for r in submitted(rows) for s in attempts.result(bank, r)["lost_skills"]}
-    failed: list[str] = []
-    review_left: list[str] = []
-    if simulation and not attempts.is_open(simulation):
-        failed = [s["id"] for s in attempts.result(bank, simulation)["lost_skills"]]
-        sim_day = clock.school_day(simulation["submitted_at"])
-        review_left = [i for i in failed if last.get(i) is None or last[i] <= sim_day]       # not practised after the simulation
-    mastered = [i for i in covered if states.get(i) == MASTERED]
-    unmastered = [i for i in covered if states.get(i) != MASTERED]
-    sim_taken = bool(simulation and not attempts.is_open(simulation))
-    stale = sorted(covered, key=lambda i: (last.get(i) is not None, last.get(i) or date.min))
+    practice, simulations = mine("exercise_test"), mine("simulation")
+    done = sorted((r for r in practice + simulations if not attempts.is_open(r)), key=lambda r: r["submitted_at"])
+    lost = {s["id"] for r in done for s in attempts.result(bank, r)["lost_skills"]}
     used: dict[str, int] = {}
-    for rows in list(exercise.values()) + [focus, [simulation] if simulation else []]:
-        for r in rows:
-            for q in r["questions"]:
-                used[q["key"]] = used.get(q["key"], 0) + 1
-    return {"covered": covered, "states": states, "mastered": len(mastered), "path_done": bool(covered) and not unmastered,
-            "next_path_skill": unmastered[0] if unmastered else None, "exercise": exercise, "best": best, "simulation": simulation,
-            "sim_taken": sim_taken, "ex1_done": bool(submitted(exercise[1])), "ex2_done": bool(submitted(exercise[2])),
-            "weak_before": weak_before, "failed": failed, "review_left": review_left, "stale": stale, "used": used, "focus": focus,
-            "focus_skills": _focus_skills(bank, covered, states, weak_before | set(failed) | {s["id"] for r in submitted(focus) for s in attempts.result(bank, r)["lost_skills"]})}
-
-
-def _focus_skills(bank, covered: list[str], states: dict[str, str], lost: set[str]) -> list[str]:
-    """The weak topics of a test: covered skills that lost points in its exercise tests or simulation, or are still being learned."""
-    return [i for i in covered if (i in lost or states.get(i) == "learning") and bank.question_keys(i)]
+    for r in practice + simulations:
+        for q in r["questions"]:
+            used[q["key"]] = used.get(q["key"], 0) + 1
+    return {"covered": covered, "states": states, "mastered": sum(1 for i in covered if states.get(i) == MASTERED),
+            "practice": practice, "simulations": simulations, "done": done, "results": [(_kind_of(r), r["grade"]) for r in done],
+            "sim_taken": any(r["kind"] == "simulation" for r in done), "used": used,
+            "focus_skills": [i for i in covered if (i in lost or states.get(i) == "learning") and bank.question_keys(i)]}
 
 
 def readiness_for(facts: dict) -> dict:
-    m = readiness.mastery_percent(facts["mastered"], len(facts["covered"]))
-    e = readiness.exercise_average([g for g in facts["best"].values() if g is not None])
-    s = facts["simulation"]["grade"] if facts["sim_taken"] else None
-    return readiness.compute(m, e, s)
+    return readiness.compute(facts["results"])
 
 
-def plan_for(test: dict) -> dict:
-    return countdown.plan(test["date"], clock.school_day(test["created_at"]))
+def readiness_change(request: Request, row: dict) -> dict | None:
+    """For a handed-in practice test or simulation: what it did to its test's readiness number (before, after, gain, a new level)."""
+    if row["kind"] not in ("exercise_test", "simulation") or attempts.is_open(row):
+        return None
+    test_id = row["scope"].split(":")[0]
+    test = request.app.state.store.get_test(int(test_id)) if test_id.isdigit() else None
+    if test is None:
+        return None
+    facts = facts_for(request, row["user_id"], test, clock.school_day())
+    before = [(_kind_of(r), r["grade"]) for r in facts["done"] if r["submitted_at"] < row["submitted_at"]]
+    return readiness.change(before, (_kind_of(row), row["grade"]))
+
+
+def _title(row: dict) -> str:
+    return "מבחן סימולציה" if row["kind"] == "simulation" else exam.TITLES[exam.mode_of_scope(row["scope"])]
 
 
 def card(request: Request, user_id: str | None, test: dict, today: date) -> dict:
-    """A test as its student sees it: the plan, readiness, both exercise tests, the simulation, and today's task."""
+    """A test as its student sees it: the readiness number and what moves it, the practice tests by mode, the simulations, and the trail
+    of handed-in tests with what each added."""
     bank = request.app.state.bank
     facts = facts_for(request, user_id, test, today)
-    p = plan_for(test)
     days_left = (test["date"] - today).days
-    exercises = []
-    for n in (1, 2):
-        rows = facts["exercise"][n]
-        open_ = next((r for r in rows if attempts.is_open(r)), None)
-        exercises.append({"number": n, "best": facts["best"][n], "attempts": len([r for r in rows if not attempts.is_open(r)]),
-                          "open": bool(open_), "due_at": open_["due_at"].isoformat() if open_ and attempts.is_timed(open_) else None})
-    sim = facts["simulation"]
-    opens_in = max(0, days_left - p["sim"])
-    focus_open = next((r for r in facts["focus"] if attempts.is_open(r)), None)
-    focus_done = [r for r in facts["focus"] if not attempts.is_open(r)]
-    focus = {"number": exam.FOCUS, "size": exam.FOCUS_SIZE, "skills": [{"id": i, "name": bank.skill(i)["name"]} for i in facts["focus_skills"]],
-             "best": max((r["grade"] for r in focus_done), default=None), "attempts": len(focus_done), "open": bool(focus_open)}
+    skill_row = lambda i: {"id": i, "name": bank.skill(i)["name"]}
+    open_of = lambda rows: next((r["id"] for r in reversed(rows) if attempts.is_open(r)), None)
+    by_mode = {m: [r for r in facts["practice"] if exam.mode_of_scope(r["scope"]) == m] for m in exam.TITLES}
+    trail, before = [], []
+    for row in facts["done"]:
+        moved = readiness.change(before, (_kind_of(row), row["grade"]))
+        before.append((_kind_of(row), row["grade"]))
+        trail.append({"attempt": row["id"], "kind": row["kind"], "title": _title(row), "grade": row["grade"], "gain": moved["gain"],
+                      "number": int(row["scope"].split(":")[1]) if row["kind"] == "exercise_test" else None,
+                      "after": moved["after"], "at": row["submitted_at"].isoformat()})
+    lessons = {l["id"]: l["name"] for l in bank.lessons}
     return {"id": test["id"], "date": test["date"].isoformat(), "days_left": days_left, "note": test["note"], "subject_id": test.get("subject_id", "math"),
             "lessons": [{"id": i, "name": n} for i, n in zip(test["lessons"], lesson_names(request, test["lessons"]))],
-            "questions": test["questions"], "minutes": test["minutes"],
-            "plan": countdown.outline(p, facts), "task": countdown.task(days_left, p, facts), "readiness": readiness_for(facts),
-            "exercise_tests": exercises, "focus": focus,
-            "practice_first": [{"id": i, "name": bank.skill(i)["name"]} for i in facts["covered"] if facts["states"].get(i, "not_started") == "not_started"],
-            "simulation": {"open_now": countdown.sim_open(days_left, p), "opens_in_days": opens_in,
-                           "opens_on": (test["date"] - timedelta(days=p["sim"])).isoformat(), "required": countdown.sim_open(days_left, p) and not facts["sim_taken"],
-                           "taken": facts["sim_taken"], "grade": sim["grade"] if facts["sim_taken"] else None,
-                           "attempt": sim["id"] if sim else None, "in_progress": bool(sim and attempts.is_open(sim)),
-                           "review": [{"id": i, "name": bank.skill(i)["name"]} for i in facts["failed"] if bank.skill(i)]}}
+            "questions": test["questions"], "minutes": test["minutes"], "readiness": readiness_for(facts),
+            "practice": {"balanced": {"number": exam.BALANCED, "size": test["questions"], "open": open_of(by_mode["balanced"])},
+                         "focus": {"number": exam.FOCUS, "size": exam.FOCUS_SIZE, "open": open_of(by_mode["focus"]),
+                                   "skills": [skill_row(i) for i in facts["focus_skills"]]},
+                         "manual": {"number": exam.MANUAL, "size": test["questions"], "open": open_of(by_mode["manual"]),
+                                    "skills": [{**skill_row(i), "lesson": lessons.get(bank.skill(i)["unit"], ""),
+                                                "state": facts["states"].get(i, "not_started")} for i in facts["covered"]]}},
+            "simulation": {"open": open_of(facts["simulations"]), "taken": sum(1 for r in facts["done"] if r["kind"] == "simulation"),
+                           "best": readiness_for(facts)["simulation_best"]},
+            "trail": trail[::-1]}
 
 
 # ---- the teacher: set, change, remove, and see who took the simulation ----
@@ -201,7 +196,7 @@ def teacher_view(request: Request, test: dict, klass: dict, today: date) -> dict
     for m in members:
         facts = facts_for(request, m["user_id"], test, today)
         students.append({"email": m["email"], "signed_in": bool(m["user_id"]), "simulation_taken": facts["sim_taken"],
-                         "readiness": readiness_for(facts)})
+                         "readiness": readiness_for(facts)})          # readiness: the number, and how many practice tests and simulations
     taken = sum(1 for s in students if s["simulation_taken"])
     return {"id": test["id"], "class": {"id": klass["id"], "name": klass["name"]}, "date": test["date"].isoformat(), "note": test["note"],
             "subject_id": test.get("subject_id", "math"),
@@ -263,11 +258,6 @@ def remove_test(test_id: int, request: Request, user: dict = Depends(need("class
 
 # ---- the student: home and a test's card ----
 
-def _with_skill_name(request: Request, task: dict) -> dict:
-    skill = request.app.state.bank.skill(task["skill"]) if task.get("skill") else None
-    return {**task, "skill_name": skill["name"] if skill else None}
-
-
 def _next_path_skill(request: Request, user: dict, subject: str = "math") -> str | None:
     """The suggested next skill of the student's path in this subject (the same rule as the path's owl)."""
     from .skills import RECENT, visible_lesson_ids
@@ -281,8 +271,7 @@ def _next_path_skill(request: Request, user: dict, subject: str = "math") -> str
 
 @router.get("/home")
 def home(request: Request, user: dict = Depends(learner), subject: str = Query("math", max_length=40)) -> dict:
-    """The student's home: the upcoming tests (nearest first) with their readiness, today's one task from the nearest test,
-    the required simulation, and the next skill of the path."""
+    """The student's home: the upcoming tests (nearest first) with their readiness, the lesson map, and the next skill of the path."""
     here, today, uid = reads.of(request), clock.school_day(), user["id"]
     class_ids = [c["id"] for c in here.classes_of_student(user["email"])]
     from . import rounds
@@ -291,15 +280,11 @@ def home(request: Request, user: dict = Depends(learner), subject: str = Query("
     here.prefetch(("tests_of_classes", class_ids), ("recent_skills", uid, RECENT), ("attempts_of", uid, "quiz"), ("attempts_of", uid, rounds.KIND), ("curriculum",), ("daily_correct", uid), *_student_reads(uid))       # the tests and the student's facts: one wait
     tests = [t for t in here.tests_of_classes(class_ids) if t["date"] >= today and t.get("subject_id", "math") == subject]
     cards = [card(request, user["id"], t, today) for t in tests]
-    nearest = cards[0] if cards else None
     next_id = _next_path_skill(request, user, subject)
     next_skill_row = request.app.state.bank.skill(next_id) if next_id else None
-    return {"tests": cards, "task": {"test_id": nearest["id"], **_with_skill_name(request, nearest["task"])} if nearest else None,
-            "required_simulations": [{"test_id": c["id"], "date": c["date"], "days_left": c["days_left"]} for c in cards if c["simulation"]["required"]],
+    return {"tests": cards,
             "next_skill": {"id": next_id, "name": next_skill_row["name"]} if next_skill_row else None,
-            "behind": behind_lessons(request, user, subject), "subject": subject, "map": lesson_map(request, user, subject),
-            "weak_tests": [{"test_id": c["id"], "date": c["date"], "days_left": c["days_left"], "number": e["number"], "best": e["best"], "open": e["open"]}
-                           for c in cards[:1] for e in c["exercise_tests"] if e["best"] is not None and e["best"] < attempts.PASS_GRADE]}   # the nearest test's card only
+            "behind": behind_lessons(request, user, subject), "subject": subject, "map": lesson_map(request, user, subject)}
 
 
 def _student_test(request: Request, user: dict, test_id: int) -> dict:
@@ -317,54 +302,77 @@ def test_card(test_id: int, request: Request, user: dict = Depends(learner)) -> 
     return card(request, user["id"], _student_test(request, user, test_id), clock.school_day())
 
 
-# ---- starting an exercise test or the simulation (reading, answering and submitting use the /api/attempts routes) ----
+# ---- starting a practice test or a simulation (reading, answering and submitting use the /api/attempts routes) ----
 
-def _start(request: Request, user: dict, test: dict, kind: str, scope: str, share: float, include_unstarted: bool = False) -> dict:
-    """Resume the student's open attempt of this scope, else draw a new one (questions weighted toward weak skills when `share`)."""
+class PracticeBody(BaseModel):
+    mode: str = Field(pattern="^(balanced|focus|manual)$")
+    skills: list[str] = Field(default_factory=list, max_length=200)    # manual: the skills to practise
+
+
+def _new(request: Request, user: dict, test: dict, kind: str, scope: str, questions: list[dict]) -> dict:
     from .quizzes import view
-    store, bank, now = request.app.state.store, request.app.state.bank, clock.now()
+    now = clock.now()
+    return view(request, request.app.state.store.create_attempt(user["id"], kind, scope, now, now + timedelta(minutes=test["minutes"]), questions))
+
+
+def _practice(request: Request, user: dict, test: dict, mode: str, skills: list[str] | None = None, number: int | None = None) -> dict:
+    """Resume this mode's open practice test (not a manual one: a new choice is a new test), else draw a new one."""
+    from .quizzes import view
+    bank = request.app.state.bank
     facts = facts_for(request, user["id"], test, clock.school_day())
-    number = int(scope.split(":")[1]) if kind == "exercise_test" else None
-    mine = facts["focus"] if number == exam.FOCUS else facts["exercise"][number] if kind == "exercise_test" else [facts["simulation"]] if facts["simulation"] else []
-    for row in mine:
-        if attempts.is_open(row) or kind == "simulation":           # open: resume; the simulation is taken once, so its result comes back
-            return view(request, row)
-    if number == exam.FOCUS:                                        # the weak topics only, FOCUS_SIZE questions, untimed like the others
+    number = number or exam.NUMBER_OF[mode]
+    scope = f"{test['id']}:{number}"
+    if mode != "manual":
+        for row in facts["practice"]:
+            if row["scope"] == scope and attempts.is_open(row):
+                return view(request, row)
+    rng = getattr(request.app.state, "quiz_rng", None)
+    if mode == "focus":
         if not facts["focus_skills"]:
-            raise HTTPException(409, "אין כרגע נושאים לחיזוק במבחן הזה. כל הכבוד!")
-        drawn = exam.draw_focus(bank, facts["focus_skills"], used=facts["used"], rng=getattr(request.app.state, "quiz_rng", None))
-        return view(request, store.create_attempt(user["id"], kind, scope, now, now + timedelta(minutes=test["minutes"]), drawn))
-    drawn = exam.draw(bank, test["lessons"], facts["states"], test["questions"], share=share, weak_before=facts["weak_before"], used=facts["used"],
-                      include_unstarted=include_unstarted)
-    if not drawn["questions"] and kind == "exercise_test" and not include_unstarted:     # nothing started yet: all the material, like the simulation
-        drawn = exam.draw(bank, test["lessons"], facts["states"], test["questions"], share=0.0, weak_before=facts["weak_before"],
-                          used=facts["used"], include_unstarted=True)
-    if not drawn["questions"]:
-        raise HTTPException(409, "עוד לא התחלתם מיומנויות בשיעורים של המבחן. קודם מתרגלים במסלול.")
-    row = store.create_attempt(user["id"], kind, scope, now, now + timedelta(minutes=test["minutes"]), drawn["questions"])
-    return view(request, row)
+            raise HTTPException(409, "אין כרגע מיומנויות שהתקשיתם בהן. נסו מבחן מאוזן או סימולציה.")
+        drawn = exam.draw_focus(bank, facts["focus_skills"], used=facts["used"], rng=rng)
+    elif mode == "manual":
+        chosen = [i for i in dict.fromkeys(skills or []) if i in facts["covered"]]
+        if not chosen:
+            raise HTTPException(422, "בחרו לפחות מיומנות אחת מהחומר של המבחן")
+        drawn = exam.draw_focus(bank, chosen, n=test["questions"], used=facts["used"], rng=rng)
+    else:
+        drawn = exam.draw(bank, test["lessons"], facts["states"], test["questions"], used=facts["used"], include_unstarted=True, rng=rng)["questions"]
+    if not drawn:
+        raise HTTPException(409, "אין עדיין שאלות בחומר של המבחן")
+    return _new(request, user, test, "exercise_test", scope, drawn)
+
+
+@router.post("/tests/{test_id}/practice/start")
+def start_practice(test_id: int, body: PracticeBody, request: Request, user: dict = Depends(learner)) -> dict:
+    """A practice test: balanced (all the material, evenly), focus (the skills that lost points or are still being learned, 15 questions),
+    or manual (the skills the student picked)."""
+    return _practice(request, user, _student_test(request, user, test_id), body.mode, body.skills)
 
 
 @router.post("/tests/{test_id}/exercise/{number}/start")
 def start_exercise(test_id: int, number: int, request: Request, user: dict = Depends(learner),
-                   all_skills: bool = Query(False, description="the simulation's material: every skill of the test's lessons, started or not, evenly")) -> dict:
-    if number not in exam.EXERCISE_SHARE and number != exam.FOCUS:
+                   all_skills: bool = Query(False, description="kept for old links: every practice test now draws from all the material")) -> dict:
+    """An older address of a practice test by number (1, 2: balanced; 3: focus), as in a teacher's assignment."""
+    mode = exam.MODE_OF.get(number)
+    if mode is None or mode == "manual":
         raise HTTPException(404, "מבחן התרגול לא נמצא")
-    test = _student_test(request, user, test_id)
-    if number == exam.FOCUS:
-        return _start(request, user, test, "exercise_test", f"{test_id}:{number}", 1.0)
-    share = 0.0 if all_skills else exam.EXERCISE_SHARE[number]        # all_skills: drawn like the simulation (an even spread, no weak share)
-    return _start(request, user, test, "exercise_test", f"{test_id}:{number}", share, all_skills)
+    return _practice(request, user, _student_test(request, user, test_id), mode, number=number)
 
 
 @router.post("/tests/{test_id}/simulation/start")
 def start_simulation(test_id: int, request: Request, user: dict = Depends(learner),
-                     all_skills: bool = Query(False, description="a bypass: every skill of the test's lessons, started or not")) -> dict:
+                     all_skills: bool = Query(False, description="kept for old links: a simulation always draws from all the material")) -> dict:
+    """A simulation: all the test's material evenly, the test's length and time, no choice. As many as the student asks for; an open one
+    resumes."""
+    from .quizzes import view
     test = _student_test(request, user, test_id)
-    today = clock.school_day()
-    p = plan_for(test)
-    existing = facts_for(request, user["id"], test, today)["simulation"]
-    if not existing and not countdown.sim_open(( test["date"] - today).days, p):
-        opens = test["date"] - timedelta(days=p["sim"])
-        raise HTTPException(409, f"מבחן הסימולציה ייפתח ב־{opens.day}.{opens.month}" if today < opens else "מבחן הסימולציה נסגר")
-    return _start(request, user, test, "simulation", str(test_id), 0.0, all_skills)
+    facts = facts_for(request, user["id"], test, clock.school_day())
+    for row in facts["simulations"]:
+        if attempts.is_open(row):
+            return view(request, row)
+    drawn = exam.draw(request.app.state.bank, test["lessons"], facts["states"], test["questions"], used=facts["used"], include_unstarted=True,
+                      rng=getattr(request.app.state, "quiz_rng", None))["questions"]
+    if not drawn:
+        raise HTTPException(409, "אין עדיין שאלות בחומר של המבחן")
+    return _new(request, user, test, "simulation", str(test_id), drawn)

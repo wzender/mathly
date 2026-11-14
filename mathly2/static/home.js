@@ -1,66 +1,65 @@
 // The student's home for a subject: one screen, like a game's level select. The stars collected and a big play button for the next lesson,
-// every lesson as a small tile with its stars (a round finished, 8 of 10, every skill mastered), then the nearest test in one strip (the days
-// left, the readiness number, today's task) and small buttons for a required simulation, the new assignments and photo help.
+// every lesson as a small tile with its stars (a round finished, 8 of 10, every skill mastered), the nearest test in one block (the days
+// left, the readiness number and the two buttons that raise it: a practice test and a simulation), and small buttons for the new
+// assignments and photo help.
 import { swr } from "./api.js";
 import * as aiSheet from "./ai_sheet.js";
 import { esc, fmt } from "./math.js";
-import { backToSubjects, daysText, forSubject, pathHref, shortDate, tabs } from "./ui.js";
+import { backToSubjects, daysText, forSubject, shortDate, tabs } from "./ui.js";
 
-/** One part of the readiness number as a row in plain Hebrew: its name, what the number is, and its value ("—" when there is none yet). */
-const part = (id, name, what, value, unit = "") => `<li class="rd-part" data-part="${id}"><span class="grow"><b>${name}</b> <span class="muted">${what}</span></span><b class="rd-val">${value === null ? "—" : value + unit}</b></li>`;
+/* ---------- the nearest test: the readiness number, and the two ways to raise it ---------- */
 
-/** The readiness number as a level bar with its three parts under it; before the simulation it says the bar is capped. */
-const HOW = ["המדד מורכב משליטה (50%), מבחני תרגול (20%) וסימולציה (30%).", "חלק שעוד אין לו ציון לא נספר.", "בלי סימולציה המדד לא עובר 80."];
-
-/** The info button beside the readiness number and its tooltip: hover, focus or tap opens it; a second tap, a tap elsewhere or Escape closes it. */
-const howTip = () => `<span class="info-tip"><button type="button" class="info" data-info aria-label="איך המדד מחושב" aria-expanded="false">ⓘ</button>
-  <span class="tip" role="tooltip" hidden>${HOW.map(l => `<span>${l}</span>`).join("")}</span></span>`;
-
-const closeTips = except => document.querySelectorAll(".info-tip.open").forEach(t => {
-  if (t === except) return;
-  t.classList.remove("open");
-  t.querySelector("[data-info]").setAttribute("aria-expanded", "false");
-  t.querySelector(".tip").hidden = true;
-});
-document.addEventListener("click", event => {
-  const tip = event.target.closest(".info-tip");
-  closeTips(tip);
-  if (!tip || !event.target.closest("[data-info]")) return;
-  const open = !tip.classList.contains("open");
-  tip.classList.toggle("open", open);
-  tip.querySelector("[data-info]").setAttribute("aria-expanded", String(open));
-  tip.querySelector(".tip").hidden = !open;
-});
-document.addEventListener("keydown", event => { if (event.key === "Escape") { closeTips(null); document.activeElement?.closest?.(".info-tip") && document.activeElement.blur(); } });
-
-export function readinessBar(r) {
-  return `<div class="readiness" data-readiness>
-    <p class="rd-top"><b class="rd-num" aria-hidden="true">${r.number}</b><span class="rd-label">${esc(r.label)}</span>${howTip()}</p>
-    <div class="bar rd-bar" role="progressbar" aria-label="מוכנות למבחן: ${r.number} מתוך 100, ${esc(r.label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${r.number}"><i style="width:${r.number}%"></i></div>
-    <ul class="plain rd-parts">${part("M", "שליטה", "אחוז המיומנויות שנשלטו", r.parts.M, "%")}${part("E", "מבחני תרגול", "ממוצע הציונים הטובים ביותר", r.parts.E)}${part("S", "סימולציה", "הציון במבחן הסימולציה", r.parts.S)}</ul>
-    ${r.waiting_for_simulation ? `<p class="rd-note">עוד לא עשיתם מבחן סימולציה, ולכן המדד לא עובר את ${80}.</p>` : ""}</div>`;
+const SEEN = "mathly2.readiness.";
+/** The number the student saw last time for this test (to count up from it), and remember the new one. */
+function lastSeen(test) {
+  let before = null;
+  try { before = Number(localStorage.getItem(SEEN + test.id)); localStorage.setItem(SEEN + test.id, String(test.readiness.number)); } catch { /* private window */ }
+  return Number.isFinite(before) && before !== null && before < test.readiness.number ? before : null;
 }
 
-/** Today's task as {label, href}. */
-function taskLink(task, test, next) {
-  const skill = id => `#/skill/${encodeURIComponent(id)}`;
-  switch (task.kind) {
-    case "path": return { label: task.skill ? `לסיים את המסלול: ${task.skill_name}` : "לסיים את המסלול", href: task.skill ? skill(task.skill) : pathHref() };
-    case "ex1": case "ex2": return { label: `מבחן תרגול ${task.kind === "ex1" ? 1 : 2}`, href: `#/exam/${test.id}/${task.kind === "ex1" ? 1 : 2}` };
-    case "sim": return { label: "מבחן סימולציה", href: `#/sim/${test.id}` };
-    case "review": return { label: `חזרה על ${task.skill_name}`, href: skill(task.skill) };
-    case "mixed_review": return task.skill ? { label: `חזרה קלה: ${task.skill_name}`, href: skill(task.skill) } : { label: "חזרה קלה במסלול", href: pathHref() };
-    default: return next ? { label: `להמשיך במסלול: ${next.name}`, href: skill(next.id) } : { label: "למסלול", href: pathHref() };
-  }
+/** The readiness number as a level meter: the number (counting up when it grew since the last visit), its level, the bar, and the
+ *  points to the next level. */
+export function readinessMeter(test) {
+  const r = test.readiness, from = lastSeen(test);
+  return `<div class="readiness" data-readiness data-from="${from ?? ""}" data-to="${r.number}">
+    <p class="rd-top"><b class="rd-num" aria-hidden="true">${from ?? r.number}</b><span><span class="rd-label">מוכנות למבחן · <b>${esc(r.label)}</b></span>
+      ${from !== null ? `<span class="rd-up" aria-hidden="true">+${r.number - from}</span>` : ""}
+      <br><span class="muted rd-next">${r.next ? `עוד ${r.next.left} לרמה "${esc(r.next.name)}"` : "הגעתם לרמה הגבוהה ביותר! 🏆"}</span></span></p>
+    <div class="bar rd-bar" role="progressbar" aria-label="מוכנות למבחן: ${r.number} מתוך 100, ${esc(r.label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${r.number}">
+      <i style="width:${from ?? r.number}%"></i>${r.next ? `<s style="inset-inline-start:${r.next.at}%" aria-hidden="true"></s>` : ""}</div></div>`;
 }
 
-/** The nearest test, in one short strip: the days left and the readiness number (it opens the test's card, which has the bar, the plan and
- *  the practice tests), and today's one task as a button. */
-function testStrip(test, task, next) {
-  const t = taskLink(task, test, next);
+/** Count the number up from the last visit's and grow the bar with it. */
+function countUp(root = document) {
+  root.querySelectorAll(".readiness[data-from]:not([data-from=''])").forEach(meter => {
+    const from = Number(meter.dataset.from), to = Number(meter.dataset.to), num = meter.querySelector(".rd-num"), bar = meter.querySelector(".rd-bar i");
+    meter.dataset.from = "";
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { num.textContent = to; bar.style.width = `${to}%`; return; }
+    const start = performance.now(), time = 900;
+    const frame = now => {
+      const k = Math.min(1, (now - start) / time), v = Math.round(from + (to - from) * (1 - (1 - k) ** 3));
+      num.textContent = v;
+      bar.style.width = `${v}%`;
+      if (k < 1) requestAnimationFrame(frame); else meter.classList.add("grew");
+    };
+    requestAnimationFrame(frame);
+  });
+}
+export { countUp };
+
+/** The nearest test in one compact block (the home is one screen): the readiness number with its level and the days left (a link to the
+ *  test's page, with all its tests and grades), the bar, and the two buttons that raise it, each with the most it can add now. */
+function testStrip(test) {
+  const r = test.readiness, add = r.can_add, sim = test.simulation.open, from = lastSeen(test);
   return `<section class="strip test-strip" id="nearest-test" data-test="${test.id}">
-    <a class="strip-main" href="#/test/${test.id}"><h2>📅 מבחן ${daysText(test.days_left)}</h2><span class="muted">מוכנות <b>${test.readiness.number}</b> ‹</span></a>
-    <a class="today-btn" id="today-task" href="${esc(t.href)}"><small>היום:</small> ${esc(t.label)}</a></section>`;
+    <div class="readiness" data-readiness data-from="${from ?? ""}" data-to="${r.number}">
+      <a class="strip-main" href="#/test/${test.id}"><b class="rd-num" aria-hidden="true">${from ?? r.number}</b>
+        <span class="grow"><span class="rd-label">מוכנות למבחן · <b>${esc(r.label)}</b>${from !== null ? ` <span class="rd-up" aria-hidden="true">+${r.number - from}</span>` : ""}</span>
+          <small class="muted">📅 <span class="days">מבחן ${daysText(test.days_left)}</span>${r.next ? ` · עוד ${r.next.left} לרמה "${esc(r.next.name)}"` : " · 🏆"}</small></span>
+        <span class="strip-more" aria-hidden="true">‹</span></a>
+      <div class="bar rd-bar" role="progressbar" aria-label="מוכנות למבחן: ${r.number} מתוך 100, ${esc(r.label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${r.number}"><i style="width:${from ?? r.number}%"></i></div></div>
+    <div class="test-btns"><a class="test-btn" id="home-practice" href="#/test/${test.id}/practice">📝 מבחן תרגול${add.practice ? ` <small>+${add.practice}</small>` : ""}</a>
+      <a class="test-btn sim" id="home-sim" href="#/sim/${test.id}${sim ? `/${esc(sim)}` : ""}">⏱ ${sim ? "להמשיך סימולציה" : "מבחן סימולציה"}${add.simulation && !sim ? ` <small>+${add.simulation}</small>` : ""}</a></div></section>`;
 }
 
 /** An assignment's state in a symbol and a word (never colour alone). */
@@ -111,7 +110,7 @@ function tile(l, next) {
 }
 
 /** The top: the stars collected, the lessons perfected, the streak and the daily goal, then the big play button for the next lesson. */
-function quest(map) {
+function quest(map, chips = "") {
   const next = map.lessons.find(l => l.id === map.next);
   const play = next ? `<a class="play" id="play" href="${roundHref(next.id)}"><span class="play-icon" aria-hidden="true">▶</span>
       <span class="grow"><small>${next.round_open ? "להמשיך את הסבב" : next.behind ? "להשלים" : next.stars ? "לעוד כוכב" : "השיעור הבא"}</small><b>${fmt(next.name)}</b></span>
@@ -119,8 +118,9 @@ function quest(map) {
     : `<p class="all-perfect" id="play">👑 כל השיעורים מושלמים! אפשר להעמיק בלשונית העמקה.</p>`;
   const t = map.today;
   return `<section class="quest" id="quest" aria-label="המסע שלי">
-    <p class="quest-stats"><span id="stars-count">⭐ ${map.stars} מתוך ${map.max_stars}</span><span id="perfect-count">👑 ${map.perfect}</span>
-      ${map.streak ? `<span>🔥 ${map.streak}</span>` : ""}<span id="goal" class="goal-chip${t.reached ? " done" : ""}" title="יעד יומי">🎯 ${Math.min(t.done, t.goal)}/${t.goal}${t.reached ? " ✓" : ""}</span></p>
+    <p class="quest-stats"><span id="stars-count" aria-label="${map.stars} כוכבים מתוך ${map.max_stars}">⭐ ${map.stars}/${map.max_stars}</span><span id="perfect-count">👑 ${map.perfect}</span>
+      ${map.streak ? `<span>🔥 ${map.streak}</span>` : ""}<span id="goal" class="goal-chip${t.reached ? " done" : ""}" title="יעד יומי">🎯 ${Math.min(t.done, t.goal)}/${t.goal}${t.reached ? " ✓" : ""}</span>
+      ${chips ? `<span class="hchips" id="home-actions">${chips}</span>` : ""}</p>
     ${play}</section>`;
 }
 
@@ -146,13 +146,12 @@ export const show = view => swr([forSubject("/api/home"), "/api/assignments", "/
 
 function draw(view, data, assignments, ai) {
   const [first] = data.tests;
-  const required = data.tests.filter(t => t.simulation.required);
-  const chips = required.map(t => `<a class="hchip required" href="#/sim/${t.id}" data-required="${t.id}"><b>חובה</b> סימולציה</a>`).join("") + assignmentsChip(assignments) + aiChips(ai);
+  const chips = assignmentsChip(assignments) + aiChips(ai);
   view(`${tabs("home")}${backToSubjects()}
-    ${quest(data.map)}
-    ${first ? testStrip(first, data.task, data.next_skill) : ""}
-    ${chips ? `<div class="hchips" id="home-actions">${chips}</div>` : ""}
+    ${quest(data.map, chips)}
+    ${first ? testStrip(first) : ""}
     ${board(data.map)}`);
+  countUp();
   document.getElementById("ai-new")?.addEventListener("click", () => aiSheet.open());
   document.querySelectorAll("[data-ai-open]").forEach(b => b.addEventListener("click", () => aiSheet.open({ id: b.dataset.aiOpen })));
 }

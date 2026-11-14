@@ -298,50 +298,34 @@ The exercise screen is where a student practices one skill.
 - **TST-1 Setting a test.** The teacher sets a test: date + the lessons it covers (+ an optional note), plus the real test's **number of questions** and **time limit**.
   A test covers lessons of **one subject** the class studies (SUB-4): a class with several subjects picks the subject first, and the test shows only on that subject's home.
   These start with defaults (12 questions, 45 minutes) that the teacher can change.
-- **TST-2 The countdown plan.** From the moment a test is set, the system shows the student a plan that depends on the days left:
-
-  | Days before the test | What the app asks the student to do |
-  |---|---|
-  | until 9 | Finish the path for every covered lesson (bring every covered skill to "mastered") |
-  | ~9 | Exercise test 1 |
-  | ~7 | Exercise test 2 |
-  | ~5 | Simulation test (required) |
-  | 4 → 1 | Review the skills that failed in the simulation; light mixed review the day before |
-
-  The day numbers are **recommendations**: the student can start each step earlier or later.
-  If the test is set less than 9 days ahead, the system keeps the same order and shortens the gaps evenly.
-- **TST-3 Home screen reminder.** The home screen shows, for the nearest test: days left, the readiness meter (RDY-1), and **one task for today** taken from the plan.
-  When several tests are coming up, "today's task" comes from the **closest** one.
+- **TST-2 Tests on request.** From the moment a test is set, the student can ask, at any time until the test, for a **practice test** (EXT) or a **simulation test** (SIM), as many as they like. There is no fixed plan and no window: the readiness number (RDY-1) is what the student works to raise.
+- **TST-3 Home screen.** The home screen shows the nearest test in one compact block. It has the readiness number with its level and the days left (a link to the test's page), a thin bar, and two buttons, **📝 מבחן תרגול** and **⏱ מבחן סימולציה**. Each button shows the most it can add to the number now ("+30", "+60").
+  When several tests are coming up, the block is the **closest** one; the others are on its page.
 
 ### 4.11 Exercise tests (מבחן תרגול) (EXT)
 
-- **EXT-1 Created by the app.** When the teacher sets a test, the system creates 2 exercise tests for every student in the class and places them on the student's countdown.
+- **EXT-1 On request, in three modes.** The student asks for a practice test on the test's page and picks a mode:
+  - **balanced (מאוזן)**: all the covered material evenly;
+  - **focused (ממוקד)**: 15 questions only from the "weak" skills;
+  - **manual (בחירה ידנית)**: the skills the student checks.
+
+  An open practice test of the same mode resumes; a manual one is always new.
 - **EXT-2 Teacher can assign one.** The teacher can send an exercise test to the whole class as an assignment (built with the assignments, stage 6): it shows in "המשימות שלי", opens the exercise test and counts as done when the student has taken it; it is not handed in as a picture.
-- **EXT-3 Retakes.** The student can start or retake an exercise test at any time. Each retake draws new questions; the best grade counts.
+- **EXT-3 Retakes.** The student can take as many practice tests as they like. Each draws the least-used questions first.
 - **EXT-4 Like the simulation.** Exercise tests have the same number of questions as the simulation (that is, as the real test, TST-1) but no time limit,
   mix questions from all covered lessons, and do not show the skill name. Feedback comes **only at the end**, not after each question.
-- **EXT-5 Question mix.** The system picks questions in these proportions:
-
-  | Exercise test | Weak skills | Other covered skills |
-  |---|---|---|
-  | 1 | 60% | 40% |
-  | 2 | 30% | 70% |
-
-  "Weak skill" = a skill in the "learning" state, or one the student answered wrong in a previous exercise test.
-  Skills in the "not started" state do not appear; instead, the card lists them as "practice these first".
-  If the student has fewer weak skills than needed, the rest comes from the other covered skills.
+- **EXT-5 Question mix.** A balanced test spreads its questions over all covered skills, not-started ones included. A focused test takes them only from the "weak" skills, one per skill round after round. A "weak" skill is one that lost points in this test's practice tests or simulations, or one in the "learning" state.
+  A manual test takes them only from the skills the student picked.
 - **EXT-6 Result links back.** After an exercise test, the system shows the weak skills it found and links each one to its star on the path.
 - **EXT-7 Grades on the server.** Exercise test grades are computed and kept on the server.
 
 ### 4.12 Simulation test (מבחן סימולציה) (SIM)
 
-- **SIM-1 Required, one attempt.** Every student takes one simulation test per real test. It can be taken only once.
+- **SIM-1 On request, no choice.** The student can ask for a simulation at any time, as many times as they like (an open one resumes). The student has no control over its material.
 - **SIM-2 Like the real test.** The simulation covers all the lessons of the real test, with the number of questions and the time limit the teacher set for it (TST-1),
   no skill names, and no feedback until the end.
-- **SIM-3 Window.** The simulation becomes available ~5 days before the test and stays available until the test day.
-  It is shown as **required** on the student's home screen until it is taken.
 - **SIM-4 Server timer.** The timer is kept on the server, so refreshing or closing the app does not reset it. The grade is stored on the server.
-- **SIM-5 After the simulation,** the system lists the skills that failed and turns them into the review tasks of the last days (TST-2).
+- **SIM-5 After the simulation,** the result lists the skills that lost points (they feed the focused practice test, EXT-5), offers to answer the wrong questions again, and shows what the simulation added to the readiness number (RDY-5).
 
 ### 4.13 Grades and readiness meter (GRD, RDY)
 
@@ -349,14 +333,19 @@ The exercise screen is where a student practices one skill.
   Teachers' grades for assignments are on the same scale.
 - **GRD-2 When time ends.** Only the simulation is timed. When its timer ends it is submitted as it stands, and unanswered questions count as wrong.
   Leaving the screen does not stop the timer.
-- **RDY-1 Readiness meter.** For each upcoming test, the system shows the student (and the teacher) one **readiness number from 0 to 100**, drawn as a level bar, with its three parts under it:
-  - **mastery (שליטה)**: the % of the covered skills that are mastered;
-  - **practice tests (מבחני תרגול)**: the average of the best grade of each exercise test taken;
-  - **the simulation (סימולציה)**: the simulation test grade (once taken).
-  Each part is a row in plain Hebrew with a short line saying what its number is and its value ("—" when none yet); the letters M, E, S are internal and not shown.
-- **RDY-2 How the number is made.** It is the weighted average of the parts that exist, with weights M 50, E 20, S 30; a part that does not exist yet (no exercise test taken, no simulation) is left out and the others are scaled up.
-- **RDY-3 No false confidence.** Until the simulation is taken the number is capped at 80, and the bar says so. The bar's label by number is: 0–39 "מתחילים", 40–69 "בדרך", 70–84 "כמעט שם", 85–100 "מוכנים". "מוכנים" can only show after the simulation.
-- **RDY-4 The number explains itself.** An info button "ⓘ" beside the number opens a short tooltip (hover, focus or tap; closes on a second tap, a tap elsewhere or Escape): the number is made of mastery (50%), practice tests (20%) and the simulation (30%); a part with no grade yet is left out; without the simulation it cannot pass 80.
+- **RDY-1 Readiness meter.** For each upcoming test, the system shows the student (and the teacher) one **readiness number from 0 to 100**, with its level and a bar. Levels: 0–39 "מתחילים", 40–69 "בדרך", 70–84 "כמעט שם", 85–100 "מוכנים". Beside it, the app shows the points to the next level.
+- **RDY-2 Only tests move it.** The number changes only when a practice test or a simulation is handed in, never from the path, deepening or mastery. For each test, oldest first, when its grade is above the number:
+
+  `number = number + GAIN × (grade − number)`
+
+  GAIN is 0.6 for a simulation, 0.3 for a practice test and 0.15 for a manual practice test.
+- **RDY-3 Never down, never above the grades.** A grade at or below the number changes nothing, so the number never drops, and it can only approach the grades actually earned.
+- **RDY-4 The number explains itself.** The test's page says how to raise it: a practice test closes 30% of the gap, a simulation 60%, a manual one 15%; a lower grade does not lower it; only tests count.
+- **RDY-5 Make raising it rewarding.**
+  - The number counts up from the last visit with a "+N" badge.
+  - Every button to a test shows the most it can add now.
+  - A test's result opens with its gain (a big "+N" and the bar growing), "🎉 רמה חדשה" when the level changed, the points to the next level, and buttons to another simulation or practice test.
+  - The test's page lists every test handed in with its grade and what it added.
 
 ### 4.14 Handwritten answers and phone photos (ANS, PSH)
 
@@ -402,7 +391,7 @@ The exercise screen is where a student practices one skill.
 
 A tab bar at the bottom of the screen leads between them: home, path (named "העמקה": going deeper, skill by skill), submissions (STU-7), grades, collection and review (STU-8).
 
-- **STU-1 Home** is one screen (it fits 360×800 with every lesson), like a game's level select: the stars collected (three per lesson), the lessons perfected, the streak and the daily goal; one big **play** button for the next lesson (the one with a round in progress, else the earliest behind the curriculum, else the first with fewer than three stars); the nearest test in one strip (the days left and the readiness number, which open the test's card with the readiness bar, the plan and the practice tests, and today's task, TST-3, as a button); small buttons for a required simulation, the new assignments (their number, opening "הגשות") and photo help with the latest request's state (AI-1); and every lesson as a small tile: its number (a crown when perfect), its stars (★ a lesson round finished, ★★ a round with 8 of 10 or more, ★★★ every skill of the lesson mastered), "⏰" when behind the curriculum (PTH-11) and "◐" when a round is open. Tapping a tile opens the lesson's round (STU-9). The path is reached from its tab ("העמקה").
+- **STU-1 Home** is one screen (it fits 360×800 with every lesson), like a game's level select: the stars collected (three per lesson), the lessons perfected, the streak and the daily goal; one big **play** button for the next lesson (the one with a round in progress, else the earliest behind the curriculum, else the first with fewer than three stars); the nearest test in one compact block (TST-3: the readiness number, its level and the days left, which open the test's page; the practice test and simulation buttons); small buttons beside the stats for the new assignments (their number, opening "הגשות") and photo help with the latest request's state (AI-1); and every lesson as a small tile: its number (a crown when perfect), its stars (★ a lesson round finished, ★★ a round with 8 of 10 or more, ★★★ every skill of the lesson mastered), "⏰" when behind the curriculum (PTH-11) and "◐" when a round is open. Tapping a tile opens the lesson's round (STU-9). The path is reached from its tab ("העמקה").
   When the curriculum gives the lessons dates, the current lesson (the first whose date is today or later) is shown on its own with its date, and the lessons whose date has passed (with how many are behind) and the coming ones are folded under it, each with its count.
 - **STU-9 Lesson round (סבב שיעור).** At most 10 questions from the lesson's skills that are not mastered, at most 3 from each (a lesson with one skill left is a round of 3); a lesson with every skill mastered draws 10 from all of them. Instant feedback as on the exercise screen (EX); every answer is a practice answer of its skill (mastery, daily goal, review list). The result shows the score, the lesson's stars, the skills mastered in the round and those one good day away, and each mistake's name and tip; never the right answers.
 - **STU-10 The way on the board (הדרך).** Every answer (practice, lesson rounds, lesson quizzes, exercise tests, the simulation) keeps a picture of the question's board when something is written on it; in quizzes and tests a choice needs the way on the board first. The teacher's "בדיקת דרך" tab lists the handed-in quizzes and tests of their students; each question shows the choices (the right one marked), the student's choice and board, and points for the way (automatic, 0, ½, full) that recompute the grade. Work pictures are private to the student and their teachers and follow the answer pictures' retention. After a practice test or the simulation, an AI (Gemini, one request per test, no names) reviews the way per question and the result shows "משוב על הדרך" (a verdict, a feedback line and a tip, never the right answer); the teacher sees it as a suggestion.
@@ -434,7 +423,7 @@ A tab bar at the bottom of the screen leads between them: home, path (named "ה�
 - **TCH-4 Inbox and checking.** One inbox lists everything the teacher's students handed in that waits for them, oldest first: assignment submissions not checked yet (a returned one waits for the student)
   and open requests to look again (AI-5). The teacher opens each, sees the AI's suggested score and comment (AI-4) if there is one, gives a grade (0–100) and a note, or sends it back for correction.
 - **TCH-5 AI queue.** The teacher sees their classes' AI requests (AI-1), with the picture, and sends or declines each, or sends a whole batch (AI-7). It is an **"AI" tab** on the teacher's screen with the number of waiting requests, and it also has the teacher's own photo help (AI-2) and what is being worked on, what failed and why (AI-8). A student asking to look again (AI-5) appears in the inbox (TCH-4), not here.
-- **TCH-6 Tests tab.** The teacher sets a test (TST-1) and sees, for each test, which students have taken the simulation test and which have not.
+- **TCH-6 Tests tab.** The teacher sets a test (TST-1) and sees, for each test, which students have taken a simulation and which have not, and each student's readiness with how many practice tests and simulations they took and their best grades.
 - **TCH-7 Class progress, by lesson.** The teacher sees progress **per lesson, never per skill**.
   - Rows: students. Columns: lessons.
   - Each cell is short and shows three things only: a **progress bar** with the percent of the lesson's skills mastered written on it; the student's best quiz (בוחן) grade as a **bare number** (a dash for none, without the word); and, in the current period, a **warning mark** (⚠) when the lesson is behind the curriculum (PTH-11) and not completed. The lesson's state in words (הושלם PTH-10, בלמידה, לא התחילו, בפיגור) is the cell's accessible name, and a completed lesson's bar is gold.

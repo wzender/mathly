@@ -1,4 +1,4 @@
-"""Server time. Every rule that depends on days (mastery, the countdown, the simulation window) uses this,
+"""Server time. Every rule that depends on days (mastery, the days left to a test) uses this,
 never the device's clock."""
 from __future__ import annotations
 

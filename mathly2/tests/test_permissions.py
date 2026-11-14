@@ -57,6 +57,7 @@ NEEDS = {   # (method, path) -> permission
     ("POST", "/api/attempts/{attempt_id}/retry/start"): "path.use",
     ("POST", "/api/tests/{test_id}/exercise/{number}/start"): "path.use",
     ("POST", "/api/tests/{test_id}/simulation/start"): "path.use",
+    ("POST", "/api/tests/{test_id}/practice/start"): "path.use",
     ("GET", "/api/tests/{test_id}"): "path.use",
     ("GET", "/api/lessons/{lesson_id}/quiz"): "path.use",
     ("POST", "/api/lessons/{lesson_id}/quiz/start"): "path.use",
