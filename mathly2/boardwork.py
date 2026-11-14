@@ -148,7 +148,8 @@ def teacher_view(request: Request, row: dict) -> dict:
 
 @router.get("/teaching/work/{attempt_id}")
 def work_open(attempt_id: str, request: Request, user: dict = Depends(need("class.teach"))) -> dict:
-    return teacher_view(request, _graded_attempt(request, user, attempt_id))
+    from . import boardreview
+    return teacher_view(request, boardreview.ensure(request.app, _graded_attempt(request, user, attempt_id)))   # opening it starts a missing AI review
 
 
 class Credit(BaseModel):

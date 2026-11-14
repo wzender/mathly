@@ -155,3 +155,14 @@ def test_gemini_bad_or_cut_output_is_a_failure():
     with pytest.raises(boardreview.ReviewFailure) as caught:
         reviewer.review(items())
     assert caught.value.reason == "bad_output"
+
+
+def test_a_test_handed_in_before_the_key_was_set_is_reviewed_when_the_teacher_opens_it():
+    fake = FakeReviewer()
+    client, store, bank, test, _ = make(fake)
+    client.app.state.reviewer = None                                              # handed in with no key: no review
+    attempt, _ = hand_in(client, bank, test)
+    assert store.get_attempt(attempt["id"]).get("review") is None
+    client.app.state.reviewer = fake                                              # the key is set now
+    got = client.get(f"/api/teaching/work/{attempt['id']}", headers=auth(TEACHER)).json()
+    assert len(fake.calls) == 1 and got["ai_summary"] and any(q["ai"] for q in got["questions"])
