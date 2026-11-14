@@ -5,6 +5,8 @@ from __future__ import annotations
 import random
 
 EXERCISE_SHARE = {1: 0.6, 2: 0.3}      # the share of questions that come from weak skills in exercise test 1 and 2; the simulation has none
+FOCUS = 3                               # the exercise test on the weak topics: only the skills that lost points or are still being learned
+FOCUS_SIZE = 15
 
 
 def _round(x: float) -> int:
@@ -55,3 +57,21 @@ def draw(bank, lessons: list[str], states: dict[str, str], n: int, *, share: flo
                     progress = True
     rng.shuffle(taken)
     return {"questions": taken[:n], "weak": weak, "practice_first": practice_first}
+
+
+def draw_focus(bank, weak: list[str], n: int = FOCUS_SIZE, used: dict[str, int] | None = None, rng: random.Random | None = None) -> list[dict]:
+    """`n` questions from the weak skills only, one per skill round after round (least-used questions first)."""
+    used, rng = used or {}, rng or random.Random()
+    pools = {i: sorted(bank.question_keys(i), key=lambda key: (used.get(key, 0), rng.random())) for i in weak if bank.question_keys(i)}
+    order, taken, seen = rng.sample(list(pools), len(pools)), [], set()
+    progress = True
+    while len(taken) < n and progress:
+        progress = False
+        for skill_id in order:
+            key = next((k for k in pools[skill_id] if k not in seen), None)
+            if key and len(taken) < n:
+                seen.add(key)
+                taken.append({"skill_id": skill_id, "key": key})
+                progress = True
+    rng.shuffle(taken)
+    return taken

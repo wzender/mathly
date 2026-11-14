@@ -117,11 +117,14 @@ def view(request: Request, row: dict) -> dict:
         lesson = next((l for l in bank.lessons if l["id"] == row["scope"]), {"id": row["scope"], "name": row["scope"]})
     done = _graded(bank, row)
     base = {"id": row["id"], "kind": row["kind"], "lesson": {"id": lesson["id"], "name": lesson["name"]}, "subject_id": lesson.get("subject_id", "math"),
-            "total": len(row["questions"]), "results": [right for _, right, _ in done], "source": source}
+            "total": len(row["questions"]), "results": [right for _, right, _ in done], "source": _public(source)}
     if attempts.is_open(row):
         nxt = row["questions"][len(done)] if len(done) < len(row["questions"]) else None
         served = bank.practice_question(nxt["skill_id"], nxt["key"]) if nxt else None
-        return {**base, "state": "open", "question": {**served, "skill_name": bank.skill(nxt["skill_id"])["name"]} if served else None}
+        question = {**served, "skill_name": bank.skill(nxt["skill_id"])["name"]} if served else None
+        if question and source:
+            question["context"] = _context(bank, source, nxt["key"], nxt["skill_id"])
+        return {**base, "state": "open", "question": question, "source": _public(source)}
     uid = row["user_id"]
     progress = {p["skill_id"]: p for p in store.progress_of(uid)}
     started = _when(row["started_at"])
@@ -145,9 +148,10 @@ def view(request: Request, row: dict) -> dict:
             continue
         served = bank.practice_question(q["skill_id"], q["key"])
         missed.append({"question": served["question"] if served else "", "skill_name": (bank.skill(q["skill_id"]) or {}).get("name", ""),
+                       "n": source["_order"].get(q["key"]) if source else None,
                        "mistake": {"name": mistake["name"], "tip": mistake["tip"]} if mistake else None})
     stars_now = None if source else _lesson_stars(request, uid, row["scope"], store.attempts_of(uid, KIND, row["scope"]))
-    return {**base, "state": "done", "question": None,
+    return {**base, "state": "done", "question": None, "source": _public(source),
             "result": {"right": sum(base["results"]), "total": base["total"], "grade": row["grade"], "stars": stars_now,
                        "mastered": mastered, "almost": almost, "missed": missed}}
 
@@ -164,9 +168,24 @@ def _source_info(request: Request, row: dict) -> dict:
     source = request.app.state.store.get_attempt(row["scope"])
     kind = source["kind"] if source else "quiz"
     test_id = int(source["scope"].split(":")[0]) if source and kind != "quiz" and source["scope"].split(":")[0].isdigit() else None
-    name = {"quiz": "הבוחן", "exercise_test": "מבחן התרגול", "simulation": "מבחן הסימולציה"}[kind]
+    from .boardwork import _title
+    name = _title(request, source) if source else "הבוחן"
     return {"id": row["scope"], "kind": kind, "test_id": test_id, "lesson_id": source["scope"] if source and kind == "quiz" else None,
-            "title": f"חזרה על הטעויות ב{name}"}
+            "title": name, "total": len(source["questions"]) if source else None,
+            "_order": {q["key"]: i + 1 for i, q in enumerate(source["questions"])} if source else {},
+            "_answers": source["answers"] if source else {}}
+
+
+def _public(source: dict | None) -> dict | None:
+    return {k: v for k, v in source.items() if not k.startswith("_")} if source else None
+
+
+def _context(bank, source: dict, key: str, skill_id: str) -> dict:
+    """Where a question of a mistakes round came from: its number in the test, and what was chosen there (never whether it was right)."""
+    served = bank.practice_question(skill_id, key) or {"choices": []}
+    choice = source["_answers"].get(key)
+    picked = next((c["text"] for c in served["choices"] if c["index"] == choice), None) if isinstance(choice, int) else None
+    return {"title": source["title"], "n": source["_order"].get(key), "of": source["total"], "picked": picked}
 
 
 @router.post("/attempts/{attempt_id}/retry/start")

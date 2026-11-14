@@ -32,26 +32,23 @@ RETRIES = 3                                       # tries after "too many reques
 SIDE = 1280                                       # a board is shrunk to this longest side before it is sent
 VERDICTS = ("correct", "partial", "wrong", "unclear")
 
-INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט בישראל. תלמיד פתר מבחן אמריקאי, ולכל שאלה כתב את הדרך על לוח. קיבלתם את השאלות, התשובות האפשריות, \
-התשובה הנכונה (רק בשבילכם), התשובה שהתלמיד בחר, ותמונה של הלוח שלו לכל שאלה.
-לכל שאלה עם לוח, הַעריכו את הדרך (לא רק את התשובה הסופית):
+INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט בישראל. תלמיד פתר שאלה אמריקאית במבחן, וכתב את הדרך על לוח. קיבלתם את השאלה, התשובות האפשריות, \
+התשובה הנכונה (רק בשבילכם), התשובה שהתלמיד בחר, ותמונה של הלוח שלו.
+הַעריכו את הדרך (לא רק את התשובה הסופית):
 - verdict: "correct" אם הדרך נכונה ומובילה לתשובה; "partial" אם יש התחלה נכונה או רעיון נכון אבל טעות או חוסר; "wrong" אם השיטה שגויה; "unclear" אם אי אפשר לקרוא או שאין בלוח דרך של ממש.
 - feedback: משפט או שניים לתלמיד, בעברית, בפנייה ברבים (אתם), חם וענייני: מה טוב בדרך, ואם יש טעות, איפה היא הטעות הראשונה ומה סוגה.
 - tip: טיפ אחד קצר ומעשי לפעם הבאה.
 אסור לכתוב את התשובה הסופית הנכונה, את המספר שלה או איזו אפשרות נכונה. אם התלמיד טעה, כוונו אותו לשלב, אל תפתרו בשבילו.
-summary: משפט או שניים על הדרך במבחן כולו: חוזקה אחת ודבר אחד לשפר.
 נוסחאות כתבו בתוך $...$."""
 
-SCHEMA = {
-    "type": "OBJECT",
-    "properties": {
-        "summary": {"type": "STRING"},
-        "questions": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {
-            "n": {"type": "INTEGER"}, "verdict": {"type": "STRING", "enum": list(VERDICTS)},
-            "feedback": {"type": "STRING"}, "tip": {"type": "STRING"}}, "required": ["n", "verdict", "feedback", "tip"]}},
-    },
-    "required": ["summary", "questions"],
-}
+SUMMARY_INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט. לפניכם הערכות של הדרך של תלמיד בשאלות של מבחן אחד (לכל שאלה: הנושא, הערכה ומשוב).
+כתבו summary: משפט או שניים לתלמיד, בעברית, בפנייה ברבים (אתם): חוזקה אחת בדרך ודבר אחד לשפר. בלי תשובות נכונות ובלי מספרים של תשובות."""
+
+SCHEMA = {"type": "OBJECT", "properties": {"verdict": {"type": "STRING", "enum": list(VERDICTS)}, "feedback": {"type": "STRING"}, "tip": {"type": "STRING"}},
+          "required": ["verdict", "feedback", "tip"]}
+SUMMARY_SCHEMA = {"type": "OBJECT", "properties": {"summary": {"type": "STRING"}}, "required": ["summary"]}
+STOPPING = ("rate_limited", "api_key_invalid", "permission", "model_not_found", "no_connection")   # no point in asking about the next question
+MIN_GAP = 5.0                                   # seconds between requests: the free tier counts requests a minute
 
 
 class ReviewFailure(Exception):
@@ -76,19 +73,18 @@ def _letter(i: int) -> str:
 class GeminiReviewer:
     """Gemini over its REST API (no SDK). `review(items)` -> {"summary", "questions": [{n, verdict, feedback, tip}]}."""
 
-    def __init__(self, key: str, model: str = "", sleep=time.sleep) -> None:
-        self.key, self.model, self.sleep = key, clean_model(model) or DEFAULT_MODEL, sleep
+    def __init__(self, key: str, model: str = "", sleep=time.sleep, gap: float = MIN_GAP, now=time.monotonic) -> None:
+        self.key, self.model, self.sleep, self.gap, self.now = key, clean_model(model) or DEFAULT_MODEL, sleep, gap, now
+        self._last = None
         self._lock = threading.Lock()                   # one request at a time: the free tier counts requests a minute
 
-    def _parts(self, items: list[dict]) -> list[dict]:
-        parts = [{"text": INSTRUCTIONS}]
-        for it in items:
-            choices = "\n".join(f"  {_letter(i)}. {c}" for i, c in enumerate(it["choices"]))
-            picked = _letter(it["picked"]) if it["picked"] is not None else "לא ענה"
-            parts.append({"text": f"\n\nשאלה {it['n']}:\n{it['question']}\nאפשרויות:\n{choices}\nהתשובה הנכונה (לא לגלות): {_letter(it['correct'])}\n"
-                                  f"התלמיד בחר: {picked}\nהלוח של התלמיד לשאלה {it['n']}:"})
-            parts.append({"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(_small(it["image"])).decode()}})
-        return parts
+    def _parts(self, item: dict) -> list[dict]:
+        choices = "\n".join(f"  {_letter(i)}. {c}" for i, c in enumerate(item["choices"]))
+        picked = _letter(item["picked"]) if item["picked"] is not None else "לא ענה"
+        return [{"text": INSTRUCTIONS},
+                {"text": f"\n\nהשאלה:\n{item['question']}\nאפשרויות:\n{choices}\nהתשובה הנכונה (לא לגלות): {_letter(item['correct'])}\n"
+                         f"התלמיד בחר: {picked}\nהלוח של התלמיד:"},
+                {"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(_small(item["image"])).decode()}}]
 
     def _call(self, body: bytes) -> dict:
         request = urllib.request.Request(ENDPOINT.format(model=self.model), data=body, method="POST",
@@ -111,11 +107,24 @@ class GeminiReviewer:
             return None
         return pick_model(names, self.model)
 
-    def review(self, items: list[dict], on_event=lambda step, **info: None) -> dict:
-        body = json.dumps({"contents": [{"role": "user", "parts": self._parts(items)}],
-                           "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json", "responseSchema": SCHEMA}}).encode()
+    def review_one(self, item: dict, on_event=lambda step, **info: None) -> dict:
+        """One question with its board -> {verdict, feedback, tip}."""
+        return self._ask(self._parts(item), SCHEMA, on_event)
+
+    def summarize(self, reviewed: list[dict], on_event=lambda step, **info: None) -> str:
+        """A line about the way in the whole test, from the per-question reviews (text only, no pictures)."""
+        lines = "\n".join(f"שאלה {r['n']} ({r.get('skill', '')}): {r['verdict']}. {r['feedback']}" for r in reviewed)
+        return str(self._ask([{"text": SUMMARY_INSTRUCTIONS}, {"text": "\n\n" + lines}], SUMMARY_SCHEMA, on_event).get("summary") or "")
+
+    def _ask(self, parts: list[dict], schema: dict, on_event) -> dict:
+        body = json.dumps({"contents": [{"role": "user", "parts": parts}],
+                           "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json", "responseSchema": schema}}).encode()
         with self._lock:
             for attempt in range(RETRIES + 1):
+                if self._last is not None and self.gap:                     # keep under the free tier's requests a minute
+                    left = self.gap - (self.now() - self._last)
+                    if left > 0:
+                        self.sleep(left)
                 try:
                     data = self._call(body)
                     break
@@ -125,7 +134,7 @@ class GeminiReviewer:
                         wait = _retry_after(detail, 20 * (attempt + 1))
                         on_event("busy", seconds=round(wait))
                         self.sleep(wait)
-                        on_event("sent")
+                        on_event("resumed")
                         continue
                     if exc.code == 404 and not getattr(self, "_switched", False):
                         other = self._another_model()
@@ -137,12 +146,16 @@ class GeminiReviewer:
                                          429: "rate_limited"}.get(exc.code, "provider_error"), f"HTTP {exc.code} ({self.model}): {detail}") from None
                 except (urllib.error.URLError, TimeoutError) as exc:
                     raise ReviewFailure("no_connection", str(exc)[:300]) from None
+                finally:
+                    self._last = self.now()
         try:
             candidate = data["candidates"][0]
             if candidate.get("finishReason") not in (None, "STOP"):
                 raise ReviewFailure("incomplete", str(candidate.get("finishReason")))
             text = "".join(p.get("text", "") for p in candidate["content"]["parts"] if not p.get("thought"))
             out = json.loads(text)
+            if not isinstance(out, dict):
+                raise ValueError("not an object")
         except ReviewFailure:
             raise
         except (KeyError, IndexError, ValueError, TypeError) as exc:
@@ -202,48 +215,79 @@ def _items(app, row: dict) -> tuple[list[dict], dict]:
             continue
         correct = next((c["index"] for c in served["choices"] if (bank.grade(q["skill_id"], q["key"], c["index"]) or {}).get("correct")), 0)
         picked = row["answers"].get(q["key"])
-        items.append({"n": n, "question": served["question"], "choices": [c["text"] for c in served["choices"]], "correct": correct,
+        items.append({"n": n, "skill": (bank.skill(q["skill_id"]) or {}).get("name", ""),
+                      "question": served["question"], "choices": [c["text"] for c in served["choices"]], "correct": correct,
                       "picked": picked if isinstance(picked, int) else None, "image": app.state.pictures.get(picture["path"])})
         keys[n] = q["key"]
     return items, keys
 
 
-def run(app, attempt_id: str) -> None:
-    """Review one handed-in attempt and store the result on it. Never raises: a failure is stored as {"state": "failed"}.
-    While it runs, its steps are stored on the pending review (`events`: boards found, sent, the AI busy and waiting), for the screens."""
-    store = app.state.store
+def _clean(got: dict) -> dict | None:
+    if not isinstance(got, dict) or got.get("verdict") not in VERDICTS:
+        return None
+    return {"verdict": got["verdict"], "feedback": str(got.get("feedback", ""))[:600], "tip": str(got.get("tip", ""))[:300]}
+
+
+def run(app, attempt_id: str, keys: list[str] | None = None) -> None:
+    """Review a handed-in attempt question by question (`keys`: only these, kept with the earlier review of the rest), then a summary line.
+    Never raises: a review with no question checked is stored as {"state": "failed", "reason"}. While it runs, the pending review carries
+    its steps (`events`) and the questions checked so far, for the screens."""
+    store, reviewer = app.state.store, app.state.reviewer
     started = clock.now().isoformat()
     events: list[dict] = []
+    row = store.get_attempt(attempt_id)
+    earlier = (row.get("review") or {}) if row and keys else {}          # one question: the rest of the review (kept on the pending one) stays
+    questions: dict = dict(earlier.get("questions") or {})
+
+    def save(review: dict) -> None:
+        try:
+            store.save_attempt(attempt_id, review=review)
+        except Exception:                                  # the steps are a courtesy: never fail the review for them
+            log.warning("could not save a review step")
 
     def event(step: str, **info) -> None:
         events.append({"step": step, "at": clock.now().isoformat(), **info})
-        try:
-            store.save_attempt(attempt_id, review={"state": "pending", "at": started, "events": list(events)})
-        except Exception:                                  # the steps are a courtesy: never fail the review for them
-            log.warning("could not save a review step")
+        save({"state": "pending", "at": started, "events": list(events), "questions": dict(questions), "summary": earlier.get("summary")})
+
+    reason, checked = None, 0
     try:
-        row = store.get_attempt(attempt_id)
-        items, keys = _items(app, row)
+        items, by_n = _items(app, row)
+        if keys:
+            items = [it for it in items if by_n[it["n"]] in keys]
         event("boards", count=len(items), total=len(row["questions"]))
-        if not items:
-            result = {"state": "done", "summary": None, "questions": {}}
+        reviewed = []
+        for i, item in enumerate(items):
+            key = by_n[item["n"]]
+            event("question", n=item["n"], i=i + 1, of=len(items))
+            try:
+                got = _clean(reviewer.review_one(item, on_event=event))
+            except ReviewFailure as exc:
+                log.warning("board review of a question failed: %s %s", exc.reason, exc.detail)
+                reason = exc.reason
+                if exc.reason in STOPPING:
+                    break
+                continue
+            if got is None:
+                reason = "bad_output"
+                continue
+            questions[key], checked = got, checked + 1
+            reviewed.append({"n": item["n"], "skill": item["skill"], **got})
+        summary = earlier.get("summary")
+        if reviewed and not keys:
+            event("summary")
+            try:
+                summary = reviewer.summarize(reviewed, on_event=event)[:800] or None
+            except ReviewFailure as exc:
+                log.warning("board review summary failed: %s", exc.reason)
+        if items and not checked:
+            result = {"state": "failed", "reason": reason or "provider_error", "model": getattr(reviewer, "model", None)}
         else:
-            event("sent")
-            got = app.state.reviewer.review(items, on_event=event)
-            questions = {}
-            for q in got.get("questions", []):
-                key = keys.get(q.get("n"))
-                if key and q.get("verdict") in VERDICTS:
-                    questions[key] = {"verdict": q["verdict"], "feedback": str(q.get("feedback", ""))[:600], "tip": str(q.get("tip", ""))[:300]}
-            result = {"state": "done", "summary": str(got.get("summary") or "")[:800] or None, "questions": questions}
-        result["at"] = clock.now().isoformat()
-    except ReviewFailure as exc:
-        log.warning("board review failed: %s %s", exc.reason, exc.detail)
-        result = {"state": "failed", "reason": exc.reason, "at": clock.now().isoformat(),
-                  "model": getattr(app.state.reviewer, "model", None)}
+            result = {"state": "done", "summary": summary, "questions": questions, "missing": len(items) - checked,
+                      **({"reason": reason} if reason and checked < len(items) else {})}
     except Exception:
         log.exception("board review failed")
-        result = {"state": "failed", "reason": "provider_error", "at": clock.now().isoformat()}
+        result = {"state": "failed", "reason": "provider_error"}
+    result["at"] = clock.now().isoformat()
     try:
         store.save_attempt(attempt_id, review=result)
     finally:
@@ -251,11 +295,11 @@ def run(app, attempt_id: str) -> None:
             _running.discard(attempt_id)
 
 
-def start_in_thread(app, attempt_id: str) -> None:
-    threading.Thread(target=run, args=(app, attempt_id), name="board-review", daemon=True).start()
+def start_in_thread(app, attempt_id: str, keys: list[str] | None = None) -> None:
+    threading.Thread(target=run, args=(app, attempt_id, keys), name="board-review", daemon=True).start()
 
 
-def ensure(app, row: dict, force: bool = False) -> dict:
+def ensure(app, row: dict, force: bool = False, keys: list[str] | None = None) -> dict:
     """For a handed-in practice test or simulation: start its review if it has none yet (or a lost one). Returns the row as it is now.
     `force` (the teacher asked): any graded attempt, and again after a failed or a finished review."""
     if row["submitted_at"] is None or getattr(app.state, "reviewer", None) is None:
@@ -271,13 +315,18 @@ def ensure(app, row: dict, force: bool = False) -> dict:
             return row
         _running.add(row["id"])
     try:
-        row = app.state.store.save_attempt(row["id"], review={"state": "pending", "at": clock.now().isoformat()})
+        earlier = row.get("review") or {}
+        row = app.state.store.save_attempt(row["id"], review={"state": "pending", "at": clock.now().isoformat(),
+                                                              **({"questions": earlier.get("questions", {}), "summary": earlier.get("summary")} if keys else {})})
     except Exception:                                   # e.g. the review column's migration was not run: the result still shows
         log.exception("board review could not be saved")
         with _running_lock:
             _running.discard(row["id"])
         return {**row, "review": {"state": "failed", "reason": "database"}}
-    app.state.run_review(app, row["id"])
+    if keys:
+        app.state.run_review(app, row["id"], keys)
+    else:
+        app.state.run_review(app, row["id"])
     return app.state.store.get_attempt(row["id"]) or row
 
 
@@ -287,7 +336,7 @@ def student_view(row: dict) -> dict | None:
     if not review:
         return None
     if review["state"] == "pending":
-        return {"state": "pending", "at": review.get("at"), "events": review.get("events", [])}
+        return {"state": "pending", "at": review.get("at"), "events": review.get("events", []), "questions": review.get("questions", {})}
     if review["state"] != "done":
         return {"state": review["state"]}
     return {"state": "done", "summary": review.get("summary"), "questions": review.get("questions", {})}

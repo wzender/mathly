@@ -46,7 +46,8 @@ export async function startSimulation(testId, allSkills = false) {
 }
 
 /** What the sheet is called, who it is about and where closing it leads, by kind. */
-const names = a => a.kind === "exercise_test" ? { title: `מבחן תרגול ${a.test.number}`, again: "מבחן חוזר" }
+const FOCUS = 3;                                     // the exercise test on the weak topics
+const names = a => a.kind === "exercise_test" ? (a.test.number === FOCUS ? { title: "מבחן תרגול: נושאים לחיזוק", again: "עוד מבחן על הנושאים" } : { title: `מבחן תרגול ${a.test.number}`, again: "מבחן חוזר" })
   : a.kind === "simulation" ? { title: "מבחן סימולציה", again: "" } : { title: "בוחן", again: "בוחן חוזר" };
 const chip = a => a.kind === "quiz" ? fmt(a.lesson.name) : a.test.lessons.map(fmt).join(", ");
 const leaveTo = () => !attempt || attempt.kind === "quiz" ? pathHref() : `#/test/${attempt.test.id}`;
@@ -199,19 +200,24 @@ function submit() {
 const VERDICT = { correct: ["✓", "דרך נכונה"], partial: ["◐", "חלק מהדרך נכון"], wrong: ["✗", "הדרך לא נכונה"], unclear: ["?", "לא הצלחנו לקרוא"] };
 
 /** The AI's review of the way (a practice test, the simulation): waiting, failed, or per question with a board its verdict, feedback and tip. */
+function reviewRows(r, questions) {
+  const rows = (r.keys || []).map((key, i) => [i + 1, questions?.[key]]).filter(([, q]) => q);
+  return rows.length ? `<ol class="plain qz-review-list">${rows.map(([n, q]) => `<li class="v-${esc(q.verdict)}" data-n="${n}"><p><b>שאלה ${n}</b>
+      <span class="tag"><span aria-hidden="true">${VERDICT[q.verdict][0]}</span> ${VERDICT[q.verdict][1]}</span></p>
+      <p>${fmt(q.feedback)}</p>${q.tip ? `<p class="muted">💡 ${fmt(q.tip)}</p>` : ""}</li>`).join("")}</ol>` : "";
+}
+
 function reviewHtml(r) {
   const review = r.review;
   if (!review) return "";
   if (review.state === "pending") return `<section class="qz-review" id="qz-review" data-state="pending"><h4>משוב על הדרך</h4>
-    <p class="muted">ה־AI עובר על הדרך שכתבתם בלוח. אפשר להמשיך לקרוא את התוצאה, המשוב יופיע כאן.</p>${stepsHtml(review)}</section>`;
+    <p class="muted">ה־AI עובר על הדרך שכתבתם בלוח, שאלה אחרי שאלה. אפשר להמשיך לקרוא את התוצאה, המשוב יופיע כאן.</p>${stepsHtml(review)}
+    ${reviewRows(r, review.questions)}</section>`;
   if (review.state === "failed") return `<section class="qz-review" id="qz-review" data-state="failed"><h4>משוב על הדרך</h4><p class="muted">לא הצלחנו לבדוק את הדרך הפעם. המורה יראו את הלוחות.</p></section>`;
-  const rows = (r.keys || []).map((key, i) => [i + 1, review.questions[key]]).filter(([, q]) => q);
+  const rows = reviewRows(r, review.questions);
   return `<section class="qz-review" id="qz-review" data-state="done"><h4>משוב על הדרך</h4>
     ${review.summary ? `<p class="qz-review-sum">${fmt(review.summary)}</p>` : ""}
-    ${rows.length ? `<ol class="plain qz-review-list">${rows.map(([n, q]) => `<li class="v-${esc(q.verdict)}" data-n="${n}"><p><b>שאלה ${n}</b>
-      <span class="tag"><span aria-hidden="true">${VERDICT[q.verdict][0]}</span> ${VERDICT[q.verdict][1]}</span></p>
-      <p>${fmt(q.feedback)}</p>${q.tip ? `<p class="muted">💡 ${fmt(q.tip)}</p>` : ""}</li>`).join("")}</ol>`
-      : `<p class="muted">לא נשמרה דרך בלוח באף שאלה.</p>`}
+    ${rows || `<p class="muted">לא נשמרה דרך בלוח באף שאלה.</p>`}
     <p class="muted qz-review-note">משוב אוטומטי. המורה בודקים את הדרך ונותנים את הנקודות.</p></section>`;
 }
 
@@ -238,7 +244,8 @@ function renderResult() {
       <p class="muted" id="qz-best"></p>${r.kind === "simulation" ? `<p class="muted">מבחן סימולציה אפשר לעשות פעם אחת.</p>` : ""}</div>
     ${r.lost_skills.length ? `<h4>איפה אפשר להשתפר</h4><ul class="plain" id="qz-lost">${r.lost_skills.map(s =>
       `<li><a href="#/skill/${esc(s.id)}">${fmt(s.name)}</a><span class="muted">${s.missed} ${s.missed === 1 ? "שאלה שגויה" : "שאלות שגויות"}</span></li>`).join("")}</ul>
-      <p class="muted">אפשר לתרגל את המיומנות ואז לנסות שוב.</p>` : `<p id="qz-perfect">כל התשובות נכונות. כל הכבוד!</p>`}
+      <p class="muted">אפשר לתרגל את המיומנות ואז לנסות שוב.</p>
+      ${r.kind !== "quiz" && r.test.number !== FOCUS ? `<p><a class="button" id="qz-focus" href="#/exam/${esc(r.test.id)}/${FOCUS}">🎯 מבחן תרגול על הנושאים לחיזוק (15 שאלות)</a></p>` : ""}` : `<p id="qz-perfect">כל התשובות נכונות. כל הכבוד!</p>`}
     ${r.missed.length ? `<h4>הטעויות</h4><ol class="qz-missed" id="qz-missed">${r.missed.map(m => `<li><p class="ex-text" dir="auto">${fmt(m.question)}</p>
       ${m.picked ? `<p class="muted">בחרתם: <span dir="auto">${fmt(m.picked)}</span></p>` : `<p class="muted">לא ענו על השאלה.</p>`}
       ${m.mistake ? `<p><b>${esc(m.mistake.name)}</b>${m.mistake.tip ? `<br>${fmt(m.mistake.tip)}` : ""}</p>` : ""}</li>`).join("")}</ol>` : ""}

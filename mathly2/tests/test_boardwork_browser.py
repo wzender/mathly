@@ -183,6 +183,11 @@ def test_the_teacher_sees_why_the_ai_failed_and_runs_it_again(browser, bank):
         teacher.wait_for_selector("#work-ai[data-state='done']", timeout=15000)
         assert "סיכום ה־AI" in teacher.inner_text("#work-ai") and teacher.locator(".work-q .work-ai").count() == 1
         assert teacher.get_attribute(f".work-q[data-key='{second}'] [data-points='0.5']", "aria-pressed") == "true"   # the pick stayed
+        first = attempt["questions"][0]["key"]
+        asked = len(fake.calls)
+        teacher.click(f".work-q[data-key='{first}'] [data-ai-key]")                                  # one question alone
+        teacher.wait_for_selector("#work-ai[data-state='done']", timeout=15000)
+        assert len(fake.calls) == asked + 1 and fake.calls[-1]["n"] == 1
         assert teacher.errors == []
 
 
@@ -194,10 +199,10 @@ def test_while_the_ai_works_the_student_and_the_teacher_see_its_steps(browser, b
     release = threading.Event()
 
     class Slow(FakeReviewer):
-        def review(self, items, on_event=lambda step, **info: None):
+        def review_one(self, item, on_event=lambda step, **info: None):
             on_event("busy", seconds=30)
             release.wait(30)
-            return super().review(items, on_event)
+            return super().review_one(item, on_event)
     lessons = [l["id"] for l in bank.lessons][:2]
     store = InMemoryStore()
     klass = store.create_class("setup", "A", lessons=lessons, teacher_email=TEACHER)

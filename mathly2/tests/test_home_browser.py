@@ -388,6 +388,8 @@ def test_after_the_simulation_the_wrong_questions_are_answered_again_in_a_round(
         page.click("#qz-retry")
         page.wait_for_selector(".round-layer #ex-q")
         assert "חזרה על הטעויות" in page.inner_text(".round-layer .ex-chip") and "מתוך 6" in page.inner_text("#rd-count")
+        context = page.inner_text("#rd-context")
+        assert "מבחן סימולציה" in context and "שאלה 1 מתוך 6" in context and "לא עניתם" in context      # where the question came from
         for n in range(6):
             page.locator(".round-layer .ex-choice").first.click()
             page.wait_for_selector(".round-layer .ex-ok, .round-layer .ex-bad")
@@ -400,6 +402,13 @@ def test_after_the_simulation_the_wrong_questions_are_answered_again_in_a_round(
         page.click("#rd-result [data-close]")
         page.wait_for_selector("#test-card")
         assert page.locator(".round-layer").count() == 0 and page.errors == []
+        page.wait_for_selector("#focus[data-ready='true']")                                             # the weak topics now have their own test
+        page.click("#focus-start")
+        page.wait_for_selector("#qz-q")
+        assert "נושאים לחיזוק" in page.inner_text(".mx-sheet h3") and 0 < page.locator(".qz-dot").count() <= 15
+        focus = store.attempts_of(KID_ID, "exercise_test")[0]
+        lost = {q["skill_id"] for q in store.attempts_of(KID_ID, "simulation")[0]["questions"]}
+        assert focus["scope"].endswith(":3") and {q["skill_id"] for q in focus["questions"]} <= lost and page.errors == []
 
 
 # --- 3.5 the grades screen has exercise tests and simulations ---

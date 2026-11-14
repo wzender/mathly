@@ -341,7 +341,7 @@ def test_an_exercise_test_with_nothing_started_draws_all_the_material_and_a_weak
     test = set_test(client, lessons, days=14, questions=6).json()
     got = start_ex(client, test["id"])
     assert got.status_code == 200 and len(got.json()["questions"]) == 6             # not refused: drawn like the simulation
-    assert start_ex(client, test["id"], 3).status_code == 404
+    assert start_ex(client, test["id"], 4).status_code == 404
 
 
 def test_an_exercise_test_with_all_skills_starts_even_when_nothing_is_started(world):
@@ -467,6 +467,8 @@ def test_after_the_simulation_its_wrong_questions_can_be_answered_again_without_
     assert rnd["kind"] == "mistakes_round" and rnd["total"] == 4 and rnd["source"]["test_id"] == test["id"]
     assert [q["key"] for q in store.get_attempt(rnd["id"])["questions"]] == [q["key"] for q in sim["questions"][8:]]
     assert '"correct"' not in json.dumps(rnd)
+    ctx = rnd["question"]["context"]
+    assert ctx["n"] == 9 and ctx["of"] == 12 and ctx["title"].startswith("מבחן סימולציה") and ctx["picked"]   # where it came from, and the old pick
     assert client.post(f"/api/attempts/{sim['id']}/retry/start", headers=auth(KID)).json()["id"] == rnd["id"]    # an open one resumes
     for ok in [True, False, True, True]:
         key = rnd["question"]["key"]
@@ -474,6 +476,7 @@ def test_after_the_simulation_its_wrong_questions_can_be_answered_again_without_
         assert got.status_code == 200 and got.json()["correct"] is ok
         rnd = got.json()["round"]
     assert rnd["state"] == "done" and rnd["result"]["right"] == 3 and rnd["result"]["stars"] is None and len(rnd["result"]["missed"]) == 1
+    assert rnd["result"]["missed"][0]["n"] == 10
     assert store.get_attempt(sim["id"])["grade"] == 67                                    # the simulation's grade stays
     assert client.post(f"/api/attempts/{sim['id']}/retry/start", headers=auth(KID)).json()["id"] != rnd["id"]    # again: a new round
     assert client.post(f"/api/attempts/{sim['id']}/retry/start", headers=auth(TEACHER)).status_code == 404       # only the student's own
@@ -485,3 +488,26 @@ def test_a_test_with_no_mistakes_has_nothing_to_retry(world):
     started(client, store, lessons)
     done = answer_all(client, client.app.state.bank, start_ex(client, test["id"]).json(), [True] * 6)
     assert client.post(f"/api/attempts/{done['id']}/retry/start", headers=auth(KID)).status_code == 409
+
+
+def test_the_weak_topics_test_has_15_questions_only_from_the_skills_that_lost_points(world):
+    client, store, lessons = world
+    bank = client.app.state.bank
+    test = set_test(client, lessons, days=14).json()
+    client.set_time(MON + 12 * DAY)
+    assert client.get(f"/api/tests/{test['id']}", headers=auth(KID)).json()["focus"]["skills"] == []
+    assert start_ex(client, test["id"], 3).status_code == 409                          # nothing weak yet
+    sim = client.post(f"/api/tests/{test['id']}/simulation/start?all_skills=true", headers=auth(KID)).json()
+    done = answer_all(client, bank, sim, [True] * 8 + [False] * 4)
+    lost = {s["id"] for s in done["lost_skills"]}
+    card = client.get(f"/api/tests/{test['id']}", headers=auth(KID)).json()
+    assert {s["id"] for s in card["focus"]["skills"]} == lost and card["focus"]["size"] == 15 and card["focus"]["best"] is None
+    focus = start_ex(client, test["id"], 3).json()
+    assert focus["kind"] == "exercise_test" and focus["test"]["number"] == 3 and len(focus["questions"]) == 15
+    assert {q["skill_id"] for q in store.get_attempt(focus["id"])["questions"]} <= lost
+    assert len({q["key"] for q in store.get_attempt(focus["id"])["questions"]}) == 15                    # no question twice
+    assert start_ex(client, test["id"], 3).json()["id"] == focus["id"]                                   # open: it resumes
+    answer_all(client, bank, focus, [True] * 15)
+    card = client.get(f"/api/tests/{test['id']}", headers=auth(KID)).json()
+    assert card["focus"]["best"] == 100 and card["focus"]["attempts"] == 1
+    assert [e["number"] for e in card["exercise_tests"]] == [1, 2] and all(e["best"] is None for e in card["exercise_tests"])   # not exercise test 1 or 2

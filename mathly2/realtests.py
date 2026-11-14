@@ -82,9 +82,10 @@ def facts_for(request: Request, user_id: str | None, test: dict, today: date) ->
         rows = here.attempts_of(user_id, kind) if user_id else []
         return [attempts.settle(store, bank, r, now) for r in rows if r["scope"] == tid or r["scope"].startswith(tid + ":")]
 
-    exercise = {1: [], 2: []}
+    exercise, focus = {1: [], 2: []}, []
     for row in mine("exercise_test"):
-        exercise[int(row["scope"].split(":")[1])].append(row)
+        number = int(row["scope"].split(":")[1])
+        (focus if number == exam.FOCUS else exercise[number]).append(row)
     simulation = next(iter(mine("simulation")), None)
     submitted = lambda rows: [r for r in rows if not attempts.is_open(r)]
     best = {n: max((r["grade"] for r in submitted(rows)), default=None) for n, rows in exercise.items()}
@@ -100,14 +101,20 @@ def facts_for(request: Request, user_id: str | None, test: dict, today: date) ->
     sim_taken = bool(simulation and not attempts.is_open(simulation))
     stale = sorted(covered, key=lambda i: (last.get(i) is not None, last.get(i) or date.min))
     used: dict[str, int] = {}
-    for rows in list(exercise.values()) + [[simulation] if simulation else []]:
+    for rows in list(exercise.values()) + [focus, [simulation] if simulation else []]:
         for r in rows:
             for q in r["questions"]:
                 used[q["key"]] = used.get(q["key"], 0) + 1
     return {"covered": covered, "states": states, "mastered": len(mastered), "path_done": bool(covered) and not unmastered,
             "next_path_skill": unmastered[0] if unmastered else None, "exercise": exercise, "best": best, "simulation": simulation,
             "sim_taken": sim_taken, "ex1_done": bool(submitted(exercise[1])), "ex2_done": bool(submitted(exercise[2])),
-            "weak_before": weak_before, "failed": failed, "review_left": review_left, "stale": stale, "used": used}
+            "weak_before": weak_before, "failed": failed, "review_left": review_left, "stale": stale, "used": used, "focus": focus,
+            "focus_skills": _focus_skills(bank, covered, states, weak_before | set(failed) | {s["id"] for r in submitted(focus) for s in attempts.result(bank, r)["lost_skills"]})}
+
+
+def _focus_skills(bank, covered: list[str], states: dict[str, str], lost: set[str]) -> list[str]:
+    """The weak topics of a test: covered skills that lost points in its exercise tests or simulation, or are still being learned."""
+    return [i for i in covered if (i in lost or states.get(i) == "learning") and bank.question_keys(i)]
 
 
 def readiness_for(facts: dict) -> dict:
@@ -135,11 +142,15 @@ def card(request: Request, user_id: str | None, test: dict, today: date) -> dict
                           "open": bool(open_), "due_at": open_["due_at"].isoformat() if open_ and attempts.is_timed(open_) else None})
     sim = facts["simulation"]
     opens_in = max(0, days_left - p["sim"])
+    focus_open = next((r for r in facts["focus"] if attempts.is_open(r)), None)
+    focus_done = [r for r in facts["focus"] if not attempts.is_open(r)]
+    focus = {"number": exam.FOCUS, "size": exam.FOCUS_SIZE, "skills": [{"id": i, "name": bank.skill(i)["name"]} for i in facts["focus_skills"]],
+             "best": max((r["grade"] for r in focus_done), default=None), "attempts": len(focus_done), "open": bool(focus_open)}
     return {"id": test["id"], "date": test["date"].isoformat(), "days_left": days_left, "note": test["note"], "subject_id": test.get("subject_id", "math"),
             "lessons": [{"id": i, "name": n} for i, n in zip(test["lessons"], lesson_names(request, test["lessons"]))],
             "questions": test["questions"], "minutes": test["minutes"],
             "plan": countdown.outline(p, facts), "task": countdown.task(days_left, p, facts), "readiness": readiness_for(facts),
-            "exercise_tests": exercises,
+            "exercise_tests": exercises, "focus": focus,
             "practice_first": [{"id": i, "name": bank.skill(i)["name"]} for i in facts["covered"] if facts["states"].get(i, "not_started") == "not_started"],
             "simulation": {"open_now": countdown.sim_open(days_left, p), "opens_in_days": opens_in,
                            "opens_on": (test["date"] - timedelta(days=p["sim"])).isoformat(), "required": countdown.sim_open(days_left, p) and not facts["sim_taken"],
@@ -313,10 +324,16 @@ def _start(request: Request, user: dict, test: dict, kind: str, scope: str, shar
     from .quizzes import view
     store, bank, now = request.app.state.store, request.app.state.bank, clock.now()
     facts = facts_for(request, user["id"], test, clock.school_day())
-    mine = [r for r in (facts["exercise"][int(scope.split(":")[1])] if kind == "exercise_test" else [facts["simulation"]] if facts["simulation"] else [])]
+    number = int(scope.split(":")[1]) if kind == "exercise_test" else None
+    mine = facts["focus"] if number == exam.FOCUS else facts["exercise"][number] if kind == "exercise_test" else [facts["simulation"]] if facts["simulation"] else []
     for row in mine:
         if attempts.is_open(row) or kind == "simulation":           # open: resume; the simulation is taken once, so its result comes back
             return view(request, row)
+    if number == exam.FOCUS:                                        # the weak topics only, FOCUS_SIZE questions, untimed like the others
+        if not facts["focus_skills"]:
+            raise HTTPException(409, "אין כרגע נושאים לחיזוק במבחן הזה. כל הכבוד!")
+        drawn = exam.draw_focus(bank, facts["focus_skills"], used=facts["used"], rng=getattr(request.app.state, "quiz_rng", None))
+        return view(request, store.create_attempt(user["id"], kind, scope, now, now + timedelta(minutes=test["minutes"]), drawn))
     drawn = exam.draw(bank, test["lessons"], facts["states"], test["questions"], share=share, weak_before=facts["weak_before"], used=facts["used"],
                       include_unstarted=include_unstarted)
     if not drawn["questions"] and kind == "exercise_test" and not include_unstarted:     # nothing started yet: all the material, like the simulation
@@ -331,9 +348,11 @@ def _start(request: Request, user: dict, test: dict, kind: str, scope: str, shar
 @router.post("/tests/{test_id}/exercise/{number}/start")
 def start_exercise(test_id: int, number: int, request: Request, user: dict = Depends(learner),
                    all_skills: bool = Query(False, description="the simulation's material: every skill of the test's lessons, started or not, evenly")) -> dict:
-    if number not in exam.EXERCISE_SHARE:
+    if number not in exam.EXERCISE_SHARE and number != exam.FOCUS:
         raise HTTPException(404, "מבחן התרגול לא נמצא")
     test = _student_test(request, user, test_id)
+    if number == exam.FOCUS:
+        return _start(request, user, test, "exercise_test", f"{test_id}:{number}", 1.0)
     share = 0.0 if all_skills else exam.EXERCISE_SHARE[number]        # all_skills: drawn like the simulation (an even spread, no weak share)
     return _start(request, user, test, "exercise_test", f"{test_id}:{number}", share, all_skills)
 

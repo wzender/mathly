@@ -66,7 +66,10 @@ const progress = () => `<div class="ex-progress"><span id="rd-count">${countText
 
 function questionHtml() {
   const question = round.question;
-  return `<div class="mx-q" id="ex-q" data-key="${esc(question.key)}"><p class="muted rd-skill">${fmt(question.skill_name)}</p>
+  const ctx = question.context;
+  const from = ctx ? `<div class="rd-context" id="rd-context"><span class="ex-chip">📝 ${ctx.n ? `שאלה ${ctx.n}${ctx.of ? ` מתוך ${ctx.of}` : ""} ב${fmt(ctx.title)}` : fmt(ctx.title)}</span>
+    <p class="muted">${ctx.picked ? `במבחן בחרתם: <span dir="auto">${fmt(ctx.picked)}</span>` : "במבחן לא עניתם על השאלה הזו."} נסו שוב.</p></div>` : "";
+  return `<div class="mx-q" id="ex-q" data-key="${esc(question.key)}">${from}<p class="muted rd-skill">${fmt(question.skill_name)}</p>
     <p class="ex-text" dir="auto">${fmt(question.question)}</p>${figures(question)}
     <div class="ex-choices" id="ex-choices">${shuffled(question.choices).map(c =>
       `<button type="button" class="ex-choice" data-i="${c.index}" dir="auto">${fmt(c.text)}</button>`).join("")}</div>
@@ -81,7 +84,7 @@ function retryResultHtml() {
     <h4 class="rd-title">${all ? "כל הטעויות תוקנו!" : "סיימתם לחזור על הטעויות"}</h4>
     <p class="ex-score" id="rd-score"><b>${r.right}</b> מתוך ${r.total} נכונות הפעם</p>
     ${r.mastered.length ? `<p class="rd-mastered" id="rd-mastered">🎉 נשלטו: ${r.mastered.map(s => fmt(s.name)).join(", ")}</p>` : ""}
-    ${r.missed.length ? `<h4>עדיין כדאי לחזק</h4><ol class="ex-missed" id="rd-missed">${r.missed.map(m => `<li><p class="muted">${fmt(m.skill_name)}</p><p class="ex-text" dir="auto">${fmt(m.question)}</p>
+    ${r.missed.length ? `<h4>עדיין כדאי לחזק</h4><ol class="ex-missed" id="rd-missed">${r.missed.map(m => `<li><p class="muted">${m.n ? `שאלה ${m.n} · ` : ""}${fmt(m.skill_name)}</p><p class="ex-text" dir="auto">${fmt(m.question)}</p>
       ${m.mistake ? `<p><b>${esc(m.mistake.name)}</b>${m.mistake.tip ? `<br>${fmt(m.mistake.tip)}` : ""}</p>` : ""}</li>`).join("")}</ol>` : ""}
     <p class="muted">הציון במבחן לא משתנה. התרגול נספר לשליטה במיומנויות.</p>
     <p class="ex-actions">${all ? "" : `<button type="button" class="primary" id="rd-again">שוב על הטעויות</button> `}<button type="button" data-close>${round.source.test_id ? "חזרה למבחן" : "חזרה למסלול"}</button></p></section>`;

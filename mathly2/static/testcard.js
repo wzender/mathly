@@ -20,6 +20,17 @@ function exercises(test) {
     <a class="button" href="#/exam/${test.id}/${e.number}">${e.open ? "להמשיך" : e.attempts ? "שוב" : "התחלה"}</a></li>`).join("")}</ul>`;
 }
 
+/** The practice test on the weak topics: 15 questions from the skills that lost points (or are still being learned). */
+function focus(test) {
+  const f = test.focus;
+  if (!f) return "";
+  if (!f.skills.length) return `<div id="focus" data-ready="false"><p class="muted">🎯 ${f.attempts ? "אין כרגע נושאים לחיזוק. כל הכבוד!" : "אחרי מבחן תרגול או סימולציה יופיע כאן מבחן על הנושאים שצריך לחזק."}</p></div>`;
+  return `<div id="focus" data-ready="true"><p><b>🎯 מבחן תרגול על הנושאים לחיזוק</b> <span class="muted">· ${f.size} שאלות</span></p>
+    <p class="focus-skills">${f.skills.map(s => `<a class="ex-chip link" href="#/skill/${esc(s.id)}">${fmt(s.name)}</a>`).join(" ")}</p>
+    ${f.best === null ? "" : `<p class="muted">הציון הטוב: ${f.best} · ${f.attempts} ${f.attempts === 1 ? "ניסיון" : "ניסיונות"}</p>`}
+    <p><a class="button primary" id="focus-start" href="#/exam/${test.id}/${f.number}">${f.open ? "להמשיך" : f.attempts ? "עוד מבחן על הנושאים" : "התחלה"}</a></p></div>`;
+}
+
 function simulation(test) {
   const s = test.simulation;
   const lead = s.taken ? `<p>הציון: <b id="sim-grade">${s.grade}</b></p>${s.review.length ? `<p>מיומנויות לחזרה:</p><ul class="plain" id="sim-review">${s.review.map(r =>
@@ -41,7 +52,7 @@ export async function show(view, id) {
       <p class="muted">${test.lessons.map(l => fmt(l.name)).join(", ")}${test.note ? ` · ${esc(test.note)}` : ""}<br>${test.questions} שאלות · ${test.minutes} דקות</p>
       ${readinessBar(test.readiness)}</section>
     <section class="card"><h3>התוכנית</h3>${planList(test)}</section>
-    <section class="card"><h3>מבחני תרגול</h3>${exercises(test)}
+    <section class="card"><h3>מבחני תרגול</h3>${exercises(test)}${focus(test)}
       ${test.practice_first.length ? `<p id="practice-first"><b>כדאי לתרגל קודם:</b> ${test.practice_first.map(s => `<a class="ex-chip link" href="#/skill/${esc(s.id)}">${fmt(s.name)}</a>`).join(" ")}</p>
         <p class="muted">אלה מיומנויות שעוד לא התחלתם, ולכן אין להן שאלות במבחני התרגול.</p>
         <p id="all-skills">${test.exercise_tests.map(e => `<a class="button" href="#/exam/${test.id}/${e.number}/all">מבחן תרגול ${e.number} על כל החומר</a>`).join(" ")}</p>

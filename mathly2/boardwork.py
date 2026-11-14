@@ -89,7 +89,9 @@ def _title(request: Request, row: dict) -> str:
     test_id, _, number = row["scope"].partition(":")
     test = store.get_test(int(test_id)) if test_id.isdigit() else None
     when = f" ({test['date'].day}.{test['date'].month})" if test else ""
-    return (f"מבחן תרגול {number}" if row["kind"] == "exercise_test" else "מבחן סימולציה") + when
+    from .exam import FOCUS
+    name = ("מבחן תרגול: נושאים לחיזוק" if number == str(FOCUS) else f"מבחן תרגול {number}") if row["kind"] == "exercise_test" else "מבחן סימולציה"
+    return name + when
 
 
 def _iso(value):
@@ -151,7 +153,7 @@ def _ai_state(request: Request, row: dict) -> dict:
     review = row.get("review") or {}
     return {"available": getattr(request.app.state, "reviewer", None) is not None, "state": review.get("state"),
             "reason": review.get("reason"), "summary": review.get("summary"), "model": review.get("model"),
-            "at": review.get("at"), "events": review.get("events", [])}
+            "at": review.get("at"), "events": review.get("events", []), "missing": review.get("missing", 0)}
 
 
 @router.get("/teaching/work/{attempt_id}")
@@ -161,12 +163,18 @@ def work_open(attempt_id: str, request: Request, user: dict = Depends(need("clas
 
 
 @router.post("/teaching/work/{attempt_id}/review")
-def work_review(attempt_id: str, request: Request, user: dict = Depends(need("class.teach"))) -> dict:
-    """The teacher asks for the AI review (again): after a failure, for a lesson quiz, or for a fresh look."""
+def work_review(attempt_id: str, request: Request, key: str | None = Query(None, max_length=200),
+                user: dict = Depends(need("class.teach"))) -> dict:
+    """The teacher asks for the AI review (again): of the whole attempt, or of one question (`key`)."""
     from . import boardreview
     if getattr(request.app.state, "reviewer", None) is None:
         raise HTTPException(409, "בדיקה עם AI לא מוגדרת בשרת: חסר GEMINI_API_KEY")
-    return teacher_view(request, boardreview.ensure(request.app, _graded_attempt(request, user, attempt_id), force=True))
+    row = _graded_attempt(request, user, attempt_id)
+    if key is not None and key not in {q["key"] for q in row["questions"]}:
+        raise HTTPException(404, "השאלה לא נמצאה")
+    if key is not None and key not in request.app.state.store.work_of(row["user_id"], row["id"]):
+        raise HTTPException(409, "אין לוח לשאלה הזו")
+    return teacher_view(request, boardreview.ensure(request.app, row, force=True, keys=[key] if key else None))
 
 
 class Credit(BaseModel):
