@@ -82,6 +82,7 @@ def right(bank, ref, ok=True):
 
 
 def tap_choice(page, bank, ref, ok=True):
+    page.evaluate("window.MathlyBoard && (window.MathlyBoard.hasWork = () => true)")          # as if the way were on the board (board-work requires it; test_boardwork_browser tests that)
     page.click(f"#qz-choices .qz-choice[data-i='{right(bank, ref, ok)}']")
 
 

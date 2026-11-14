@@ -117,3 +117,30 @@ def test_a_lesson_round_needs_no_board_but_sends_it_when_there_is_one(browser, b
         wait_until(lambda: key in store.work_of(KID_ID, rnd["id"]))
         assert len(store.work_of(KID_ID, rnd["id"])) == 1                                          # the first answer had no board
         assert page.errors == []
+
+
+def test_after_a_practice_test_the_student_sees_the_review_of_the_way(browser, bank):
+    from datetime import timedelta
+    from mathly2 import boardreview, clock
+    from mathly2.tests.test_boardreview_api import FakeReviewer
+    lessons = [l["id"] for l in bank.lessons][:2]
+    store = InMemoryStore()
+    klass = store.create_class("setup", "A", lessons=lessons, teacher_email=TEACHER)
+    store.add_member(klass["id"], KID)
+    test = store.create_test(klass["id"], clock.school_day() + timedelta(days=9), lessons, TEACHER, created_at=clock.now() - timedelta(days=20))
+    app = create_app(Settings(), bank=bank, store=store, reviewer=FakeReviewer())
+    with running(app) as url:
+        page = sign_in(browser, url, f"#/exam/{test['id']}/1/all")
+        page.wait_for_selector("#qz-q")
+        page.click("[data-board-toggle]")
+        page.wait_for_selector(".mx-board.full canvas")
+        draw_line(page)
+        page.click(".mx-board .mx-board-back")
+        page.locator(".qz-choice").first.click()
+        page.wait_for_selector(".qz-choice.picked")
+        page.click("#qz-submit")
+        page.click("#qz-yes")
+        page.wait_for_selector("#qz-review[data-state='done']", timeout=15000)                   # pending at first, then the review
+        text = page.inner_text("#qz-review")
+        assert "משוב על הדרך" in text and "שאלה 1" in text and "חלק מהדרך נכון" in text and "בדקו סימן" in text
+        assert page.errors == []

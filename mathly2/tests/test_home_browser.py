@@ -482,6 +482,7 @@ def answer_in_browser(page, bank, store, kind, scope, rights):
         key = page.get_attribute("#qz-q", "data-key")
         question = bank._questions[key.split(":")[0]][key]
         picks = [i for i, c in enumerate(question["choices"]) if bool(c.get("correct")) == ok]
+        page.evaluate("window.MathlyBoard && (window.MathlyBoard.hasWork = () => true)")      # as if the way were on the board
         page.click(f"#qz-choices .qz-choice[data-i='{picks[0]}']")
         if n < len(rights) - 1:
             page.click(".qz-nav button >> nth=1")

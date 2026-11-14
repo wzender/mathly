@@ -35,3 +35,14 @@ A work picture SHALL be read only by its student, the teachers of the student's 
 #### Scenario: A new board for the same question
 - **WHEN** a student saves a second board for a question
 - **THEN** the first picture is no longer referred to and the cleanup removes it
+
+### Requirement: An AI review of the way in tests
+When a practice test or the simulation is handed in and the server has a Gemini key, the boards of its questions SHALL be sent to the model in one request, with each question, its choices, the right choice (for the model only) and the student's choice, and nothing that names the student. The model SHALL judge the way per question (correct, partial, wrong, unclear) and write a short feedback line and a tip in Hebrew without stating the right answer. The result screen SHALL show "משוב על הדרך": waiting while it is written, then the summary and each reviewed question; if it fails, it says so. The teacher SHALL see the review beside each board, as a suggestion; the points stay the teacher's. A lesson quiz is not reviewed, and without a key there is no review.
+
+#### Scenario: A practice test with two boards
+- **WHEN** a student hands in a practice test with boards on questions 1 and 2
+- **THEN** one request reviews both, and the result shows the feedback for questions 1 and 2
+
+#### Scenario: Lost by a restart
+- **WHEN** a review is still pending ten minutes later
+- **THEN** reading the result starts it again

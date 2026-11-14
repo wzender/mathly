@@ -50,6 +50,8 @@ venv/bin/python -m pytest mathly2/tests
 | `TEACHER_EMAILS` | Teachers' email addresses, separated by commas, spaces or new lines |
 | `DEVELOPER_EMAILS` | Developers' email addresses: every permission and the developer tools. The developer role comes only from here |
 | `ADMIN_EMAILS` | The first admins. Admins give roles (student, teacher, manager, admin) to other accounts |
+| `GEMINI_API_KEY` | The AI review of the way (the board) in practice tests and the simulation; none without it. The boards (no names) go to Google |
+| `GEMINI_MODEL` | The Gemini model for that review (default `gemini-2.5-flash`, which has a free tier) |
 | `PORT` | The port in the container (default 7860) |
 
 Set all three Supabase values or none. With none, the app runs locally with the in-memory store and the
