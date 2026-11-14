@@ -124,9 +124,22 @@ function quest(map) {
     ${play}</section>`;
 }
 
+/** The lessons. With dates in the curriculum: the current lesson (the first whose date is today or later) on its own, and the lessons
+ *  whose date has passed and the coming ones folded under it, each with how many there are (and how many are behind). Without dates:
+ *  every lesson as a tile. */
 function board(map) {
   if (!map.lessons.length) return "";
-  return `<section class="lesson-board" id="lesson-map" aria-label="השיעורים">${map.lessons.map(l => tile(l, map.next)).join("")}</section>`;
+  const tiles = list => `<div class="lesson-board">${list.map(l => tile(l, map.next)).join("")}</div>`;
+  if (!map.lessons.some(l => l.when)) return `<section class="lesson-board" id="lesson-map" aria-label="השיעורים">${map.lessons.map(l => tile(l, map.next)).join("")}</section>`;
+  const past = map.lessons.filter(l => l.when === "past"), later = map.lessons.filter(l => l.when === "later");
+  const now = map.lessons.find(l => l.when === "current");
+  const behind = past.filter(l => l.behind).length;
+  const fold = (id, title, list, extra = "") => list.length ? `<details class="lfold" id="${id}"><summary><span class="grow">${title} (${list.length})</span>${extra}</summary>${tiles(list)}</details>` : "";
+  return `<section class="lesson-groups" id="lesson-map" aria-label="השיעורים">
+    ${now ? `<div class="lnow" id="lesson-now"><h2 class="lnow-title">השיעור הנוכחי <span class="muted">עד ${esc(shortDate(now.due_date))}</span></h2>${tile(now, map.next)}</div>`
+          : `<p class="muted" id="lesson-now">כל התאריכים בתוכנית כבר עברו.</p>`}
+    ${fold("lessons-past", "שיעורים שעברו", past, behind ? `<span class="lfold-late">⏰ ${behind} בפיגור</span>` : "")}
+    ${fold("lessons-later", "השיעורים הבאים", later)}</section>`;
 }
 
 export const show = view => swr([forSubject("/api/home"), "/api/assignments", "/api/ai/status"], ([data, assignments, ai]) => draw(view, data, assignments, ai));

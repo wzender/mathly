@@ -14,6 +14,13 @@ Each lesson SHALL be a small tile in the bank's order: its number (a crown when 
 - **WHEN** a lesson's date has passed and it is not completed
 - **THEN** its tile shows "⏰" and its name says it is behind and since when
 
+### Requirement: Lessons by date
+When the class's curriculum gives lessons dates, home SHALL show the current lesson (the first whose date is today or later, by Israel's date) on its own with its date, and fold under it "שיעורים שעברו" (dates gone by, with how many are behind) and "השיעורים הבאים" (later dates or no date), each with its count. Without dates the lessons stay one grid.
+
+#### Scenario: The middle of the term
+- **WHEN** two lessons' dates have passed, one of them not completed, and the next lesson's date is in two days
+- **THEN** that lesson is shown as the current one, and "שיעורים שעברו (2)" is folded with "⏰ 1 בפיגור"
+
 ### Requirement: Play the next lesson
 Home SHALL have one big button that opens the round of the next lesson: the lesson with an open round, else the earliest lesson behind the curriculum, else the first lesson with fewer than three stars. With every lesson perfect, it SHALL say so.
 
