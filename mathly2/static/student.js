@@ -24,13 +24,20 @@ export async function show(me, view) {
     phone.stopComputer();                                      // a page that was waiting for the phone's photo is left
     const raw = location.hash.replace(/^#/, "");
     const where = raw.startsWith("/") ? raw : "/";          // no address, or the sign-in service's "#access_token=…": the first screen
-    if (!where.startsWith("/round/")) lessonRound.close();
+    if (!where.startsWith("/round/") && !where.startsWith("/retry/")) lessonRound.close();
     try {
       if (where.startsWith("/round/")) {                                     // a lesson's round over the home (a link or a reload: the home first)
         exercise.close(); quiz.close();
         const data = await lessonRound.start(decodeURIComponent(where.slice(7)));
         setSubject(data.subject_id);
         if (!document.getElementById("lesson-map")) await home.show(view);
+        await lessonRound.show(data);
+      } else if (where.startsWith("/retry/")) {                              // the mistakes of a handed-in attempt, over its test's card (a quiz: the path)
+        exercise.close(); quiz.close();
+        const data = await lessonRound.startRetry(decodeURIComponent(where.slice(7)));
+        setSubject(data.subject_id);
+        if (data.source.test_id) { if (!document.getElementById("test-card")) await (await import("./testcard.js")).show(view, data.source.test_id); }
+        else if (!document.getElementById("path")) await path.show(view);
         await lessonRound.show(data);
       } else if (where.startsWith("/skill/")) {
         quiz.close();

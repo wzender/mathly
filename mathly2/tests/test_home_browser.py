@@ -374,6 +374,34 @@ def test_the_simulation_with_nothing_practiced_offers_a_bypass_on_all_the_materi
         assert len(store.attempts_of(KID_ID, "simulation")) == 1
 
 
+def test_after_the_simulation_the_wrong_questions_are_answered_again_in_a_round(browser, bank):
+    app, store, klass, lessons = world(bank)
+    started_skills(store, bank, lessons)
+    test = add_test(store, klass, lessons, 4, questions=6, minutes=45)
+    with running(app) as url:
+        page = sign_in(browser, url, f"#/sim/{test['id']}")
+        page.wait_for_selector("#qz-q")
+        page.click("#qz-submit")                                                                        # nothing answered: six mistakes
+        page.click("#qz-yes")
+        page.wait_for_selector("#qz-retry")
+        assert "(6)" in page.inner_text("#qz-retry")
+        page.click("#qz-retry")
+        page.wait_for_selector(".round-layer #ex-q")
+        assert "חזרה על הטעויות" in page.inner_text(".round-layer .ex-chip") and "מתוך 6" in page.inner_text("#rd-count")
+        for n in range(6):
+            page.locator(".round-layer .ex-choice").first.click()
+            page.wait_for_selector(".round-layer .ex-ok, .round-layer .ex-bad")
+            page.click("#rd-next")
+            if n < 5:
+                page.wait_for_function(f"document.querySelector('#rd-count').textContent.includes('{n + 2} מתוך')")
+        page.wait_for_selector("#rd-result[data-kind='retry']")
+        assert "הציון במבחן לא משתנה" in page.inner_text("#rd-result") and page.locator(".rd-bigstars span").count() == 0
+        assert store.attempts_of(KID_ID, "simulation")[0]["grade"] == 0
+        page.click("#rd-result [data-close]")
+        page.wait_for_selector("#test-card")
+        assert page.locator(".round-layer").count() == 0 and page.errors == []
+
+
 # --- 3.5 the grades screen has exercise tests and simulations ---
 
 def test_exercise_tests_and_the_simulation_appear_on_the_grades_screen(browser, bank):

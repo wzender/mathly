@@ -451,3 +451,37 @@ def test_another_students_grades_are_not_mine_and_an_unfinished_attempt_is_not_l
     start_ex(client, test["id"])                                                                              # mine is open, not finished
     assert client.get("/api/grades", headers=auth(KID)).json()["exercise_tests"] == []
     assert len(client.get("/api/grades", headers=auth(KID2)).json()["exercise_tests"]) == 1
+
+
+def test_after_the_simulation_its_wrong_questions_can_be_answered_again_without_changing_the_grade(world):
+    client, store, lessons = world
+    bank = client.app.state.bank
+    test = set_test(client, lessons, days=14).json()
+    client.set_time(MON + 12 * DAY)
+    sim = client.post(f"/api/tests/{test['id']}/simulation/start?all_skills=true", headers=auth(KID)).json()
+    early = client.post(f"/api/attempts/{sim['id']}/retry/start", headers=auth(KID))
+    assert early.status_code == 409                                                       # not handed in yet
+    done = answer_all(client, bank, sim, [True] * 8 + [False] * 4)
+    assert done["grade"] == 67 and len(done["missed"]) == 4
+    rnd = client.post(f"/api/attempts/{sim['id']}/retry/start", headers=auth(KID)).json()
+    assert rnd["kind"] == "mistakes_round" and rnd["total"] == 4 and rnd["source"]["test_id"] == test["id"]
+    assert [q["key"] for q in store.get_attempt(rnd["id"])["questions"]] == [q["key"] for q in sim["questions"][8:]]
+    assert '"correct"' not in json.dumps(rnd)
+    assert client.post(f"/api/attempts/{sim['id']}/retry/start", headers=auth(KID)).json()["id"] == rnd["id"]    # an open one resumes
+    for ok in [True, False, True, True]:
+        key = rnd["question"]["key"]
+        got = client.post(f"/api/rounds/{rnd['id']}/answer", headers=auth(KID), json={"key": key, "choice": right_index(bank, key, ok)})
+        assert got.status_code == 200 and got.json()["correct"] is ok
+        rnd = got.json()["round"]
+    assert rnd["state"] == "done" and rnd["result"]["right"] == 3 and rnd["result"]["stars"] is None and len(rnd["result"]["missed"]) == 1
+    assert store.get_attempt(sim["id"])["grade"] == 67                                    # the simulation's grade stays
+    assert client.post(f"/api/attempts/{sim['id']}/retry/start", headers=auth(KID)).json()["id"] != rnd["id"]    # again: a new round
+    assert client.post(f"/api/attempts/{sim['id']}/retry/start", headers=auth(TEACHER)).status_code == 404       # only the student's own
+
+
+def test_a_test_with_no_mistakes_has_nothing_to_retry(world):
+    client, store, lessons = world
+    test = set_test(client, lessons, days=14, questions=6).json()
+    started(client, store, lessons)
+    done = answer_all(client, client.app.state.bank, start_ex(client, test["id"]).json(), [True] * 6)
+    assert client.post(f"/api/attempts/{done['id']}/retry/start", headers=auth(KID)).status_code == 409

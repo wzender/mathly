@@ -242,7 +242,7 @@ function renderResult() {
       ${m.picked ? `<p class="muted">בחרתם: <span dir="auto">${fmt(m.picked)}</span></p>` : `<p class="muted">לא ענו על השאלה.</p>`}
       ${m.mistake ? `<p><b>${esc(m.mistake.name)}</b>${m.mistake.tip ? `<br>${fmt(m.mistake.tip)}` : ""}</p>` : ""}</li>`).join("")}</ol>` : ""}
     ${reviewHtml(r)}
-    <p class="qz-actions">${names(r).again ? `<button type="button" class="primary" id="qz-retake">${names(r).again}</button> ` : ""}<button type="button" data-close>${r.kind === "quiz" ? "חזרה למסלול" : "חזרה למבחן"}</button></p>`;
+    <p class="qz-actions">${r.missed.length ? `<a class="button primary" id="qz-retry" href="#/retry/${esc(r.id)}">🔁 חזרה על השאלות שטעיתי (${r.missed.length})</a> ` : ""}${names(r).again ? `<button type="button" class="${r.missed.length ? "" : "primary"}" id="qz-retake">${names(r).again}</button> ` : ""}<button type="button" data-close>${r.kind === "quiz" ? "חזרה למסלול" : "חזרה למבחן"}</button></p>`;
   if (r.review?.state === "pending") waitForReview(r.id);
   const best = r.kind === "quiz" ? api(`/api/lessons/${encodeURIComponent(r.lesson.id)}/quiz`).then(f => f.best === null ? "" : `הציון של השיעור: ${f.best}`)
     : r.kind === "exercise_test" ? api(`/api/tests/${encodeURIComponent(r.test.id)}`).then(t => `הציון הטוב במבחן התרגול: ${t.exercise_tests[r.test.number - 1].best ?? ""}`) : Promise.resolve("");

@@ -6,7 +6,11 @@ ROUND_SIZE from all of them. The questions are answered in order, each once, and
 for mastery and the daily goal; a wrong one goes to the review list). After the last answer the round is graded and closed.
 
 A lesson's stars: 3 when every skill is mastered, else 2 when a finished round had at least TWO_STARS percent right, else 1 when a round was
-finished, else 0. Nothing here ever says which choice was right."""
+finished, else 0. Nothing here ever says which choice was right.
+
+A mistakes round (חזרה על הטעויות, kind `mistakes_round`, scope: the handed-in attempt's id) is the same sheet over the questions a handed-in
+quiz, exercise test or simulation got wrong (or left empty): answered again one by one with instant feedback, as practice. It has no stars and
+never changes the attempt's grade."""
 from __future__ import annotations
 
 import logging
@@ -27,6 +31,8 @@ KIND = "lesson_round"
 ROUND_SIZE = 10
 PER_SKILL = 3          # three right in a row is what mastery needs, so a skill never takes more of a round
 TWO_STARS = 80         # percent right in a finished round for the second star
+RETRY = "mistakes_round"
+RETRY_OF = ("quiz", "exercise_test", "simulation")
 
 
 class RoundAnswer(BaseModel):
@@ -102,10 +108,16 @@ def _lesson_stars(request: Request, uid: str, lesson_id: str, rows: list[dict]) 
 def view(request: Request, row: dict) -> dict:
     """An open round: its size, a result per answered question and the next question (without the right answer). A finished round: its result."""
     bank, store = request.app.state.bank, request.app.state.store
-    lesson = next((l for l in bank.lessons if l["id"] == row["scope"]), {"id": row["scope"], "name": row["scope"]})
+    source = _source_info(request, row) if row["kind"] == RETRY else None
+    if source:
+        first = bank.skill(row["questions"][0]["skill_id"]) if row["questions"] else None
+        lesson = next((l for l in bank.lessons if first and l["id"] == first["unit"]), {})
+        lesson = {"id": row["scope"], "name": source["title"], "subject_id": lesson.get("subject_id", "math")}
+    else:
+        lesson = next((l for l in bank.lessons if l["id"] == row["scope"]), {"id": row["scope"], "name": row["scope"]})
     done = _graded(bank, row)
-    base = {"id": row["id"], "lesson": {"id": lesson["id"], "name": lesson["name"]}, "subject_id": lesson.get("subject_id", "math"), "total": len(row["questions"]),
-            "results": [right for _, right, _ in done]}
+    base = {"id": row["id"], "kind": row["kind"], "lesson": {"id": lesson["id"], "name": lesson["name"]}, "subject_id": lesson.get("subject_id", "math"),
+            "total": len(row["questions"]), "results": [right for _, right, _ in done], "source": source}
     if attempts.is_open(row):
         nxt = row["questions"][len(done)] if len(done) < len(row["questions"]) else None
         served = bank.practice_question(nxt["skill_id"], nxt["key"]) if nxt else None
@@ -134,17 +146,48 @@ def view(request: Request, row: dict) -> dict:
         served = bank.practice_question(q["skill_id"], q["key"])
         missed.append({"question": served["question"] if served else "", "skill_name": (bank.skill(q["skill_id"]) or {}).get("name", ""),
                        "mistake": {"name": mistake["name"], "tip": mistake["tip"]} if mistake else None})
-    all_rows = store.attempts_of(uid, KIND, row["scope"])
+    stars_now = None if source else _lesson_stars(request, uid, row["scope"], store.attempts_of(uid, KIND, row["scope"]))
     return {**base, "state": "done", "question": None,
-            "result": {"right": sum(base["results"]), "total": base["total"], "grade": row["grade"], "stars": _lesson_stars(request, uid, row["scope"], all_rows),
+            "result": {"right": sum(base["results"]), "total": base["total"], "grade": row["grade"], "stars": stars_now,
                        "mastered": mastered, "almost": almost, "missed": missed}}
 
 
 def _mine(request: Request, user: dict, round_id: str) -> dict:
     row = request.app.state.store.get_attempt(round_id)
-    if row is None or row["user_id"] != user["id"] or row["kind"] != KIND:
+    if row is None or row["user_id"] != user["id"] or row["kind"] not in (KIND, RETRY):
         raise HTTPException(404, "הסבב לא נמצא")
     return row
+
+
+def _source_info(request: Request, row: dict) -> dict:
+    """The handed-in attempt a mistakes round repeats: its kind, its test (if any) and a title."""
+    source = request.app.state.store.get_attempt(row["scope"])
+    kind = source["kind"] if source else "quiz"
+    test_id = int(source["scope"].split(":")[0]) if source and kind != "quiz" and source["scope"].split(":")[0].isdigit() else None
+    name = {"quiz": "הבוחן", "exercise_test": "מבחן התרגול", "simulation": "מבחן הסימולציה"}[kind]
+    return {"id": row["scope"], "kind": kind, "test_id": test_id, "lesson_id": source["scope"] if source and kind == "quiz" else None,
+            "title": f"חזרה על הטעויות ב{name}"}
+
+
+@router.post("/attempts/{attempt_id}/retry/start")
+def start_retry(attempt_id: str, request: Request, user: dict = Depends(learner)) -> dict:
+    """A mistakes round over the questions this handed-in attempt got wrong (or left empty): resume the open one, else a new one."""
+    store, bank, uid = request.app.state.store, request.app.state.bank, user["id"]
+    source = store.get_attempt(attempt_id)
+    if source is None or source["user_id"] != uid or source["kind"] not in RETRY_OF:
+        raise HTTPException(404, "הבוחן לא נמצא")
+    if attempts.is_open(source):
+        raise HTTPException(409, "קודם מגישים, ואז חוזרים על הטעויות")
+    for row in store.attempts_of(uid, RETRY, attempt_id):
+        if attempts.is_open(row):
+            return view(request, row)
+    wrong = [{"skill_id": q["skill_id"], "key": q["key"]} for q in source["questions"]
+             if bank.practice_question(q["skill_id"], q["key"]) and not (bank.grade(q["skill_id"], q["key"], source["answers"].get(q["key"]))
+                                                                      if isinstance(source["answers"].get(q["key"]), int) else {"correct": False}).get("correct")]
+    if not wrong:
+        raise HTTPException(409, "אין שאלות לא נכונות לחזור עליהן")
+    now = clock.now()
+    return view(request, store.create_attempt(uid, RETRY, attempt_id, now, now + timedelta(days=365), wrong))
 
 
 @router.post("/lessons/{lesson_id}/round/start")
