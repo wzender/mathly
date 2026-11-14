@@ -64,8 +64,9 @@ def test_home_is_a_map_of_the_lessons_with_stars_and_a_play_button(browser, bank
         page.wait_for_selector("#lesson-map")
         nodes = page.locator(".lnode")
         assert nodes.count() == len(lessons)
-        assert nodes.nth(0).get_attribute("data-stars") == "3" and "👑" in nodes.nth(0).inner_text()
-        assert "⏰" in nodes.nth(2).inner_text()
+        first, late = page.locator(f".lnode[data-lesson='{lessons[0]}']"), page.locator(f".lnode[data-lesson='{lessons[2]}']")
+        assert first.get_attribute("data-stars") == "3" and "👑" in first.text_content()
+        assert "⏰" in late.text_content()
         assert page.locator("#stars-count").inner_text() == f"⭐ 3 מתוך {3 * len(lessons)}"
         assert page.locator("#play").get_attribute("href") == f"#/round/{lessons[2]}"            # the behind lesson comes first
         assert page.locator(".lnode.next").get_attribute("data-lesson") == lessons[2]
@@ -134,4 +135,31 @@ def test_home_is_one_screen_with_every_lesson_a_test_and_an_assignment(browser, 
         assert page.evaluate("document.documentElement.scrollHeight <= window.innerHeight")                    # nothing to scroll
         no_sideways_scroll(page)
         shot(page, "home-one-screen")
+        assert page.errors == []
+
+
+def test_home_shows_the_current_lesson_and_folds_the_past_and_the_coming_ones(browser, bank):
+    app, store, small, lessons = world(bank, 5)
+    for s in (s["id"] for s in small.skills if s["unit"] == lessons[0]):
+        store.save_progress(KID_ID, s, started_at=STAMP, mastered_at=STAMP)                    # lesson 1 done
+    today = clock.school_day()
+    store.set_lesson_dates({lessons[0]: today - timedelta(days=14), lessons[1]: today - timedelta(days=7),     # 2 is behind
+                            lessons[2]: today + timedelta(days=2), lessons[3]: today + timedelta(days=9)})   # 5 has no date
+    with running(app) as url:
+        page = sign_in(browser, url)
+        to_home(page)
+        page.wait_for_selector("#lesson-now")
+        assert page.locator("#lesson-now .lnode").get_attribute("data-lesson") == lessons[2]
+        assert "השיעור הנוכחי" in page.inner_text("#lesson-now")
+        past = page.locator("#lessons-past")
+        assert [n.get_attribute("data-lesson") for n in past.locator(".lnode").all()] == lessons[:2]
+        assert "שיעורים שעברו (2)" in past.locator("summary").inner_text() and "⏰ 1 בפיגור" in past.locator("summary").inner_text()
+        assert not past.locator(".lnode").first.is_visible()                                    # folded until opened
+        past.locator("summary").click()
+        assert past.locator(".lnode").first.is_visible()
+        later = page.locator("#lessons-later")
+        assert [n.get_attribute("data-lesson") for n in later.locator(".lnode").all()] == lessons[3:5]
+        assert page.locator("#play").get_attribute("href") == f"#/round/{lessons[1]}"            # the behind lesson is still played first
+        no_sideways_scroll(page)
+        shot(page, "home-by-date")
         assert page.errors == []
