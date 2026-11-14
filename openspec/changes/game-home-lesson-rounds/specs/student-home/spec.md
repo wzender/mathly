@@ -47,6 +47,10 @@ The path SHALL be reached from its tab, "העמקה"; the home has no other link
 ### Requirement: Home shows only what is critical
 The home SHALL show only: the stars and goal, the play button, the lessons board, the nearest test's strip, a required simulation, the number of new assignments (as one button to "הגשות") and photo help. Other tests, the readiness bar, the practice tests, assignments that were handed in or checked, and settings SHALL NOT be on home; they are on the test's card and in their tabs.
 
+#### Scenario: Nothing critical
+- **WHEN** a student has no upcoming test, no new assignment and no lesson behind
+- **THEN** home shows the stars and goal, the play button and the lessons, and no test strip or buttons under it
+
 #### Scenario: Two tests
 - **WHEN** a student has two upcoming tests
 - **THEN** home shows the nearest one, and the other is listed on that test's card

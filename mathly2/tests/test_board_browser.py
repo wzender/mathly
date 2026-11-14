@@ -79,7 +79,7 @@ def test_the_math_keyboard_file_is_the_unedited_copy_from_mathly1():
 def test_the_board_loads_and_opens_in_light_and_dark_with_no_error(browser, scheme):
     with running(create_app()) as url:
         page = board_page(browser, url, DESKTOP, scheme)
-        assert page.evaluate("Object.keys(window.MathlyBoard).sort()") == ["button", "closeFull", "desk", "isOn", "mount", "openFull", "show", "toggle"]
+        assert page.evaluate("Object.keys(window.MathlyBoard).sort()") == ["button", "closeFull", "desk", "hasWork", "isOn", "mount", "openFull", "pictureOf", "show", "toggle", "workSig"]
         page.click("[data-board-toggle]")
         page.wait_for_selector(".mx-board")
         assert page.is_visible(".mx-board") and page.is_visible(".mx-board-bar")

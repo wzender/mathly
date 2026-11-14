@@ -39,3 +39,20 @@ def only(bank, lessons):
     from mathly2.bank import Bank
     keep = set(lessons)
     return Bank({**bank.data, "units": [u for u in bank.lessons if u["id"] in keep], "skills": [s for s in bank.skills if s["unit"] in keep]})
+
+
+# The board as if the student wrote the way on it (board-work): for tests about something else, a quiz or a test then takes a choice
+# without drawing first. No picture is sent (pictureOf gives nothing). The board-work tests draw on the real board instead.
+_BOARD_WRITTEN = """(() => {
+  const patch = b => { b.hasWork = () => true; b.workSig = () => "test"; b.pictureOf = async () => null; return b; };
+  if (window.MathlyBoard) { patch(window.MathlyBoard); return; }
+  let board;
+  Object.defineProperty(window, "MathlyBoard", { configurable: true, get: () => board, set: b => { board = patch(b); } });
+})()"""
+
+
+def board_written(page):
+    """From now on (and after a reload) every board on the page counts as written on."""
+    page.add_init_script(_BOARD_WRITTEN)
+    page.evaluate(_BOARD_WRITTEN)
+    return page

@@ -45,9 +45,9 @@ def test_picture_refs_find_assignments_submissions_and_requests(store):
     s = store.save_submission(a["id"], U, pictures=[lone["id"]])
     r = store.create_photo_request(U, a["id"], "d1", "1234", NOW, NOW + timedelta(minutes=10))
     store.save_photo_request(r["id"], state="received", picture_id=lone["id"])
-    assert store.picture_refs(pic["id"]) == {"assignments": [a["id"]], "submissions": [], "requests": [], "ai_requests": []}
-    assert store.picture_refs(lone["id"]) == {"assignments": [], "submissions": [s["id"]], "requests": [r["id"]], "ai_requests": []}
-    assert store.picture_refs(picture(store)["id"]) == {"assignments": [], "submissions": [], "requests": [], "ai_requests": []}
+    assert store.picture_refs(pic["id"]) == {"assignments": [a["id"]], "submissions": [], "requests": [], "ai_requests": [], "work": []}
+    assert store.picture_refs(lone["id"]) == {"assignments": [], "submissions": [s["id"]], "requests": [r["id"]], "ai_requests": [], "work": []}
+    assert store.picture_refs(picture(store)["id"]) == {"assignments": [], "submissions": [], "requests": [], "ai_requests": [], "work": []}
 
 
 # --- 1.1 assignments ---
@@ -172,8 +172,9 @@ def test_supabase_requests_for_pictures_and_assignments():
     assert s.calls[4][3]["due_date"] == "2026-11-20" and s.calls[4][3]["pages"] == ["p1"] and made_a["due_date"] == DUE
     assert s.get_assignment(3)["pages"] == ["p1"] and [a["id"] for a in s.assignments_of_classes([2, 1])] == [3]
     assert s.calls[6][2] == {"class_id": "in.(1,2)", "select": "*", "order": "due_date,id", "removed_at": "is.null"}
-    s2 = Recorder([[{"id": 3}], [{"id": 9}], [{"id": 4}], [{"id": "a1"}]])
-    assert s2.picture_refs("p1") == {"assignments": [3], "submissions": [9], "requests": [4], "ai_requests": ["a1"]}
+    s2 = Recorder([[{"id": 3}], [{"id": 9}], [{"id": 4}], [{"id": "a1"}], [{"ref": "12", "question_key": "q1"}]])
+    assert s2.picture_refs("p1") == {"assignments": [3], "submissions": [9], "requests": [4], "ai_requests": ["a1"], "work": ["12:q1"]}
+    assert s2.calls[4][1] == "m2_work" and s2.calls[4][2] == {"picture_id": "eq.p1", "select": "ref,question_key"}
     assert s2.calls[0][2] == {"pages": "cs.{p1}", "select": "id"} and s2.calls[1][2] == {"pictures": "cs.{p1}", "select": "id"}
 
 
