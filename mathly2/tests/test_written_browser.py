@@ -837,11 +837,11 @@ def test_every_teacher_tab_shows_its_number_and_the_numbers_change_after_grading
         page.wait_for_selector("#teaching")
         page.wait_for_function("document.querySelector('[data-count=inbox]')?.innerText !== ''")
         numbers = lambda: {el.get_attribute("data-count"): el.inner_text() for el in page.locator("#teacher-tabs [data-count]").all()}
-        assert numbers() == {"classes": "1", "tests": "3", "assignments": "2", "inbox": "2", "progress": "2", "ai": "0"}
+        assert numbers() == {"classes": "1", "tests": "3", "assignments": "2", "inbox": "2", "progress": "2", "ai": "0", "work": "0"}
         for tab in ("tests", "assignments", "inbox"):                                                     # on every tab
             page.click(f"#teacher-tabs [data-tab='{tab}']")
             page.wait_for_function("(t) => document.querySelector(`#teacher-tabs [data-tab='${t}'][aria-pressed='true']`) && [...document.querySelectorAll('#teacher-tabs [data-count]')].every(e => e.innerText !== '')", arg=tab)
-            assert numbers() == {"classes": "1", "tests": "3", "assignments": "2", "inbox": "2", "progress": "2", "ai": "0"}, tab
+            assert numbers() == {"classes": "1", "tests": "3", "assignments": "2", "inbox": "2", "progress": "2", "ai": "0", "work": "0"}, tab
         page.click(f"[data-open='{monday['id']}']")
         page.fill("[name=grade]", "80")
         page.click("#give-grade")
