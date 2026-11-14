@@ -33,10 +33,21 @@ def _right(bank, question: dict, answers: dict) -> bool:
     return bool(graded and graded["correct"])
 
 
-def grade(bank, questions: list[dict], answers: dict) -> tuple[int, int]:
-    """(grade, number right). A question without an answer, or with an answer the bank does not know, is wrong."""
+CREDITS = (0, 0.5, 1)                # what a teacher can give a question for its work: nothing, half, all
+
+
+def points(bank, question: dict, answers: dict, credit: dict | None = None) -> float:
+    """A question's points: the teacher's credit for the work when they gave one, else 1 for a right answer and 0 for a wrong one."""
+    given = (credit or {}).get(question["key"])
+    return float(given) if given in CREDITS else (1.0 if _right(bank, question, answers) else 0.0)
+
+
+def grade(bank, questions: list[dict], answers: dict, credit: dict | None = None) -> tuple[int, int]:
+    """(grade, number right). A question without an answer, or with an answer the bank does not know, is wrong. The teacher's credit for the
+    work (in halves) replaces a question's points."""
     right = sum(1 for q in questions if _right(bank, q, answers))
-    return percent(right, len(questions)), right
+    halves = sum(round(2 * points(bank, q, answers, credit)) for q in questions)
+    return percent(halves, 2 * len(questions)), right
 
 
 def add_wrong_to_review(store, bank, row: dict, at: datetime) -> None:

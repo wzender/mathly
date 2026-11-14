@@ -662,3 +662,23 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .pr-form textarea { min-height: 180px; }
 .pr-actions { flex-wrap: wrap; }
 .pr-help pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: 8px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }
+
+/* ---------- the work on the board: the student's prompt and the teacher's check (board-work) ---------- */
+.qz-need-work { border-color: var(--sky-gold); }
+.work-list li { flex-wrap: wrap; }
+.work-q .work-choices li { padding: 6px 8px; border-radius: 8px; }
+.work-q .work-choices li.right { background: color-mix(in srgb, var(--ok, #15803d) 18%, transparent); }
+.work-q .work-choices li.picked:not(.right) { background: color-mix(in srgb, var(--danger) 16%, transparent); }
+.work-q .work-pic { display: block; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); background: #fff; }
+.work-points { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.work-points button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.work-points .work-now { margin-inline-start: auto; font-size: 18px; }
+.qz-review { margin-block: 12px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: color-mix(in srgb, var(--sky-accent) 6%, var(--surface)); }
+.qz-review h4 { margin: 0 0 6px; }
+.qz-review-list li { display: block; padding: 8px 0; }
+.qz-review-list li p { margin: 4px 0; }
+.qz-review-list li.v-correct .tag { border-color: var(--ok, #15803d); }
+.qz-review-list li.v-wrong .tag { border-color: var(--danger); }
+.qz-review .spin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 1s linear infinite; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.work-ai { margin: 4px 0 8px; }

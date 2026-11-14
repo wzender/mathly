@@ -20,7 +20,7 @@ def run(store, backend, now: datetime | None = None) -> dict:
     for pic in store.pictures():
         refs = store.picture_refs(pic["id"])
         referenced = any(refs.values())
-        if pic["kind"] == "answer" and retention.is_expired(clock.school_day(pic["created_at"]), today):
+        if pic["kind"] in ("answer", "work") and retention.is_expired(clock.school_day(pic["created_at"]), today):
             reason = "expired"
         elif not referenced and now - pic["created_at"] > retention.ORPHAN_AGE:
             reason = "orphans"

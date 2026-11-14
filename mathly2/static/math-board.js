@@ -859,12 +859,19 @@ if(window.MathlyBoardMath) window.MathlyBoardMath.onFonts=()=>el&&paint();
 
 /* ---------- handing in ---------- */
 // the whole sketch as a picture on white paper: as wide as the board (wider when it was written further right), as tall as what is drawn
-function snapshot(){
-  const all=marks(); if(!all.some(m=>m.kind!=="card")) return null;
-  const [,y0,x1,y1]=edges(all), top=Math.max(0,y0-24), W=Math.min(Math.max(canvas.clientWidth,x1+24),8000), H=Math.min(y1+24-top,8000), k=2;
-  const out=document.createElement("canvas"); out.width=W*k; out.height=Math.round(H*k);
+function snapshot(){ return pictureOf(key); }
+/* the work on the board (הדרך): has this question's sketch anything but the question's copy; its picture, even while the board is closed;
+   and a signature that changes when the sketch does (so a picture is sent again only after a change) */
+const hasWork=k=>(sketches.get(k)?.marks||[]).some(m=>m.kind!=="card");
+const workSig=k=>JSON.stringify(sketches.get(k)?.marks||[]);
+function pictureOf(k){
+  const all=sketches.get(k)?.marks||[]; if(!all.some(m=>m.kind!=="card")) return null;
+  if(!el) build();
+  const wide=canvas.clientWidth||720;
+  const [,y0,x1,y1]=edges(all), top=Math.max(0,y0-24), W=Math.min(Math.max(wide,x1+24),8000), H=Math.min(y1+24-top,8000), k2=2;
+  const out=document.createElement("canvas"); out.width=W*k2; out.height=Math.round(H*k2);
   const keep=ctx; ctx=out.getContext("2d"); paper="#fff";
-  try{ ctx.fillStyle="#fff"; ctx.fillRect(0,0,out.width,out.height); ctx.setTransform(k,0,0,k,0,-top*k); all.forEach(draw); }
+  try{ ctx.fillStyle="#fff"; ctx.fillRect(0,0,out.width,out.height); ctx.setTransform(k2,0,0,k2,0,-top*k2); all.forEach(draw); }
   finally{ ctx=keep; paper=PAPER; }
   return new Promise(ok=>out.toBlob(ok,"image/png"));
 }
@@ -939,5 +946,5 @@ function closeFull(){
 // the header's switch: beside the exercise on a desktop screen, full screen on a phone
 const button=()=>`<button class="mx-board-btn" data-board-toggle aria-pressed="${isOn()&&desk()}" title="לוח טיוטה">${ic("pen")}<span>לוח</span></button>`;
 
-window.MathlyBoard={button,mount,toggle,show,openFull,closeFull,isOn,desk};
+window.MathlyBoard={button,mount,toggle,show,openFull,closeFull,isOn,desk,hasWork,workSig,pictureOf};
 })();

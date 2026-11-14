@@ -6,6 +6,7 @@ import { loadBoard } from "./exercise.js";
 import { figures } from "./figures.js";
 import { esc, fmt } from "./math.js";
 import { pathHref, shuffled } from "./ui.js";
+import { hasWork, sendWork } from "./boardwork.js";
 
 const LIVE_AT = new Set([300, 60, 10, 0]);        // seconds left at which the timer is announced to a screen reader
 
@@ -103,7 +104,7 @@ async function tick() {
 async function finish(submit) {
   const id = attempt.id;
   try {
-    if (submit) await saving;
+    if (submit) { await saving; await sendAllWork(); }                                         // the boards go with the hand-in
     const data = submit ? await api(`/api/attempts/${id}/submit`, { method: "POST" }) : await api(`/api/attempts/${id}`);
     if (data.state === "open") { setTimeout(() => layer && finish(false), 1000); return; }      // a hair early on the device: ask again
     show(data);
@@ -144,8 +145,27 @@ function renderQuestion() {
 
 let saving = Promise.resolve();   // the answer saves still on their way to the server
 
+const boardKey = key => `quiz:${attempt.id}:${key}`;
+
+/** In a quiz or a test the way counts: a choice needs something written on the board for this question (or a board already saved). */
+function needsWork(question) {
+  if (!attempt.work_required || hasWork(boardKey(question.key)) || (attempt.work || []).includes(question.key)) return false;
+  q("#qz-fb").innerHTML = `<div class="ex-note qz-need-work" id="qz-need-work" role="alert"><p><b>✏️ קודם כותבים את הדרך בלוח</b></p>
+    <p>המורה בודק גם את הדרך, לא רק את התשובה. פתרו בלוח ואז בחרו תשובה.</p>
+    <p><button type="button" class="primary" id="qz-open-board">פתיחת הלוח</button></p></div>`;
+  return true;
+}
+
+/** Send the board of every answered question that changed since it was last sent (before handing in). */
+function sendAllWork() {
+  const id = attempt.id;
+  return Promise.allSettled(attempt.questions.filter(x => attempt.answers[x.key] !== undefined)
+    .map(x => sendWork(`quiz:${id}:${x.key}`, id, x.key).then(ok => { if (ok && attempt?.id === id) (attempt.work ||= []).push(x.key); })));
+}
+
 async function choose(button) {
   const question = attempt.questions[at], index = Number(button.dataset.i), before = attempt.answers[question.key];
+  if (needsWork(question)) return;
   attempt.answers[question.key] = index;
   layer.querySelectorAll(".qz-choice").forEach(b => { const on = Number(b.dataset.i) === index; b.classList.toggle("picked", on); b.setAttribute("aria-pressed", String(on)); });
   q(`.qz-dot[data-go="${at}"]`)?.classList.add("done");
@@ -153,6 +173,7 @@ async function choose(button) {
   saving = save.catch(() => {});      // one save at a time, and a submit waits for the last one (else it is graded without it)
   try {
     await save;
+    sendWork(boardKey(question.key), id, question.key).then(ok => { if (ok && attempt?.id === id) (attempt.work ||= []).push(question.key); }).catch(() => {});
   } catch (error) {
     if (error instanceof ApiError && error.status === 409) return finish(false);                // time ran out: the server already submitted
     if (before === undefined) delete attempt.answers[question.key]; else attempt.answers[question.key] = before;
@@ -173,6 +194,39 @@ function submit() {
   finish(true);
 }
 
+const VERDICT = { correct: ["✓", "דרך נכונה"], partial: ["◐", "חלק מהדרך נכון"], wrong: ["✗", "הדרך לא נכונה"], unclear: ["?", "לא הצלחנו לקרוא"] };
+
+/** The AI's review of the way (a practice test, the simulation): waiting, failed, or per question with a board its verdict, feedback and tip. */
+function reviewHtml(r) {
+  const review = r.review;
+  if (!review) return "";
+  if (review.state === "pending") return `<section class="qz-review" id="qz-review" data-state="pending"><h4>משוב על הדרך</h4>
+    <p class="muted"><span class="spin" aria-hidden="true"></span> בודקים את הדרך שכתבתם בלוח… זה לוקח כדקה.</p></section>`;
+  if (review.state === "failed") return `<section class="qz-review" id="qz-review" data-state="failed"><h4>משוב על הדרך</h4><p class="muted">לא הצלחנו לבדוק את הדרך הפעם. המורה יראו את הלוחות.</p></section>`;
+  const rows = (r.keys || []).map((key, i) => [i + 1, review.questions[key]]).filter(([, q]) => q);
+  return `<section class="qz-review" id="qz-review" data-state="done"><h4>משוב על הדרך</h4>
+    ${review.summary ? `<p class="qz-review-sum">${fmt(review.summary)}</p>` : ""}
+    ${rows.length ? `<ol class="plain qz-review-list">${rows.map(([n, q]) => `<li class="v-${esc(q.verdict)}" data-n="${n}"><p><b>שאלה ${n}</b>
+      <span class="tag"><span aria-hidden="true">${VERDICT[q.verdict][0]}</span> ${VERDICT[q.verdict][1]}</span></p>
+      <p>${fmt(q.feedback)}</p>${q.tip ? `<p class="muted">💡 ${fmt(q.tip)}</p>` : ""}</li>`).join("")}</ol>`
+      : `<p class="muted">לא נשמרה דרך בלוח באף שאלה.</p>`}
+    <p class="muted qz-review-note">משוב אוטומטי. המורה בודקים את הדרך ונותנים את הנקודות.</p></section>`;
+}
+
+/** While the review is being written, ask again every few seconds and redraw only its section. */
+function waitForReview(id) {
+  setTimeout(async () => {
+    if (!layer || attempt?.id !== id || attempt.review?.state !== "pending") return;
+    try {
+      const fresh = await api(`/api/attempts/${encodeURIComponent(id)}`);
+      if (!layer || attempt?.id !== id) return;
+      attempt.review = fresh.review;
+      q("#qz-review")?.replaceWith(Object.assign(document.createElement("div"), { innerHTML: reviewHtml(fresh) }).firstElementChild || "");
+    } catch { /* try again */ }
+    waitForReview(id);
+  }, 4000);
+}
+
 function renderResult() {
   const r = attempt;
   stopTimer();
@@ -186,7 +240,9 @@ function renderResult() {
     ${r.missed.length ? `<h4>הטעויות</h4><ol class="qz-missed" id="qz-missed">${r.missed.map(m => `<li><p class="ex-text" dir="auto">${fmt(m.question)}</p>
       ${m.picked ? `<p class="muted">בחרתם: <span dir="auto">${fmt(m.picked)}</span></p>` : `<p class="muted">לא ענו על השאלה.</p>`}
       ${m.mistake ? `<p><b>${esc(m.mistake.name)}</b>${m.mistake.tip ? `<br>${fmt(m.mistake.tip)}` : ""}</p>` : ""}</li>`).join("")}</ol>` : ""}
+    ${reviewHtml(r)}
     <p class="qz-actions">${names(r).again ? `<button type="button" class="primary" id="qz-retake">${names(r).again}</button> ` : ""}<button type="button" data-close>${r.kind === "quiz" ? "חזרה למסלול" : "חזרה למבחן"}</button></p>`;
+  if (r.review?.state === "pending") waitForReview(r.id);
   const best = r.kind === "quiz" ? api(`/api/lessons/${encodeURIComponent(r.lesson.id)}/quiz`).then(f => f.best === null ? "" : `הציון של השיעור: ${f.best}`)
     : r.kind === "exercise_test" ? api(`/api/tests/${encodeURIComponent(r.test.id)}`).then(t => `הציון הטוב במבחן התרגול: ${t.exercise_tests[r.test.number - 1].best ?? ""}`) : Promise.resolve("");
   best.then(text => { if (text && q("#qz-best")) q("#qz-best").textContent = text; }).catch(() => {});
@@ -202,6 +258,7 @@ function onClick(event) {
     const choice = target.closest(".qz-choice");
     if (choice) { choose(choice); return; }
     if (target.closest("#qz-submit")) { submit(); return; }
+    if (target.closest("#qz-open-board")) { window.MathlyBoard?.show?.(0); return; }
     if (target.closest("#qz-yes")) { finish(true); return; }
     if (target.closest("#qz-back")) { q("#qz-warn").innerHTML = ""; warned = false; return; }
   } else if (target.closest("#qz-retake")) {

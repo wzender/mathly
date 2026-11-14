@@ -56,10 +56,15 @@ def view(request: Request, row: dict) -> dict:
         base["test"] = _test_info(request, row)
     if attempts.is_open(row):
         questions = [q for q in (bank.practice_question(r["skill_id"], r["key"]) for r in row["questions"]) if q]
-        return {**base, "state": "open", "due_at": _iso(row["due_at"]) if attempts.is_timed(row) else None, "now": _iso(clock.now()), "answers": row["answers"], "questions": questions}
+        from .boardwork import WORK_REQUIRED
+        return {**base, "state": "open", "due_at": _iso(row["due_at"]) if attempts.is_timed(row) else None, "now": _iso(clock.now()), "answers": row["answers"], "questions": questions,
+                "work_required": row["kind"] in WORK_REQUIRED, "work": sorted(request.app.state.store.work_of(row["user_id"], row["id"]))}   # questions whose board is saved
+    from . import boardreview
+    row = boardreview.ensure(request.app, row)                          # a practice test or the simulation: the AI reviews the way
     result = attempts.result(bank, row)
     result.pop("lesson", None)
-    return {**base, "state": "submitted", **result, "submitted_at": _iso(row["submitted_at"])}
+    return {**base, "state": "submitted", **result, "submitted_at": _iso(row["submitted_at"]), "review": boardreview.student_view(row),
+            "keys": [q["key"] for q in row["questions"]]}
 
 
 _view = view

@@ -59,6 +59,9 @@ def can_read_picture(request: Request, user: dict, picture: dict) -> bool:
     if picture["owner_id"] == user["id"] or allowed(user["roles"], "*"):
         return True
     store, here = request.app.state.store, reads.of(request)
+    if picture["kind"] == "work":                                       # the board of an answer: the teachers of the student's classes
+        from .boardwork import teaches_student
+        return teaches_student(request, user, picture["owner_id"])
     classes = _class_ids_of(request, picture)
     if not classes:
         return False
