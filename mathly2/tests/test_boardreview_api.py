@@ -140,6 +140,7 @@ def test_gemini_reviewer_sends_one_request_with_the_picture_and_retries_when_tol
 def test_gemini_errors_have_reasons(code, reason):
     reviewer = boardreview.GeminiReviewer("key", sleep=lambda s: None)
     reviewer._call = lambda body: (_ for _ in ()).throw(http_error(code))
+    reviewer._models = lambda: []                                                  # no other model to fall back to
     with pytest.raises(boardreview.ReviewFailure) as caught:
         reviewer.review(items())
     assert caught.value.reason == reason
@@ -173,7 +174,7 @@ def test_the_teacher_sees_the_ai_state_and_can_run_it_again_or_on_a_quiz():
     client, store, bank, test, _ = make(fake)
     attempt, _ = hand_in(client, bank, test)
     view = client.get(f"/api/teaching/work/{attempt['id']}", headers=auth(TEACHER)).json()
-    assert view["ai"] == {"available": True, "state": "failed", "reason": "rate_limited", "summary": None}
+    assert view["ai"] == {"available": True, "state": "failed", "reason": "rate_limited", "summary": None, "model": None}
     assert client.get(f"/api/teaching/work/{attempt['id']}", headers=auth(TEACHER)).json()["ai"]["state"] == "failed"   # opening does not retry
     fake.fail = None
     again = client.post(f"/api/teaching/work/{attempt['id']}/review", headers=auth(TEACHER)).json()
@@ -200,3 +201,25 @@ def test_no_key_says_so_and_a_missing_column_does_not_break_the_result():
     got = client.get(f"/api/attempts/{attempt['id']}", headers=auth(KID))
     assert got.status_code == 200 and got.json()["review"] == {"state": "failed"}
     assert client.get(f"/api/teaching/work/{attempt['id']}", headers=auth(TEACHER)).json()["ai"]["reason"] == "database"
+
+
+def test_a_model_not_found_falls_back_to_a_flash_model_the_key_has():
+    reviewer = boardreview.GeminiReviewer("key", " models/gemini-9-flash ")
+    assert reviewer.model == "gemini-9-flash"                                      # a pasted name is cleaned
+    reviewer._models = lambda: ["gemini-2.0-flash-lite", "gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-image",
+                                "gemini-3.8-flash", "text-embedding-004"]
+    used = []
+
+    def call(body):
+        used.append(reviewer.model)
+        if reviewer.model == "gemini-9-flash":
+            raise http_error(404)
+        return answer({"summary": "s", "questions": []})
+    reviewer._call = call
+    assert reviewer.review(items())["summary"] == "s"
+    assert used == ["gemini-9-flash", "gemini-3.8-flash"] and reviewer.model == "gemini-3.8-flash"
+
+
+def test_pick_model_prefers_stable_full_and_new():
+    assert boardreview.pick_model(["gemini-3-flash-preview", "gemini-2.5-flash-lite", "gemini-2.5-flash"]) == "gemini-2.5-flash"
+    assert boardreview.pick_model(["gemini-2.5-pro", "gemini-2.5-flash-preview-tts"]) is None

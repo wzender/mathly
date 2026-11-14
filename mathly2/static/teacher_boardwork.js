@@ -12,7 +12,7 @@ let ctx, poll = null;
 const REASONS = {
   api_key_invalid: "המפתח של Gemini לא תקין. בדקו את GEMINI_API_KEY בשרת.",
   permission: "למפתח של Gemini אין הרשאה למודל הזה.",
-  model_not_found: "המודל לא נמצא. בדקו את GEMINI_MODEL בשרת.",
+  model_not_found: "המודל לא נמצא, ולא נמצא מודל Flash אחר למפתח הזה. בדקו את GEMINI_MODEL בשרת (או מחקו אותו).",
   rate_limited: "נגמרה המכסה החינמית של Gemini לעכשיו. נסו שוב מאוחר יותר.",
   no_connection: "השרת לא הצליח להתחבר ל־Gemini.",
   database: "לא ניתן לשמור את הבדיקה: חסרה במסד הנתונים העמודה review (המיגרציה 20261121090000_m2_board_review.sql).",
@@ -25,7 +25,7 @@ function aiPanel(data) {
   if (!ai.available) return `<div class="card work-ai-panel" id="work-ai"><p class="muted">🤖 בדיקה עם AI לא מוגדרת בשרת: חסר GEMINI_API_KEY.</p></div>`;
   const button = label => `<button type="button" id="work-ai-run">${label}</button>`;
   const body = ai.state === "pending" ? `<p role="status">🤖 ה־AI בודק את הדרך… (עד דקה בערך)</p>`
-    : ai.state === "failed" ? `<p class="error" role="alert">🤖 הבדיקה עם AI נכשלה. ${esc(REASONS[ai.reason] || "")}</p>${button("לנסות שוב")}`
+    : ai.state === "failed" ? `<p class="error" role="alert">🤖 הבדיקה עם AI נכשלה. ${esc(REASONS[ai.reason] || "")}${ai.model ? ` <span dir="ltr">(${esc(ai.model)})</span>` : ""}</p>${button("לנסות שוב")}`
     : ai.state === "done" ? `<p>🤖 <b>סיכום ה־AI:</b> ${ai.summary ? fmt(ai.summary) : "לא היו לוחות לבדוק."}</p><p class="muted">הצעה בלבד: הנקודות שלכם קובעות.</p>${button("לבדוק שוב עם AI")}`
     : `<p class="muted">🤖 עוד לא נבדק עם AI.</p>${button("בדיקה עם AI")}`;
   return `<div class="card work-ai-panel" id="work-ai" data-state="${esc(ai.state || "none")}">${body}</div>`;

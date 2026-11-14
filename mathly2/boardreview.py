@@ -26,6 +26,7 @@ log = logging.getLogger("mathly2.boardreview")
 REVIEWED = ("exercise_test", "simulation")
 DEFAULT_MODEL = "gemini-2.5-flash"                 # a model with a free tier; GEMINI_MODEL overrides it
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+MODELS = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000"   # the models this key can use, when the named one is gone
 STALE = timedelta(minutes=10)                     # a pending review older than this was lost (a restart) and is started again
 RETRIES = 3                                       # tries after "too many requests", waiting as the API asks (or 20, 40 s)
 SIDE = 1280                                       # a board is shrunk to this longest side before it is sent
@@ -76,7 +77,7 @@ class GeminiReviewer:
     """Gemini over its REST API (no SDK). `review(items)` -> {"summary", "questions": [{n, verdict, feedback, tip}]}."""
 
     def __init__(self, key: str, model: str = "", sleep=time.sleep) -> None:
-        self.key, self.model, self.sleep = key, model or DEFAULT_MODEL, sleep
+        self.key, self.model, self.sleep = key, clean_model(model) or DEFAULT_MODEL, sleep
         self._lock = threading.Lock()                   # one request at a time: the free tier counts requests a minute
 
     def _parts(self, items: list[dict]) -> list[dict]:
@@ -95,6 +96,21 @@ class GeminiReviewer:
         with urllib.request.urlopen(request, timeout=180) as response:
             return json.loads(response.read())
 
+    def _models(self) -> list[str]:
+        """The names of the models this key can generate with (no "models/" prefix)."""
+        request = urllib.request.Request(MODELS, headers={"x-goog-api-key": self.key})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            listed = json.loads(response.read()).get("models", [])
+        return [clean_model(m.get("name", "")) for m in listed if "generateContent" in m.get("supportedGenerationMethods", [])]
+
+    def _another_model(self) -> str | None:
+        """When the model is not found (a wrong name, or retired): a Flash model this key has, the newest stable one first."""
+        try:
+            names = self._models()
+        except (urllib.error.URLError, TimeoutError, ValueError):
+            return None
+        return pick_model(names, self.model)
+
     def review(self, items: list[dict]) -> dict:
         body = json.dumps({"contents": [{"role": "user", "parts": self._parts(items)}],
                            "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json", "responseSchema": SCHEMA}}).encode()
@@ -108,8 +124,14 @@ class GeminiReviewer:
                     if exc.code == 429 and attempt < RETRIES:
                         self.sleep(_retry_after(detail, 20 * (attempt + 1)))
                         continue
+                    if exc.code == 404 and not getattr(self, "_switched", False):
+                        other = self._another_model()
+                        if other:
+                            log.warning("Gemini model %s not found; using %s", self.model, other)
+                            self.model, self._switched = other, True      # kept for the next reviews too
+                            continue
                     raise ReviewFailure({400: "bad_request", 401: "api_key_invalid", 403: "permission", 404: "model_not_found",
-                                         429: "rate_limited"}.get(exc.code, "provider_error"), f"HTTP {exc.code}: {detail}") from None
+                                         429: "rate_limited"}.get(exc.code, "provider_error"), f"HTTP {exc.code} ({self.model}): {detail}") from None
                 except (urllib.error.URLError, TimeoutError) as exc:
                     raise ReviewFailure("no_connection", str(exc)[:300]) from None
         try:
@@ -123,6 +145,24 @@ class GeminiReviewer:
         except (KeyError, IndexError, ValueError, TypeError) as exc:
             raise ReviewFailure("bad_output", f"{type(exc).__name__}: {str(data)[:300]}") from None
         return out
+
+
+def clean_model(name: str) -> str:
+    """A model name as people paste it: spaces, quotes, a "models/" prefix."""
+    name = (name or "").strip().strip("'\"").strip()
+    return name[len("models/"):] if name.startswith("models/") else name
+
+
+def pick_model(names: list[str], not_this: str = "") -> str | None:
+    """A Flash model to fall back to: stable before preview, full before lite, the newest version first; never an image/audio/TTS one."""
+    import re
+    def version(n):
+        m = re.search(r"gemini-(\d+(?:\.\d+)?)", n)
+        return float(m.group(1)) if m else 0.0
+    special = ("image", "tts", "audio", "live", "embedding", "thinking", "exp", "learnlm", "robotics")
+    flash = [n for n in names if n.startswith("gemini-") and "flash" in n and n != not_this and not any(w in n for w in special)]
+    flash.sort(key=lambda n: ("preview" in n, "lite" in n, -version(n), len(n)))
+    return flash[0] if flash else None
 
 
 def _retry_after(detail: str, default: float) -> float:
@@ -184,7 +224,8 @@ def run(app, attempt_id: str) -> None:
         result["at"] = clock.now().isoformat()
     except ReviewFailure as exc:
         log.warning("board review failed: %s %s", exc.reason, exc.detail)
-        result = {"state": "failed", "reason": exc.reason, "at": clock.now().isoformat()}
+        result = {"state": "failed", "reason": exc.reason, "at": clock.now().isoformat(),
+                  "model": getattr(app.state.reviewer, "model", None)}
     except Exception:
         log.exception("board review failed")
         result = {"state": "failed", "reason": "provider_error", "at": clock.now().isoformat()}

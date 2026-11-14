@@ -150,7 +150,7 @@ def _ai_state(request: Request, row: dict) -> dict:
     """The AI review as the teacher sees it: can it run here (a key is set), its state, and why it failed."""
     review = row.get("review") or {}
     return {"available": getattr(request.app.state, "reviewer", None) is not None, "state": review.get("state"),
-            "reason": review.get("reason"), "summary": review.get("summary")}
+            "reason": review.get("reason"), "summary": review.get("summary"), "model": review.get("model")}
 
 
 @router.get("/teaching/work/{attempt_id}")
