@@ -6,9 +6,9 @@ from collections import Counter
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from . import attempts, clock, quiz, reads
+from . import attempts, clock, quiz, reads, writtentest
 from .access import learner
 from .skills import visible_lesson_ids
 
@@ -17,7 +17,8 @@ router = APIRouter(prefix="/api")
 
 class AnswerBody(BaseModel):
     key: str
-    choice: int
+    choice: int | None = None                     # a choices test
+    final: str | None = Field(None, max_length=40)   # the written simulation: the typed final answer ("" when only the board is written)
 
 
 def _lesson(request: Request, user: dict, lesson_id: str) -> dict:
@@ -58,16 +59,22 @@ def view(request: Request, row: dict) -> dict:
     else:
         base["test"] = _test_info(request, row)
     if attempts.is_open(row):
-        questions = [q for q in (bank.practice_question(r["skill_id"], r["key"]) for r in row["questions"]) if q]
+        written = writtentest.is_written(row)
+        serve = (lambda r: writtentest.served_question(bank, r)) if written else (lambda r: bank.practice_question(r["skill_id"], r["key"]))
+        questions = [q for q in (serve(r) for r in row["questions"]) if q]
         from .boardwork import WORK_REQUIRED
-        return {**base, "state": "open", "due_at": _iso(row["due_at"]) if attempts.is_timed(row) else None, "now": _iso(clock.now()), "answers": row["answers"], "questions": questions,
+        return {**base, "state": "open", "written": written, "due_at": _iso(row["due_at"]) if attempts.is_timed(row) else None, "now": _iso(clock.now()), "answers": row["answers"], "questions": questions,
                 "work_required": row["kind"] in WORK_REQUIRED, "work": sorted(request.app.state.store.work_of(row["user_id"], row["id"]))}   # questions whose board is saved
     from . import boardreview
     row = boardreview.ensure(request.app, row)                          # a practice test or the simulation: the AI reviews the way
-    result = attempts.result(bank, row)
+    if writtentest.is_written(row):
+        row = writtentest.settle_grade(request.app.state.store, bank, row)         # a check that ended while nobody was looking
+        result = writtentest.result(bank, row, request.app.state.store.work_of(row["user_id"], row["id"]))
+    else:
+        result = attempts.result(bank, row)
     result.pop("lesson", None)
     from .realtests import readiness_change
-    return {**base, "state": "submitted", **result, "submitted_at": _iso(row["submitted_at"]), "review": boardreview.student_view(row),
+    return {**base, "state": "submitted", "written": writtentest.is_written(row), **result, "submitted_at": _iso(row["submitted_at"]), "review": boardreview.student_view(row),
             "keys": [q["key"] for q in row["questions"]], "readiness": readiness_change(request, row)}
 
 
@@ -121,9 +128,15 @@ def attempt_answer(attempt_id: str, body: AnswerBody, request: Request, user: di
     if not attempts.is_open(row):
         raise HTTPException(409, "הזמן נגמר והבוחן הוגש")
     ref = next((q for q in row["questions"] if q["key"] == body.key), None)
-    if ref is None or bank.grade(ref["skill_id"], body.key, body.choice) is None:
-        raise HTTPException(422, "תשובה לא חוקית")
-    saved = store.save_open_answers(row["id"], {**row["answers"], body.key: body.choice})
+    if writtentest.is_written(row):                     # the typed final answer, or "" for an answer written only on the board
+        if ref is None or body.final is None:
+            raise HTTPException(422, "תשובה לא חוקית")
+        value = body.final.strip()
+    else:
+        if ref is None or body.choice is None or bank.grade(ref["skill_id"], body.key, body.choice) is None:
+            raise HTTPException(422, "תשובה לא חוקית")
+        value = body.choice
+    saved = store.save_open_answers(row["id"], {**row["answers"], body.key: value})
     if saved is None:                                    # submitted between the read and the save: the answer came too late
         raise HTTPException(409, "הזמן נגמר והבוחן הוגש")
     return {"saved": len(saved["answers"]), "of": len(saved["questions"])}
@@ -170,8 +183,9 @@ def grades(request: Request, user: dict = Depends(learner), subject: str = Query
         test = store.get_test(int(test_id)) if test_id.isdigit() else None
         if test is None or test.get("subject_id", "math") != subject:
             continue
-        item = {"test": _test_ref(request, test), "best": max(r["grade"] for r in rows), "attempts": len(rows),
-                "last": _iso(max(r["submitted_at"] for r in rows))}
+        graded = [r["grade"] for r in rows if r["grade"] is not None]      # a written simulation waiting for its check has no grade yet
+        item = {"test": _test_ref(request, test), "best": max(graded) if graded else None, "attempts": len(rows),
+                "checking": len(rows) - len(graded), "last": _iso(max(r["submitted_at"] for r in rows))}
         if kind == "exercise_test":
             from .exam import NUMBER_OF, TITLES
             exercise.append({**item, "number": NUMBER_OF[number], "mode": number, "title": TITLES[number]})

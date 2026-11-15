@@ -49,7 +49,7 @@ export async function show(context) {
   document.querySelectorAll("[data-open]").forEach(b => b.addEventListener("click", () => open(b.dataset.open)));
 }
 
-const pointsOf = q => q.credit ?? q.auto;
+const pointsOf = q => q.credit ?? q.auto ?? "—";        // a written question waiting for the AI has no automatic points yet
 const VERDICT = { correct: "✓ נכונה", partial: "◐ חלקית", wrong: "✗ שגויה", unclear: "? לא ברורה" };
 let aiNow = {};                                            // the attempt's AI state, for the per-question buttons
 
@@ -61,17 +61,21 @@ function aiSlot(q) {
   return `<div class="work-ai-slot">${line}${button}</div>`;
 }
 
+/** A written simulation's question: the right answer, and the final answer the student typed (with whether it matches). */
+const writtenAnswer = q => `<p class="work-written"><span class="muted">התשובה הנכונה:</span> <b dir="auto">${fmt(q.right || "")}</b></p>
+    <p class="work-written"><span class="muted">התשובה הסופית שהוקלדה:</span> ${q.typed ? `<b dir="ltr">${esc(q.typed)}</b>${q.matches === true ? " ✓" : q.matches === false ? " ✗" : ""}` : `<span class="muted">לא הוקלדה</span>`}</p>`;
+
 function questionCard(q, i) {
   const picked = q.choices.find(c => c.index === q.picked);
   return `<article class="card work-q" data-key="${esc(q.key)}">
     <p class="muted">${i + 1}. ${fmt(q.skill_name)}</p>
     <p class="ex-text" dir="auto">${fmt(q.question)}</p>${figures(q)}
-    <ul class="plain work-choices">${q.choices.map(c => `<li class="${c.correct ? "right" : ""}${c.index === q.picked ? " picked" : ""}"><span dir="auto">${fmt(c.text)}</span>
+    ${q.written ? writtenAnswer(q) : `<ul class="plain work-choices">${q.choices.map(c => `<li class="${c.correct ? "right" : ""}${c.index === q.picked ? " picked" : ""}"><span dir="auto">${fmt(c.text)}</span>
       <span>${c.correct ? "✓ נכונה" : ""}${c.index === q.picked ? " ← בחר/ה" : ""}</span></li>`).join("")}</ul>
-    ${picked ? "" : `<p class="muted">לא ענה/תה על השאלה.</p>`}
+    ${picked ? "" : `<p class="muted">לא ענה/תה על השאלה.</p>`}`}
     <h4>הדרך</h4>${aiSlot(q)}${q.work ? `<img class="work-pic" data-picture="${esc(q.work)}" alt="הלוח של התלמיד בשאלה ${i + 1}" hidden>` : `<p class="muted no-work">אין לוח לשאלה הזו.</p>`}
     <div class="work-points" role="group" aria-label="נקודות לשאלה ${i + 1}"><span class="muted">נקודות:</span>${POINTS.map(([v, label]) =>
-      `<button type="button" data-points="${v === null ? "auto" : v}" aria-pressed="${(q.credit ?? null) === v}">${label}${v === null ? ` (${q.auto})` : ""}</button>`).join("")}
+      `<button type="button" data-points="${v === null ? "auto" : v}" aria-pressed="${(q.credit ?? null) === v}">${label}${v === null ? ` (${q.auto ?? "—"})` : ""}</button>`).join("")}
       <b class="work-now">${pointsOf(q)}</b></div></article>`;
 }
 
@@ -124,7 +128,7 @@ async function open(id, note = "", given = null, keep = null) {
     const q = data.questions.find(x => x.key === card.dataset.key), v = b.dataset.points === "auto" ? null : Number(b.dataset.points);
     chosen[q.key] = v;
     card.querySelectorAll("[data-points]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
-    card.querySelector(".work-now").textContent = v ?? q.auto;
+    card.querySelector(".work-now").textContent = v ?? q.auto ?? "—";
   }));
   document.getElementById("work-save").addEventListener("click", async event => {
     event.target.disabled = true;

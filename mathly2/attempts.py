@@ -17,6 +17,7 @@ MINUTES_PER_QUESTION = 3
 QUIZ_MINUTES = MINUTES_PER_QUESTION * QUIZ_SIZE   # 45
 PASS_RIGHT = 13                    # right answers out of QUIZ_SIZE that pass a lesson quiz
 TIMED_KINDS = frozenset({"simulation"})   # the only attempts with a time limit
+WRITTEN_KINDS = frozenset({"simulation"})  # no choices: the way on the board, checked by the AI or the teacher (writtentest.py)
 
 
 def percent(right: int, total: int) -> int:
@@ -78,9 +79,16 @@ def settle(store, bank, row: dict, now: datetime) -> dict:
     """Grade an overdue open attempt from the answers saved so far. Anything else is returned as it is."""
     if not is_overdue(row, now):
         return row
+    return _hand_in(store, bank, row, row["due_at"], timed_out=True)
+
+
+def _hand_in(store, bank, row: dict, at: datetime, timed_out: bool) -> dict:
+    """Store the hand-in. A choices test is graded now; a written one (the simulation) has no grade until its boards are checked."""
+    if row["kind"] in WRITTEN_KINDS:
+        return store.save_attempt(row["id"], submitted_at=at, timed_out=timed_out, grade=None, answers=row["answers"])
     value, _ = grade(bank, row["questions"], row["answers"])
-    saved = store.save_attempt(row["id"], submitted_at=row["due_at"], timed_out=True, grade=value, answers=row["answers"])
-    add_wrong_to_review(store, bank, saved, row["due_at"])
+    saved = store.save_attempt(row["id"], submitted_at=at, timed_out=timed_out, grade=value, answers=row["answers"])   # the answers it was graded on
+    add_wrong_to_review(store, bank, saved, at)
     return saved
 
 
@@ -91,10 +99,7 @@ def submit(store, bank, row: dict, now: datetime) -> dict:
         return row
     if is_overdue(row, now):
         return settle(store, bank, row, now)
-    value, _ = grade(bank, row["questions"], row["answers"])
-    saved = store.save_attempt(row["id"], submitted_at=now, timed_out=False, grade=value, answers=row["answers"])   # the answers it was graded on
-    add_wrong_to_review(store, bank, saved, now)
-    return saved
+    return _hand_in(store, bank, row, now, timed_out=False)
 
 
 def result(bank, row: dict) -> dict:

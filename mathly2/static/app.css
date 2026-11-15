@@ -768,3 +768,10 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .quest-stats .hchips { padding: 0; border: 0; background: none; }
 .mode > span { flex: 1; min-width: 0; }
 .mode input { flex: none; width: 20px; height: 20px; }
+
+/* The written simulation (writtentest.py): the answer area, the final answer's box, and the result while it is checked. */
+.qz-written { margin-top: 10px; display: grid; gap: 6px; }
+.qz-final { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.qz-final-row { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.qz-final input { width: 9em; font-size: 18px; padding: 8px 10px; min-height: 44px; text-align: center; }
+.qz-checking .qz-grade b { font-size: 40px; }

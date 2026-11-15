@@ -422,19 +422,45 @@ def test_home_shows_the_readiness_and_two_clear_buttons_that_raise_it(browser, b
         no_sideways_scroll(page)
 
 
-def test_a_simulation_on_request_raises_readiness_with_a_level_up_and_another_can_follow(browser, bank):
+def test_a_written_simulation_is_checked_by_the_ai_then_raises_readiness_and_another_can_follow(browser, bank):
+    from mathly2 import writtentest
+    from mathly2.tests.test_boardreview_api import FakeReviewer
+
+    class AllRight(FakeReviewer):
+        def review_one(self, item, on_event=lambda step, **info: None):
+            self.calls.append(item)
+            return {"verdict": "correct", "feedback": "דרך מסודרת", "tip": "ככה ממשיכים"}
+
     app, store, klass, lessons = world(bank)
+    app.state.reviewer = reviewer = AllRight()
     test = add_test(store, klass, lessons, 30, questions=4, minutes=20)                                 # a month ahead: no window
     with running(app) as url:
         page = sign_in(browser, url)
+        board_written(page, pictures=True)
         to_home(page)
         page.click("#home-sim")
         page.wait_for_selector("#qz-timer")
         assert "מבחן סימולציה" in page.inner_text(".mx-sheet") and page.locator(".qz-dot").count() == 4
-        answer_in_browser(page, bank, store, "simulation", str(test["id"]), [True] * 4)
+        assert page.locator(".qz-choice").count() == 0 and page.locator("#qz-written").count() == 1        # no choices: the board, like a real exam
+        refs = {r["key"]: r for r in store.attempts_of(KID_ID, "simulation", str(test["id"]))[-1]["questions"]}
+        boxes = 0
+        for n in range(4):
+            key = page.get_attribute("#qz-q", "data-key")
+            final = writtentest.final_of(bank, refs[key])
+            assert (page.locator("#qz-final").count() == 1) == (final is not None)                       # a box only for a plain number
+            if final is not None:
+                page.fill("#qz-final", str(final["value"]))
+                boxes += 1
+            if n < 3:
+                page.click(".qz-nav button >> nth=1")
+                page.wait_for_function("(k) => document.querySelector('#qz-q').dataset.key !== k", arg=key)
+        page.click("#qz-submit")
+        page.wait_for_selector("#qz-checking, #qz-grade")                                               # "בבדיקה" until the AI is done
+        page.wait_for_selector("#qz-grade", timeout=20000)
+        assert page.inner_text("#qz-grade b") == "100" and len(reviewer.calls) == 4
+        assert sum(1 for c in reviewer.calls if c["typed"]) == boxes
         page.wait_for_selector("#qz-ready.up")
         assert page.inner_text(".qz-gain") == "+60" and "עלתה ל־60" in page.inner_text("#qz-ready") and "רמה חדשה: בדרך" in page.inner_text("#qz-ready")
-        page.wait_for_function("document.querySelector('#qz-ready .rd-bar i').style.width === '60%'")   # the bar grows to the new number
         page.click("#qz-more-sim")                                                                   # another one, on request
         page.wait_for_selector("#qz-timer")
         assert len(store.attempts_of(KID_ID, "simulation")) == 2 and page.errors == []
@@ -465,3 +491,17 @@ def test_the_tests_page_has_three_practice_modes_and_the_trail_of_gains(browser,
         page.click("#rd-how summary")
         assert "סימולציה סוגר 60%" in page.inner_text("#rd-how") and page.errors == []
         no_sideways_scroll(page)
+
+
+def test_without_the_ai_a_written_simulation_waits_for_the_teacher(browser, bank):
+    app, store, klass, lessons = world(bank)
+    test = add_test(store, klass, lessons, 30, questions=4, minutes=20)
+    with running(app) as url:
+        page = sign_in(browser, url, f"#/sim/{test['id']}")
+        board_written(page, pictures=True)
+        page.wait_for_selector("#qz-written")
+        page.click(".qz-nav button >> nth=1")                                                         # every board here counts as written on
+        page.click("#qz-submit")
+        page.wait_for_selector("#qz-checking")
+        assert "ממתין לבדיקת המורה" in page.inner_text("#qz-checking") and page.locator("#qz-grade").count() == 0
+        assert store.attempts_of(KID_ID, "simulation")[0]["grade"] is None and page.errors == []

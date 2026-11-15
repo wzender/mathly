@@ -9,7 +9,7 @@ from datetime import date as Day
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from . import attempts, clock, exam, readiness, reads
+from . import writtentest, attempts, clock, exam, readiness, reads
 from .access import allowed, learner, need
 from .learning import MASTERED, next_skill, skill_state
 
@@ -91,15 +91,22 @@ def facts_for(request: Request, user_id: str | None, test: dict, today: date) ->
 
     practice, simulations = mine("exercise_test"), mine("simulation")
     done = sorted((r for r in practice + simulations if not attempts.is_open(r)), key=lambda r: r["submitted_at"])
-    lost = {s["id"] for r in done for s in attempts.result(bank, r)["lost_skills"]}
+    graded = [r for r in done if r["grade"] is not None]                 # a written simulation waiting for its check does not count yet
+    lost = {s["id"] for r in graded for s in _result(request, r)["lost_skills"]}
     used: dict[str, int] = {}
     for r in practice + simulations:
         for q in r["questions"]:
             used[q["key"]] = used.get(q["key"], 0) + 1
     return {"covered": covered, "states": states, "mastered": sum(1 for i in covered if states.get(i) == MASTERED),
-            "practice": practice, "simulations": simulations, "done": done, "results": [(_kind_of(r), r["grade"]) for r in done],
+            "practice": practice, "simulations": simulations, "done": done, "graded": graded, "results": [(_kind_of(r), r["grade"]) for r in graded],
             "sim_taken": any(r["kind"] == "simulation" for r in done), "used": used,
             "focus_skills": [i for i in covered if (i in lost or states.get(i) == "learning") and bank.question_keys(i)]}
+
+
+def _result(request: Request, row: dict) -> dict:
+    if writtentest.is_written(row):
+        return writtentest.result(request.app.state.bank, row, request.app.state.store.work_of(row["user_id"], row["id"]))
+    return attempts.result(request.app.state.bank, row)
 
 
 def readiness_for(facts: dict) -> dict:
@@ -108,14 +115,14 @@ def readiness_for(facts: dict) -> dict:
 
 def readiness_change(request: Request, row: dict) -> dict | None:
     """For a handed-in practice test or simulation: what it did to its test's readiness number (before, after, gain, a new level)."""
-    if row["kind"] not in ("exercise_test", "simulation") or attempts.is_open(row):
+    if row["kind"] not in ("exercise_test", "simulation") or attempts.is_open(row) or row["grade"] is None:
         return None
     test_id = row["scope"].split(":")[0]
     test = request.app.state.store.get_test(int(test_id)) if test_id.isdigit() else None
     if test is None:
         return None
     facts = facts_for(request, row["user_id"], test, clock.school_day())
-    before = [(_kind_of(r), r["grade"]) for r in facts["done"] if r["submitted_at"] < row["submitted_at"]]
+    before = [(_kind_of(r), r["grade"]) for r in facts["graded"] if r["submitted_at"] < row["submitted_at"]]
     return readiness.change(before, (_kind_of(row), row["grade"]))
 
 
@@ -134,6 +141,10 @@ def card(request: Request, user_id: str | None, test: dict, today: date) -> dict
     by_mode = {m: [r for r in facts["practice"] if exam.mode_of_scope(r["scope"]) == m] for m in exam.TITLES}
     trail, before = [], []
     for row in facts["done"]:
+        if row["grade"] is None:                                        # handed in, waiting for its check: no gain yet
+            trail.append({"attempt": row["id"], "kind": row["kind"], "title": _title(row), "grade": None, "checking": True, "gain": 0,
+                          "number": None, "after": None, "at": row["submitted_at"].isoformat()})
+            continue
         moved = readiness.change(before, (_kind_of(row), row["grade"]))
         before.append((_kind_of(row), row["grade"]))
         trail.append({"attempt": row["id"], "kind": row["kind"], "title": _title(row), "grade": row["grade"], "gain": moved["gain"],

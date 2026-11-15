@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
-from . import attempts, clock, pictures
+from . import attempts, clock, pictures, writtentest
 from .access import allowed, learner, need
 from .written import picture_error
 
@@ -130,9 +130,20 @@ def teacher_view(request: Request, row: dict) -> dict:
     bank, store = request.app.state.bank, request.app.state.store
     work = store.work_of(row["user_id"], row["id"])
     questions = []
+    written = writtentest.is_written(row)
     for q in row["questions"]:
         served = bank.practice_question(q["skill_id"], q["key"])
         if served is None:
+            continue
+        if written:                                     # no choices: the right answer, the typed one, and the AI's points as the automatic ones
+            auto = writtentest.question_points({**row, "credit": {}}, q["key"], q["key"] in work)
+            typed = writtentest.typed(row, q["key"])
+            questions.append({"key": q["key"], "skill_name": (bank.skill(q["skill_id"]) or {}).get("name", ""), "written": True,
+                              "question": served["question"], **{k: served[k] for k in ("figure", "graph") if k in served},
+                              "choices": [], "picked": None, "right": writtentest.right_text(bank, q), "typed": typed,
+                              "matches": writtentest.matches(typed, writtentest.final_of(bank, q)),
+                              "auto": auto, "credit": row["credit"].get(q["key"]), "work": work.get(q["key"]),
+                              "ai": ((row.get("review") or {}).get("questions") or {}).get(q["key"])})
             continue
         choices = [{**c, "correct": bool((bank.grade(q["skill_id"], q["key"], c["index"]) or {}).get("correct"))} for c in served["choices"]]
         picked = row["answers"].get(q["key"])
@@ -195,6 +206,10 @@ def work_check(attempt_id: str, body: Credit, request: Request, user: dict = Dep
             credit.pop(key, None)
         else:
             credit[key] = value
+    if writtentest.is_written(row):                      # the teacher's check is final: a board without a verdict or points counts 0
+        saved = store.save_attempt(row["id"], credit=credit, checked_at=clock.now(), checked_by=user["email"])
+        saved = writtentest.settle_grade(store, bank, saved, final=True, at=clock.now())
+        return teacher_view(request, saved)
     value, _ = attempts.grade(bank, row["questions"], row["answers"], credit)
     saved = store.save_attempt(row["id"], credit=credit, grade=value, checked_at=clock.now(), checked_by=user["email"])
     return teacher_view(request, saved)

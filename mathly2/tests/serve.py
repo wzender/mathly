@@ -51,8 +51,16 @@ _BOARD_WRITTEN = """(() => {
 })()"""
 
 
-def board_written(page):
-    """From now on (and after a reload) every board on the page counts as written on."""
-    page.add_init_script(_BOARD_WRITTEN)
-    page.evaluate(_BOARD_WRITTEN)
+# The same, and each board's picture is a small real image, so it reaches the server as the work (the written simulation's check needs it).
+_BOARD_PICTURED = _BOARD_WRITTEN.replace('b.pictureOf = async () => null;', """b.pictureOf = () => new Promise(done => {
+    const c = document.createElement("canvas"); c.width = 40; c.height = 30;
+    const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, 40, 30); g.fillStyle = "#000"; g.fillRect(5, 12, 30, 4);
+    c.toBlob(done, "image/png"); });""")
+
+
+def board_written(page, pictures=False):
+    """From now on (and after a reload) every board on the page counts as written on; with `pictures`, its picture is sent too."""
+    script = _BOARD_PICTURED if pictures else _BOARD_WRITTEN
+    page.add_init_script(script)
+    page.evaluate(script)
     return page

@@ -194,11 +194,28 @@ def right_index(bank, ref_key, right=True):
 
 
 def answer_all(client, bank, attempt, rights, who=KID):
-    """Answer the attempt's questions right (True) or wrong (False), one flag per question; submit; return the result."""
+    """Answer the attempt's questions right (True) or wrong (False), one flag per question; submit; return the result. The written
+    simulation: a typed answer and a board for each, then the check's verdicts (right: correct, wrong: wrong) as the AI would give them."""
+    if attempt.get("written"):
+        return write_all(client, attempt, rights, who)
     for question, ok in zip(attempt["questions"], rights):
         got = client.put(f"/api/attempts/{attempt['id']}/answers", json={"key": question["key"], "choice": right_index(bank, question["key"], ok)}, headers=auth(who))
         assert got.status_code == 200
     return client.post(f"/api/attempts/{attempt['id']}/submit", headers=auth(who)).json()
+
+
+def write_all(client, attempt, rights, who=KID, typed="1"):
+    store, aid = client.app.state.store, attempt["id"]
+    refs = {q["key"]: q for q in store.get_attempt(aid)["questions"]}
+    for n, (question, ok) in enumerate(zip(attempt["questions"], rights)):
+        got = client.put(f"/api/attempts/{aid}/answers", json={"key": question["key"], "final": typed}, headers=auth(who))
+        assert got.status_code == 200
+        store.save_work(uid(who), aid, question["key"], refs[question["key"]]["skill_id"], f"pic-{n}")
+    handed = client.post(f"/api/attempts/{aid}/submit", headers=auth(who)).json()
+    assert handed["checking"] is True and handed["grade"] is None                     # nothing until the boards are checked
+    verdicts = {q["key"]: {"verdict": "correct" if ok else "wrong", "feedback": "", "tip": ""} for q, ok in zip(attempt["questions"], rights)}
+    store.save_attempt(aid, review={"state": "done", "questions": verdicts, "summary": None})
+    return client.get(f"/api/attempts/{aid}", headers=auth(who)).json()
 
 
 def started(client, store, lessons, learning=5, mastered=3, who=KID):

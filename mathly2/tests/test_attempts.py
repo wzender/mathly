@@ -62,13 +62,14 @@ def test_settling_grades_from_the_answers_saved_and_marks_timed_out(bank):
     before = attempts.settle(store, bank, store.get_attempt(row["id"]), DUE - timedelta(seconds=1))
     assert before["submitted_at"] is None and before["grade"] is None                     # not overdue: untouched
     settled = attempts.settle(store, bank, store.get_attempt(row["id"]), DUE + timedelta(minutes=20))
-    assert settled["grade"] == 75 and settled["timed_out"] is True and settled["submitted_at"] == DUE
+    assert settled["timed_out"] is True and settled["submitted_at"] == DUE and len(settled["answers"]) == 3
+    assert settled["grade"] is None                                                       # the written simulation waits for its check
     again = attempts.settle(store, bank, settled, DUE + timedelta(hours=5))
     assert again == settled == store.get_attempt(row["id"])                               # settling twice changes nothing
 
 
-def test_submitting_before_the_deadline_grades_at_once_and_is_idempotent(bank):
-    store, row, questions = make(bank, 4)
+def test_submitting_grades_a_choices_test_at_once_and_is_idempotent(bank):
+    store, row, questions = make(bank, 4, kind="exercise_test")
     store.save_attempt(row["id"], answers={q["key"]: choose(bank, q) for q in questions[:2]})
     done = attempts.submit(store, bank, store.get_attempt(row["id"]), T0 + timedelta(minutes=5))
     assert done["grade"] == 50 and done["timed_out"] is False and done["submitted_at"] == T0 + timedelta(minutes=5)
@@ -79,7 +80,7 @@ def test_submitting_before_the_deadline_grades_at_once_and_is_idempotent(bank):
 def test_submitting_after_the_deadline_is_a_timeout(bank):
     store, row, questions = make(bank, 4)
     done = attempts.submit(store, bank, row, DUE + timedelta(minutes=1))
-    assert done["timed_out"] is True and done["grade"] == 0
+    assert done["timed_out"] is True and done["submitted_at"] == DUE and done["grade"] is None
 
 
 @pytest.mark.parametrize("kind", ["quiz", "exercise_test"])
@@ -93,7 +94,7 @@ def test_a_quiz_or_an_exercise_test_has_no_time_limit(bank, kind):
 
 
 def test_the_result_lists_lost_skills_and_mistakes_but_never_the_right_answer(bank):
-    store, row, questions = make(bank, 4)
+    store, row, questions = make(bank, 4, kind="exercise_test")
     answers = {questions[0]["key"]: choose(bank, questions[0]),                            # right
                questions[1]["key"]: choose(bank, questions[1], right=False),               # wrong, with a named mistake
                questions[2]["key"]: choose(bank, questions[2], right=False)}               # wrong; the fourth is not answered
