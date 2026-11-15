@@ -13,11 +13,12 @@ const MODES = [
 ];
 const STATE = { mastered: "👑", learning: "◐", not_started: "○" };
 
-/** How the number moves, in plain words. */
-const HOW = `<details class="rd-how" id="rd-how"><summary>איך מעלים את המוכנות?</summary><ul>
+/** How the number moves, in plain words, with what deepening gives now. */
+const how = r => `<details class="rd-how" id="rd-how"><summary>איך מעלים את המוכנות?</summary><ul>
+  <li id="rd-deepening">העמקה נספרת: כל מיומנות מהחומר של המבחן שמגיעים בה לשליטה (👑) מעלה את נקודת ההתחלה, עד 20 נקודות כשכל החומר בשליטה.
+    ${r.mastered_share ? `<b>עכשיו: ${Math.round(r.mastered_share * 100)}% מהמיומנויות בשליטה, ${r.deepening} נקודות.</b>` : ""}</li>
   <li>כל מבחן שהציון בו גבוה מהמוכנות מעלה אותה: מבחן תרגול סוגר 30% מהפער, <b>מבחן סימולציה סוגר 60%</b>, ומבחן בבחירה ידנית 15%.</li>
-  <li>ציון נמוך מהמוכנות לא מוריד אותה.</li>
-  <li>רק מבחנים נספרים. תרגול במסלול ובהעמקה עוזר להצליח בהם, אבל לא משנה את המספר.</li></ul></details>`;
+  <li>ציון נמוך מהמוכנות לא מוריד אותה.</li></ul></details>`;
 
 function simulationCard(test) {
   const s = test.simulation, gain = test.readiness.can_add.simulation;
@@ -95,7 +96,7 @@ export async function show(view, id, focus = "") {
   view(`${tabs("home")}<p><a class="back" href="${homeHref()}">‹ הבית</a></p>
     <section class="card" id="test-card" data-test="${test.id}"><h2>מבחן ב־${shortDate(test.date)} <span class="muted">(${daysText(test.days_left)})</span></h2>
       <p class="muted">${test.lessons.map(l => fmt(l.name)).join(", ")}${test.note ? ` · ${esc(test.note)}` : ""}</p>
-      ${readinessMeter(test)}${HOW}</section>
+      ${readinessMeter(test)}${how(test.readiness)}</section>
     ${simulationCard(test)}
     ${practiceCard(test)}
     ${trailCard(test)}

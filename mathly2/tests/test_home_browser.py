@@ -489,7 +489,7 @@ def test_the_tests_page_has_three_practice_modes_and_the_trail_of_gains(browser,
         page.click(".mx-x")
         page.wait_for_selector("#practice")
         page.click("#rd-how summary")
-        assert "סימולציה סוגר 60%" in page.inner_text("#rd-how") and page.errors == []
+        assert "סימולציה סוגר 60%" in page.inner_text("#rd-how") and "העמקה נספרת" in page.inner_text("#rd-deepening") and page.errors == []
         no_sideways_scroll(page)
 
 
