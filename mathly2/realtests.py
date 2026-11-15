@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from . import writtentest, attempts, clock, exam, readiness, reads
-from .access import allowed, learner, need
+from .access import allowed, learner, my_classes, need
 from .learning import MASTERED, next_skill, skill_state
 
 router = APIRouter(prefix="/api")
@@ -289,7 +289,7 @@ def _next_path_skill(request: Request, user: dict, subject: str = "math") -> str
 def home(request: Request, user: dict = Depends(learner), subject: str = Query("math", max_length=40)) -> dict:
     """The student's home: the upcoming tests (nearest first) with their readiness, the lesson map, and the next skill of the path."""
     here, today, uid = reads.of(request), clock.school_day(), user["id"]
-    class_ids = [c["id"] for c in here.classes_of_student(user["email"])]
+    class_ids = [c["id"] for c in my_classes(request, user)]
     from . import rounds
     from .skills import RECENT, behind_lessons, lesson_map, subject_param
     subject = subject_param(request, user, subject)
@@ -306,7 +306,7 @@ def home(request: Request, user: dict = Depends(learner), subject: str = Query("
 def _student_test(request: Request, user: dict, test_id: int) -> dict:
     here = reads.of(request)
     test = here.get_test(test_id)
-    mine = {c["id"] for c in here.classes_of_student(user["email"])}
+    mine = {c["id"] for c in my_classes(request, user)}
     if test is None or test["removed_at"] or not (test["class_id"] in mine or allowed(user["roles"], "*")):
         raise HTTPException(404, "המבחן לא נמצא")
     return test

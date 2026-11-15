@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from . import attempts, cleanup, clock, pictures, reads
-from .access import allowed, learner, need
+from .access import allowed, learner, need, my_classes
 from .pictures import PictureError
 from .realtests import _my_class, lesson_names
 from .written import picture_error
@@ -161,7 +161,7 @@ def _my_assignment(request: Request, user: dict, assignment_id: int) -> dict:
     """An assignment of one of the student's classes (404 for anything else, and for a removed one)."""
     here = reads.of(request)
     row = here.get_assignment(assignment_id)
-    mine = {c["id"] for c in here.classes_of_student(user["email"])}
+    mine = {c["id"] for c in my_classes(request, user)}
     if row is None or row["removed_at"] or row["class_id"] not in mine:
         raise HTTPException(404, "המשימה לא נמצאה")
     return row
@@ -210,7 +210,7 @@ def student_assignment(request: Request, user: dict, row: dict, sub: dict | None
 def my_assignments(request: Request, user: dict = Depends(learner)) -> list[dict]:
     """The student's assignments: the open ones first by due date, then the done ones."""
     here, today = reads.of(request), clock.school_day()
-    class_ids = [c["id"] for c in here.classes_of_student(user["email"])]
+    class_ids = [c["id"] for c in my_classes(request, user)]
     here.prefetch(("assignments_of_classes", class_ids), ("submissions_of_user", user["id"]), ("attempts_of", user["id"], "exercise_test"))
     subs = {s["assignment_id"]: s for s in here.submissions_of_user(user["id"])}
     shown = [student_assignment(request, user, r, subs.get(r["id"]), today) for r in here.assignments_of_classes(class_ids)]
@@ -375,7 +375,7 @@ def return_submission(submission_id: int, body: SendBack, request: Request, user
 def grade_rows(request: Request, user: dict) -> list[dict]:
     """Graded assignments and done exercise-test assignments, with the teacher's note. A removed assignment keeps its grade."""
     store, here = request.app.state.store, reads.of(request)
-    class_ids = [c["id"] for c in here.classes_of_student(user["email"])]
+    class_ids = [c["id"] for c in my_classes(request, user)]
     rows = {r["id"]: r for r in store.assignments_of_classes(class_ids, include_removed=True)}
     out = []
     subs = {s["assignment_id"]: s for s in store.submissions_of_user(user["id"])}

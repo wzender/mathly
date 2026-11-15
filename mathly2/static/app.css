@@ -775,3 +775,9 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .qz-final-row { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
 .qz-final input { width: 9em; font-size: 18px; padding: 8px 10px; min-height: 44px; text-align: center; }
 .qz-checking .qz-grade b { font-size: 40px; }
+
+/* "תצוגה ככיתה" on top of the student screens, for a developer or a teacher who is in no class (student.js). */
+.view-as { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 8px; padding: 8px 12px; border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--sky-gold) 60%, transparent); background: color-mix(in srgb, var(--sky-gold) 8%, transparent); }
+.view-as select { min-height: 40px; }
+.view-as .muted { font-size: 13px; }

@@ -8,6 +8,14 @@ export class ApiError extends Error {
 const MESSAGES = { 503: "שירות ההתחברות לא זמין כרגע, נסו שוב בעוד רגע", 403: "אין הרשאה לפעולה הזו" };
 
 const remembered = new Map();                    // GET path -> the last answer
+const VIEW_KEY = "mathly2.view-class";
+
+/** "תצוגה ככיתה": the class a developer or a teacher who is in no class sees the student screens as (kept on this device). */
+export const viewClass = () => { try { return localStorage.getItem(VIEW_KEY) || ""; } catch { return ""; } };
+export function setViewClass(id) {
+  try { if (id) localStorage.setItem(VIEW_KEY, String(id)); else localStorage.removeItem(VIEW_KEY); } catch { /* private window */ }
+  remembered.clear(); changes++;                 // every screen is now about another class
+}
 let changes = 0;                                 // counts changes, so an answer to a read that began before one is not kept
 onSignOut(() => { remembered.clear(); changes++; });
 
@@ -15,6 +23,7 @@ async function request(path, { method = "GET", body } = {}) {
   const started = changes;
   if (method !== "GET") { remembered.clear(); changes++; }      // after a change of theirs, no old answer is ever shown
   const headers = { Authorization: "Bearer " + await token() };
+  if (viewClass()) headers["X-View-Class"] = viewClass();
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const response = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   if (response.ok) {

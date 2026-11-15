@@ -43,6 +43,29 @@ def need(permission: str) -> Callable[..., dict]:
     return dependency
 
 
+VIEW_CLASS = "x-view-class"          # a developer or a teacher who is in no class previews the student screens as this class
+
+
+def preview_classes(request: Request, user: dict) -> list[dict]:
+    """The classes this person may preview the student screens as: a developer every class, a teacher the classes they teach."""
+    if allowed(user["roles"], "*"):
+        return request.app.state.store.classes()
+    if "teacher" in user["roles"]:
+        return reads.of(request).classes_taught(user["email"])
+    return []
+
+
+def my_classes(request: Request, user: dict) -> list[dict]:
+    """The classes the student screens are about: the person's own classes as a student; for a developer or a teacher who is in no
+    class, the class picked in "תצוגה ככיתה" (the X-View-Class header), if they may preview it."""
+    here = reads.of(request)
+    own = here.classes_of_student(user["email"])
+    picked = request.headers.get(VIEW_CLASS, "")
+    if own or not picked.isdigit() or set(user["roles"]) == {"student"}:
+        return own
+    return [c for c in preview_classes(request, user) if c["id"] == int(picked)][:1]
+
+
 def learner(request: Request, user: dict = Depends(need("path.use"))) -> dict:
     """Someone who may use the path: a teacher or developer, or a student who is in a class. A person whose
     only role is student and who is in no class is asked to talk to their teacher (403)."""

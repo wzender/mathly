@@ -1,7 +1,7 @@
 // The student's screens, switched by the address after "#": "/" the subjects, "/subject/<id>" a subject's home, "/subject/<id>/path"
 // its path, "/skill/<id>" a skill's sheet over its subject's path, "/collection". The subject of a skill, a quiz or a test opened by a
 // link is asked from the server, so a reload lands on the right subject's path.
-import { api } from "./api.js";
+import { api, setViewClass, viewClass } from "./api.js";
 import { esc } from "./math.js";
 import { setSubject } from "./ui.js";
 import * as exercise from "./exercise.js";
@@ -12,7 +12,24 @@ import * as quiz from "./quiz.js";
 import * as lessonRound from "./round.js";
 import { route as onRoute } from "./router.js";
 
-export async function show(me, view) {
+/** "תצוגה ככיתה": a developer or a teacher who is in no class picks the class the student screens show (its tests, assignments, subjects).
+ *  Their own progress stays theirs. The bar sits on top of every student screen. */
+function withPreview(me, view) {
+  const classes = me.preview || [];
+  if (!classes.length) { if (viewClass()) setViewClass(""); return view; }
+  if (viewClass() && !classes.some(c => String(c.id) === viewClass())) setViewClass("");   // a class that is gone, or not theirs any more
+  const bar = () => `<div class="view-as" id="view-as"><label for="view-class">תצוגה ככיתה:</label>
+    <select id="view-class"><option value="">בלי כיתה (כל השיעורים, בלי מבחנים)</option>${classes.map(c =>
+      `<option value="${c.id}"${String(c.id) === viewClass() ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
+    <span class="muted">ההתקדמות והכוכבים הם שלך.</span></div>`;
+  return html => {
+    view(bar() + html);
+    document.getElementById("view-class").addEventListener("change", event => { setViewClass(event.target.value); location.reload(); });
+  };
+}
+
+export async function show(me, rawView) {
+  const view = withPreview(me, rawView);
   if (!me.classes.length && me.roles.every(r => r === "student")) {
     view(`<section class="card" id="no-class"><h2>עוד לא בכיתה</h2>
       <p>עוד לא הוסיפו אותך לכיתה. בקשו מהמורה או ממנהל הכיתות להוסיף את כתובת המייל שבה נכנסתם:</p>
