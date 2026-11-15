@@ -202,8 +202,9 @@ def test_an_exercise_test_runs_with_the_tests_length_and_no_timer_and_links_its_
         assert links and all(h.startswith("#/skill/") and h[8:] in skills for h in links)                    # weak skills link to their stars
         assert "המוכנות נשארה 0" in page.inner_text("#qz-ready") and page.locator("#qz-retake").count() == 0
         page.click(".qz-actions [data-close]")
-        page.wait_for_selector("#test-card")                                                                 # closing leads back to the test's card
-        assert page.evaluate("location.hash") == f"#/test/{test['id']}"
+        page.wait_for_function("(h) => location.hash === h", arg=f"#/test/{test['id']}")                    # closing leads back to the test's card
+        page.wait_for_selector(".mx-sheet", state="detached")
+        assert page.locator("#test-card").count() == 1
 
 
 
@@ -252,8 +253,8 @@ def test_after_the_simulation_the_wrong_questions_are_answered_again_in_a_round(
         assert "הציון במבחן לא משתנה" in page.inner_text("#rd-result") and page.locator(".rd-bigstars span").count() == 0
         assert store.attempts_of(KID_ID, "simulation")[0]["grade"] == 0
         page.click("#rd-result [data-close]")
-        page.wait_for_selector("#test-card")
-        assert page.locator(".round-layer").count() == 0 and page.errors == []
+        page.wait_for_selector(".round-layer", state="detached")                 # the card is already under the round: wait for the round to go
+        assert page.locator("#test-card").count() == 1 and page.errors == []
         page.check("#practice input[value='focus']")                                                     # the hard skills now have their own test
         assert page.locator("#focus-skills .ex-chip").count() > 0
         page.click("#practice-start")
