@@ -247,6 +247,7 @@ a.ex-chip.link { color: var(--accent); border-color: var(--accent); margin-inlin
 .subject-icon { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; font-weight: 700;
   background: color-mix(in srgb, var(--sky-accent) 22%, var(--bg)); color: var(--sky-accent); }
 .back { display: inline-block; padding: 10px 4px; color: var(--sky-accent); font-weight: 700; text-decoration: none; }
+button.back { background: none; border: 0; font: inherit; font-weight: 700; cursor: pointer; min-height: 44px; }
 
 /* A faded star: mastered, but not practiced for 14 days. Only a cue; the word "דועך" says so too. */
 .star.faded .node { opacity: .55; filter: saturate(.5); box-shadow: none; }
