@@ -455,6 +455,7 @@ A tab bar at the bottom of the screen leads between them: home, path (named "ה�
 *Reference: `app/prompter.py`, `static/prompter.js`, and the management sheet in `static/math.js`.*
 
 - **DEV-1 Every permission.** A developer can open any class's progress, tests, assignments, inbox and AI queue, as the class's teacher can, and everything managers and admins can do.
+  **תצוגה ככיתה.** A developer or a teacher who is in no class sees a picker on top of the student screens and can view them as a class (a developer any class, a teacher the classes they teach): its tests, assignments, subjects and photo help, as its students see them. Progress, stars and readiness stay their own. A student cannot pick another class.
 - **DEV-2 Prompter (פרומפטר).** A developer writes or pastes a text and shows it full screen as a scrolling teleprompter. Saved texts (a title up to 120 characters; up to 200 texts) belong to the account and are on every device; what is being edited is also kept in the browser, so nothing is lost before it is saved.
   Keys: space starts and stops, ↑/↓ change speed, +/− change size, M mirrors, F is full screen, Esc leaves; the mouse and a presentation remote work too.
   A saved text can have an **outline (ראשי פרקים)**: on request the AI rewrites the text as the same slides with two to four very short topic reminders each, once; it is kept with the text and can be edited. Changing the text without sending an outline drops the outline, so a stale one is never shown.

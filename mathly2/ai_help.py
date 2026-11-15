@@ -213,7 +213,8 @@ def requeue_after_restart(store) -> int:
 # ---- the student ----
 
 def _student_classes(request: Request, user: dict) -> list[dict]:
-    return reads.of(request).classes_of_student(user["email"])
+    from .access import my_classes
+    return my_classes(request, user)
 
 
 def _choose_class(request: Request, user: dict, wanted: int | None) -> dict:

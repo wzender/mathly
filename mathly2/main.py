@@ -11,7 +11,7 @@ from fastapi import Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .access import RoleResolver, learner, permissions_of
+from .access import RoleResolver, learner, permissions_of, preview_classes
 from .auth import DevAuthenticator, SupabaseAuthenticator, current_user
 from .bank import Bank, load_bank
 
@@ -114,7 +114,9 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
             store.link_user(user["email"], user["id"])
         return {"email": user["email"], "roles": user["roles"], "permissions": sorted(permissions_of(user["roles"])),
                 "classes": [{"id": c["id"], "name": c["name"]} for c in classes_as_student],
-                "teaching": [{"id": c["id"], "name": c["name"]} for c in here.classes_taught(user["email"])]}
+                "teaching": [{"id": c["id"], "name": c["name"]} for c in here.classes_taught(user["email"])],
+                "preview": [] if classes_as_student or set(user["roles"]) == {"student"}            # "תצוגה ככיתה" in the student view
+                else [{"id": c["id"], "name": c["name"]} for c in preview_classes(request, user)]}
 
     @app.get("/api/lessons")
     def lessons(request: Request, user: dict = Depends(learner)) -> list[dict]:

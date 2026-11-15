@@ -88,9 +88,11 @@ def _round_view(request: Request, skill_id: str, rows: list[dict], round_start: 
 
 def studied_subjects(request: Request, user: dict) -> list[str] | None:
     """The subjects of the student's classes, in the bank's subject order; None means all (a teacher or a developer)."""
-    if set(user["roles"]) - {"student"}:
+    from .access import my_classes
+    classes = my_classes(request, user)
+    if set(user["roles"]) - {"student"} and not classes:                 # a teacher or a developer who previews no class: everything
         return None
-    mine = {s for c in reads.of(request).classes_of_student(user["email"]) for s in (c.get("subjects") or ["math"])}
+    mine = {s for c in classes for s in (c.get("subjects") or ["math"])}
     return [s["id"] for s in request.app.state.bank.subjects if s["id"] in mine]
 
 
