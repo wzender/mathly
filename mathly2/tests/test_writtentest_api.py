@@ -93,7 +93,7 @@ def test_after_handing_in_it_waits_for_the_check_and_the_ai_sets_the_grade():
     assert got["checking"] is False and got["grade"] == attempts.percent(3, 2 * n)            # 1 + ½ points of n
     assert got["right"] == 1 and len(got["missed"]) == n - 1
     assert got["missed"][0]["points"] == 0.5 and got["missed"][-1]["no_work"] is True
-    assert '"right"' not in json.dumps(got["missed"]) and first["right"] not in json.dumps(got, ensure_ascii=False)
+    assert all(set(m) == {"skill_id", "skill_name", "question", "picked", "points", "no_work", "mistake"} for m in got["missed"])   # never the right answer
 
 
 def test_without_the_ai_it_waits_for_the_teacher_whose_points_are_final():

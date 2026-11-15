@@ -364,17 +364,31 @@ def card_of(client, test_id, who=KID):
     return client.get(f"/api/tests/{test_id}", headers=auth(who)).json()
 
 
-def test_readiness_moves_only_with_tests_never_with_the_path(world):
+def test_readiness_starts_from_deepening_and_tests_pull_it_up(world):
     client, store, lessons = world
     test = set_test(client, lessons, days=14).json()
-    master(store, covered(client.app.state.bank, lessons[:2]))                       # the whole material mastered on the path
+    skills = covered(client.app.state.bank, lessons[:2])
+    assert card_of(client, test["id"])["readiness"]["number"] == 0                      # nothing mastered, no test
+    master(store, skills[:len(skills) // 2])                                          # half the material mastered in deepening
+    half = card_of(client, test["id"])["readiness"]
+    assert half["number"] == round(20 * (len(skills) // 2) / len(skills)) and half["deepening"] == half["number"]
+    master(store, skills)                                                             # all of it: 20% of the way from 0
     ready = card_of(client, test["id"])["readiness"]
-    assert ready["number"] == 0 and ready["label"] == "מתחילים" and ready["can_add"]["simulation"] == 60
+    assert ready["number"] == 20 and ready["deepening"] == 20 and ready["label"] == "מתחילים" and ready["can_add"]["simulation"] == 48
     finished(store, test["id"], "exercise_test", f"{test['id']}:1", 80)
-    assert card_of(client, test["id"])["readiness"]["number"] == 24
+    assert card_of(client, test["id"])["readiness"]["number"] == 38                  # 20 + 30% of (80 - 20)
     finished(store, test["id"], "simulation", str(test["id"]), 90)
     ready = card_of(client, test["id"])["readiness"]
-    assert ready["number"] == 64 and ready["practice_best"] == 80 and ready["simulation_best"] == 90 and ready["simulations"] == 1
+    assert ready["number"] == 69 and ready["practice_best"] == 80 and ready["simulation_best"] == 90 and ready["simulations"] == 1
+
+
+def test_mastering_more_after_the_tests_still_raises_the_number(world):
+    client, store, lessons = world
+    test = set_test(client, lessons, days=14).json()
+    finished(store, test["id"], "exercise_test", f"{test['id']}:1", 60)
+    assert card_of(client, test["id"])["readiness"]["number"] == 18                  # 30% of 60
+    master(store, covered(client.app.state.bank, lessons[:2]))
+    assert card_of(client, test["id"])["readiness"]["number"] == 32                  # 20, then 20 + 30% of (60 - 20)
 
 
 def test_the_card_offers_three_practice_modes_simulations_and_the_trail_of_gains(world):

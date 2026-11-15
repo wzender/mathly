@@ -335,13 +335,13 @@ The exercise screen is where a student practices one skill.
 - **GRD-2 When time ends.** Only the simulation is timed. When its timer ends it is submitted as it stands, and unanswered questions count as wrong.
   Leaving the screen does not stop the timer.
 - **RDY-1 Readiness meter.** For each upcoming test, the system shows the student (and the teacher) one **readiness number from 0 to 100**, with its level and a bar. Levels: 0–39 "מתחילים", 40–69 "בדרך", 70–84 "כמעט שם", 85–100 "מוכנים". Beside it, the app shows the points to the next level.
-- **RDY-2 Only tests move it.** The number changes only when a practice test or a simulation is handed in, never from the path, deepening or mastery. For each test, oldest first, when its grade is above the number:
+- **RDY-2 Deepening, then tests.** Deepening sets where the number starts: the share of the test's skills mastered (0–100) closes 20% of the gap from 0, so all of the material mastered starts it at 20. Then each handed-in practice test or simulation, oldest first, when its grade is above the number:
 
   `number = number + GAIN × (grade − number)`
 
   GAIN is 0.6 for a simulation, 0.3 for a practice test and 0.15 for a manual practice test.
 - **RDY-3 Never down, never above the grades.** A grade at or below the number changes nothing, so the number never drops, and it can only approach the grades actually earned.
-- **RDY-4 The number explains itself.** The test's page says how to raise it: a practice test closes 30% of the gap, a simulation 60%, a manual one 15%; a lower grade does not lower it; only tests count.
+- **RDY-4 The number explains itself.** The test's page says how to raise it: mastering the test's skills in deepening raises the start (up to 20, with how much it gives now); a practice test closes 30% of the gap, a simulation 60%, a manual one 15%; a lower grade does not lower it.
 - **RDY-5 Make raising it rewarding.**
   - The number counts up from the last visit with a "+N" badge.
   - Every button to a test shows the most it can add now.

@@ -1,4 +1,4 @@
-"""The readiness number: only tests move it, only up, a simulation more than a practice test, a picked one less."""
+"""The readiness number: deepening sets where it starts; tests move it only up, a simulation more than a practice test, a picked one less."""
 from mathly2 import readiness
 
 
@@ -28,3 +28,13 @@ def test_change_says_the_gain_and_a_new_level():
     moved = readiness.change([("practice", 100)], ("simulation", 90))
     assert moved == {**moved, "before": 30, "after": 66, "gain": 36, "label": "בדרך", "level_up": True}
     assert readiness.change([("simulation", 90)], ("practice", 20))["gain"] == 0
+
+
+def test_deepening_is_the_start_and_tests_pull_from_there():
+    assert readiness.compute([], 0.5)["number"] == 10                                # half the skills mastered: 20% of 50
+    assert readiness.compute([], 1.0)["number"] == 20 and readiness.compute([], 1.0)["deepening"] == 20
+    assert readiness.compute([("simulation", 80)], 0.5)["number"] == 52              # 10, then 60% of the way to 80
+    assert readiness.compute([("simulation", 80)], 1.0)["can_add"]["simulation"] == 26   # at 56, a perfect simulation adds 60% of 44
+    more = [readiness.compute([("practice", 70)], share)["number"] for share in (0, 0.25, 0.5, 1)]
+    assert more == sorted(more) and more[0] < more[-1]                                # more mastery never lowers it
+    assert readiness.change([], ("practice", 80), 1.0) == {**readiness.change([], ("practice", 80), 1.0), "before": 20, "after": 38, "gain": 18}

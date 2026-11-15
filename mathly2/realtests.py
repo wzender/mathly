@@ -109,8 +109,13 @@ def _result(request: Request, row: dict) -> dict:
     return attempts.result(request.app.state.bank, row)
 
 
+def mastered_share(facts: dict) -> float:
+    """The share of the test's skills mastered (deepening counts toward readiness)."""
+    return facts["mastered"] / len(facts["covered"]) if facts["covered"] else 0.0
+
+
 def readiness_for(facts: dict) -> dict:
-    return readiness.compute(facts["results"])
+    return readiness.compute(facts["results"], mastered_share(facts))
 
 
 def readiness_change(request: Request, row: dict) -> dict | None:
@@ -123,7 +128,7 @@ def readiness_change(request: Request, row: dict) -> dict | None:
         return None
     facts = facts_for(request, row["user_id"], test, clock.school_day())
     before = [(_kind_of(r), r["grade"]) for r in facts["graded"] if r["submitted_at"] < row["submitted_at"]]
-    return readiness.change(before, (_kind_of(row), row["grade"]))
+    return readiness.change(before, (_kind_of(row), row["grade"]), mastered_share(facts))
 
 
 def _title(row: dict) -> str:
@@ -145,7 +150,7 @@ def card(request: Request, user_id: str | None, test: dict, today: date) -> dict
             trail.append({"attempt": row["id"], "kind": row["kind"], "title": _title(row), "grade": None, "checking": True, "gain": 0,
                           "number": None, "after": None, "at": row["submitted_at"].isoformat()})
             continue
-        moved = readiness.change(before, (_kind_of(row), row["grade"]))
+        moved = readiness.change(before, (_kind_of(row), row["grade"]), mastered_share(facts))
         before.append((_kind_of(row), row["grade"]))
         trail.append({"attempt": row["id"], "kind": row["kind"], "title": _title(row), "grade": row["grade"], "gain": moved["gain"],
                       "number": int(row["scope"].split(":")[1]) if row["kind"] == "exercise_test" else None,
