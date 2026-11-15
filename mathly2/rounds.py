@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from . import attempts, clock, quiz, reads
+from . import attempts, clock, quiz, reads, writtentest
 from .access import learner
 from .learning import MASTERED, record_practice_answer, skill_state
 
@@ -184,7 +184,8 @@ def _context(bank, source: dict, key: str, skill_id: str) -> dict:
     """Where a question of a mistakes round came from: its number in the test, and what was chosen there (never whether it was right)."""
     served = bank.practice_question(skill_id, key) or {"choices": []}
     choice = source["_answers"].get(key)
-    picked = next((c["text"] for c in served["choices"] if c["index"] == choice), None) if isinstance(choice, int) else None
+    picked = next((c["text"] for c in served["choices"] if c["index"] == choice), None) if isinstance(choice, int) \
+        else (choice if isinstance(choice, str) and choice.strip() else None)          # a written simulation: the typed final answer
     return {"title": source["title"], "n": source["_order"].get(key), "of": source["total"], "picked": picked}
 
 
@@ -200,9 +201,16 @@ def start_retry(attempt_id: str, request: Request, user: dict = Depends(learner)
     for row in store.attempts_of(uid, RETRY, attempt_id):
         if attempts.is_open(row):
             return view(request, row)
-    wrong = [{"skill_id": q["skill_id"], "key": q["key"]} for q in source["questions"]
-             if bank.practice_question(q["skill_id"], q["key"]) and not (bank.grade(q["skill_id"], q["key"], source["answers"].get(q["key"]))
-                                                                      if isinstance(source["answers"].get(q["key"]), int) else {"correct": False}).get("correct")]
+    if writtentest.is_written(source):                 # a written simulation: once checked, the questions without full points
+        if source["grade"] is None:
+            raise HTTPException(409, "המבחן עוד נבדק. אפשר לחזור על הטעויות אחרי הבדיקה")
+        missed = set(writtentest.missed_keys(source, store.work_of(uid, source["id"])))
+        wrong = [{"skill_id": q["skill_id"], "key": q["key"]} for q in source["questions"]
+                 if q["key"] in missed and bank.practice_question(q["skill_id"], q["key"])]
+    else:
+        wrong = [{"skill_id": q["skill_id"], "key": q["key"]} for q in source["questions"]
+                 if bank.practice_question(q["skill_id"], q["key"]) and not (bank.grade(q["skill_id"], q["key"], source["answers"].get(q["key"]))
+                                                                          if isinstance(source["answers"].get(q["key"]), int) else {"correct": False}).get("correct")]
     if not wrong:
         raise HTTPException(409, "אין שאלות לא נכונות לחזור עליהן")
     now = clock.now()

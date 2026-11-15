@@ -123,6 +123,7 @@ async function finish(submit) {
   const id = attempt.id;
   try {
     if (submit) { await saving; await sendAllWork(); }                                         // the boards go with the hand-in
+    else if (attempt.written && attempt.state === "open") await sendAllWork();                 // time ran out: the boards still go, before the check starts
     const data = submit ? await api(`/api/attempts/${id}/submit`, { method: "POST" }) : await api(`/api/attempts/${id}`);
     if (data.state === "open") { setTimeout(() => layer && finish(false), 1000); return; }      // a hair early on the device: ask again
     show(data);
@@ -141,18 +142,31 @@ function choicesOf(question) {
   return order[question.key].map(i => question.choices.find(c => c.index === i));
 }
 
+/** Is a question answered: a choice, or in the written simulation a board with work or a typed final answer. */
+const isAnswered = x => attempt.answers[x.key] !== undefined || (attempt.written && hasWork(boardKey(x.key)));
+
+/** The written simulation's answer area: the way goes on the board; a plain-number answer also has a box. */
+function writtenHtml(question) {
+  const typed = typeof attempt.answers[question.key] === "string" ? attempt.answers[question.key] : "";
+  const box = question.final ? `<p class="qz-final"><label for="qz-final">התשובה הסופית:</label>
+      <span class="qz-final-row" dir="ltr">${question.final.label ? `<span>${esc(question.final.label)}</span>` : ""}<input id="qz-final" inputmode="decimal" autocomplete="off"
+        maxlength="40" value="${esc(typed)}" aria-describedby="qz-written-note">${question.final.unit ? `<span>${esc(question.final.unit)}</span>` : ""}</span></p>` : "";
+  return `<div class="qz-written" id="qz-written"><p class="muted" id="qz-written-note">✏️ כמו במבחן אמיתי: כותבים את הפתרון המלא בלוח. הבודק רואה את הדרך, לא רק את התשובה.</p>
+    <p><button type="button" id="qz-open-board" class="primary">פתיחת הלוח</button></p>${box}</div>`;
+}
+
 function renderQuestion() {
   const total = attempt.questions.length, question = attempt.questions[at], saved = attempt.answers[question.key];
-  const answered = Object.keys(attempt.answers).length;
+  const answered = attempt.questions.filter(isAnswered).length;
   q(".mx-sheet").innerHTML = `${heading(names(attempt).title)}
     <div class="qz-bar">${attempt.due_at ? `<span class="qz-timer" id="qz-timer" aria-label="הזמן שנשאר">${clock(left())}</span>` : ""}
       <span id="qz-count">שאלה ${at + 1} מתוך ${total}</span></div>
     <span class="mx-sr" id="qz-live" role="status" aria-live="polite"></span>
     <div class="qz-dots" role="group" aria-label="נענו ${answered} מתוך ${total}">${attempt.questions.map((x, i) =>
-      `<button type="button" class="qz-dot${attempt.answers[x.key] !== undefined ? " done" : ""}${i === at ? " cur" : ""}" data-go="${i}" aria-label="שאלה ${i + 1}${attempt.answers[x.key] !== undefined ? ", נענתה" : ", לא נענתה"}"${i === at ? ' aria-current="step"' : ""}></button>`).join("")}</div>
+      `<button type="button" class="qz-dot${isAnswered(x) ? " done" : ""}${i === at ? " cur" : ""}" data-go="${i}" aria-label="שאלה ${i + 1}${isAnswered(x) ? ", נענתה" : ", לא נענתה"}"${i === at ? ' aria-current="step"' : ""}></button>`).join("")}</div>
     <div class="mx-q" id="qz-q" data-key="${esc(question.key)}"><p class="ex-text" dir="auto">${fmt(question.question)}</p>${figures(question)}
-      <div class="ex-choices" id="qz-choices">${choicesOf(question).map(c =>
-        `<button type="button" class="ex-choice qz-choice${saved === c.index ? " picked" : ""}" data-i="${c.index}" aria-pressed="${saved === c.index}" dir="auto">${fmt(c.text)}</button>`).join("")}</div>
+      ${attempt.written ? writtenHtml(question) : `<div class="ex-choices" id="qz-choices">${choicesOf(question).map(c =>
+        `<button type="button" class="ex-choice qz-choice${saved === c.index ? " picked" : ""}" data-i="${c.index}" aria-pressed="${saved === c.index}" dir="auto">${fmt(c.text)}</button>`).join("")}</div>`}
       <div id="qz-fb" role="status" aria-live="polite"></div></div>
     <div class="qz-nav"><button type="button" data-go="${at - 1}"${at === 0 ? " disabled" : ""}>הקודמת</button>
       <button type="button" data-go="${at + 1}"${at === total - 1 ? " disabled" : ""}>הבאה</button>
@@ -177,8 +191,24 @@ function needsWork(question) {
 /** Send the board of every answered question that changed since it was last sent (before handing in). */
 function sendAllWork() {
   const id = attempt.id;
-  return Promise.allSettled(attempt.questions.filter(x => attempt.answers[x.key] !== undefined)
+  return Promise.allSettled(attempt.questions.filter(x => attempt.answers[x.key] !== undefined || (attempt.written && hasWork(boardKey(x.key))))
     .map(x => sendWork(`quiz:${id}:${x.key}`, id, x.key).then(ok => { if (ok && attempt?.id === id) (attempt.work ||= []).push(x.key); })));
+}
+
+/** The written simulation: keep this question's typed final answer (or "" when only its board has work) on the server, then its board. */
+function saveWritten(question) {
+  if (!attempt?.written || !question) return Promise.resolve();
+  const box = q("#qz-final"), typed = box && q("#qz-q")?.dataset.key === question.key ? box.value.trim() : (attempt.answers[question.key] || "");
+  if (!typed && !hasWork(boardKey(question.key)) && attempt.answers[question.key] === undefined) return Promise.resolve();
+  if (attempt.answers[question.key] === typed && !hasWork(boardKey(question.key))) return Promise.resolve();
+  attempt.answers[question.key] = typed;
+  const id = attempt.id, save = saving.then(() => api(`/api/attempts/${id}/answers`, { method: "PUT", body: { key: question.key, final: typed } }));
+  saving = save.catch(() => {});
+  return save.then(() => sendWork(boardKey(question.key), id, question.key).then(ok => { if (ok && attempt?.id === id) (attempt.work ||= []).push(question.key); }).catch(() => {}))
+    .catch(error => {
+      if (error instanceof ApiError && error.status === 409) return finish(false);
+      if (q("#qz-fb")) q("#qz-fb").innerHTML = `<p class="error" role="alert">${esc(error.message || "התשובה לא נשמרה, נסו שוב")}</p>`;
+    });
 }
 
 async function choose(button) {
@@ -200,8 +230,9 @@ async function choose(button) {
   }
 }
 
-function submit() {
-  const missing = attempt.questions.filter(x => attempt.answers[x.key] === undefined).length;
+async function submit() {
+  await saveWritten(attempt.questions[at]);
+  const missing = attempt.questions.filter(x => !isAnswered(x)).length;
   if (missing && !warned) {
     warned = true;
     q("#qz-warn").innerHTML = `<div class="ex-note" role="alert"><p>יש ${missing} ${missing === 1 ? "שאלה" : "שאלות"} בלי תשובה. הן ייחשבו שגויות.</p>
@@ -243,19 +274,41 @@ function waitForReview(id) {
     try {
       const fresh = await api(`/api/attempts/${encodeURIComponent(id)}`);
       if (!layer || attempt?.id !== id) return;
+      if (attempt.checking && !fresh.checking) { show(fresh); return; }        // the check ended: the grade and the rest of the result
       attempt.review = fresh.review;
+      if (attempt.checking && fresh.review?.state !== "pending") { show(fresh); return; }   // it failed: waiting for the teacher
       q("#qz-review")?.replaceWith(Object.assign(document.createElement("div"), { innerHTML: reviewHtml(fresh) }).firstElementChild || "");
     } catch { /* try again */ }
     waitForReview(id);
   }, 4000);
 }
 
+/** The written simulation before its check: no grade yet, what is happening, and the check's steps. */
+function checkingHtml(r) {
+  const aiOn = r.review && r.review.state !== "failed";
+  return `${heading(`תוצאת ${names(r).title}`)}
+    <div class="qz-result qz-checking" id="qz-checking"><p class="qz-grade" aria-label="המבחן בבדיקה"><b aria-hidden="true">⏳</b><span>בבדיקה</span></p>
+      <p>${aiOn ? "ה־AI בודק את הפתרונות שכתבתם בלוח, שאלה אחרי שאלה. הציון יופיע כאן בסוף הבדיקה, אפשר לסגור ולחזור."
+        : "המבחן הוגש וממתין לבדיקת המורה. הציון יופיע אחרי הבדיקה."}${r.timed_out ? " הזמן נגמר והמבחן הוגש כמו שהוא." : ""}</p></div>
+    ${reviewHtml(r)}
+    <p class="qz-actions"><button type="button" data-close>חזרה למבחן</button></p>`;
+}
+
+const missedLine = (r, m) => !r.written ? (m.picked ? `<p class="muted">בחרתם: <span dir="auto">${fmt(m.picked)}</span></p>` : `<p class="muted">לא ענו על השאלה.</p>`)
+  : `${m.no_work ? `<p class="muted">לא נכתב פתרון בלוח.</p>` : `<p class="muted">${m.points === 0.5 ? "חצי מהנקודות על השאלה." : "לא קיבלתם נקודות על השאלה."}</p>`}
+     ${m.picked ? `<p class="muted">התשובה הסופית שכתבתם: <span dir="ltr">${esc(m.picked)}</span></p>` : ""}`;
+
 function renderResult() {
   const r = attempt;
   stopTimer();
+  if (r.checking) {
+    q(".mx-sheet").innerHTML = checkingHtml(r);
+    if (r.review?.state === "pending") waitForReview(r.id);
+    return;
+  }
   q(".mx-sheet").innerHTML = `${heading(`תוצאת ${names(r).title}`)}
     <div class="qz-result"><p class="qz-grade" id="qz-grade" aria-label="הציון ${r.grade}"><b>${r.grade}</b><span>מתוך 100</span></p>
-      <p>${r.right === 1 ? "תשובה נכונה אחת" : `${r.right} תשובות נכונות`} מתוך ${r.total}${r.timed_out ? ". הזמן נגמר והבוחן הוגש כמו שהוא." : ""}</p>
+      <p>${r.written ? `${r.right === 1 ? "שאלה אחת" : `${r.right} שאלות`} עם ניקוד מלא` : r.right === 1 ? "תשובה נכונה אחת" : `${r.right} תשובות נכונות`} מתוך ${r.total}${r.timed_out ? ". הזמן נגמר והבוחן הוגש כמו שהוא." : ""}</p>
       <p class="muted" id="qz-best"></p></div>
     ${readinessHtml(r)}
     ${r.lost_skills.length ? `<h4>איפה אפשר להשתפר</h4><ul class="plain" id="qz-lost">${r.lost_skills.map(s =>
@@ -263,7 +316,7 @@ function renderResult() {
       <p class="muted">אפשר לתרגל את המיומנות ואז לנסות שוב.</p>
       ${r.kind !== "quiz" && r.test.number !== FOCUS ? `<p><a class="button" id="qz-focus" href="#/exam/${esc(r.test.id)}/${FOCUS}">🎯 מבחן תרגול ממוקד על מה שהיה קשה (15 שאלות)</a></p>` : ""}` : `<p id="qz-perfect">כל התשובות נכונות. כל הכבוד!</p>`}
     ${r.missed.length ? `<h4>הטעויות</h4><ol class="qz-missed" id="qz-missed">${r.missed.map(m => `<li><p class="ex-text" dir="auto">${fmt(m.question)}</p>
-      ${m.picked ? `<p class="muted">בחרתם: <span dir="auto">${fmt(m.picked)}</span></p>` : `<p class="muted">לא ענו על השאלה.</p>`}
+      ${missedLine(r, m)}
       ${m.mistake ? `<p><b>${esc(m.mistake.name)}</b>${m.mistake.tip ? `<br>${fmt(m.mistake.tip)}` : ""}</p>` : ""}</li>`).join("")}</ol>` : ""}
     ${reviewHtml(r)}
     <p class="qz-actions">${r.missed.length ? `<a class="button primary" id="qz-retry" href="#/retry/${esc(r.id)}">🔁 חזרה על השאלות שטעיתי (${r.missed.length})</a> ` : ""}${names(r).again ? `<button type="button" class="${r.missed.length ? "" : "primary"}" id="qz-retake">${names(r).again}</button> ` : ""}<button type="button" data-close>${r.kind === "quiz" ? "חזרה למסלול" : "חזרה למבחן"}</button></p>`;
@@ -281,7 +334,7 @@ function onClick(event) {
   if (target.closest("[data-board-toggle]")) { window.MathlyBoard?.toggle(); return; }
   if (attempt?.state === "open") {
     const go = target.closest("[data-go]");
-    if (go && !go.disabled) { at = Number(go.dataset.go); warned = false; renderQuestion(); return; }
+    if (go && !go.disabled) { saveWritten(attempt.questions[at]); at = Number(go.dataset.go); warned = false; renderQuestion(); return; }
     const choice = target.closest(".qz-choice");
     if (choice) { choose(choice); return; }
     if (target.closest("#qz-submit")) { submit(); return; }

@@ -19,7 +19,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timedelta
 
-from . import clock
+from . import clock, writtentest
 
 log = logging.getLogger("mathly2.boardreview")
 
@@ -39,6 +39,17 @@ INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט בישראל.
 - feedback: משפט או שניים לתלמיד, בעברית, בפנייה ברבים (אתם), חם וענייני: מה טוב בדרך, ואם יש טעות, איפה היא הטעות הראשונה ומה סוגה.
 - tip: טיפ אחד קצר ומעשי לפעם הבאה.
 אסור לכתוב את התשובה הסופית הנכונה, את המספר שלה או איזו אפשרות נכונה. אם התלמיד טעה, כוונו אותו לשלב, אל תפתרו בשבילו.
+נוסחאות כתבו בתוך $...$."""
+
+WRITTEN_INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט בישראל ובודקים מבחן אמיתי. תלמיד פתר שאלה פתוחה (בלי תשובות לבחירה) וכתב את הפתרון על לוח. \
+קיבלתם את השאלה, התשובה הנכונה (רק בשבילכם), התשובה הסופית שהתלמיד הקליד (אם יש תיבה כזו לשאלה) ותמונה של הלוח שלו.
+בדקו את הפתרון כמו בבדיקת מבחן:
+- verdict: "correct" אם הדרך נכונה ומגיעה לתשובה הנכונה; "partial" אם הדרך ברובה נכונה אבל יש טעות חישוב, שלב חסר או תשובה סופית שגויה; \
+"wrong" אם השיטה שגויה או שאין התקדמות של ממש; "unclear" אם אי אפשר לקרוא את הלוח או שאין בו פתרון.
+תשובה סופית נכונה בלי דרך בלוח אינה "correct".
+- feedback: משפט או שניים לתלמיד, בעברית, בפנייה ברבים (אתם), חם וענייני: מה טוב בפתרון, ואם יש טעות, איפה הטעות הראשונה ומה סוגה.
+- tip: טיפ אחד קצר ומעשי לפעם הבאה.
+אסור לכתוב את התשובה הסופית הנכונה או את המספר שלה. אם התלמיד טעה, כוונו אותו לשלב, אל תפתרו בשבילו.
 נוסחאות כתבו בתוך $...$."""
 
 SUMMARY_INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט. לפניכם הערכות של הדרך של תלמיד בשאלות של מבחן אחד (לכל שאלה: הנושא, הערכה ומשוב).
@@ -79,6 +90,14 @@ class GeminiReviewer:
         self._lock = threading.Lock()                   # one request at a time: the free tier counts requests a minute
 
     def _parts(self, item: dict) -> list[dict]:
+        if item.get("written"):                         # the written simulation: an open question, its board and the typed final answer
+            typed = item.get("typed")
+            final = ("התלמיד לא הקליד תשובה סופית" if not typed else
+                     f"התשובה הסופית שהתלמיד הקליד: {typed} ({'שווה' if item.get('matches') else 'לא שווה'} לתשובה הנכונה)") if item.get("has_box") \
+                else "לשאלה הזו אין תיבה לתשובה סופית: התשובה צריכה להופיע בלוח"
+            return [{"text": WRITTEN_INSTRUCTIONS},
+                    {"text": f"\n\nהשאלה:\n{item['question']}\nהתשובה הנכונה (לא לגלות): {item['right']}\n{final}\nהלוח של התלמיד:"},
+                    {"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(_small(item["image"])).decode()}}]
         choices = "\n".join(f"  {_letter(i)}. {c}" for i, c in enumerate(item["choices"]))
         picked = _letter(item["picked"]) if item["picked"] is not None else "לא ענה"
         return [{"text": INSTRUCTIONS},
@@ -213,11 +232,18 @@ def _items(app, row: dict) -> tuple[list[dict], dict]:
         picture = store.get_picture(pid) if pid else None
         if not served or not picture or picture["deleted_at"]:
             continue
+        image, skill = app.state.pictures.get(picture["path"]), (bank.skill(q["skill_id"]) or {}).get("name", "")
+        if writtentest.is_written(row):
+            final, typed = writtentest.final_of(bank, q), writtentest.typed(row, q["key"])
+            items.append({"n": n, "skill": skill, "written": True, "question": served["question"], "right": writtentest.right_text(bank, q) or "",
+                          "has_box": final is not None, "typed": typed, "matches": writtentest.matches(typed, final), "image": image})
+            keys[n] = q["key"]
+            continue
         correct = next((c["index"] for c in served["choices"] if (bank.grade(q["skill_id"], q["key"], c["index"]) or {}).get("correct")), 0)
         picked = row["answers"].get(q["key"])
-        items.append({"n": n, "skill": (bank.skill(q["skill_id"]) or {}).get("name", ""),
+        items.append({"n": n, "skill": skill,
                       "question": served["question"], "choices": [c["text"] for c in served["choices"]], "correct": correct,
-                      "picked": picked if isinstance(picked, int) else None, "image": app.state.pictures.get(picture["path"])})
+                      "picked": picked if isinstance(picked, int) else None, "image": image})
         keys[n] = q["key"]
     return items, keys
 
@@ -289,7 +315,12 @@ def run(app, attempt_id: str, keys: list[str] | None = None) -> None:
         result = {"state": "failed", "reason": "provider_error"}
     result["at"] = clock.now().isoformat()
     try:
-        store.save_attempt(attempt_id, review=result)
+        saved = store.save_attempt(attempt_id, review=result)
+        if result["state"] == "done":                                   # a written simulation: its grade from the verdicts
+            try:
+                writtentest.settle_grade(store, app.state.bank, saved)
+            except Exception:
+                log.exception("could not set the written test's grade")
     finally:
         with _running_lock:
             _running.discard(attempt_id)

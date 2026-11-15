@@ -324,12 +324,13 @@ The exercise screen is where a student practices one skill.
 - **SIM-1 On request, no choice.** The student can ask for a simulation at any time, as many times as they like (an open one resumes). The student has no control over its material.
 - **SIM-2 Like the real test.** The simulation covers all the lessons of the real test, with the number of questions and the time limit the teacher set for it (TST-1),
   no skill names, and no feedback until the end.
+- **SIM-3 Written, like a real exam.** The simulation has no choices. Each question is answered on its board; when the right answer is a plain number (5, x = 5, 70°, 1/4) a box takes the final answer too. After the hand-in it is **בבדיקה**: the AI checks each board (it gets the right answer, which the student never sees, and the typed answer) and gives full, half or no points; an empty board is 0. The grade, the readiness gain, the review list and the mistakes round come once it is checked. The teacher sees each board with the right and typed answers and the AI's verdict, and their points replace the AI's; their check is final. Without the AI the simulation waits for the teacher.
 - **SIM-4 Server timer.** The timer is kept on the server, so refreshing or closing the app does not reset it. The grade is stored on the server.
 - **SIM-5 After the simulation,** the result lists the skills that lost points (they feed the focused practice test, EXT-5), offers to answer the wrong questions again, and shows what the simulation added to the readiness number (RDY-5).
 
 ### 4.13 Grades and readiness meter (GRD, RDY)
 
-- **GRD-1 One scale.** Every grade (quiz, exercise test, simulation, assignment) is a whole number from 0 to 100. In a multiple-choice quiz or test every question is worth the same, and the grade is the share of right answers, rounded.
+- **GRD-1 One scale.** Every grade (quiz, exercise test, simulation, assignment) is a whole number from 0 to 100. In a multiple-choice quiz or test every question is worth the same, and the grade is the share of right answers, rounded. In the written simulation (SIM-3) a question is worth 1, ½ or 0 points and the grade is their share.
   Teachers' grades for assignments are on the same scale.
 - **GRD-2 When time ends.** Only the simulation is timed. When its timer ends it is submitted as it stands, and unanswered questions count as wrong.
   Leaving the screen does not stop the timer.
