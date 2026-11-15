@@ -552,3 +552,32 @@ def test_the_curriculum_is_grouped_by_subject(browser):
         page.click("#save-curriculum")
         said(page, "נשמרה")
         assert str(store.curriculum()[f"w{lesson['id']}"]) == "2026-12-01"
+
+
+def test_a_student_goes_back_from_my_access_with_its_button_with_the_browser_and_to_the_same_tab(browser):
+    app, store = seeded()
+    klass = store.create_class("setup", "A", lessons=[], teacher_email=TEACHER)
+    store.add_member(klass["id"], KID)
+    with running(app) as url:
+        page = page_for(browser, PHONE)
+        sign_in(page, url, KID)
+        page.click(".subject-card")
+        page.click(".tabs a[href='#/grades']")
+        page.wait_for_selector("#grades")
+        assert page.locator("#nav .roles").count() == 0                         # one role: no chips to go back with
+        page.click("#access")
+        page.wait_for_selector("#my-access")
+        assert page.evaluate("location.hash") == "#/access"
+        page.click("#access-back")                                               # its own button: back to the grades tab
+        page.wait_for_selector("#grades")
+        assert page.locator(".tabs").count() == 1
+        page.click("#access")
+        page.wait_for_selector("#my-access")
+        page.go_back()                                                           # the browser's back: the same
+        page.wait_for_selector("#grades")
+        page.click(".tabs a[href='#/review']")                                   # and the tabs work after it
+        page.wait_for_selector(".tabs a[href='#/review'][aria-current='page']")
+        page.click("#access")
+        page.wait_for_selector("#my-access")
+        page.reload()                                                            # a reload on it opens the student's screens
+        page.wait_for_selector(".tabs, .subject-card")

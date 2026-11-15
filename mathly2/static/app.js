@@ -2,7 +2,7 @@
 import { api, ApiError } from "./api.js";
 import { esc } from "./math.js";
 import { ROLE_NAMES, visibleRoles } from "./roles.js";
-import { clearRoute, leaveScreen } from "./router.js";
+import { clearRoute, leaveScreen, route } from "./router.js";
 import * as session from "./session.js";
 import { owl } from "./sky.js";
 
@@ -50,13 +50,24 @@ function header(me, current) {
       `<button type="button" data-role="${role}" aria-pressed="${role === current}">${ROLE_NAMES[role]}</button>`).join("")}</span>` : ""}
     <button type="button" id="access">ההרשאות שלי</button> <button type="button" id="out">יציאה</button>`;
   document.getElementById("out").addEventListener("click", () => signOutAndShow());
-  document.getElementById("access").addEventListener("click", async () => {
-    clearRoute();
-    nav.querySelectorAll("[data-role]").forEach(b => b.setAttribute("aria-pressed", "false"));
-    ++opened;                                    // a role screen still loading must not draw over this one
-    await (await import("./access.js")).show(me, view);
-  });
+  document.getElementById("access").addEventListener("click", () => showAccess(me, current));
   nav.querySelectorAll("[data-role]").forEach(button => button.addEventListener("click", () => open(me, button.dataset.role)));
+}
+
+/** "My access" over the role screen, at its own address (#/access): its back button, or the browser's, returns to the screen it came from,
+ *  and a link on it (or any other address) opens the role there. A person with one role has no chips, so this is their only way back. */
+async function showAccess(me, role) {
+  clearRoute({ keepAddress: true });
+  const pushed = location.hash !== "#/access";
+  if (pushed) history.pushState(null, "", "#/access");                             // the screen it came from stays one step back
+  nav.querySelectorAll("[data-role]").forEach(b => b.setAttribute("aria-pressed", "false"));
+  ++opened;                                    // a role screen still loading must not draw over this one
+  route(() => { if (location.hash !== "#/access") open(me, role, { keepAddress: true }); });
+  await (await import("./access.js")).show(me, view);
+  document.getElementById("access-back")?.addEventListener("click", () => {
+    if (pushed) history.back();                // the address changes back, and the route above opens the screen there
+    else open(me, role);
+  });
 }
 
 let opened = 0;   // which role screen is open: a screen opened earlier never draws over a later one (its answers may come late)
