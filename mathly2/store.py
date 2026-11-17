@@ -128,6 +128,9 @@ def _submission_row(row: dict) -> dict:
     return {**_stamped(row, "handed_at", "checked_at"), "pictures": [str(x) for x in (row.get("pictures") or [])]}
 
 
+RECENT_ANSWERS = 800                 # answers read for the forecast grade (one request, the newest first)
+
+
 class InMemoryStore:
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -365,6 +368,12 @@ class InMemoryStore:
         with self._lock:
             return [{k: a[k] for k in ("question_key", "correct", "counted", "day", "mistake_id")} for a in self._answers
                     if a["user_id"] == user_id and a["skill_id"] == skill_id]
+
+    def recent_answers(self, user_id: str, n: int = RECENT_ANSWERS) -> list[dict]:
+        """The student's last `n` answers on every skill, newest first: skill_id, correct, counted, day (the forecast grade, forecast.py)."""
+        with self._lock:
+            mine = [a for a in self._answers if a["user_id"] == user_id][-n:]
+            return [{k: a[k] for k in ("skill_id", "correct", "counted", "day")} for a in reversed(mine)]
 
     def recent_skills(self, user_id: str, n: int = 20) -> list[str]:
         """The skills the student answered most recently, newest first, each once (helped and wrong answers count)."""
@@ -1706,6 +1715,11 @@ class SupabaseStore:
     def answers_of(self, user_id: str, skill_id: str) -> list[dict]:
         rows = self._request("GET", "m2_answers", {"user_id": self._eq(user_id), "skill_id": self._eq(skill_id),
                                                    "select": "question_key,correct,counted,day,mistake_id", "order": "id"})
+        return [{**r, "day": date.fromisoformat(r["day"])} for r in rows]
+
+    def recent_answers(self, user_id: str, n: int = RECENT_ANSWERS) -> list[dict]:
+        rows = self._request("GET", "m2_answers", {"user_id": self._eq(user_id), "select": "skill_id,correct,counted,day",
+                                                   "order": "id.desc", "limit": str(n)})
         return [{**r, "day": date.fromisoformat(r["day"])} for r in rows]
 
     def recent_skills(self, user_id: str, n: int = 20) -> list[str]:

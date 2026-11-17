@@ -29,6 +29,33 @@ export function readinessMeter(test) {
       <i style="width:${from ?? r.number}%"></i>${r.next ? `<s style="inset-inline-start:${r.next.at}%" aria-hidden="true"></s>` : ""}</div></div>`;
 }
 
+/* ---------- the forecast grade: "if the test were today" (forecast.py), on home and after every activity ---------- */
+
+const FORECAST_SEEN = "mathly2.forecast.";
+/** The forecast this device showed last for the test (or null), and remember `now` as seen. */
+export function forecastSeen(testId, now) {
+  let before = null;
+  try {
+    const kept = localStorage.getItem(FORECAST_SEEN + testId);
+    before = kept === null ? null : Number(kept);
+    if (now !== undefined) localStorage.setItem(FORECAST_SEEN + testId, String(now));
+  } catch { /* private window */ }
+  return Number.isFinite(before) ? before : null;
+}
+
+/** The forecast as a meter: the grade (counting up when it grew since the last time it was seen; a drop is shown as it is), the range
+ *  while it rests on few answers, and the bar with the range drawn faintly behind it. */
+export function forecastMeter(f, testId, { id = "", compact = false } = {}) {
+  const before = forecastSeen(testId, f.grade), from = before !== null && before < f.grade ? before : null;
+  const wide = f.high - f.low >= 10;
+  return `<div class="readiness forecast${compact ? " compact" : ""}"${id ? ` id="${id}"` : ""} data-from="${from ?? ""}" data-to="${f.grade}">
+    <p class="rd-top"><b class="rd-num" aria-hidden="true">${from ?? f.grade}</b><span><span class="rd-label">🎯 הציון הצפוי במבחן</span>
+      ${from !== null ? ` <span class="rd-up" aria-hidden="true">+${f.grade - from}</span>` : ""}
+      <br><span class="muted fc-range">${wide ? `בין ${f.low} ל־${f.high} · ` : ""}${f.answers < 10 ? "עוד מעט תשובות, התחזית תתחדד עם התרגול" : "מתעדכן אחרי כל סבב, תרגול ומבחן"}</span></span></p>
+    <div class="bar rd-bar fc-bar" role="progressbar" aria-label="הציון הצפוי במבחן: ${f.grade}${wide ? `, בין ${f.low} ל־${f.high}` : ""}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${f.grade}">
+      ${wide ? `<u style="inset-inline-start:${f.low}%;width:${f.high - f.low}%" aria-hidden="true"></u>` : ""}<i style="width:${from ?? f.grade}%"></i></div></div>`;
+}
+
 /** Count the number up from the last visit's and grow the bar with it. */
 function countUp(root = document) {
   root.querySelectorAll(".readiness[data-from]:not([data-from=''])").forEach(meter => {
@@ -50,6 +77,7 @@ export { countUp };
 /** The nearest test in one compact block (the home is one screen): the readiness number with its level and the days left (a link to the
  *  test's page, with all its tests and grades), the bar, and the two buttons that raise it, each with the most it can add now. */
 function testStrip(test) {
+  if (test.forecast) return forecastStrip(test);
   const r = test.readiness, add = r.can_add, sim = test.simulation.open, from = lastSeen(test);
   return `<section class="strip test-strip" id="nearest-test" data-test="${test.id}">
     <div class="readiness" data-readiness data-from="${from ?? ""}" data-to="${r.number}">
@@ -60,6 +88,24 @@ function testStrip(test) {
       <div class="bar rd-bar" role="progressbar" aria-label="מוכנות למבחן: ${r.number} מתוך 100, ${esc(r.label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${r.number}"><i style="width:${from ?? r.number}%"></i></div></div>
     <div class="test-btns"><a class="test-btn" id="home-practice" href="#/test/${test.id}/practice">📝 מבחן תרגול${add.practice ? ` <small>+${add.practice}</small>` : ""}</a>
       <a class="test-btn sim" id="home-sim" href="#/sim/${test.id}${sim ? `/${esc(sim)}` : ""}">⏱ ${sim ? "להמשיך סימולציה" : "מבחן סימולציה"}${add.simulation && !sim ? ` <small>+${add.simulation}</small>` : ""}</a></div></section>`;
+}
+
+/** The nearest test with its forecast grade, in the strip's one-screen layout: the grade (counting up from the last time it was seen),
+ *  the days left and the range (a link to the test's page, where the readiness number is), the bar, and the practice test and the
+ *  simulation. */
+function forecastStrip(test) {
+  const f = test.forecast, sim = test.simulation.open, before = forecastSeen(test.id, f.grade);
+  const from = before !== null && before < f.grade ? before : null, wide = f.high - f.low >= 10;
+  return `<section class="strip test-strip" id="nearest-test" data-test="${test.id}">
+    <div class="readiness forecast" id="home-forecast" data-from="${from ?? ""}" data-to="${f.grade}">
+      <a class="strip-main" href="#/test/${test.id}"><b class="rd-num" aria-hidden="true">${from ?? f.grade}</b>
+        <span class="grow"><span class="rd-label">🎯 הציון הצפוי במבחן${from !== null ? ` <span class="rd-up" aria-hidden="true">+${f.grade - from}</span>` : ""}</span>
+          <small class="muted">📅 <span class="days">מבחן ${daysText(test.days_left)}</span>${wide ? ` · בין ${f.low} ל־${f.high}` : ""}</small></span>
+        <span class="strip-more" aria-hidden="true">‹</span></a>
+      <div class="bar rd-bar fc-bar" role="progressbar" aria-label="הציון הצפוי במבחן: ${f.grade}${wide ? `, בין ${f.low} ל־${f.high}` : ""}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${f.grade}">
+        ${wide ? `<u style="inset-inline-start:${f.low}%;width:${f.high - f.low}%" aria-hidden="true"></u>` : ""}<i style="width:${from ?? f.grade}%"></i></div></div>
+    <div class="test-btns"><a class="test-btn" id="home-practice" href="#/test/${test.id}/practice">📝 מבחן תרגול</a>
+      <a class="test-btn sim" id="home-sim" href="#/sim/${test.id}${sim ? `/${esc(sim)}` : ""}">⏱ ${sim ? "להמשיך סימולציה" : "מבחן סימולציה"}</a></div></section>`;
 }
 
 /** An assignment's state in a symbol and a word (never colour alone). */

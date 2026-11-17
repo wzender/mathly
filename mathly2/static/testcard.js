@@ -3,7 +3,7 @@
 // handed in with what each one added.
 import { api } from "./api.js";
 import { esc, fmt } from "./math.js";
-import { countUp, readinessMeter } from "./home.js";
+import { countUp, forecastMeter, readinessMeter } from "./home.js";
 import { daysText, forSubject, homeHref, setSubject, shortDate, tabs } from "./ui.js";
 
 const MODES = [
@@ -96,7 +96,7 @@ export async function show(view, id, focus = "") {
   view(`${tabs("home")}<p><a class="back" href="${homeHref()}">‹ הבית</a></p>
     <section class="card" id="test-card" data-test="${test.id}"><h2>מבחן ב־${shortDate(test.date)} <span class="muted">(${daysText(test.days_left)})</span></h2>
       <p class="muted">${test.lessons.map(l => fmt(l.name)).join(", ")}${test.note ? ` · ${esc(test.note)}` : ""}</p>
-      ${readinessMeter(test)}${how(test.readiness)}</section>
+      ${test.forecast ? forecastMeter(test.forecast, test.id, { id: "card-forecast" }) : ""}${readinessMeter(test)}${how(test.readiness)}</section>
     ${simulationCard(test)}
     ${practiceCard(test)}
     ${trailCard(test)}

@@ -781,3 +781,10 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
   border: 1px dashed color-mix(in srgb, var(--sky-gold) 60%, transparent); background: color-mix(in srgb, var(--sky-gold) 8%, transparent); }
 .view-as select { min-height: 40px; }
 .view-as .muted { font-size: 13px; }
+
+/* The forecast grade (home.js forecastMeter): the range drawn faintly behind the bar. */
+.fc-bar { position: relative; }
+.fc-bar u { position: absolute; top: 0; bottom: 0; border-radius: inherit; background: color-mix(in srgb, var(--sky-aurora) 22%, transparent); text-decoration: none; }
+.fc-bar i { position: relative; }
+.forecast.compact .rd-top { margin: 4px 0; }
+.forecast .fc-range { font-size: 13px; }
