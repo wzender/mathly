@@ -1,0 +1,58 @@
+"""The forecast grade (הציון הצפוי) for a real test: "if the test were today, what would I get?", from everything the student did on the
+test's skills. It moves after every activity (a round, practice, a quiz, a practice test, the simulation), up after right answers and down
+after wrong ones, honestly.
+
+Each skill of the test gets a chance of answering a question on it right. It starts from the skill's state (not started 30%, learning 50%,
+mastered 85%, held like a few answers' worth) and moves with the student's latest answers on it: the newest weigh most, and answers in a
+practice test or the simulation weigh double (they are closest to the real test). A mastered skill does not fall below 75%; a faded one
+(not answered for a while) loses a tenth. The forecast grade is the mean chance over the test's skills, as the test draws its questions
+evenly over them. With few answers it is a guess, so it comes with a range that narrows as the student practises."""
+from __future__ import annotations
+
+from math import sqrt
+
+PRIOR = {"not_started": (0.30, 2.0), "learning": (0.50, 2.0), "mastered": (0.85, 4.0)}   # state -> (chance, how many answers it is worth)
+DECAY = 0.85                     # each older answer on a skill weighs this much of the one after it
+LAST = 12                        # answers per skill that count
+TEST_WEIGHT = 2.0                # an answer in a practice test or the simulation
+MASTERED_FLOOR = 0.75
+FADED = 0.9
+WIDEST, NARROWEST = 25, 3        # the range's half-width with no answers, and at the least
+
+
+def skill_chance(state: str, faded: bool, answers: list[tuple[bool, float]]) -> float:
+    """`answers`: the skill's latest answers, newest first, as (right, weight)."""
+    chance, strength = PRIOR.get(state, PRIOR["not_started"])
+    right, total = chance * strength, strength
+    for i, (ok, weight) in enumerate(answers[:LAST]):
+        w = weight * DECAY ** i
+        right += w * (1.0 if ok else 0.0)
+        total += w
+    p = right / total
+    if state == "mastered":
+        p = max(p, MASTERED_FLOOR)
+    return p * FADED if faded else p
+
+
+def compute(skills: list[str], states: dict[str, str], faded: set[str], answers: dict[str, list[tuple[bool, float]]]) -> dict | None:
+    """The forecast for a test on `skills`: {"grade", "low", "high", "answers"} (the range, and how many answers it rests on), or None
+    for a test with no skills."""
+    if not skills:
+        return None
+    chances = [skill_chance(states.get(s, "not_started"), s in faded, answers.get(s, [])) for s in skills]
+    grade = round(100 * sum(chances) / len(chances))
+    count = sum(min(len(answers.get(s, [])), LAST) for s in skills)
+    half = max(NARROWEST, round(WIDEST / sqrt(1 + count / 5)))
+    return {"grade": grade, "low": max(0, grade - half), "high": min(100, grade + half), "answers": count}
+
+
+def answers_by_skill(recent: list[dict], tests: list[tuple[str, bool]]) -> dict[str, list[tuple[bool, float]]]:
+    """The answers per skill, newest first: the handed-in practice tests' and simulations' answers (`tests`: (skill, right), newest
+    first) before the practice and round answers (`recent`: the store's recent answers, newest first; helped ones do not count)."""
+    out: dict[str, list[tuple[bool, float]]] = {}
+    for skill, ok in tests:
+        out.setdefault(skill, []).append((ok, TEST_WEIGHT))
+    for a in recent:
+        if a.get("counted", True):
+            out.setdefault(a["skill_id"], []).append((bool(a["correct"]), 1.0))
+    return out

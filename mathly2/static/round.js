@@ -5,7 +5,8 @@ import { api, ApiError } from "./api.js";
 import { figures } from "./figures.js";
 import { esc, fmt } from "./math.js";
 import { loadBoard } from "./exercise.js";
-import { homeHref, pathHref, shuffled } from "./ui.js";
+import { forSubject, homeHref, pathHref, shuffled } from "./ui.js";
+import { countUp, forecastMeter } from "./home.js";
 import { sendWorkQuietly } from "./boardwork.js";
 
 const COUNTDOWN = 2;   // seconds before the next question after a right answer
@@ -104,7 +105,19 @@ function resultHtml() {
     ${r.stars < 3 ? `<p class="muted rd-next">${r.stars < 2 ? "8 מתוך 10 נותנים כוכב שני." : "הכוכב השלישי: כל המיומנויות נשלטו. חוזרים מחר לעוד סבב."}</p>` : ""}
     ${r.missed.length ? `<h4>מה כדאי לחזק</h4><ol class="ex-missed" id="rd-missed">${r.missed.map(m => `<li><p class="muted">${fmt(m.skill_name)}</p><p class="ex-text" dir="auto">${fmt(m.question)}</p>
       ${m.mistake ? `<p><b>${esc(m.mistake.name)}</b>${m.mistake.tip ? `<br>${fmt(m.mistake.tip)}` : ""}</p>` : ""}</li>`).join("")}</ol>` : ""}
+    <div id="rd-forecast" aria-live="polite"></div>
     <p class="ex-actions"><button type="button" class="primary" id="rd-again">סבב נוסף</button> <button type="button" data-close>חזרה למפה</button></p></section>`;
+}
+
+/** After a round: the nearest test's forecast grade, growing from what was seen last (a round moves it, forecast.py). */
+async function showForecast(id) {
+  try {
+    const got = await api(forSubject("/api/forecast"));
+    const slot = q("#rd-forecast");
+    if (!got.forecast || !slot || round?.id !== id) return;
+    slot.innerHTML = forecastMeter(got.forecast, got.test.id, { compact: true });
+    countUp(slot);
+  } catch { /* the result stands without it */ }
 }
 
 function mountBoard() {
@@ -116,6 +129,7 @@ function render(notice = "") {
   q(".mx-sheet").innerHTML = `${heading()}${notice ? `<p class="ex-note" role="status">${esc(notice)}</p>` : ""}${progress()}
     ${round.state === "done" ? resultHtml() : questionHtml()}`;
   mountBoard();
+  if (round.state === "done" && !isRetry()) showForecast(round.id);
 }
 
 function updateProgress() {

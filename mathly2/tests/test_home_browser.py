@@ -404,21 +404,28 @@ def answer_in_browser(page, bank, store, kind, scope, rights):
 
 # --- readiness: the home's block, the test's page, practice tests by mode and simulations on request ---
 
-def test_home_shows_the_readiness_and_two_clear_buttons_that_raise_it(browser, bank):
+def test_home_shows_the_forecast_grade_with_its_range_and_it_counts_up_after_practice(browser, bank):
     app, store, klass, lessons = world(bank)
     test = add_test(store, klass, lessons, 2)
     with running(app) as url:
         page = sign_in(browser, url)
         to_home(page)
         strip = page.locator("#nearest-test")
-        assert "מבחן בעוד 2 ימים" in strip.inner_text() and "מוכנות למבחן" in strip.inner_text()
-        assert strip.locator(".rd-num").inner_text() == "0" and "מתחילים" in strip.inner_text() and 'עוד 40 לרמה "בדרך"' in strip.inner_text()
+        assert "מבחן בעוד 2 ימים" in strip.inner_text() and "הציון הצפוי במבחן" in strip.inner_text()
+        assert strip.locator(".rd-num").inner_text() == "30" and "בין 5 ל־55" in strip.inner_text()          # nothing done: a wide guess
         assert page.get_attribute("#nearest-test .strip-main", "href") == f"#/test/{test['id']}"
-        assert "מבחן תרגול" in page.inner_text("#home-practice") and "+30" in page.inner_text("#home-practice") and "+60" in page.inner_text("#home-sim")
-        assert page.get_attribute("#home-practice", "href") == f"#/test/{test['id']}/practice"
+        assert page.inner_text("#home-practice").strip() == "📝 מבחן תרגול" and "+" not in page.inner_text("#home-sim")
+        for skill in covered(bank, lessons):                                                        # right answers on every skill
+            for n in range(4):
+                store.add_answer(KID_ID, skill, f"{skill}:{n}", True, True, None, clock.school_day())
+        page.reload()
+        page.wait_for_selector("#home-forecast .rd-up")
+        page.wait_for_function("document.querySelector('#home-forecast .rd-num').textContent === document.querySelector('#home-forecast').dataset.to")
+        grade = int(page.inner_text("#home-forecast .rd-num"))
+        assert grade > 30 and page.inner_text("#home-forecast .rd-up") == f"+{grade - 30}"
         page.click("#home-practice")                                                                # straight to choosing a practice test
         page.wait_for_selector("#practice .modes")
-        assert page.evaluate("document.getElementById('practice').getBoundingClientRect().top") < 200
+        assert page.evaluate("document.getElementById('practice').getBoundingClientRect().top") < 260
         no_sideways_scroll(page)
 
 
@@ -473,7 +480,7 @@ def test_the_tests_page_has_three_practice_modes_and_the_trail_of_gains(browser,
     finished(store, f"{test['id']}:1", "exercise_test", 50)
     with running(app) as url:
         page = card_page(browser, url, test["id"])
-        page.wait_for_function("document.querySelector('#test-card .rd-num').textContent === '15'")
+        page.wait_for_function("document.querySelector('#test-card .readiness:not(.forecast) .rd-num').textContent === '15'")
         assert [m.get_attribute("data-mode") for m in page.locator("#practice .mode").all()] == ["balanced", "focus", "manual"]
         assert page.locator("#practice input[value='focus']").is_disabled()                          # nothing hard yet (no questions in that one)
         assert "+15" in page.inner_text("#trail") and "מבחן תרגול מאוזן" in page.inner_text("#trail")

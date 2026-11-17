@@ -124,8 +124,8 @@ function testCard(c, t) {
     <p class="muted">${t.lessons.map(l => fmt(l.name)).join(", ")}${t.note ? ` · ${esc(t.note)}` : ""} · ${t.questions} שאלות · ${t.minutes} דקות</p>
     ${t.simulation.missing.length ? `<p class="sim-missing"><b>עוד לא עשו סימולציה:</b> ${t.simulation.missing.map(e => `<span dir="ltr">${esc(e)}</span>`).join(", ")}</p>`
       : t.simulation.total ? `<p class="sim-missing">כולם עשו את מבחן הסימולציה.</p>` : ""}
-    ${t.students.length ? `<div class="tablewrap"><table class="data readiness-table"><thead><tr><th>תלמיד</th><th>מוכנות</th><th>מבחני תרגול</th><th>סימולציות</th></tr></thead>
-      <tbody>${t.students.map(s => `<tr><td dir="ltr">${esc(s.email)}</td><td>${s.readiness.number} · ${esc(s.readiness.label)}</td>
+    ${t.students.length ? `<div class="tablewrap"><table class="data readiness-table"><thead><tr><th>תלמיד</th><th>ציון צפוי</th><th>מוכנות</th><th>מבחני תרגול</th><th>סימולציות</th></tr></thead>
+      <tbody>${t.students.map(s => `<tr><td dir="ltr">${esc(s.email)}</td><td class="fc-cell">${s.forecast ? `${s.forecast.grade} <span class="muted">(${s.forecast.low}–${s.forecast.high})</span>` : "—"}</td><td>${s.readiness.number} · ${esc(s.readiness.label)}</td>
         <td>${s.readiness.practices ? `${s.readiness.practices} · הטוב ${s.readiness.practice_best}` : "—"}</td><td>${s.readiness.simulations ? `${s.readiness.simulations} · הטוב ${s.readiness.simulation_best}` : "—"}</td></tr>`).join("")}</tbody></table></div>` : ""}
     <p class="test-actions">${open ? `<button type="button" data-edit="${t.id}">שינוי</button> ` : ""}<button type="button" data-remove-test="${t.id}">הסרה</button></p>
     <div class="edit-slot" data-slot="${t.id}"></div></article>`;

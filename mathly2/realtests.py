@@ -9,9 +9,9 @@ from datetime import date as Day
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from . import writtentest, attempts, clock, exam, readiness, reads
+from . import attempts, clock, exam, forecast, readiness, reads, writtentest
 from .access import allowed, learner, my_classes, need
-from .learning import MASTERED, next_skill, skill_state
+from .learning import MASTERED, is_faded, next_skill, skill_state
 
 router = APIRouter(prefix="/api")
 
@@ -56,6 +56,7 @@ def prime_students(request: Request, user_ids: list[str], kinds: tuple[str, ...]
     store, here = request.app.state.store, reads.of(request)
     jobs = {"progress_of": reads.POOL.submit(store.progress_of_users, ids), "last_answered": reads.POOL.submit(store.last_answered_users, ids)}
     jobs.update({("attempts_of", kind): reads.POOL.submit(store.attempts_of_users, ids, kind) for kind in kinds})
+    answers = {uid: reads.POOL.submit(store.recent_answers, uid) for uid in ids}             # the forecast grade: one read a student, together
     for key, future in jobs.items():
         found = future.result()
         for uid in ids:
@@ -63,10 +64,31 @@ def prime_students(request: Request, user_ids: list[str], kinds: tuple[str, ...]
                 here.prime(key[0], (uid, key[1]), found[uid])
             else:
                 here.prime(key, (uid,), found[uid])
+    for uid, future in answers.items():
+        here.prime("recent_answers", (uid,), future.result())
 
 
 def _student_reads(user_id: str) -> list[tuple]:
-    return [("progress_of", user_id), ("last_answered", user_id), ("attempts_of", user_id, "exercise_test"), ("attempts_of", user_id, "simulation")]
+    return [("progress_of", user_id), ("last_answered", user_id), ("attempts_of", user_id, "exercise_test"), ("attempts_of", user_id, "simulation"),
+            ("recent_answers", user_id)]
+
+
+def forecast_for(request: Request, user_id: str | None, facts: dict, today: date) -> dict | None:
+    """The forecast grade for this test (forecast.py): the test's skills, their states, the faded ones, and the answers on them, with the
+    handed-in practice tests' and simulations' answers counted double."""
+    if not user_id:
+        return None
+    here, bank, store = reads.of(request), request.app.state.bank, request.app.state.store
+    last = here.last_answered(user_id)
+    faded = {s for s in facts["covered"] if is_faded(facts["states"].get(s, "not_started"), last.get(s), today)}
+    tests: list[tuple[str, bool]] = []
+    for row in reversed(facts["graded"]):                                     # the newest test first
+        work = store.work_of(row["user_id"], row["id"]) if writtentest.is_written(row) else None
+        for q in row["questions"]:
+            got = writtentest.question_points(row, q["key"], q["key"] in work) if work is not None \
+                else attempts.points(bank, q, row["answers"], row.get("credit"))
+            tests.append((q["skill_id"], (got or 0.0) >= 1.0))
+    return forecast.compute(facts["covered"], facts["states"], faded, forecast.answers_by_skill(here.recent_answers(user_id), tests))
 
 
 def _kind_of(row: dict) -> str:
@@ -158,7 +180,7 @@ def card(request: Request, user_id: str | None, test: dict, today: date) -> dict
     lessons = {l["id"]: l["name"] for l in bank.lessons}
     return {"id": test["id"], "date": test["date"].isoformat(), "days_left": days_left, "note": test["note"], "subject_id": test.get("subject_id", "math"),
             "lessons": [{"id": i, "name": n} for i, n in zip(test["lessons"], lesson_names(request, test["lessons"]))],
-            "questions": test["questions"], "minutes": test["minutes"], "readiness": readiness_for(facts),
+            "questions": test["questions"], "minutes": test["minutes"], "readiness": readiness_for(facts), "forecast": forecast_for(request, user_id, facts, today),
             "practice": {"balanced": {"number": exam.BALANCED, "size": test["questions"], "open": open_of(by_mode["balanced"])},
                          "focus": {"number": exam.FOCUS, "size": exam.FOCUS_SIZE, "open": open_of(by_mode["focus"]),
                                    "skills": [skill_row(i) for i in facts["focus_skills"]]},
@@ -212,7 +234,8 @@ def teacher_view(request: Request, test: dict, klass: dict, today: date) -> dict
     for m in members:
         facts = facts_for(request, m["user_id"], test, today)
         students.append({"email": m["email"], "signed_in": bool(m["user_id"]), "simulation_taken": facts["sim_taken"],
-                         "readiness": readiness_for(facts)})          # readiness: the number, and how many practice tests and simulations
+                         "readiness": readiness_for(facts),          # readiness: the number, and how many practice tests and simulations
+                         "forecast": forecast_for(request, m["user_id"], facts, today)})
     taken = sum(1 for s in students if s["simulation_taken"])
     return {"id": test["id"], "class": {"id": klass["id"], "name": klass["name"]}, "date": test["date"].isoformat(), "note": test["note"],
             "subject_id": test.get("subject_id", "math"),
@@ -301,6 +324,22 @@ def home(request: Request, user: dict = Depends(learner), subject: str = Query("
     return {"tests": cards,
             "next_skill": {"id": next_id, "name": next_skill_row["name"]} if next_skill_row else None,
             "behind": behind_lessons(request, user, subject), "subject": subject, "map": lesson_map(request, user, subject)}
+
+
+@router.get("/forecast")
+def nearest_forecast(request: Request, user: dict = Depends(learner), subject: str = Query("math", max_length=40)) -> dict:
+    """The nearest test's forecast grade, for the screens that end an activity (a round's result): {"test", "forecast"}, or nulls."""
+    here, today = reads.of(request), clock.school_day()
+    from .skills import subject_param
+    subject = subject_param(request, user, subject)
+    class_ids = [c["id"] for c in my_classes(request, user)]
+    here.prefetch(("tests_of_classes", class_ids), *_student_reads(user["id"]))
+    test = next((t for t in here.tests_of_classes(class_ids) if t["date"] >= today and t.get("subject_id", "math") == subject), None)
+    if test is None:
+        return {"test": None, "forecast": None}
+    facts = facts_for(request, user["id"], test, today)
+    return {"test": {"id": test["id"], "date": test["date"].isoformat(), "days_left": (test["date"] - today).days},
+            "forecast": forecast_for(request, user["id"], facts, today)}
 
 
 def _student_test(request: Request, user: dict, test_id: int) -> dict:
