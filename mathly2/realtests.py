@@ -9,7 +9,7 @@ from datetime import date as Day
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from . import attempts, clock, exam, forecast, readiness, reads, writtentest
+from . import attempts, clock, exam, forecast, nextstep, readiness, reads, writtentest
 from .access import allowed, learner, my_classes, need
 from .learning import MASTERED, is_faded, next_skill, skill_state
 
@@ -78,6 +78,12 @@ def forecast_for(request: Request, user_id: str | None, facts: dict, today: date
     handed-in practice tests' and simulations' answers counted double."""
     if not user_id:
         return None
+    faded, answers = forecast_inputs(request, user_id, facts, today)
+    return forecast.compute(facts["covered"], facts["states"], faded, answers)
+
+
+def forecast_inputs(request: Request, user_id: str, facts: dict, today: date) -> tuple[set[str], dict]:
+    """The faded skills of the test's material and the answers per skill, as the forecast reads them."""
     here, bank, store = reads.of(request), request.app.state.bank, request.app.state.store
     last = here.last_answered(user_id)
     faded = {s for s in facts["covered"] if is_faded(facts["states"].get(s, "not_started"), last.get(s), today)}
@@ -88,7 +94,7 @@ def forecast_for(request: Request, user_id: str | None, facts: dict, today: date
             got = writtentest.question_points(row, q["key"], q["key"] in work) if work is not None \
                 else attempts.points(bank, q, row["answers"], row.get("credit"))
             tests.append((q["skill_id"], (got or 0.0) >= 1.0))
-    return forecast.compute(facts["covered"], facts["states"], faded, forecast.answers_by_skill(here.recent_answers(user_id), tests))
+    return faded, forecast.answers_by_skill(here.recent_answers(user_id), tests)
 
 
 def _kind_of(row: dict) -> str:
@@ -321,9 +327,21 @@ def home(request: Request, user: dict = Depends(learner), subject: str = Query("
     cards = [card(request, user["id"], t, today) for t in tests]
     next_id = _next_path_skill(request, user, subject)
     next_skill_row = request.app.state.bank.skill(next_id) if next_id else None
-    return {"tests": cards,
+    the_map = lesson_map(request, user, subject)
+    return {"tests": cards, "next_step": _next_step(request, uid, tests[0] if tests else None, cards[0] if cards else None, the_map, today),
             "next_skill": {"id": next_id, "name": next_skill_row["name"]} if next_skill_row else None,
-            "behind": behind_lessons(request, user, subject), "subject": subject, "map": lesson_map(request, user, subject)}
+            "behind": behind_lessons(request, user, subject), "subject": subject, "map": the_map}
+
+
+def _next_step(request: Request, uid: str, test: dict | None, test_card: dict | None, the_map: dict, today: date) -> dict | None:
+    """Home's next step (nextstep.py), with the nearest test's material when there is a test."""
+    here = reads.of(request)
+    states = {p["skill_id"]: skill_state(p) for p in here.progress_of(uid)}
+    facts = facts_for(request, uid, test, today) if test else None
+    faded, answers = forecast_inputs(request, uid, facts, today) if facts else (set(), {})
+    return nextstep.choose(bank=request.app.state.bank, lessons=the_map["lessons"], next_lesson=the_map["next"], states=states,
+                           recent=here.recent_answers(uid), today=today, daily=the_map["today"], test=test_card, test_facts=facts,
+                           test_answers=answers, faded=faded)
 
 
 @router.get("/forecast")

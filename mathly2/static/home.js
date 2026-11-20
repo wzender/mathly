@@ -70,7 +70,7 @@ export function forecastMeter(f, testId, { id = "", compact = false, link = "", 
     const p = f.placement, left = p.need - p.done;
     return `<div class="readiness forecast placing${compact ? " compact" : ""}"${id ? ` id="${id}"` : ""} data-from="${st.from ?? ""}" data-to="${p.done}" data-min="0" data-max="${p.need}">
       ${top(`<span class="fc-icon" aria-hidden="true">🔍</span><span class="grow"><span class="rd-label">מגלים את הליגה שלך</span>
-        <small class="muted">${when}${when ? " · " : ""}עוד ${left} ${left === 1 ? "תשובה" : "תשובות"} בחומר של המבחן</small></span>
+        <small class="muted">${when}${when ? " · " : ""}עוד ${left} ${left === 1 ? "תשובה" : "תשובות"}</small></span>
         <span class="fc-count"><b class="rd-num">${st.from ?? p.done}</b>/${p.need}</span>`)}
       <div class="bar rd-bar fc-bar" role="progressbar" aria-label="מגלים את הליגה: ${p.done} מתוך ${p.need} תשובות" aria-valuemin="0" aria-valuemax="${p.need}" aria-valuenow="${p.done}"><i style="width:${100 * (st.from ?? p.done) / p.need}%"></i></div></div>`;
   }
@@ -181,9 +181,45 @@ function tile(l, next) {
 }
 
 /** The top: the stars collected, the lessons perfected, the streak and the daily goal, then the big play button for the next lesson. */
-function quest(map, chips = "") {
+/* ---------- the next step: one exercise to do now, and why it moves the student forward (nextstep.py) ---------- */
+
+/** The card's words by the kind of step: what it is, the main line, the chip (the reward) and one short line of why it helps.
+ *  `f`: the nearest test's forecast. */
+function stepWords(step, f) {
+  const lesson = step.lesson ? fmt(step.lesson.name) : "";
+  const next = f && !f.placement ? f.leagues[f.league + 1] : null;
+  switch (step.kind) {
+    case "continue": return { icon: "▶", small: "להמשיך מאיפה שעצרתם", title: lesson, chip: "◐", why: "הסבב מחכה לכם: מסיימים וקולטים כוכבים." };
+    case "crown": return { icon: "👑", small: "עוד תשובה נכונה אחת", title: `ו"${fmt(step.skill.name)}" בשליטה`, chip: "⭐ +1",
+      why: "הכי קרוב לכתר: כתר = כוכב וקפיצה בליגה." };
+    case "behind": return { icon: "⏰", small: "להשלים", title: lesson, chip: `עד ${shortDate(step.due_date)}`, why: "היה אמור להסתיים: סבב אחד סוגר את הפער." };
+    case "test": return { icon: "📅", small: `במבחן ${daysText(step.days_left)}`, title: lesson,
+      chip: `~${step.in_test} ${step.in_test === 1 ? "שאלה" : "שאלות"}`, why: "הנושא הכי חלש שלכם במבחן: כאן מרוויחים נקודות." };
+    case "league": return f?.placement
+      ? { icon: "▶", small: "הצעד הבא שלך", title: `סבב: ${lesson}`, chip: "🔍 +10", why: `מקרב את גילוי הליגה (עוד ${f.placement.need - f.placement.done} תשובות).` }
+      : { icon: "▶", small: "הצעד הבא שלך", title: `סבב: ${lesson}`, chip: `${(next || f?.leagues[f.league])?.icon || "🚀"} +${step.gain}`,
+          why: next ? `הכי מקרב לליגת ${next.icon} ${next.name}: סבב טוב = עוד ${step.gain} נקודות.` : "הכי שומר על הליגה הגבוהה ביותר." };
+    default: return { icon: "▶", small: step.stars ? "לעוד כוכב" : "השיעור הבא", title: lesson, chip: starsText(step.stars || 0),
+      why: "8 נכונות מתוך 10 = כוכב בשיעור." };
+  }
+}
+
+/** The next step as the first thing under the status line: one link with what it is, what it costs, why it moves the student forward
+ *  and the reward; 🎯 when it completes today's goal. */
+function nextStepCard(step, f) {
+  const w = stepWords(step, f);
+  const cost = `⏱ ${step.minutes} דק׳`, size = step.questions === 1 ? "שאלה אחת" : `${step.questions} שאלות`;
+  return `<a class="play next-step step-${step.kind}" id="play" href="${esc(step.href)}" data-kind="${step.kind}"
+      aria-label="${esc(`${w.small}: ${plainText(w.title)}. ${w.why} ${cost}, ${size}${step.completes_goal ? ", משלים את היעד היומי" : ""}`)}">
+    <span class="ns-row"><span class="play-icon" aria-hidden="true">${w.icon}</span>
+      <span class="grow"><small>${w.small}</small><b>${w.title}</b></span>
+      <span class="ns-side"><span class="ns-chip">${w.chip}</span><span class="ns-cost" title="${size}">${cost}${step.completes_goal ? " · 🎯" : ""}</span></span></span>
+    <span class="ns-why">${w.why}</span></a>`;
+}
+
+function quest(map, chips = "", step = null, f = null) {
   const next = map.lessons.find(l => l.id === map.next);
-  const play = next ? `<a class="play" id="play" href="${roundHref(next.id)}"><span class="play-icon" aria-hidden="true">▶</span>
+  const play = step ? nextStepCard(step, f) : next ? `<a class="play" id="play" href="${roundHref(next.id)}"><span class="play-icon" aria-hidden="true">▶</span>
       <span class="grow"><small>${next.round_open ? "להמשיך את הסבב" : next.behind ? "להשלים" : next.stars ? "לעוד כוכב" : "השיעור הבא"}</small><b>${fmt(next.name)}</b></span>
       <span class="lstars" aria-label="${starsLabel(next.stars)}">${starsText(next.stars)}</span></a>`
     : `<p class="all-perfect" id="play">👑 כל השיעורים מושלמים! אפשר להעמיק בלשונית העמקה.</p>`;
@@ -219,7 +255,7 @@ function draw(view, data, assignments, ai) {
   const [first] = data.tests;
   const chips = assignmentsChip(assignments) + aiChips(ai);
   view(`${tabs("home")}${backToSubjects()}
-    ${quest(data.map, chips)}
+    ${quest(data.map, chips, data.next_step, first?.forecast)}
     ${first ? testStrip(first) : ""}
     ${board(data.map)}`);
   countUp();
