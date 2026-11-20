@@ -788,3 +788,25 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .fc-bar i { position: relative; }
 .forecast.compact .rd-top { margin: 4px 0; }
 .forecast .fc-range { font-size: 13px; }
+
+/* The forecast as a game (home.js forecastMeter): finding the league, then a league with its icon, the points to the next one, the
+   forecast grade small at the side, and a cheer when the league is revealed or goes up. */
+.forecast .strip-main, .forecast .fc-top { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+.forecast .fc-icon { font-size: 30px; line-height: 1; flex: none; }
+.forecast .rd-label { font-weight: 800; font-size: 17px; }
+.forecast .grow { display: flex; flex-direction: column; min-width: 0; }
+.forecast .fc-grade { display: flex; flex-direction: column; align-items: center; line-height: 1.1; flex: none; }
+.forecast .fc-grade small { font-size: 11px; color: var(--muted); }
+.forecast .fc-grade .rd-num { font-size: 22px; }
+.forecast .fc-count { font-weight: 700; color: var(--muted); flex: none; }
+.forecast .fc-count .rd-num { font-size: 22px; color: var(--text); }
+.forecast.placing .fc-bar i { background: repeating-linear-gradient(45deg, var(--sky-aurora), var(--sky-aurora) 8px, color-mix(in srgb, var(--sky-aurora) 70%, #fff) 8px, color-mix(in srgb, var(--sky-aurora) 70%, #fff) 16px); }
+.forecast.league-0 .fc-bar i { background: #c9d4e8; }
+.forecast.league-1 .fc-bar i { background: #e2a86b; }
+.forecast.league-2 .fc-bar i { background: var(--sky-gold); }
+.forecast.league-3 .fc-bar i { background: linear-gradient(90deg, #8b7bff, #4fd1ff); }
+.fc-cheer { margin: 0 0 6px; padding: 6px 10px; border-radius: 10px; font-weight: 800; text-align: center;
+  background: color-mix(in srgb, var(--sky-gold) 18%, transparent); animation: fc-pop .5s ease-out; }
+@keyframes fc-pop { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .fc-cheer { animation: none; } }
+.fc-detail { margin: 6px 0 0; font-size: 13px; }
