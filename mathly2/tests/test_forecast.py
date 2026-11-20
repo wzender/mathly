@@ -78,3 +78,11 @@ def test_the_test_card_the_nearest_forecast_and_the_teacher_all_carry_it(world):
 def test_no_test_means_no_forecast(world):
     client, store, lessons = world
     assert client.get("/api/forecast", headers=auth(KID)).json() == {"test": None, "forecast": None}
+
+
+def test_home_carries_the_next_step_toward_the_tests_material(world):
+    client, store, lessons = world
+    set_test(client, lessons, days=30)
+    step = client.get("/api/home", headers=auth(KID)).json()["next_step"]
+    assert step["kind"] in ("league", "next") and step["href"].startswith("#/round/") and step["questions"] == 10 and step["test"] is True
+    assert step["lesson"]["id"] in lessons

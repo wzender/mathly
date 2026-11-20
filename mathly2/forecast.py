@@ -70,3 +70,21 @@ def answers_by_skill(recent: list[dict], tests: list[tuple[str, bool]]) -> dict[
         if a.get("counted", True):
             out.setdefault(a["skill_id"], []).append((bool(a["correct"]), 1.0))
     return out
+
+
+def chances(skills: list[str], states: dict[str, str], faded: set[str], answers: dict[str, list[tuple[bool, float]]]) -> dict[str, float]:
+    """Each skill's chance of a right answer (as in compute)."""
+    return {s: skill_chance(states.get(s, "not_started"), s in faded, answers.get(s, [])) for s in skills}
+
+
+def gain_of_round(skills: list[str], states: dict[str, str], faded: set[str], answers: dict[str, list[tuple[bool, float]]],
+                  round_skills: list[str], size: int = 10) -> int:
+    """How many points a good round (`size` right answers spread over `round_skills`) would add to the forecast grade."""
+    if not skills or not round_skills:
+        return 0
+    before = compute(skills, states, faded, answers)["grade"]
+    after = {s: list(v) for s, v in answers.items()}
+    for i in range(size):
+        s = round_skills[i % len(round_skills)]
+        after[s] = [(True, 1.0)] + after.get(s, [])
+    return compute(skills, states, faded, after)["grade"] - before

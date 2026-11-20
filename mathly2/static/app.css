@@ -810,3 +810,12 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 @keyframes fc-pop { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .fc-cheer { animation: none; } }
 .fc-detail { margin: 6px 0 0; font-size: 13px; }
+
+/* The next step on home (home.js nextStepCard): the yellow play button with the reward and the time at the side and one line of why. */
+.play.next-step { flex-direction: column; align-items: stretch; gap: 4px; padding: 8px 12px; }
+.next-step .ns-row { display: flex; align-items: center; gap: 10px; }
+.next-step .grow { display: flex; flex-direction: column; min-width: 0; }
+.next-step .ns-why { font-size: 13px; line-height: 1.3; opacity: .9; }
+.next-step .ns-side { flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.next-step .ns-chip { padding: 3px 9px; border-radius: 999px; font-weight: 800; font-size: 13.5px; background: #1c2440; color: #ffd36b; white-space: nowrap; }
+.next-step .ns-cost { font-size: 12px; font-weight: 700; white-space: nowrap; }
