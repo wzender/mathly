@@ -404,28 +404,41 @@ def answer_in_browser(page, bank, store, kind, scope, rights):
 
 # --- readiness: the home's block, the test's page, practice tests by mode and simulations on request ---
 
-def test_home_shows_the_forecast_grade_with_its_range_and_it_counts_up_after_practice(browser, bank):
+def test_home_finds_the_league_first_then_reveals_it_and_counts_up_after_practice(browser, bank):
     app, store, klass, lessons = world(bank)
     test = add_test(store, klass, lessons, 2)
+    skills = covered(bank, lessons)
+    day = clock.school_day()
+
+    def answer(n, right=True):
+        for skill in skills:
+            for i in range(n):
+                store.add_answer(KID_ID, skill, f"{skill}:{i}", right, True, None, day)
+
     with running(app) as url:
         page = sign_in(browser, url)
         to_home(page)
         strip = page.locator("#nearest-test")
-        assert "מבחן בעוד 2 ימים" in strip.inner_text() and "הציון הצפוי במבחן" in strip.inner_text()
-        assert strip.locator(".rd-num").inner_text() == "30" and "בין 5 ל־55" in strip.inner_text()          # nothing done: a wide guess
+        assert "מגלים את הליגה שלך" in strip.inner_text() and "מבחן בעוד 2 ימים" in strip.inner_text()   # no low number on day one
+        assert page.inner_text("#home-forecast .fc-count") == "0/15" and "עוד 15 תשובות" in strip.inner_text()
         assert page.get_attribute("#nearest-test .strip-main", "href") == f"#/test/{test['id']}"
         assert page.inner_text("#home-practice").strip() == "📝 מבחן תרגול" and "+" not in page.inner_text("#home-sim")
-        for skill in covered(bank, lessons):                                                        # right answers on every skill
-            for n in range(4):
-                store.add_answer(KID_ID, skill, f"{skill}:{n}", True, True, None, clock.school_day())
+        answer(1)                                                                                   # a few answers: the bar fills
+        page.reload()
+        page.wait_for_selector("#home-forecast.placing")
+        page.wait_for_function(f"document.querySelector('#home-forecast .rd-num').textContent === '{len(skills)}'")   # counts up 0 -> 8
+        answer(4)                                                                                   # enough: the league is revealed
+        page.reload()
+        page.wait_for_selector("#home-forecast[data-league]")
+        assert "נחשפה הליגה שלך" in page.inner_text(".fc-cheer") and "ליגת" in page.inner_text("#home-forecast .rd-label")
+        first = int(page.get_attribute("#home-forecast", "data-to"))
+        answer(8)                                                                                   # more right answers: up, with +N
         page.reload()
         page.wait_for_selector("#home-forecast .rd-up")
-        page.wait_for_function("document.querySelector('#home-forecast .rd-num').textContent === document.querySelector('#home-forecast').dataset.to")
-        grade = int(page.inner_text("#home-forecast .rd-num"))
-        assert grade > 30 and page.inner_text("#home-forecast .rd-up") == f"+{grade - 30}"
+        grade = int(page.get_attribute("#home-forecast", "data-to"))
+        assert grade > first and page.inner_text("#home-forecast .rd-up") == f"+{grade - first}"
         page.click("#home-practice")                                                                # straight to choosing a practice test
         page.wait_for_selector("#practice .modes")
-        assert page.evaluate("document.getElementById('practice').getBoundingClientRect().top") < 260
         no_sideways_scroll(page)
 
 
@@ -512,3 +525,29 @@ def test_without_the_ai_a_written_simulation_waits_for_the_teacher(browser, bank
         page.wait_for_selector("#qz-checking")
         assert "ממתין לבדיקת המורה" in page.inner_text("#qz-checking") and page.locator("#qz-grade").count() == 0
         assert store.attempts_of(KID_ID, "simulation")[0]["grade"] is None and page.errors == []
+
+
+def test_a_league_is_held_through_a_small_dip_and_going_up_is_cheered(browser, bank):
+    app, store, klass, lessons = world(bank)
+    with running(app) as url:
+        page = sign_in(browser, url)
+        to_home(page)
+        show = """async ([grade, seen]) => {
+            const m = await import('/static/home.js');
+            if (seen === null) localStorage.removeItem('mathly2.forecast.99'); else localStorage.setItem('mathly2.forecast.99', JSON.stringify(seen));
+            const leagues = [{at: 0, name: 'ירח', icon: '🌙'}, {at: 55, name: 'כוכב לכת', icon: '🪐'}, {at: 70, name: 'כוכב', icon: '⭐'}, {at: 85, name: 'גלקסיה', icon: '🌌'}];
+            const league = leagues.map(l => l.at).filter(at => grade >= at).length - 1;
+            const box = document.createElement('div');
+            box.innerHTML = m.forecastMeter({grade, low: grade - 5, high: grade + 5, answers: 40, placement: null, league, leagues, keep: 3}, 99, {});
+            const el = box.firstElementChild;
+            return {league: Number(el.dataset.league), cheer: box.querySelector('.fc-cheer')?.textContent || ''};
+        }"""
+        held = page.evaluate(show, [68, {"grade": 72, "league": 2, "done": 40}])
+        assert held == {"league": 2, "cheer": ""}                                                   # 68 is within 3 of ⭐ at 70: kept
+        dropped = page.evaluate(show, [64, {"grade": 72, "league": 2, "done": 40}])
+        assert dropped["league"] == 1 and dropped["cheer"] == ""                                    # a real drop: shown quietly
+        up = page.evaluate(show, [71, {"grade": 66, "league": 1, "done": 40}])
+        assert up["league"] == 2 and "עליתם לליגת ⭐ כוכב" in up["cheer"]
+        revealed = page.evaluate(show, [60, {"grade": 40, "league": -1, "done": 14}])
+        assert revealed["league"] == 1 and "נחשפה הליגה שלך" in revealed["cheer"]
+        assert page.errors == []

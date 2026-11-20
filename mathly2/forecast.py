@@ -19,6 +19,18 @@ MASTERED_FLOOR = 0.75
 FADED = 0.9
 WIDEST, NARROWEST = 25, 3        # the range's half-width with no answers, and at the least
 
+# What the student sees (the teacher sees the numbers): until PLACEMENT answers on the test's material, "finding your league" with a bar
+# that only fills ("placement matches", as in competitive games); then a league with the points to the next one. A league is never left
+# for a dip of less than KEEP points below its floor (the screens remember the league last shown).
+PLACEMENT = 15
+LEAGUES = [{"at": 0, "name": "ירח", "icon": "🌙"}, {"at": 55, "name": "כוכב לכת", "icon": "🪐"},
+           {"at": 70, "name": "כוכב", "icon": "⭐"}, {"at": 85, "name": "גלקסיה", "icon": "🌌"}]
+KEEP = 3
+
+
+def league_of(grade: int) -> int:
+    return max(i for i, league in enumerate(LEAGUES) if grade >= league["at"])
+
 
 def skill_chance(state: str, faded: bool, answers: list[tuple[bool, float]]) -> float:
     """`answers`: the skill's latest answers, newest first, as (right, weight)."""
@@ -43,7 +55,9 @@ def compute(skills: list[str], states: dict[str, str], faded: set[str], answers:
     grade = round(100 * sum(chances) / len(chances))
     count = sum(min(len(answers.get(s, [])), LAST) for s in skills)
     half = max(NARROWEST, round(WIDEST / sqrt(1 + count / 5)))
-    return {"grade": grade, "low": max(0, grade - half), "high": min(100, grade + half), "answers": count}
+    return {"grade": grade, "low": max(0, grade - half), "high": min(100, grade + half), "answers": count,
+            "placement": {"done": count, "need": PLACEMENT} if count < PLACEMENT else None,
+            "league": league_of(grade), "leagues": LEAGUES, "keep": KEEP}
 
 
 def answers_by_skill(recent: list[dict], tests: list[tuple[str, bool]]) -> dict[str, list[tuple[bool, float]]]:

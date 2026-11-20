@@ -8,7 +8,7 @@ to see the grade they are heading for, and a bar that fills with every activity 
 ## What Changes
 
 - A forecast grade per upcoming test: a chance per skill of the test from its state and the latest answers on it (the newest weigh most, test answers double), averaged over the test's skills, with a range that narrows with practice.
-- Home's test strip shows the forecast in place of the readiness number (which stays on the test's page), counting up with "+N" when it grew since it was last seen. It is honest: wrong answers lower it.
+- Home's test strip shows it as a game in place of the readiness number (which stays on the test's page): "finding your league" until 15 answers on the test's material (no low first guess is ever shown), then a league (🌙 ירח, 🪐 כוכב לכת, ⭐ כוכב, 🌌 גלקסיה) with the points to the next one, cheered when revealed or moving up, held through a small dip. The grade counts up with "+N"; a drop is shown quietly.
 - The result of a lesson round shows the forecast; the test's page shows it above readiness; the teacher's tests tab has a column for it.
 - One new read: the student's latest answers on every skill (`recent_answers`); a route `/api/forecast` for the nearest test.
 

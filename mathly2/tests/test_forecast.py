@@ -7,7 +7,8 @@ from mathly2.tests.test_realtests_api import KID, TEACHER, auth, bank, covered, 
 
 def test_nothing_done_is_a_wide_guess_from_the_states():
     got = forecast.compute(["a", "b"], {}, set(), {})
-    assert got == {"grade": 30, "low": 5, "high": 55, "answers": 0}
+    assert {k: got[k] for k in ("grade", "low", "high", "answers")} == {"grade": 30, "low": 5, "high": 55, "answers": 0}
+    assert got["placement"] == {"done": 0, "need": forecast.PLACEMENT} and got["league"] == 0
     assert forecast.compute(["a", "b"], {"a": "mastered", "b": "learning"}, set(), {})["grade"] == round(100 * (0.85 + 0.5) / 2)
     assert forecast.compute([], {}, set(), {}) is None
 
@@ -26,6 +27,14 @@ def test_a_test_answer_counts_double_a_mastered_skill_has_a_floor_and_a_faded_on
     assert forecast.skill_chance("learning", False, [(True, 2.0)]) > forecast.skill_chance("learning", False, [(True, 1.0)])
     assert forecast.skill_chance("mastered", False, [(False, 1.0)] * 12) == forecast.MASTERED_FLOOR
     assert forecast.skill_chance("mastered", True, []) == forecast.skill_chance("mastered", False, []) * 0.9
+
+
+def test_placement_until_enough_answers_then_a_league_by_the_grade():
+    few = forecast.compute(["a"], {}, set(), {"a": [(True, 1.0)] * 5})
+    assert few["placement"] == {"done": 5, "need": 15}
+    many = forecast.compute(["a", "b"], {}, set(), {"a": [(True, 1.0)] * 8, "b": [(True, 1.0)] * 8})
+    assert many["placement"] is None and many["leagues"][many["league"]]["at"] <= many["grade"]
+    assert [forecast.league_of(g) for g in (0, 54, 55, 69, 70, 84, 85, 100)] == [0, 0, 1, 1, 2, 2, 3, 3]
 
 
 def test_the_range_narrows_with_answers():
