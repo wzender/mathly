@@ -432,6 +432,8 @@ def test_home_finds_the_league_first_then_reveals_it_and_counts_up_after_practic
         page.wait_for_selector("#home-forecast[data-league]")
         assert "נחשפה הליגה שלך" in page.inner_text(".fc-cheer") and "ליגת" in page.inner_text("#home-forecast .rd-label")
         first = int(page.get_attribute("#home-forecast", "data-to"))
+        shown = page.inner_text("#home-forecast")
+        assert "צפוי" not in shown and f"{first}" not in shown.replace(f"עוד {55 - first}", "")   # the student never sees the forecast number
         answer(8)                                                                                   # more right answers: up, with +N
         page.reload()
         page.wait_for_selector("#home-forecast .rd-up")

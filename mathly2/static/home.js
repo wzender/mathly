@@ -81,11 +81,10 @@ export function forecastMeter(f, testId, { id = "", compact = false, link = "", 
   return `<div class="readiness forecast league-${st.league}${compact ? " compact" : ""}"${id ? ` id="${id}"` : ""} data-league="${st.league}"
       data-from="${st.from ?? ""}" data-to="${f.grade}" data-min="${min}" data-max="${max}">
     ${cheer ? `<p class="fc-cheer" role="status">${cheer}</p>` : ""}
-    ${top(`<span class="fc-icon" aria-hidden="true">${now.icon}</span><span class="grow"><span class="rd-label">ליגת ${now.name}</span>
-      <small class="muted">${when}${when ? " · " : ""}${toNext}</small></span>
-      <span class="fc-grade" title="הציון הצפוי במבחן"><small>צפוי</small><b class="rd-num">${st.from ?? f.grade}</b>${st.from !== null ? `<span class="rd-up" aria-hidden="true">+${f.grade - st.from}</span>` : ""}</span>`)}
-    <div class="bar rd-bar fc-bar" role="progressbar" aria-label="ליגת ${now.name}, הציון הצפוי ${f.grade}${next ? `, ${next.at} לליגה הבאה` : ""}" aria-valuemin="${min}" aria-valuemax="${max}" aria-valuenow="${f.grade}"><i style="width:${pct(st.from ?? f.grade)}%"></i></div>
-    ${detail ? `<p class="muted fc-detail">הציון הצפוי אם המבחן היה היום: ${f.grade}${f.high - f.low >= 10 ? ` (בין ${f.low} ל־${f.high})` : ""}. מתעדכן אחרי כל סבב, תרגול ומבחן.</p>` : ""}</div>`;
+    ${top(`<span class="fc-icon" aria-hidden="true">${now.icon}</span><span class="grow"><span class="rd-label">ליגת ${now.name}${st.from !== null ? ` <span class="rd-up" aria-hidden="true">+${f.grade - st.from}</span>` : ""}</span>
+      <small class="muted">${when}${when ? " · " : ""}${toNext}</small></span>`)}
+    <div class="bar rd-bar fc-bar" role="progressbar" aria-label="ליגת ${now.name}${next ? `, ${toNext}` : ""}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct(f.grade))}"><i style="width:${pct(st.from ?? f.grade)}%"></i></div>
+    ${detail ? `<p class="muted fc-detail">הליגה מתעדכנת אחרי כל סבב, תרגול ומבחן בחומר של המבחן: כל תשובה נכונה מקרבת לליגה הבאה.</p>` : ""}</div>`;
 }
 
 /** Count the number up from the last visit's and grow the bar with it. */
@@ -95,11 +94,11 @@ function countUp(root = document) {
     const min = Number(meter.dataset.min || 0), max = Number(meter.dataset.max || 100);                // a league's bar spans its own points
     const width = v => `${Math.max(0, Math.min(100, 100 * (v - min) / (max - min)))}%`;
     meter.dataset.from = "";
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { num.textContent = to; bar.style.width = width(to); return; }
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { if (num) num.textContent = to; bar.style.width = width(to); return; }
     const start = performance.now(), time = 900;
     const frame = now => {
       const k = Math.min(1, (now - start) / time), v = Math.round(from + (to - from) * (1 - (1 - k) ** 3));
-      num.textContent = v;
+      if (num) num.textContent = v;
       bar.style.width = width(v);
       if (k < 1) requestAnimationFrame(frame); else meter.classList.add("grew");
     };
