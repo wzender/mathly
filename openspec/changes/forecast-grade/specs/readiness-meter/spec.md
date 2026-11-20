@@ -26,7 +26,7 @@ Until the student has 15 answers on the test's material, home SHALL show "מגל
 - **THEN** the strip says "מגלים את הליגה שלך" with 0/15, and no grade
 
 ### Requirement: Leagues
-After the placement, the student SHALL see a league by the forecast grade (🌙 ירח below 55, 🪐 כוכב לכת from 55, ⭐ כוכב from 70, 🌌 גלקסיה from 85) with the points to the next league, a bar across the current league, and the forecast grade small at the side. The teacher SHALL see the forecast grade and its range as numbers.
+After the placement, the student SHALL see a league by the forecast grade (🌙 ירח below 55, 🪐 כוכב לכת from 55, ⭐ כוכב from 70, 🌌 גלקסיה from 85) with the points to the next league and a bar across the current league; the student SHALL NOT see the forecast grade itself, only "+N" when it rose. The teacher SHALL see the forecast grade and its range as numbers.
 
 #### Scenario: Revealed
 - **WHEN** a student reaches 15 answers on the test's material with a forecast of 73
@@ -44,7 +44,7 @@ Every move up SHALL be cheered. A league SHALL be kept through a dip of less tha
 - **THEN** home cheers "עליתם לליגת ⭐ כוכב"
 
 ### Requirement: Where the forecast shows
-Home's test strip SHALL show the placement or the league in place of the readiness number, counting up with "+N" when the forecast grew since it was last seen on the device. The result of a lesson round and the test's page SHALL show it (the test's page with the forecast grade and its range), and the teacher's tests tab SHALL show each student's forecast.
+Home's test strip SHALL show the placement or the league in place of the readiness number, counting up with "+N" when the forecast grew since it was last seen on the device. The result of a lesson round and the test's page SHALL show it, and the teacher's tests tab SHALL show each student's forecast.
 
 #### Scenario: After practice
 - **WHEN** a student answers right on the test's skills and opens home again
