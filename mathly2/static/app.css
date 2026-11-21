@@ -819,3 +819,6 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .next-step .ns-side { flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .next-step .ns-chip { padding: 3px 9px; border-radius: 999px; font-weight: 800; font-size: 13.5px; background: #1c2440; color: #ffd36b; white-space: nowrap; }
 .next-step .ns-cost { font-size: 12px; font-weight: 700; white-space: nowrap; }
+/* With practice on the go beside the tests: three buttons in a row (home.js forecastStrip). */
+.test-btns:has(.go) { grid-template-columns: 1fr 1fr 1fr; }
+.test-btns:has(.go) .test-btn { white-space: nowrap; padding-inline: 6px; }

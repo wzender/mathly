@@ -15,7 +15,7 @@ from .access import RoleResolver, learner, permissions_of, preview_classes
 from .auth import DevAuthenticator, SupabaseAuthenticator, current_user
 from .bank import Bank, load_bank
 
-from . import accounts, ai, ai_help, assignments, boardreview, boardwork, classes, cleanup, content, progress, prompter, quizzes, reads, realtests, review, rounds, skills, status, subjects, worksheets, written
+from . import onthego, accounts, ai, ai_help, assignments, boardreview, boardwork, classes, cleanup, content, progress, prompter, quizzes, reads, realtests, review, rounds, skills, status, subjects, worksheets, written
 from .config import Settings, load_settings
 from .cached import CachedStore
 from .store import InMemoryStore, StoreUnavailable, SupabaseStore
@@ -51,6 +51,7 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     app = FastAPI(title="Mathly 2", lifespan=lifespan)
     app.state.settings = settings = (settings or load_settings()).check()
     app.state.bank = bank or load_bank()   # a broken bank stops the server from starting
+    app.state.onthego = onthego.load_keys()   # the questions that need no board (practice on the go)
     if settings.supabase_on:
         app.state.store = store or CachedStore(SupabaseStore(settings.supabase_url, settings.supabase_secret), settings.cache_seconds)
         app.state.authenticator = authenticator or SupabaseAuthenticator(settings.supabase_url, settings.supabase_key)

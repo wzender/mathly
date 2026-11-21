@@ -17,10 +17,10 @@ import logging
 from collections import Counter
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from . import attempts, clock, quiz, reads, writtentest
+from . import attempts, clock, onthego, quiz, reads, writtentest
 from .access import learner
 from .learning import MASTERED, record_practice_answer, skill_state
 
@@ -109,7 +109,9 @@ def view(request: Request, row: dict) -> dict:
     """An open round: its size, a result per answered question and the next question (without the right answer). A finished round: its result."""
     bank, store = request.app.state.bank, request.app.state.store
     source = _source_info(request, row) if row["kind"] == RETRY else None
-    if source:
+    if row["kind"] == onthego.KIND:                                      # on the go: the subject's questions that need no board
+        lesson = {"id": row["scope"], "name": "תרגול בנסיעה", "subject_id": row["scope"]}
+    elif source:
         first = bank.skill(row["questions"][0]["skill_id"]) if row["questions"] else None
         lesson = next((l for l in bank.lessons if first and l["id"] == first["unit"]), {})
         lesson = {"id": row["scope"], "name": source["title"], "subject_id": lesson.get("subject_id", "math")}
@@ -150,7 +152,7 @@ def view(request: Request, row: dict) -> dict:
         missed.append({"question": served["question"] if served else "", "skill_name": (bank.skill(q["skill_id"]) or {}).get("name", ""),
                        "n": source["_order"].get(q["key"]) if source else None,
                        "mistake": {"name": mistake["name"], "tip": mistake["tip"]} if mistake else None})
-    stars_now = None if source else _lesson_stars(request, uid, row["scope"], store.attempts_of(uid, KIND, row["scope"]))
+    stars_now = _lesson_stars(request, uid, row["scope"], store.attempts_of(uid, KIND, row["scope"])) if row["kind"] == KIND else None
     return {**base, "state": "done", "question": None, "source": _public(source),
             "result": {"right": sum(base["results"]), "total": base["total"], "grade": row["grade"], "stars": stars_now,
                        "mastered": mastered, "almost": almost, "missed": missed}}
@@ -158,7 +160,7 @@ def view(request: Request, row: dict) -> dict:
 
 def _mine(request: Request, user: dict, round_id: str) -> dict:
     row = request.app.state.store.get_attempt(round_id)
-    if row is None or row["user_id"] != user["id"] or row["kind"] not in (KIND, RETRY):
+    if row is None or row["user_id"] != user["id"] or row["kind"] not in (KIND, RETRY, onthego.KIND):
         raise HTTPException(404, "הסבב לא נמצא")
     return row
 
@@ -215,6 +217,38 @@ def start_retry(attempt_id: str, request: Request, user: dict = Depends(learner)
         raise HTTPException(409, "אין שאלות לא נכונות לחזור עליהן")
     now = clock.now()
     return view(request, store.create_attempt(uid, RETRY, attempt_id, now, now + timedelta(days=365), wrong))
+
+
+def onthego_lessons(request: Request, user: dict, subject: str) -> list[str]:
+    """The student's lessons of the subject, in order (what on-the-go practice draws from)."""
+    from .skills import visible_lesson_ids
+    shown = visible_lesson_ids(request, user)
+    return [l["id"] for l in request.app.state.bank.lessons_of_subject(subject) if shown is None or l["id"] in shown]
+
+
+@router.post("/onthego/start")
+def onthego_start(request: Request, user: dict = Depends(learner), subject: str = Query("math", max_length=40)) -> dict:
+    """Practice on the go: resume the open round of this subject, else draw one from the questions that need no board."""
+    from .access import my_classes
+    from .skills import subject_param
+    store, bank, here, uid = request.app.state.store, request.app.state.bank, reads.of(request), user["id"]
+    subject = subject_param(request, user, subject)
+    here.prefetch(("attempts_of", uid, onthego.KIND, subject), ("progress_of", uid))
+    mine = here.attempts_of(uid, onthego.KIND, subject)
+    for row in mine:
+        if attempts.is_open(row):
+            return view(request, row)
+    today = clock.school_day()
+    class_ids = [c["id"] for c in my_classes(request, user)]
+    nearest = next((t for t in here.tests_of_classes(class_ids) if t["date"] >= today and t.get("subject_id", "math") == subject), None)
+    states = {p["skill_id"]: skill_state(p) for p in here.progress_of(uid)}
+    used = Counter(q["key"] for row in mine for q in row["questions"])
+    drawn = onthego.draw(bank, request.app.state.onthego, onthego_lessons(request, user, subject), states,
+                         set(nearest["lessons"]) if nearest else set(), used, getattr(request.app.state, "quiz_rng", None))
+    if not drawn:
+        raise HTTPException(409, "אין עדיין שאלות לתרגול בנסיעה בשיעורים שלך")
+    now = clock.now()
+    return view(request, store.create_attempt(uid, onthego.KIND, subject, now, now + timedelta(days=365), drawn))
 
 
 @router.post("/lessons/{lesson_id}/round/start")

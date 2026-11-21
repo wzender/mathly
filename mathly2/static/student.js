@@ -41,11 +41,17 @@ export async function show(me, rawView) {
     phone.stopComputer();                                      // a page that was waiting for the phone's photo is left
     const raw = location.hash.replace(/^#/, "");
     const where = raw.startsWith("/") ? raw : "/";          // no address, or the sign-in service's "#access_token=…": the first screen
-    if (!where.startsWith("/round/") && !where.startsWith("/retry/")) lessonRound.close();
+    if (!where.startsWith("/round/") && !where.startsWith("/retry/") && where !== "/onthego") lessonRound.close();
     try {
       if (where.startsWith("/round/")) {                                     // a lesson's round over the home (a link or a reload: the home first)
         exercise.close(); quiz.close();
         const data = await lessonRound.start(decodeURIComponent(where.slice(7)));
+        setSubject(data.subject_id);
+        if (!document.getElementById("lesson-map")) await home.show(view);
+        await lessonRound.show(data);
+      } else if (where === "/onthego") {                                     // practice on the go: questions that need no board, over the home
+        exercise.close(); quiz.close();
+        const data = await lessonRound.startOnTheGo();
         setSubject(data.subject_id);
         if (!document.getElementById("lesson-map")) await home.show(view);
         await lessonRound.show(data);

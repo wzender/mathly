@@ -163,3 +163,28 @@ def test_home_shows_the_current_lesson_and_folds_the_past_and_the_coming_ones(br
         no_sideways_scroll(page)
         shot(page, "home-by-date")
         assert page.errors == []
+
+
+def test_practice_on_the_go_from_home_has_no_board_and_ends_with_another_round(browser, bank):
+    app, store, small, lessons = world(bank)
+    with running(app) as url:
+        page = sign_in(browser, url)
+        to_home(page)
+        page.click("#home-onthego")
+        page.wait_for_selector(".round-layer #ex-q")
+        assert "תרגול בנסיעה" in page.inner_text("#rd-title") and "בלי לוח" in page.inner_text(".round-layer .ex-chip")
+        assert page.locator(".round-layer [data-board-toggle]").count() == 0                       # no board on the go
+        keys = app.state.onthego
+        for n in range(10):
+            assert page.get_attribute(".round-layer #ex-q", "data-key") in keys if page.locator(".round-layer #ex-q[data-key]").count() else True
+            page.locator(".round-layer .ex-choice").first.click()
+            page.wait_for_selector(".round-layer .ex-ok, .round-layer .ex-bad")
+            page.click("#rd-next")
+            if n < 9:
+                page.wait_for_function(f"document.querySelector('#rd-count').textContent.includes('{n + 2} מתוך')")
+        page.wait_for_selector("#rd-result[data-kind='onthego']")
+        assert "עוד סבב בנסיעה" in page.inner_text("#rd-again") and page.locator(".rd-bigstars").count() == 0
+        shot(page, "onthego-result")
+        page.click("#rd-again")
+        page.wait_for_selector(".round-layer #ex-q")
+        assert len(store.attempts_of(KID_ID, "onthego_round", "math")) == 2 and page.errors == []
