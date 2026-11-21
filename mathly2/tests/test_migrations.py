@@ -549,3 +549,15 @@ def test_rounds_of_every_kind_are_kept(db, kind):
     as_role(db, "service_role", f"insert into public.m2_attempts(user_id, kind, scope, due_at) values ('00000000-0000-0000-0000-0000000000ab', '{kind}', 'math', now() + interval '1 day')")
     with pytest.raises(psycopg.errors.CheckViolation):
         as_role(db, "service_role", "insert into public.m2_attempts(user_id, kind, scope, due_at) values ('00000000-0000-0000-0000-0000000000ab', 'other', 'math', now() + interval '1 day')")
+
+
+# --- suggestions and feedback (20261123090000) ---
+
+def test_the_server_keeps_feedback_and_the_browser_roles_cannot_read_it(db):
+    as_role(db, "service_role", "insert into public.m2_feedback(user_id, email, roles, kind, body, page) values ('00000000-0000-0000-0000-0000000000ac', 'k@s.test', '{student}', 'idea', 'רעיון', '#/')")
+    assert as_role(db, "service_role", "select kind, body, handled_at from public.m2_feedback") == [("idea", "רעיון", None)]
+    with pytest.raises(psycopg.errors.CheckViolation):
+        as_role(db, "service_role", "insert into public.m2_feedback(user_id, email, kind, body) values ('00000000-0000-0000-0000-0000000000ac', 'k@s.test', 'spam', 'x')")
+    for role in ("authenticated", "anon"):
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            as_role(db, role, "select * from public.m2_feedback")

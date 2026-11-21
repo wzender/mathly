@@ -48,8 +48,9 @@ function header(me, current) {
   nav.innerHTML = `<span class="muted" dir="ltr">${esc(me.email)}</span>
     ${roles.length > 1 ? `<span class="roles" role="group" aria-label="תפקיד">${roles.map(role =>
       `<button type="button" data-role="${role}" aria-pressed="${role === current}">${ROLE_NAMES[role]}</button>`).join("")}</span>` : ""}
-    <button type="button" id="access">ההרשאות שלי</button> <button type="button" id="out">יציאה</button>`;
+    <button type="button" id="access">ההרשאות שלי</button> <button type="button" id="out">יציאה</button> <button type="button" id="feedback" title="הצעה או משוב" aria-label="הצעה או משוב">💡</button>`;
   document.getElementById("out").addEventListener("click", () => signOutAndShow());
+  document.getElementById("feedback").addEventListener("click", async () => (await import("./feedback.js")).open());
   document.getElementById("access").addEventListener("click", () => showAccess(me, current));
   nav.querySelectorAll("[data-role]").forEach(button => button.addEventListener("click", () => open(me, button.dataset.role)));
 }

@@ -12,10 +12,12 @@ from mathly2.main import create_app
 from mathly2.store import InMemoryStore
 
 PUBLIC = {("GET", "/api/health")}
-ANY_SIGNED_IN = {("GET", "/api/me")}
+ANY_SIGNED_IN = {("GET", "/api/me"), ("POST", "/api/feedback")}
 NEEDS = {   # (method, path) -> permission
     ("GET", "/api/lessons"): "path.use",
     ("GET", "/api/dev/status"): "dev.status",
+    ("GET", "/api/feedback"): "dev.status",
+    ("POST", "/api/feedback/{feedback_id}/handled"): "dev.status",
     ("GET", "/api/prompter/texts"): "dev.status",
     ("POST", "/api/prompter/texts"): "dev.status",
     ("PUT", "/api/prompter/texts/{text_id}"): "dev.status",
@@ -148,7 +150,7 @@ def world():
 
 
 def call(client, method, path, email):
-    url = path.format(skill_id="t_ext", lesson_id="t", attempt_id="x", round_id="x", test_id="1", number="1", picture_id="x", assignment_id="1", submission_id="1", request_id="x", class_id="1", subject_id="math", index="0", text_id="00000000-0000-0000-0000-000000000000", email="someone@school.test", role="teacher")
+    url = path.format(skill_id="t_ext", lesson_id="t", attempt_id="x", round_id="x", test_id="1", number="1", picture_id="x", assignment_id="1", submission_id="1", request_id="x", class_id="1", subject_id="math", index="0", text_id="00000000-0000-0000-0000-000000000000", feedback_id="1", email="someone@school.test", role="teacher")
     sends = method in ("POST", "PUT", "PATCH")
     return client.request(method, url, headers={"Authorization": f"Bearer dev:{email}"}, json={} if sends else None)
 
