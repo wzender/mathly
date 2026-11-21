@@ -128,6 +128,10 @@ def _submission_row(row: dict) -> dict:
     return {**_stamped(row, "handed_at", "checked_at"), "pictures": [str(x) for x in (row.get("pictures") or [])]}
 
 
+def _feedback_row(r: dict) -> dict:
+    return {**r, "created_at": _when(r.get("created_at")), "handled_at": _when(r.get("handled_at"))}
+
+
 RECENT_ANSWERS = 800                 # answers read for the forecast grade (one request, the newest first)
 
 
@@ -140,6 +144,7 @@ class InMemoryStore:
         self._roles: dict[tuple[str, str], dict] = {}     # (email, role) -> row
         self._progress: dict[tuple[str, str], dict] = {}   # (user_id, skill_id) -> row
         self._answers: list[dict] = []
+        self._feedback: list[dict] = []
         self._comets: dict[str, dict[str, str]] = {}       # user_id -> {comet_id: caught_at}
         self._attempts: dict[str, dict] = {}                # attempt id -> row
         self._work: dict[tuple, dict] = {}                  # (user id, ref, question key) -> the board's picture for that answer
@@ -368,6 +373,32 @@ class InMemoryStore:
         with self._lock:
             return [{k: a[k] for k in ("question_key", "correct", "counted", "day", "mistake_id")} for a in self._answers
                     if a["user_id"] == user_id and a["skill_id"] == skill_id]
+
+    # --- suggestions and feedback (feedback.py) ---
+
+    def add_feedback(self, user_id: str, email: str, roles: list[str], kind: str, body: str, page: str, at: datetime) -> dict:
+        with self._lock:
+            row = {"id": len(self._feedback) + 1, "user_id": user_id, "email": email, "roles": list(roles), "kind": kind, "body": body,
+                   "page": page, "created_at": at, "handled_at": None}
+            self._feedback.append(row)
+            return dict(row)
+
+    def feedback(self, limit: int = 200) -> list[dict]:
+        """The newest first."""
+        with self._lock:
+            return [dict(r) for r in sorted(self._feedback, key=lambda r: (r["created_at"], r["id"]), reverse=True)[:limit]]
+
+    def feedback_count_since(self, user_id: str, since: datetime) -> int:
+        with self._lock:
+            return sum(1 for r in self._feedback if r["user_id"] == user_id and r["created_at"] >= since)
+
+    def mark_feedback(self, feedback_id: int, handled_at: datetime | None) -> dict | None:
+        with self._lock:
+            row = next((r for r in self._feedback if r["id"] == feedback_id), None)
+            if row is None:
+                return None
+            row["handled_at"] = handled_at
+            return dict(row)
 
     def recent_answers(self, user_id: str, n: int = RECENT_ANSWERS) -> list[dict]:
         """The student's last `n` answers on every skill, newest first: skill_id, correct, counted, day (the forecast grade, forecast.py)."""
@@ -1716,6 +1747,24 @@ class SupabaseStore:
         rows = self._request("GET", "m2_answers", {"user_id": self._eq(user_id), "skill_id": self._eq(skill_id),
                                                    "select": "question_key,correct,counted,day,mistake_id", "order": "id"})
         return [{**r, "day": date.fromisoformat(r["day"])} for r in rows]
+
+    def add_feedback(self, user_id: str, email: str, roles: list[str], kind: str, body: str, page: str, at: datetime) -> dict:
+        rows = self._request("POST", "m2_feedback", None, {"user_id": user_id, "email": email, "roles": list(roles), "kind": kind,
+                                                           "body": body, "page": page, "created_at": at.isoformat()}, returning=True)
+        return _feedback_row(rows[0])
+
+    def feedback(self, limit: int = 200) -> list[dict]:
+        rows = self._request("GET", "m2_feedback", {"select": "*", "order": "created_at.desc,id.desc", "limit": str(limit)})
+        return [_feedback_row(r) for r in rows]
+
+    def feedback_count_since(self, user_id: str, since: datetime) -> int:
+        rows = self._request("GET", "m2_feedback", {"user_id": self._eq(user_id), "created_at": f"gte.{since.isoformat()}", "select": "id"})
+        return len(rows)
+
+    def mark_feedback(self, feedback_id: int, handled_at: datetime | None) -> dict | None:
+        rows = self._request("PATCH", "m2_feedback", {"id": self._eq(feedback_id)}, {"handled_at": handled_at.isoformat() if handled_at else None},
+                             returning=True)
+        return _feedback_row(rows[0]) if rows else None
 
     def recent_answers(self, user_id: str, n: int = RECENT_ANSWERS) -> list[dict]:
         rows = self._request("GET", "m2_answers", {"user_id": self._eq(user_id), "select": "skill_id,correct,counted,day",

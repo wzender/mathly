@@ -822,3 +822,25 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 /* With practice on the go beside the tests: three buttons in a row (home.js forecastStrip). */
 .test-btns:has(.go) { grid-template-columns: 1fr 1fr 1fr; }
 .test-btns:has(.go) .test-btn { white-space: nowrap; padding-inline: 6px; }
+
+/* Suggestions and feedback (feedback.js): the sheet from the header, and the developer's list (developer.js). */
+.fb-sheet { display: grid; gap: 8px; }
+.fb-kinds { display: flex; flex-wrap: wrap; gap: 6px; border: 0; padding: 0; margin: 0; }
+.fb-kind { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; width: auto; margin: 0; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); cursor: pointer; min-height: 40px; font-weight: 600; }
+.fb-kind input { width: auto; min-height: 0; margin: 0; }
+.fb-kind:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.fb-sheet textarea { width: 100%; min-height: 120px; }
+.fb-list li { display: grid; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.fb-list li.handled { opacity: .6; }
+.fb-list .fb-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+.fb-list .fb-text { white-space: pre-wrap; margin: 0; }
+/* The feedback sheet opens without the board, so it carries the sheet's look itself (as board.css draws .mx-sheet). */
+.fb-layer .mx-scrim { position: fixed; inset: 0; z-index: 61; background: rgb(0 0 0 / .55); }
+.fb-layer .mx-sheet { position: fixed; inset: auto 0 0 0; z-index: 62; max-height: 88vh; overflow: auto; background: var(--surface, #141a33);
+  border-radius: 20px 20px 0 0; box-shadow: 0 -6px 30px rgb(0 0 0 / .3); padding: 16px max(18px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 720px) { .fb-layer .mx-sheet { inset: auto calc(50% - 330px) 0 calc(50% - 330px); } }
+.fb-layer .mx-shtop { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.fb-sheet p { margin: 0; }
+/* The header's buttons a little tighter, so "💡" (suggestions) fits beside "ההרשאות שלי" and "יציאה" without a third row. */
+#nav > button { padding-inline: 12px; }
+#nav > #feedback { padding-inline: 10px; }
