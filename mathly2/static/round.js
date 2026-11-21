@@ -23,6 +23,10 @@ export const isOpen = () => !!layer;
 export const start = lesson => api(`/api/lessons/${encodeURIComponent(lesson)}/round/start`, { method: "POST" });
 
 /** Start (or resume) the mistakes round of a handed-in attempt. */
+/** Practice on the go (onthego.py): a round of questions that need no board; an open one resumes. */
+export const startOnTheGo = () => api(forSubject("/api/onthego/start"), { method: "POST" });
+const isOnTheGo = () => round?.kind === "onthego_round";
+
 export const startRetry = attemptId => api(`/api/attempts/${encodeURIComponent(attemptId)}/retry/start`, { method: "POST" });
 
 const isRetry = () => !!round?.source;
@@ -54,8 +58,8 @@ export function close() {
   layer = round = null;
 }
 
-const heading = () => `<div class="mx-shtop"><div><span class="ex-chip">${isRetry() ? "חזרה על הטעויות" : "סבב שיעור"}</span><h3 id="rd-title">${fmt(round.lesson.name)}</h3></div>
-  <div class="mx-shacts">${window.MathlyBoard?.button() || ""}<button type="button" class="mx-x" data-close aria-label="סגירה">✕</button></div></div>`;
+const heading = () => `<div class="mx-shtop"><div><span class="ex-chip">${isOnTheGo() ? "🚌 בלי לוח, בראש" : isRetry() ? "חזרה על הטעויות" : "סבב שיעור"}</span><h3 id="rd-title">${fmt(round.lesson.name)}</h3></div>
+  <div class="mx-shacts">${isOnTheGo() ? "" : window.MathlyBoard?.button() || ""}<button type="button" class="mx-x" data-close aria-label="סגירה">✕</button></div></div>`;
 
 const dots = () => Array.from({ length: round.total }, (_, i) => {
   const r = round.results[i];
@@ -91,7 +95,22 @@ function retryResultHtml() {
     <p class="ex-actions">${all ? "" : `<button type="button" class="primary" id="rd-again">שוב על הטעויות</button> `}<button type="button" data-close>${round.source.test_id ? "חזרה למבחן" : "חזרה למסלול"}</button></p></section>`;
 }
 
+/** The end of an on-the-go round: the score, what was mastered, what to strengthen, and another round. */
+function onTheGoResultHtml() {
+  const r = round.result, names = list => list.map(s => fmt(s.name)).join(", ");
+  return `<section class="rd-result" id="rd-result" data-kind="onthego">
+    <h4 class="rd-title">${r.right === r.total ? "מושלם! 🚌✨" : r.right * 10 >= r.total * 7 ? "כל הכבוד! ניצלתם את הנסיעה" : "סיימתם סבב בנסיעה!"}</h4>
+    <p class="ex-score" id="rd-score"><b>${r.right}</b> מתוך ${r.total}</p>
+    ${r.mastered.length ? `<p class="rd-mastered" id="rd-mastered">🎉 נשלטו: ${names(r.mastered)}</p>` : ""}
+    ${r.missed.length ? `<h4>מה כדאי לחזק</h4><ol class="ex-missed" id="rd-missed">${r.missed.map(m => `<li><p class="muted">${fmt(m.skill_name)}</p><p class="ex-text" dir="auto">${fmt(m.question)}</p>
+      ${m.mistake ? `<p><b>${esc(m.mistake.name)}</b>${m.mistake.tip ? `<br>${fmt(m.mistake.tip)}` : ""}</p>` : ""}</li>`).join("")}</ol>
+      <p class="muted">השאלות האלה נכנסו לרשימת החזרה.</p>` : ""}
+    <div id="rd-forecast" aria-live="polite"></div>
+    <p class="ex-actions"><button type="button" class="primary" id="rd-again">עוד סבב בנסיעה</button> <button type="button" data-close>חזרה לבית</button></p></section>`;
+}
+
 function resultHtml() {
+  if (isOnTheGo()) return onTheGoResultHtml();
   if (isRetry()) return retryResultHtml();
   const r = round.result;
   const names = list => list.map(s => fmt(s.name)).join(", ");
@@ -121,6 +140,7 @@ async function showForecast(id) {
 }
 
 function mountBoard() {
+  if (isOnTheGo()) { window.MathlyBoard?.closeFull?.(); return; }          // on the go: questions that need no board
   const key = round.question ? `round:${round.id}:${round.question.key}` : `round:${round.id}:done`;
   window.MathlyBoard?.mount(layer, key, { question: () => q("#ex-q") });
 }
@@ -204,7 +224,7 @@ async function again() {
   const button = q("#rd-again");
   button.disabled = true;
   try {
-    round = await (isRetry() ? startRetry(round.source.id) : start(round.lesson.id));
+    round = await (isOnTheGo() ? startOnTheGo() : isRetry() ? startRetry(round.source.id) : start(round.lesson.id));
     streak = 0;
     render();
   } catch (error) {

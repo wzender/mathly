@@ -540,3 +540,12 @@ def test_the_server_keeps_prompter_texts_and_worksheet_and_prompter_usage(db):
 def test_browser_roles_cannot_read_prompter_texts(db, role):
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         as_role(db, role, "select * from public.m2_prompter_texts")
+
+
+# --- the kinds of attempts (20261122090000) ---
+
+@pytest.mark.parametrize("kind", ["lesson_round", "mistakes_round", "onthego_round"])
+def test_rounds_of_every_kind_are_kept(db, kind):
+    as_role(db, "service_role", f"insert into public.m2_attempts(user_id, kind, scope, due_at) values ('00000000-0000-0000-0000-0000000000ab', '{kind}', 'math', now() + interval '1 day')")
+    with pytest.raises(psycopg.errors.CheckViolation):
+        as_role(db, "service_role", "insert into public.m2_attempts(user_id, kind, scope, due_at) values ('00000000-0000-0000-0000-0000000000ab', 'other', 'math', now() + interval '1 day')")

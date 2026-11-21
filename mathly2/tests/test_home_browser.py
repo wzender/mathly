@@ -422,7 +422,8 @@ def test_home_finds_the_league_first_then_reveals_it_and_counts_up_after_practic
         assert "מגלים את הליגה שלך" in strip.inner_text() and "מבחן בעוד 2 ימים" in strip.inner_text()   # no low number on day one
         assert page.inner_text("#home-forecast .fc-count") == "0/15" and "עוד 15 תשובות" in strip.inner_text()
         assert page.get_attribute("#nearest-test .strip-main", "href") == f"#/test/{test['id']}"
-        assert page.inner_text("#home-practice").strip() == "📝 מבחן תרגול" and "+" not in page.inner_text("#home-sim")
+        assert page.get_attribute("#home-practice", "aria-label") == "מבחן תרגול" and "+" not in page.inner_text("#home-sim")
+        assert page.get_attribute("#home-onthego", "href") == "#/onthego"                          # on the go, beside the tests
         answer(1)                                                                                   # a few answers: the bar fills
         page.reload()
         page.wait_for_selector("#home-forecast.placing")
