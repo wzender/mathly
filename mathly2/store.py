@@ -10,7 +10,7 @@ import threading
 import urllib.error
 import urllib.parse
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from . import pooled
 
@@ -985,6 +985,22 @@ class InMemoryStore:
                     found.setdefault((day, r["user_id"]), {"day": day, "user_id": r["user_id"], "answers": 0, "attempts": 0})["attempts"] += 1
             return sorted(found.values(), key=lambda r: (r["day"], r["user_id"]))
 
+    def correct_on(self, day: date) -> dict[str, int]:
+        """Each person's correct practice answers on one day (the morning report, report.py)."""
+        with self._lock:
+            out: dict[str, int] = {}
+            for a in self._answers:
+                if a["day"] == day and a["correct"]:
+                    out[a["user_id"]] = out.get(a["user_id"], 0) + 1
+            return out
+
+    def attempts_started_on(self, day: date) -> list[dict]:
+        """The attempts (quizzes, tests, rounds) started on one Israel day: kind, user_id, submitted_at."""
+        from .clock import school_day
+        with self._lock:
+            return [{"kind": r["kind"], "user_id": r["user_id"], "submitted_at": r["submitted_at"]} for r in self._attempts.values()
+                    if school_day(r["started_at"]) == day]
+
     def daily_correct(self, user_id: str) -> dict[date, int]:
         """Correct practice answers per day (helped answers included): the daily goal and the streak."""
         with self._lock:
@@ -1738,6 +1754,18 @@ class SupabaseStore:
             last = page[-1]
             params = {**params, "or": f"(day.gt.{last['day']},and(day.eq.{last['day']},user_id.gt.{last['user_id']}))"}
         return [{**r, "day": date.fromisoformat(r["day"])} for r in rows]
+
+    def correct_on(self, day: date) -> dict[str, int]:
+        rows = self._request("GET", "m2_daily_correct", {"day": self._eq(day.isoformat()), "select": "user_id,correct", "limit": "5000"})
+        return {r["user_id"]: r["correct"] for r in rows}
+
+    def attempts_started_on(self, day: date) -> list[dict]:
+        from datetime import time as _time
+        from zoneinfo import ZoneInfo
+        start = datetime.combine(day, _time(0), tzinfo=ZoneInfo("Asia/Jerusalem"))
+        rows = self._request("GET", "m2_attempts", {"select": "kind,user_id,submitted_at", "limit": "5000",
+                                                    "and": f"(started_at.gte.{start.isoformat()},started_at.lt.{(start + timedelta(days=1)).isoformat()})"})
+        return [{**r, "submitted_at": _when(r.get("submitted_at"))} for r in rows]
 
     def daily_correct(self, user_id: str) -> dict[date, int]:
         rows = self._request("GET", "m2_daily_correct", {"user_id": self._eq(user_id), "select": "day,correct"})
