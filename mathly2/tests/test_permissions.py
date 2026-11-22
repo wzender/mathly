@@ -17,6 +17,7 @@ NEEDS = {   # (method, path) -> permission
     ("GET", "/api/lessons"): "path.use",
     ("GET", "/api/dev/status"): "dev.status",
     ("GET", "/api/feedback"): "dev.status",
+    ("GET", "/api/dev/report"): "dev.status",
     ("POST", "/api/feedback/{feedback_id}/handled"): "dev.status",
     ("GET", "/api/prompter/texts"): "dev.status",
     ("POST", "/api/prompter/texts"): "dev.status",

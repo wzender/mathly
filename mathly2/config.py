@@ -28,6 +28,7 @@ class Settings:
     anthropic_key: str = ""                                         # the AI is unavailable without it (a send fails with "missing key")
     math_model: str = ""                                            # empty: the default model in ai.py
     gemini_key: str = ""                                            # the AI review of the way in tests (boardreview.py); none without it
+    report_token: str = ""                                          # the morning report's key (report.py); no token-read report without it
     gemini_model: str = ""                                          # empty: the default (free tier) model in boardreview.py
     cache_seconds: float = 30                                       # how long slow-changing reads are remembered; 0 is off
     vapid_private_key: str = ""                                     # the server's push key; push notifications are off without it
@@ -63,6 +64,7 @@ def load_settings(env_file: Path | None = None) -> Settings:
         anthropic_key=env("ANTHROPIC_API_KEY"),
         math_model=env("MATH_MODEL"),
         gemini_key=env("GEMINI_API_KEY"),
+        report_token=env("REPORT_TOKEN"),
         gemini_model=env("GEMINI_MODEL"),
         cache_seconds=float(env("MATHLY_CACHE_SECONDS") or 30),
         vapid_private_key=env("VAPID_PRIVATE_KEY"),
