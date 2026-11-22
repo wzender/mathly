@@ -132,6 +132,12 @@ def _feedback_row(r: dict) -> dict:
     return {**r, "created_at": _when(r.get("created_at")), "handled_at": _when(r.get("handled_at"))}
 
 
+def _now() -> datetime:
+    """The app's clock (tests can set it), for the time an answer was given."""
+    from . import clock
+    return clock.now()
+
+
 RECENT_ANSWERS = 800                 # answers read for the forecast grade (one request, the newest first)
 
 
@@ -351,7 +357,7 @@ class InMemoryStore:
         with self._lock:
             self._answers.append({"id": len(self._answers) + 1, "user_id": user_id, "skill_id": skill_id,
                                   "question_key": question_key, "correct": correct, "counted": counted,
-                                  "mistake_id": mistake_id, "day": day})
+                                  "mistake_id": mistake_id, "day": day, "at": _now()})
 
     def last_counted_answers(self, user_id: str, skill_id: str, n: int) -> list[dict]:
         """The last `n` answers that were not given with help, oldest first."""
@@ -984,6 +990,23 @@ class InMemoryStore:
                 if day >= first:
                     found.setdefault((day, r["user_id"]), {"day": day, "user_id": r["user_id"], "answers": 0, "attempts": 0})["attempts"] += 1
             return sorted(found.values(), key=lambda r: (r["day"], r["user_id"]))
+
+    def daily_practice(self, user_ids, since: date) -> list[dict]:
+        """Per student and day from `since`: answers, right ones and the estimated seconds (as the view m2_daily_practice)."""
+        wanted = set(user_ids)
+        with self._lock:
+            mine = sorted((a for a in self._answers if a["user_id"] in wanted and a["day"] >= since), key=lambda a: (a["user_id"], a["day"], a["at"], a["id"]))
+        out: dict[tuple, dict] = {}
+        previous = None
+        for a in mine:
+            row = out.setdefault((a["user_id"], a["day"]), {"user_id": a["user_id"], "day": a["day"], "answers": 0, "correct": 0, "seconds": 0})
+            same = previous is not None and previous["user_id"] == a["user_id"] and previous["day"] == a["day"]
+            gap = (a["at"] - previous["at"]).total_seconds() if same else None
+            row["answers"] += 1
+            row["correct"] += 1 if a["correct"] else 0
+            row["seconds"] += 60 if gap is None or gap > 300 else int(min(gap, 180))
+            previous = a
+        return sorted(out.values(), key=lambda r: (r["user_id"], r["day"]))
 
     def correct_on(self, day: date) -> dict[str, int]:
         """Each person's correct practice answers on one day (the morning report, report.py)."""
@@ -1753,6 +1776,24 @@ class SupabaseStore:
                 break
             last = page[-1]
             params = {**params, "or": f"(day.gt.{last['day']},and(day.eq.{last['day']},user_id.gt.{last['user_id']}))"}
+        return [{**r, "day": date.fromisoformat(r["day"])} for r in rows]
+
+    def daily_practice(self, user_ids, since: date) -> list[dict]:
+        """Read in pages, each after the last (user_id, day) read."""
+        ids = sorted(set(user_ids))
+        if not ids:
+            return []
+        rows: list[dict] = []
+        base = {"user_id": f"in.({','.join(ids)})", "day": f"gte.{since.isoformat()}", "select": "user_id,day,answers,correct,seconds",
+                "order": "user_id,day", "limit": str(self.ACTIVITY_PAGE)}
+        params = base
+        while True:
+            page = self._request("GET", "m2_daily_practice", params)
+            rows += page
+            if len(page) < self.ACTIVITY_PAGE:
+                break
+            last = page[-1]
+            params = {**base, "or": f"(user_id.gt.{last['user_id']},and(user_id.eq.{last['user_id']},day.gt.{last['day']}))"}
         return [{**r, "day": date.fromisoformat(r["day"])} for r in rows]
 
     def correct_on(self, day: date) -> dict[str, int]:

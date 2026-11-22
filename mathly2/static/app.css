@@ -844,3 +844,12 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 /* The header's buttons a little tighter, so "💡" (suggestions) fits beside "ההרשאות שלי" and "יציאה" without a third row. */
 #nav > button { padding-inline: 12px; }
 #nav > #feedback { padding-inline: 10px; }
+
+/* The teacher's activity view (teacher_progress.js): numbers per student, the days as small bars, and a day-by-day table. */
+.act-note { font-size: 13px; }
+.act-table td, .act-table th { text-align: center; white-space: nowrap; }
+.act-open { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; cursor: pointer; min-height: 36px; }
+.act-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 26px; }
+.act-bars i { display: block; width: 5px; min-height: 0; background: var(--sky-aurora, #6fd3ff); border-radius: 2px 2px 0 0; }
+.act-days-box { position: sticky; inset-inline-start: 0; max-width: min(560px, calc(100vw - 72px)); }
+.act-day-table { margin: 4px 0; width: 100%; }

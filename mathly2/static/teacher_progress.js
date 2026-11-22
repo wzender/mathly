@@ -4,8 +4,8 @@ import { esc, fmt } from "./math.js";
 import { shortDate } from "./ui.js";
 
 const STATE = { completed: ["✓", "הושלם", "m"], learning: ["◐", "בלמידה", "l"], not_started: ["○", "לא התחילו", "n"] };
-const VIEWS = [["lessons", "לפי שיעור"], ["readiness", "מוכנות למבחן"]];
-let chosen = { classId: null, period: null, view: "lessons" };      // what the teacher last looked at
+const VIEWS = [["lessons", "לפי שיעור"], ["readiness", "מוכנות למבחן"], ["activity", "פעילות"]];
+let chosen = { classId: null, period: null, view: "lessons", days: 14 };      // what the teacher last looked at
 
 const dash = value => value === null || value === undefined ? "—" : value;
 const first = email => esc(email.split("@")[0]);
@@ -33,10 +33,64 @@ function readiness(data) {
     <p class="muted">המוכנות עולה רק ממבחני תרגול וסימולציות. השליטה במסלול מוצגת לידה ולא נכללת בה.</p>`;
 }
 
+/* ---------- each student's activity: how much and how long, in all and day by day (progress.py class_activity) ---------- */
+
+const minutes = m => m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")} שע׳` : `${m} דק׳`;
+const percent = (right, all) => all ? `${Math.round(100 * right / all)}%` : "—";
+
+/** The days of the range as small bars (the class's busiest day is full height), with each day's numbers on hover. */
+function bars(daily, top) {
+  return `<span class="act-bars" aria-hidden="true">${daily.map(d => `<i style="height:${top ? Math.max(d.answers || d.tests ? 8 : 0, Math.round(100 * d.answers / top)) : 0}%"
+    title="${shortDate(d.day)}: ${d.answers} תרגילים, ${minutes(d.minutes)}${d.tests ? `, ${d.tests} בחנים/מבחנים` : ""}"></i>`).join("")}</span>`;
+}
+
+function activityTable(data) {
+  if (!data.students.length) return `<p class="muted">אין עדיין תלמידים בכיתה.</p>`;
+  const top = Math.max(1, ...data.students.flatMap(s => s.daily.map(d => d.answers)));
+  const row = (s, i) => `<tr data-student="${i}">${who(s)}
+      <td><button type="button" class="act-open" data-open-student="${i}" aria-expanded="false" aria-label="פירוט יומי של ${esc(s.email)}">${bars(s.daily, top)}</button></td>
+      <td>${s.recent.answers}</td><td>${minutes(s.recent.minutes)}</td><td>${s.recent.days}</td><td>${percent(s.recent.correct, s.recent.answers)}</td>
+      <td>${s.total.answers}</td><td>${minutes(s.total.minutes)}</td><td>${s.last_day ? shortDate(s.last_day) : "—"}</td></tr>
+    <tr class="act-days" data-days="${i}" hidden><td colspan="9"><div class="act-days-box">${dayTable(s)}</div></td></tr>`;
+  return `<div class="tablewrap"><table class="data act-table" id="activity-table"><thead>
+      <tr><th rowspan="2" class="sticky">תלמיד</th><th rowspan="2">יום אחר יום</th><th colspan="4">ב־${data.days} הימים האחרונים</th><th colspan="2">מתחילת השנה</th><th rowspan="2">פעילות אחרונה</th></tr>
+      <tr><th>תרגילים</th><th>זמן</th><th>ימים</th><th>נכונות</th><th>תרגילים</th><th>זמן</th></tr></thead>
+    <tbody>${data.students.map(row).join("")}</tbody></table></div>`;
+}
+
+function dayTable(s) {
+  const days = s.daily.filter(d => d.answers || d.tests).reverse();
+  if (!days.length) return `<p class="muted">לא היה תרגול בימים האלה.</p>`;
+  return `<table class="data act-day-table"><thead><tr><th>יום</th><th>תרגילים</th><th>נכונות</th><th>זמן</th><th title="בחנים ומבחנים שהוגשו">מבחנים</th></tr></thead><tbody>${days.map(d =>
+    `<tr><td>${shortDate(d.day)}</td><td>${d.answers}</td><td>${percent(d.correct, d.answers)}</td><td>${minutes(d.minutes)}</td><td>${d.tests || "—"}</td></tr>`).join("")}</tbody></table>`;
+}
+
+async function showActivity(classId) {
+  const slot = document.getElementById("activity-view");
+  if (!slot) return;
+  await swr(`/api/classes/${classId}/activity?days=${chosen.days}`, data => {
+    const here = document.getElementById("activity-view");
+    if (!here || chosen.view !== "activity") return;
+    here.innerHTML = `<div class="subtabs" id="act-range" role="group" aria-label="טווח">${[7, 14, 30].map(n =>
+        `<button type="button" data-days="${n}" aria-pressed="${n === data.days}">${n} ימים</button>`).join("")}</div>
+      <p class="muted act-note">תרגילים: כל תשובה בתרגול, בסבבים ובחזרה. הזמן הוא הערכה לפי הפערים בין התשובות (עד 3 דקות לתשובה, הפסקה של יותר מ־5 דקות לא נספרת), ובבחנים ובמבחנים מההתחלה ועד ההגשה.</p>
+      ${activityTable(data)}`;
+    here.querySelector("#act-range").addEventListener("click", e => {
+      const n = Number(e.target.closest("[data-days]")?.dataset.days);
+      if (n && n !== chosen.days) { chosen.days = n; showActivity(classId); }
+    });
+    here.querySelectorAll("[data-open-student]").forEach(b => b.addEventListener("click", () => {
+      const rowEl = here.querySelector(`[data-days="${b.dataset.openStudent}"]`), open = rowEl.hidden;
+      rowEl.hidden = !open;
+      b.setAttribute("aria-expanded", String(open));
+    }));
+  });
+}
+
 function page(ctx, classes, data) {
-  const periodTabs = chosen.view === "readiness" ? "" : `<div class="subtabs" id="period-tabs" role="group" aria-label="תקופה">${data.periods.map(p =>
+  const periodTabs = chosen.view !== "lessons" ? "" : `<div class="subtabs" id="period-tabs" role="group" aria-label="תקופה">${data.periods.map(p =>
     `<button type="button" data-period="${p.id}" aria-pressed="${p.id === data.period}">${p.label}${p.current ? " (עכשיו)" : ""}</button>`).join("")}</div>`;
-  const body = chosen.view === "readiness" ? readiness(data) : lessonsView(data);
+  const body = chosen.view === "readiness" ? readiness(data) : chosen.view === "activity" ? `<div id="activity-view"><p class="muted">טוענים…</p></div>` : lessonsView(data);
   ctx.draw(`${ctx.tabs("progress")}<section id="progress"><h2>התקדמות</h2>
     ${classes.length > 1 ? `<label for="class-pick">כיתה</label><select id="class-pick">${classes.map(c => `<option value="${c.id}"${c.id === data.class.id ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select>` : `<p class="muted">${esc(data.class.name)}</p>`}
     <div class="subtabs" id="view-tabs" role="group" aria-label="תצוגה">${VIEWS.map(([id, label]) => `<button type="button" data-view="${id}" aria-pressed="${id === chosen.view}">${label}</button>`).join("")}</div>
@@ -47,6 +101,7 @@ function page(ctx, classes, data) {
     const view = e.target.closest("[data-view]")?.dataset.view;
     if (view) { chosen.view = view; page(ctx, classes, data); }                       // the same data, another view
   });
+  if (chosen.view === "activity") showActivity(data.class.id);
   document.getElementById("period-tabs")?.addEventListener("click", e => {
     const period = Number(e.target.closest("[data-period]")?.dataset.period);
     if (period) show(ctx, data.class.id, period);

@@ -561,3 +561,17 @@ def test_the_server_keeps_feedback_and_the_browser_roles_cannot_read_it(db):
     for role in ("authenticated", "anon"):
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             as_role(db, role, "select * from public.m2_feedback")
+
+
+# --- each student's practice per day (20261124090000) ---
+
+def test_daily_practice_counts_answers_right_ones_and_the_time_from_the_gaps(db):
+    u = "00000000-0000-0000-0000-0000000000ad"
+    for i, (offset, right) in enumerate([(0, True), (30, True), (90, False), (690, True), (710, True)]):    # gaps 30, 60, 600 (a break), 20
+        as_role(db, "service_role", f"insert into public.m2_answers(user_id, skill_id, question_key, correct, day, answered_at) "
+                                    f"values ('{u}', 's', 's:{i}', {str(right).lower()}, '2026-11-20', timestamptz '2026-11-20 08:00:00+00' + interval '{offset} seconds')")
+    as_role(db, "service_role", f"insert into public.m2_answers(user_id, skill_id, question_key, correct, day) values ('{u}', 's', 's:9', true, '2026-11-21')")
+    rows = as_role(db, "service_role", f"select day::text, answers, correct, seconds from public.m2_daily_practice where user_id = '{u}' order by day")
+    assert rows == [("2026-11-20", 5, 4, 60 + 30 + 60 + 60 + 20), ("2026-11-21", 1, 1, 60)]
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        as_role(db, "authenticated", "select * from public.m2_daily_practice")
