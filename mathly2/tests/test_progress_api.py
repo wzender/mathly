@@ -140,3 +140,43 @@ def test_the_store_reads_many_students_at_once_and_does_not_mix_them():
     assert list(store.last_answered_users([a, b])) == [a, b] and "s1" in store.last_answered_users([a])[a] and store.last_answered_users([b])[b] == {}
     quizzes = store.attempts_of_users([a, b], "quiz")
     assert [r["id"] for r in quizzes[a]] == [row["id"]] and quizzes[b] == []
+
+
+# ---- each student's activity (class_activity) ----
+
+def activity(client, who=TEACHER, days=14):
+    return client.get(f"/api/classes/{client.a['id']}/activity?days={days}", headers=auth(who))
+
+
+def test_activity_counts_answers_time_and_tests_in_all_and_day_by_day(world, bank):
+    store, kid = world.store, uid(KID)
+    skill = lesson_of(bank, "t")["skills"][0]["id"]
+    today = clock.school_day()
+    start = clock.now()
+    for i in range(5):                                                      # 30 s, 60 s, a 10-minute break, then 20 s
+        world.set_time(start + timedelta(seconds=sum([0, 30, 60, 600, 20][:i + 1])))
+        store.add_answer(kid, skill, f"{skill}:{i}", i != 2, True, None, today)
+    world.set_time(start)
+    yesterday = today - timedelta(days=1)
+    store.add_answer(kid, skill, f"{skill}:9", True, True, None, yesterday)
+    quiz = store.create_attempt(kid, "quiz", "t", start - timedelta(minutes=40), start, [])
+    store.save_attempt(quiz["id"], submitted_at=start - timedelta(minutes=10), grade=80)          # 30 minutes
+    got = activity(world).json()
+    rows = {s["email"]: s for s in got["students"]}
+    me = rows[KID]
+    assert got["days"] == 14 and len(me["daily"]) == 14 and me["daily"][-1]["day"] == today.isoformat()
+    day = me["daily"][-1]
+    # 60 (first) + 30 + 60 + 60 (after a break) + 20 = 230 s of practice, and the quiz's 30 minutes
+    assert day == {"day": today.isoformat(), "answers": 5, "correct": 4, "tests": 1, "minutes": round((230 + 1800) / 60)}
+    assert me["daily"][-2]["answers"] == 1 and me["recent"] == {**me["recent"], "answers": 6, "correct": 5, "tests": 1, "days": 2}
+    assert me["total"]["answers"] == 6 and me["last_day"] == today.isoformat()
+    assert rows[KID2]["recent"]["answers"] == 0 and rows[KID2]["last_day"] is None
+    assert got["students"][0]["email"] == KID                                                 # the most active first
+
+
+def test_activity_is_for_the_classes_teacher_and_the_developer(world):
+    assert activity(world).status_code == 200 and activity(world, DEV).status_code == 200
+    assert activity(world, OTHER_TEACHER).status_code in (403, 404)
+    assert activity(world, KID).status_code == 403
+    assert activity(world, days=9).status_code == 422
+    assert len(activity(world, days=30).json()["students"][0]["daily"]) == 30

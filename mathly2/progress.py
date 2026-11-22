@@ -2,7 +2,7 @@
 student. Nothing is stored: it is all read from the students' progress, quizzes and tests, the lessons' dates and the bank."""
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -127,3 +127,60 @@ def class_progress(class_id: int, request: Request, period: int | None = None, u
             "periods": [{**p, "current": p["id"] == current} for p in PERIODS],
             "lessons": [{"id": l["id"], "name": l["name"], "due_date": dates[l["id"]].isoformat() if l["id"] in dates else None} for l in lessons],
             "students": students, "test": test}
+
+
+# ---- each student's activity: how much and how long, in all and day by day ----
+
+ACTIVITY_DAYS = (7, 14, 30)
+TEST_KINDS = ("quiz", "exercise_test", "simulation")
+TEST_CAP = 120 * 60                  # a quiz or test counts at most two hours (one left open is not time spent)
+
+
+@router.get("/{class_id}/activity")
+def class_activity(class_id: int, request: Request, days: int = 14, user: dict = Depends(need("class.teach"))) -> dict:
+    """For each student of the class: practice answers (right ones too), the estimated time, and quizzes and tests handed in, since the
+    school year began and over the last `days` days, with each of those days. Time: practice from the view m2_daily_practice (the gaps
+    between answers), quizzes and tests from start to hand-in."""
+    if days not in ACTIVITY_DAYS:
+        raise HTTPException(422, "טווח לא מוכר")
+    klass = _my_class(request, user, class_id)
+    store, here, today = request.app.state.store, reads.of(request), clock.school_day()
+    start = date(school_year(today), 9, 1)
+    first = today - timedelta(days=days - 1)
+    members = store.members(klass["id"])
+    ids = [m["user_id"] for m in members if m["user_id"]]
+    prime_students(request, ids, kinds=TEST_KINDS)
+    practice: dict[str, dict[date, dict]] = {}
+    for r in store.daily_practice(ids, start):
+        practice.setdefault(r["user_id"], {})[r["day"]] = r
+    students = []
+    for m in members:
+        uid = m["user_id"]
+        by_day: dict[date, dict] = {d: {"answers": r["answers"], "correct": r["correct"], "seconds": r["seconds"], "tests": 0}
+                                    for d, r in (practice.get(uid, {}) if uid else {}).items()}
+        for kind in TEST_KINDS:
+            for row in (here.attempts_of(uid, kind) if uid else []):
+                done, began = _when(row.get("submitted_at")), _when(row.get("started_at"))
+                if not done or not began:
+                    continue
+                day = clock.school_day(began)
+                if day < start:
+                    continue
+                cell = by_day.setdefault(day, {"answers": 0, "correct": 0, "seconds": 0, "tests": 0})
+                cell["tests"] += 1
+                cell["seconds"] += int(min(max((done - began).total_seconds(), 0), TEST_CAP))
+
+        def total(cells: list[dict]) -> dict:
+            return {"answers": sum(c["answers"] for c in cells), "correct": sum(c["correct"] for c in cells),
+                    "minutes": round(sum(c["seconds"] for c in cells) / 60), "tests": sum(c["tests"] for c in cells),
+                    "days": sum(1 for c in cells if c["answers"] or c["tests"])}
+
+        recent = [(first + timedelta(days=i)) for i in range(days)]
+        empty = {"answers": 0, "correct": 0, "seconds": 0, "tests": 0}
+        active = [d for d, c in by_day.items() if c["answers"] or c["tests"]]
+        students.append({"email": m["email"], "signed_in": bool(uid), "total": total(list(by_day.values())),
+                         "recent": total([by_day.get(d, empty) for d in recent]), "last_day": max(active).isoformat() if active else None,
+                         "daily": [{"day": d.isoformat(), **{k: v for k, v in by_day.get(d, empty).items() if k != "seconds"},
+                                    "minutes": round(by_day.get(d, empty)["seconds"] / 60)} for d in recent]})
+    students.sort(key=lambda s: (-s["recent"]["answers"], s["email"]))
+    return {"class": {"id": klass["id"], "name": klass["name"]}, "days": days, "since": start.isoformat(), "students": students}

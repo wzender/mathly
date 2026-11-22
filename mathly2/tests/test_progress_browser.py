@@ -1,4 +1,6 @@
 """The teacher's progress tab (add-class-progress-views 2.1), in a real browser."""
+from datetime import timedelta
+
 import pytest
 
 playwright = pytest.importorskip("playwright.sync_api")
@@ -84,3 +86,29 @@ def test_the_table_marks_a_completed_and_a_behind_lesson_in_words(browser, bank)
         assert page.locator(f"tr[data-student='{KID2}'] td[data-lesson=t] [data-behind]").inner_text() == "⚠"           # the visual mark
         assert page.inner_text("#teacher-tabs [data-tab=progress] .tab-count") == "2"                       # the tab's number: the students
         no_sideways(page)
+
+
+@pytest.mark.parametrize("viewport", [PHONE, DESKTOP], ids=["390px", "1280px"])
+def test_the_activity_view_shows_each_students_exercises_and_time_and_opens_day_by_day(browser, bank, viewport):
+    app, store, klass, lessons = world(bank)
+    skill = next(s["id"] for s in bank.skills if s["unit"] == "t")
+    today = clock.school_day()
+    for i in range(6):
+        store.add_answer(uid(KID), skill, f"{skill}:{i}", i != 0, True, None, today)
+    store.add_answer(uid(KID), skill, f"{skill}:7", True, True, None, today - timedelta(days=2))
+    with running(app) as url:
+        page = open_progress(browser, url, viewport)
+        page.click("#view-tabs [data-view=activity]")
+        page.wait_for_selector("#activity-table")
+        rows = page.locator("#activity-table tbody tr[data-student]")
+        first = rows.nth(0)
+        assert KID.split("@")[0] in first.inner_text() and first.locator("td").nth(1).inner_text() == "7"        # the most active first
+        assert "דק׳" in first.locator("td").nth(2).inner_text() and first.locator("td").nth(3).inner_text() == "2"
+        first.locator("[data-open-student]").click()
+        days = page.locator("[data-days='0']")
+        assert days.is_visible() and days.locator("tbody tr").count() == 2 and "83%" in days.inner_text()     # 5 of 6 today
+        page.click("#act-range [data-days='30']")
+        page.wait_for_function("document.querySelector('#act-range [data-days=\"30\"]').getAttribute('aria-pressed') === 'true'")
+        assert page.locator("#activity-table tbody tr[data-student]").nth(0).locator(".act-bars i").count() == 30
+        no_sideways(page)
+        assert page.errors == []
