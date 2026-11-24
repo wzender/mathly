@@ -201,7 +201,8 @@ class GeminiReviewer:
         parts = [{"text": TUTOR_INSTRUCTIONS},
                  {"text": f"\n\nהשאלה:\n{context.get('question', '')}\nהתשובה הנכונה (רק בשבילכם): {context.get('answer', '')}\n"
                           f"שלבי הפתרון (רק בשבילכם):\n{steps}\n{known}\n"
-                          + (f"הבדיקה של הלוח: {review.get('verdict', '')}. {review.get('feedback', '')}\n" if review.get("verdict") else "")
+                          + (f"הבדיקה: {review.get('verdict', '')}. {review.get('feedback', '')}\n" if review.get("verdict") else "")
+                          + (f"{context['note']}\n" if context.get("note") else "")
                           + (f"הטבלה שהתלמיד הגיש:\n{review['proof_text']}\n" if review.get("proof_text") else "")
                           + (f"\nהשיחה עד עכשיו:\n{talk}\n" if talk else "") + f"\nהתלמיד כותב עכשיו: {message}"}]
         if board:

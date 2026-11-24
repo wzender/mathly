@@ -503,3 +503,44 @@ def test_a_wrong_question_is_not_shown_again_in_the_round_in_the_browser(browser
                 page.wait_for_function("(k) => document.querySelector('#ex-q')?.dataset.key !== k", arg=shown[-1])
         assert len(set(shown)) == 10                                                                           # each question once, none came back
         page.wait_for_selector("#ex-round")
+
+
+# --- the AI tutor (practice_tutor.py) ---
+
+def test_the_ai_chat_guides_before_the_answer_explains_after_and_holds_the_countdown(browser, world):
+    from mathly2 import practice_tutor
+    from mathly2.tests.test_photoq_api import FakeAI
+    app, _, bank, ids = world
+    practice_tutor._counts.clear()
+    app.state.reviewer = ai = FakeAI()
+    with running(app) as url:
+        page = open_skill(browser, url, ids["bare"])
+        assert page.locator("#ex-chat").count() == 1 and page.is_hidden("#ex-chat")
+        page.click("[data-chat]")
+        assert page.is_visible("#ex-chat") and "בלי לגלות את התשובה" in page.inner_text("#ex-chat-note")
+        page.fill("#ex-chat-text", "איך מתחילים?")
+        page.press("#ex-chat-text", "Enter")
+        page.wait_for_selector("#ex-chat-log .pq-msg.ai")
+        assert "איך מתחילים?" in page.inner_text("#ex-chat-log .pq-msg.me") and "לבודד" in page.inner_text("#ex-chat-log .pq-msg.ai")
+        assert ai.tutored[-1]["context"]["full"] is False
+        first = key_on_screen(page)
+        choose(page, bank, ids["bare"], right=True)
+        page.wait_for_selector("#ex-fb .ex-ok")
+        page.wait_for_timeout(3500)                                                  # the chat is open: no countdown, the question stays
+        assert key_on_screen(page) == first and "למה התשובה נכונה" in page.inner_text("#ex-chat-note")
+        assert page.locator("#ex-chat-log .pq-msg").count() == 2                     # the conversation stays with its question
+        page.fill("#ex-chat-text", "למה?")
+        page.click("#ex-chat-form button")
+        page.wait_for_function("document.querySelectorAll('#ex-chat-log .pq-msg').length === 4")
+        assert ai.tutored[-1]["context"]["full"] is True and ai.tutored[-1]["history"] == 2
+        page.click("#ex-skip")
+        page.wait_for_function("(k) => document.getElementById('ex-q').dataset.key !== k", arg=first)
+        assert page.locator("#ex-chat-log .pq-msg").count() == 0 and page.is_visible("#ex-chat")   # a new question, a new conversation
+        assert page.errors == []
+
+
+def test_without_the_ai_there_is_no_chat_button(browser, world):
+    app, _, _, ids = world
+    with running(app) as url:
+        page = open_skill(browser, url, ids["bare"])
+        assert page.locator("[data-chat]").count() == 0 and page.locator("#ex-chat").count() == 0

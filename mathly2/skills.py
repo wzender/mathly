@@ -123,6 +123,7 @@ def open_skill(skill_id: str, request: Request, user: dict = Depends(learner)) -
         "opens": _named(bank, [s["id"] for s in bank.skills if skill_id in s.get("prereqs", [])]),
         "help": {"explanation": skill.get("description", ""), "solved_example": skill.get("worked_example")},
         "today": today_progress(here.daily_correct(uid), clock.school_day()),
+        "tutor": hasattr(getattr(request.app.state, "reviewer", None), "tutor_reply"),     # 💬 the AI tutor (practice_tutor.py)
     }
 
 

@@ -11,6 +11,7 @@ import { sendWorkQuietly } from "./boardwork.js";
 
 const COUNTDOWN = 3;   // seconds before the next question after a right answer
 let layer = null, skill = null, timer = null, helped = false, boardReady = null, aiOn = false;
+let chat = [], chatKey = null, chatOpen = false;                     // the AI tutor's conversation on the question on screen (practice_tutor.py)
 
 const script = src => new Promise((ok, no) => {
   const s = document.createElement("script");
@@ -44,6 +45,12 @@ export async function open(id) {
     layer.className = "mx-layer";
     document.body.append(layer);
     layer.addEventListener("click", onClick);
+    layer.addEventListener("submit", event => {
+      if (!event.target.closest("#ex-chat-form")) return;
+      event.preventDefault();
+      const text = q("#ex-chat-text").value.trim();
+      if (text && skill?.question) sendChat(text);
+    });
   }
   layer.innerHTML = `<div class="mx-scrim" data-close></div><div class="mx-sheet" role="dialog" aria-modal="true" aria-labelledby="ex-title"></div>`;
   render();
@@ -59,12 +66,14 @@ export function close() {
   window.MathlyBoard?.closeFull?.();
   layer.remove();
   layer = skill = null;
+  chat = []; chatKey = null; chatOpen = false;
 }
 
 const heading = () => `<div class="mx-shtop"><div><span class="ex-chip">${fmt(skill.lesson.name)}</span>
     <h3 id="ex-title">${fmt(skill.name)}${skill.state === "mastered" ? ' <span class="ex-done" title="נשלטה">✓ נשלטה</span>' : ""}</h3></div>
   <div class="mx-shacts">${window.MathlyBoard?.button() || ""}
     ${aiOn ? `<button type="button" class="ex-help ex-ai" data-ai aria-label="עזרה מתמונה: צלמו תרגיל ושלחו למורה" title="עזרה מתמונה">📷</button>` : ""}
+    ${skill.tutor ? `<button type="button" class="ex-help ex-tutor" data-chat aria-label="שאלו את ה־AI על השאלה" title="שאלו את ה־AI" aria-expanded="${chatOpen}">💬</button>` : ""}
     <button type="button" class="ex-help" data-help aria-label="עזרה: ההסבר והדוגמה הפתורה" title="עזרה" aria-expanded="false">?</button>
     <button type="button" class="mx-x" data-close aria-label="סגירה">✕</button></div></div>`;
 
@@ -127,7 +136,7 @@ function mountBoard() {
 
 function render(notice = "") {
   q(".mx-sheet").innerHTML = `${heading()}<p class="ex-explain">${fmt(skill.description)}</p>${notice ? `<p class="ex-note" role="status">${esc(notice)}</p>` : ""}
-    ${helpBox()}${progress()}${questionHtml()}${related()}`;
+    ${helpBox()}${progress()}${questionHtml()}${chatHtml()}${related()}`;
   helped = false;
   mountBoard();
 }
@@ -143,7 +152,55 @@ function showNextQuestion(question) {
   q("#ex-helpbox").hidden = true;
   q("[data-help]")?.setAttribute("aria-expanded", "false");
   helped = false;
+  drawChat();
   mountBoard();
+}
+
+// ---- 💬 the AI tutor: about the question on screen; before answering it guides (and the answer will not count), after it explains ----
+const answeredNow = () => !!q("#ex-fb")?.children.length && !q("#ex-thinking");
+function chatHtml() {
+  if (!skill.tutor || !skill.question) return "";
+  if (chatKey !== skill.question.key) { chat = []; chatKey = skill.question.key; }
+  return `<section class="ex-chat" id="ex-chat" aria-label="שיחה עם ה־AI"${chatOpen ? "" : " hidden"}>
+    <h4>💬 שאלו את ה־AI</h4>
+    <p class="muted" id="ex-chat-note">${answeredNow() ? "אפשר לשאול למה התשובה נכונה או איפה הטעות." : "ה־AI יעזור לחשוב, בלי לגלות את התשובה. שאלה לפני שעונים: התשובה לא תיספר לשליטה."}</p>
+    <ol class="pq-chat" id="ex-chat-log">${chat.map(m => `<li class="pq-msg ${m.role === "ai" ? "ai" : "me"}" dir="auto">${m.role === "ai" ? "🤖 " : ""}${fmt(m.text)}</li>`).join("")}</ol>
+    <form id="ex-chat-form" class="pq-ask"><input id="ex-chat-text" maxlength="500" autocomplete="off" dir="auto" aria-label="השאלה שלכם ל־AI" placeholder="למשל: איך מתחילים?">
+      <button type="submit" class="primary">שליחה</button></form>
+    <p id="ex-chat-msg" role="status"></p></section>`;
+}
+
+function drawChat() {
+  const old = q("#ex-chat"), html = chatHtml();
+  if (old) old.outerHTML = html || "";
+  else if (html) (q("#ex-q") || q(".ex-explain")).insertAdjacentHTML("afterend", html);
+  q("[data-chat]")?.setAttribute("aria-expanded", String(chatOpen));
+}
+
+function toggleChat() {
+  chatOpen = !chatOpen;
+  if (chatOpen && timer) { stop(); const c = q("#ex-countdown"); if (c) c.textContent = ""; q("#ex-pause")?.remove(); }   // talking: no countdown to the next question
+  drawChat();
+  if (chatOpen) { q("#ex-chat")?.scrollIntoView({ block: "nearest" }); q("#ex-chat-text")?.focus({ preventScroll: true }); }
+}
+
+async function sendChat(text) {
+  const key = skill.question.key, msg = q("#ex-chat-msg"), button = q("#ex-chat-form button");
+  button.disabled = true;
+  msg.textContent = "🤖 חושב…";
+  try {
+    const got = await api(`/api/skills/${encodeURIComponent(skill.id)}/tutor`, { method: "POST", body: { question_key: key, message: text, history: chat.slice(-12) } });
+    if (chatKey !== key) return;
+    chat.push({ role: "student", text }, { role: "ai", text: got.reply });
+    if (got.helped) helped = true;
+    drawChat();
+    q("#ex-chat-msg").textContent = got.left <= 5 ? `נשארו ${got.left} שאלות ל־AI היום` : "";
+    q("#ex-chat-log")?.lastElementChild?.scrollIntoView({ block: "nearest" });
+    q("#ex-chat-text")?.focus({ preventScroll: true });
+  } catch (error) {
+    button.disabled = false;
+    msg.innerHTML = `<span class="error">${esc(error.message || "ה־AI לא ענה")}</span>`;
+  }
 }
 
 function updateProgress() {
@@ -232,7 +289,8 @@ async function answer(button) {
     if (result.next_question) {
       q("#ex-skip").addEventListener("click", next);
       q("#ex-pause").addEventListener("click", () => { stop(); q("#ex-countdown").textContent = ""; q("#ex-pause").remove(); });
-      countdown(next);
+      if (chatOpen) q("#ex-pause")?.remove();                     // the chat is open: the next question waits for the button
+      else countdown(next);
     }
   } else {
     button.classList.add("wrong");               // only the chosen one is marked, with a symbol and a word (not colour alone); the right choice is never shown
@@ -243,6 +301,7 @@ async function answer(button) {
       <div class="ex-actions"><button type="button" id="ex-other">${result.next_question ? "לשאלה הבאה" : "לתוצאות הסבב"}</button></div></div>`;   // a wrong question does not come back in the round
     q("#ex-other").addEventListener("click", next);
   }
+  if (chatOpen) drawChat();                                       // now the tutor may explain: the note says so
 }
 
 async function openHelp() {
@@ -265,6 +324,7 @@ function onClick(event) {
     return;
   }
   if (target.closest("[data-help]")) { openHelp(); return; }
+  if (target.closest("[data-chat]")) { toggleChat(); return; }
   if (target.closest("#ex-newround")) { newRound(); return; }
   const choice = target.closest(".ex-choice");
   if (choice && !choice.disabled) answer(choice);
