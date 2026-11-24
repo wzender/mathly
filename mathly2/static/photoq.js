@@ -11,6 +11,8 @@ import { hasWork, sendWork } from "./boardwork.js";
 import { currentSubject, homeHref } from "./ui.js";
 
 let layer = null, current = null, timer = null, helpOpen = new Set();      // the questions whose help panel is open
+let lastField = null;                                                         // the table cell a symbol button writes into
+const tables = {};                                                            // question id -> the claim/reason rows being written
 const q = selector => layer?.querySelector(selector);
 const boardKey = id => `pq:${id}`;
 const VERDICT = { correct: ["✓", "דרך נכונה"], partial: ["◐", "חלק מהדרך נכון"], wrong: ["✗", "הדרך לא נכונה"], unclear: ["?", "לא הצלחנו לקרוא את הלוח"] };
@@ -21,6 +23,9 @@ function ensureLayer() {
     layer.className = "mx-layer pq-layer";
     document.body.append(layer);
     layer.addEventListener("click", onClick);
+    layer.addEventListener("input", onTableInput);
+    layer.addEventListener("focusin", event => { if (event.target.closest?.("[data-col]")) lastField = event.target; });
+    layer.addEventListener("mousedown", event => { if (event.target.closest("[data-sym]")) event.preventDefault(); });   // keep the cell's focus
     layer.addEventListener("submit", event => {
       if (!event.target.closest("#pq-ask")) return;
       event.preventDefault();
@@ -137,12 +142,85 @@ function helpHtml(d) {
     : `<p><button type="button" id="pq-help-open">💬 עזרה</button> <span class="muted">${before ? "רמזים בהדרגה, או שאלה חופשית ל־AI" : "לא הבנתם את הבדיקה? שאלו"}</span></p>`}</section>`;
 }
 
+// ---- the claim/reason table (טענה/נימוק) of a geometry question ----
+// The rows are [{part, claim, reason}], kept in memory and in this browser while they are written, so a redraw (a hint) or a reload keeps them.
+const SYMBOLS = ["∠", "△", "⊥", "∥", "≅", "∼", "°", "=", "≠", "½", "√", "²"];
+const REASONS = ["נתון", "במשולש שווה־שוקיים זוויות הבסיס שוות", "במשולש שווה־שוקיים התיכון לבסיס הוא גם גובה וחוצה זווית",
+  "סכום הזוויות במשולש 180°", "סכום זוויות צמודות 180°", "זוויות קודקודיות שוות", "זוויות מתאימות בין ישרים מקבילים שוות",
+  "זוויות מתחלפות בין ישרים מקבילים שוות", "סכום זוויות חד־צדדיות בין ישרים מקבילים 180°", "זווית חיצונית למשולש שווה לסכום שתי הזוויות הפנימיות שאינן צמודות לה",
+  "במשולש ישר־זווית, הניצב שמול זווית של 30° שווה למחצית היתר", "במשולש ישר־זווית, התיכון ליתר שווה למחצית היתר",
+  "משפט פיתגורס", "מול זוויות שוות מונחות צלעות שוות", "מול צלעות שוות מונחות זוויות שוות", "חפיפת משולשים לפי צ.ז.צ", "חפיפת משולשים לפי ז.צ.ז",
+  "חפיפת משולשים לפי צ.צ.צ", "חפיפת משולשים לפי צ.צ.ז (מול הצלע הגדולה)", "במשולשים חופפים מתאימות צלעות שוות וזוויות שוות", "קטע אמצעים במשולש מקביל לצלע השלישית ושווה למחציתה",
+  "ישר החוצה צלע אחת במשולש ומקביל לצלע שנייה חוצה את הצלע השלישית", "אנך יוצר זווית של 90°", "חוצה זווית מחלק אותה לשתי זוויות שוות",
+  "תיכון מחלק את הצלע לשני חלקים שווים", "כל נקודה על האנך האמצעי של קטע נמצאת במרחק שווה מקצותיו", "כלל המעבר (טרנזיטיביות)", "חיבור/חיסור שוויונות", "הצבה"];
+const tableKey = id => `mathly-pq-proof:${id}`;
+
+function rowsOf(d) {
+  if (tables[d.id]) return tables[d.id];
+  let rows = null;
+  try { rows = JSON.parse(localStorage.getItem(tableKey(d.id)) || "null"); } catch { rows = null; }
+  if (!Array.isArray(rows) || !rows.length) rows = (d.proof_rows || []).map(x => ({ ...x }));
+  for (const part of d.proof_parts || [""]) {
+    const have = rows.filter(x => x.part === part).length;
+    for (let i = have; i < 3; i++) rows.push({ part, claim: "", reason: "" });
+  }
+  rows.sort((a, b) => (d.proof_parts || [""]).indexOf(a.part) - (d.proof_parts || [""]).indexOf(b.part));
+  return (tables[d.id] = rows);
+}
+
+function keepRows(id) {
+  try { localStorage.setItem(tableKey(id), JSON.stringify(tables[id].filter(x => x.claim || x.reason))); } catch { /* private mode */ }
+}
+
+function onTableInput(event) {
+  const cell = event.target.closest?.("[data-col]");
+  if (!cell || !current || !tables[current.id]) return;
+  tables[current.id][Number(cell.dataset.row)][cell.dataset.col] = cell.value;
+  keepRows(current.id);
+}
+
+function tableHtml(d, locked) {
+  const rows = locked ? (d.proof_rows || []) : rowsOf(d);
+  const parts = d.proof_parts?.length ? d.proof_parts : [""];
+  const body = parts.map(part => {
+    const mine = rows.map((x, i) => ({ ...x, i })).filter(x => x.part === part);
+    if (locked && !mine.length) return "";
+    return `${part ? `<h3 class="pq-proof-part">סעיף ${esc(part)}</h3>` : ""}
+      <table class="pq-table"><thead><tr><th scope="col">#</th><th scope="col">טענה</th><th scope="col">נימוק</th>${locked ? "" : `<th scope="col"><span class="sr-only">מחיקה</span></th>`}</tr></thead><tbody>
+      ${mine.map((x, n) => locked
+        ? `<tr><td>${n + 1}</td><td dir="auto">${fmt(x.claim)}</td><td dir="auto">${fmt(x.reason || "—")}</td></tr>`
+        : `<tr><td>${n + 1}</td><td><input data-row="${x.i}" data-col="claim" dir="auto" maxlength="200" autocomplete="off" aria-label="טענה ${n + 1}${part ? ` בסעיף ${esc(part)}` : ""}" value="${esc(x.claim)}"></td>
+           <td><input data-row="${x.i}" data-col="reason" dir="auto" maxlength="200" autocomplete="off" list="pq-reasons" aria-label="נימוק ${n + 1}${part ? ` בסעיף ${esc(part)}` : ""}" value="${esc(x.reason)}"></td>
+           <td><button type="button" class="pq-del" data-del="${x.i}" aria-label="מחיקת שורה ${n + 1}">✕</button></td></tr>`).join("")}
+      </tbody></table>${locked ? "" : `<button type="button" class="pq-add" data-add="${esc(part)}">+ שורה</button>`}`;
+  }).join("");
+  if (locked) return body ? `<details class="pq-proof"><summary>הטבלה שהגשתם</summary>${body}</details>` : "";
+  return `<section class="pq-proof" id="pq-proof" aria-label="טבלת טענה ונימוק">
+    <div class="pq-symbols" role="toolbar" aria-label="סימנים">${SYMBOLS.map(x => `<button type="button" data-sym="${x}" aria-label="הוספת ${x}">${x}</button>`).join("")}</div>
+    ${body}<datalist id="pq-reasons">${REASONS.map(x => `<option value="${esc(x)}">`).join("")}</datalist></section>`;
+}
+
+// A revealed step of a table question ("א. ∠B = ∠C | נימוק") goes into the table: the first empty row of its part, or a new one.
+function stepIntoTable(d) {
+  const said = [...(d.help?.chat || [])].reverse().find(m => m.role === "ai" && m.kind === "step")?.text || "";
+  const found = said.replace(/^צעד \d+:\s*/, "").match(/^(?:([א-ט])\.\s*)?(.+?)\s*\|\s*(.+)$/);
+  if (!found || !tables[d.id]) return;
+  const part = (d.proof_parts || [""]).includes(found[1] || "") ? (found[1] || "") : (d.proof_parts || [""])[0];
+  const rows = tables[d.id];
+  if (rows.some(x => x.claim === found[2].trim())) return;
+  const empty = rows.find(x => x.part === part && !x.claim && !x.reason);
+  if (empty) Object.assign(empty, { claim: found[2].trim(), reason: found[3].trim() });
+  else rows.splice(rows.map(x => x.part).lastIndexOf(part) + 1, 0, { part, claim: found[2].trim(), reason: found[3].trim() });
+  keepRows(d.id);
+}
+
 async function askHelp(kind, text = "") {
   const msg = q("#pq-help-msg");
   layer.querySelectorAll("#pq-help button").forEach(b => { b.disabled = true; });
   if (msg) msg.textContent = kind === "ask" || kind === "direction" ? "🤖 חושב…" : "";
   try {
     current = await api(`/api/photo-questions/${current.id}/help`, { method: "POST", body: { kind, text } });
+    if (kind === "step" && current.layout === "proof") stepIntoTable(current);
     helpOpen.add(current.id);
     draw();
     q("#pq-chat")?.lastElementChild?.scrollIntoView({ block: "nearest" });
@@ -169,7 +247,9 @@ function draw() {
   sheet(`${heading(d.from_bank ? "שאלה מהכיתה" : "שאלה מצולמת", !checked)}
     ${photo(d)}
     <div class="mx-q" id="pq-q"><p class="ex-text pq-lines" dir="auto">${fmt(d.question)}</p>${skillPick(d, checked || checking)}
-      ${checked ? "" : `<p class="muted">✏️ פתרו בלוח, כמו במבחן. הבודק רואה את הדרך, לא רק את התשובה.</p>`}${box}</div>
+      ${checked ? "" : d.layout === "proof" ? `<p class="muted">📝 כתבו את הפתרון בטבלה: טענה ונימוק בכל שורה. הלוח לשרטוט ולחישובי עזר (רשות).</p>`
+        : `<p class="muted">✏️ פתרו בלוח, כמו במבחן. הבודק רואה את הדרך, לא רק את התשובה.</p>`}${box}</div>
+    ${d.layout === "proof" ? tableHtml(d, checked || checking) : ""}
     ${checking ? "" : helpHtml(d)}
     ${checking ? `<p class="pq-wait" role="status">🧐 בודקים את הפתרון…</p>` : ""}
     ${result}
@@ -210,12 +290,14 @@ function partsHtml(parts) {
 
 async function submit() {
   const d = current, button = q("#pq-submit"), msg = q("#pq-msg");
-  if (!hasWork(boardKey(d.id))) { msg.innerHTML = `<span class="error">✏️ קודם כותבים את הפתרון בלוח</span>`; window.MathlyBoard?.show?.(0); return; }
+  const table = d.layout === "proof" ? (tables[d.id] || []).filter(x => x.claim.trim()).map(x => ({ part: x.part, claim: x.claim.trim(), reason: x.reason.trim() })) : [];
+  if (d.layout === "proof" && !table.length) { msg.innerHTML = `<span class="error">📝 קודם ממלאים את הטבלה: טענה ונימוק בכל שורה</span>`; q("[data-col=claim]")?.focus(); return; }
+  if (d.layout !== "proof" && !hasWork(boardKey(d.id))) { msg.innerHTML = `<span class="error">✏️ קודם כותבים את הפתרון בלוח</span>`; window.MathlyBoard?.show?.(0); return; }
   button.disabled = true;
   msg.textContent = "שולחים את הלוח…";
   try {
-    if (!await sendWork(boardKey(d.id), `pq:${d.id}`, "q")) throw new Error("הלוח לא נשלח, נסו שוב");
-    await api(`/api/photo-questions/${d.id}/submit`, { method: "POST", body: { skill_id: q("#pq-skill")?.value || "", typed: typedNow() } });
+    if (hasWork(boardKey(d.id)) && !await sendWork(boardKey(d.id), `pq:${d.id}`, "q")) throw new Error("הלוח לא נשלח, נסו שוב");
+    await api(`/api/photo-questions/${d.id}/submit`, { method: "POST", body: { skill_id: q("#pq-skill")?.value || "", typed: typedNow(), proof: table } });
     open(d.id);
   } catch (error) { button.disabled = false; msg.innerHTML = `<span class="error">${esc(error.message || "ההגשה נכשלה")}</span>`; }
 }
@@ -232,6 +314,27 @@ function onClick(event) {
   if (t.closest("[data-list]")) { location.hash = "#/photoq"; showList(); return; }
   if (t.closest("#pq-new") || t.closest("#pq-again")) { showCapture(); return; }
   if (t.closest("#pq-submit")) { submit(); return; }
+  const sym = t.closest("[data-sym]")?.dataset.sym;
+  if (sym) {
+    const cell = lastField && layer.contains(lastField) ? lastField : q("[data-col=claim]");
+    if (!cell) return;
+    const at = cell.selectionStart ?? cell.value.length;
+    cell.value = cell.value.slice(0, at) + sym + cell.value.slice(cell.selectionEnd ?? at);
+    cell.focus(); cell.setSelectionRange(at + sym.length, at + sym.length);
+    cell.dispatchEvent(new Event("input", { bubbles: true }));
+    return;
+  }
+  const add = t.closest("[data-add]");
+  if (add && tables[current?.id]) {
+    const rows = tables[current.id], part = add.dataset.add;
+    rows.splice(rows.map(x => x.part).lastIndexOf(part) + 1, 0, { part, claim: "", reason: "" });
+    draw();
+    const mine = [...layer.querySelectorAll("[data-col=claim]")].filter(c => rows[Number(c.dataset.row)].part === part);
+    mine[mine.length - 1]?.focus();
+    return;
+  }
+  const del = t.closest("[data-del]");
+  if (del && tables[current?.id]) { tables[current.id].splice(Number(del.dataset.del), 1); keepRows(current.id); draw(); return; }
   const zoom = t.closest("#pq-photo-btn");
   if (zoom) { const big = zoom.classList.toggle("big"); zoom.setAttribute("aria-label", big ? "הקטנת התמונה" : "הגדלת התמונה"); return; }
   if (t.closest("#pq-help-open")) { helpOpen.add(current.id); draw(); q("#pq-ask-text")?.focus(); return; }

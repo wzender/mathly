@@ -147,3 +147,45 @@ def test_a_question_with_sub_parts_shows_them_all_with_a_box_a_part(browser):
         assert ai.graded[-1]["typed"] == "א=30;ב=12"
         assert "סעיף ב" in page.inner_text("#pq-result .pq-parts") and "בדקו את" in page.inner_text("#pq-result .pq-parts")
         assert page.errors == []
+
+
+def test_a_geometry_question_is_solved_in_the_claim_reason_table(browser):
+    bank, store = load_bank(), InMemoryStore()
+    klass = store.create_class("setup", "ט", lessons=[l["id"] for l in bank.lessons][:3], teacher_email=TEACHER)
+    store.add_member(klass["id"], KID)
+    ai = FakeAI(parts=True, proof=True)
+    app = create_app(Settings(teachers=frozenset({TEACHER})), bank=bank, store=store, reviewer=ai)
+    app.state.run_photoq = lambda target, app_, *args: target(app_, *args)
+    from fastapi.testclient import TestClient
+    api = TestClient(app)
+    with running(app) as url:
+        page = sign_in(browser, url, KID)
+        board_written(page, pictures=True)
+        page.click(".subject-card")
+        page.click("#home-photoq")
+        page.click("#pq-new")
+        page.wait_for_selector("#request-code")
+        phone = api.get("/api/photo-requests/open?device=phone", headers=auth(KID)).json()[0]
+        api.post(f"/api/photo-requests/{phone['id']}/picture", content=png(), headers={**auth(KID), "Content-Type": "image/png"})
+        page.wait_for_selector("#pq-proof")
+        assert page.locator(".pq-table").count() == 3 and page.locator("[data-col=claim]").count() == 9      # a table a part, three rows each
+        page.click("#pq-submit")
+        assert "קודם ממלאים את הטבלה" in page.inner_text("#pq-msg")
+        first = page.locator("[data-col=claim]").first
+        first.fill("AB = AC")
+        page.click("[data-sym='∠']")                                                                    # the symbol goes where the caret is
+        assert first.input_value() == "AB = AC∠"
+        first.fill("AB = AC")
+        page.locator("[data-col=reason]").first.fill("נתון")
+        page.click("[data-add='א']")
+        assert page.locator("[data-col=claim]").count() == 10 and page.input_value("[data-col=claim] >> nth=0") == "AB = AC"   # kept across the redraw
+        page.click("#pq-help-open")
+        page.click("[data-help=step]")
+        page.wait_for_function("document.querySelectorAll('[data-col=claim]')[1]?.value === '∠B = ∠C'")             # the step fills the next row
+        assert page.input_value("[data-col=reason] >> nth=1") == "במשולש שווה־שוקיים זוויות הבסיס שוות"
+        page.click("#pq-submit")
+        page.wait_for_selector("#pq-result")
+        sent = ai.graded[-1]
+        assert "שורה 1: AB = AC | נימוק: נתון" in sent["proof"] and "שורה 2: ∠B = ∠C" in sent["proof"]
+        assert "הטבלה שהגשתם" in page.inner_text(".pq-layer") and page.locator("[data-col]").count() == 0
+        assert page.errors == []

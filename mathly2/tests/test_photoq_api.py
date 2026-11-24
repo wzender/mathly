@@ -16,8 +16,8 @@ KID, KID2, TEACHER, OTHER_TEACHER = "kid@school.test", "kid2@school.test", "t@sc
 
 
 class FakeAI:
-    def __init__(self, readable=True, skill=None, score=80, fail=False, parts=False):
-        self.readable, self.skill, self.score, self.fail, self.parts = readable, skill, score, fail, parts
+    def __init__(self, readable=True, skill=None, score=80, fail=False, parts=False, proof=False):
+        self.readable, self.skill, self.score, self.fail, self.parts, self.proof = readable, skill, score, fail, parts, proof
         self.read, self.graded, self.tutored = [], [], []
 
     def read_question(self, image, skills, subject=""):
@@ -26,7 +26,9 @@ class FakeAI:
             raise RuntimeError("down")
         if self.parts:
             return {"readable": True, "question": "נתון: △ABC שווה־שוקיים ($AB = AC$), ∠A₁ = 30°, PC = 18 ס\"מ.\nא. מצאו את ∠B.\nב. מצאו את BP.\nג. הוכיחו: FP = BC/6.",
-                    "answer": "א. $∠B = 30°$\nב. $BP = 12$ ס\"מ\nג. הוכחה", "steps": ["א. $∠B = (180° − 120°)/2$", "ב. $AP = PC/2$", "ג. $FP = BP/2$"],
+                    "answer": "א. $∠B = 30°$\nב. $BP = 12$ ס\"מ\nג. הוכחה", "proof": self.proof,
+                    "steps": (["א. ∠B = ∠C | במשולש שווה־שוקיים זוויות הבסיס שוות", "ב. AP = PC/2 | במשולש ישר־זווית, הניצב שמול זווית של 30° שווה למחצית היתר"]
+                              if self.proof else ["א. $∠B = (180° − 120°)/2$", "ב. $AP = PC/2$", "ג. $FP = BP/2$"]),
                     "skill": self.skill if self.skill is not None else skills[0]["id"]}
         return {"readable": self.readable, "question": "פתרו: $2x + 3 = 11$", "answer": "$x = 4$", "steps": ["$2x = 8$", "$x = 4$"],
                 "skill": self.skill if self.skill is not None else skills[0]["id"]}
@@ -37,8 +39,8 @@ class FakeAI:
             raise RuntimeError("down")
         return "נסו לבודד את $x$: מה עושים קודם?"
 
-    def grade_open(self, question, answer, typed, board):
-        self.graded.append({"question": question, "answer": answer, "typed": typed, "board": len(board)})
+    def grade_open(self, question, answer, typed, board, proof=None):
+        self.graded.append({"question": question, "answer": answer, "typed": typed, "board": len(board) if board else 0, "proof": proof})
         parts = [{"label": "א", "verdict": "correct", "feedback": "נכון"}, {"label": "ב", "verdict": "wrong", "feedback": "בדקו את $AP$"}] if self.parts else []
         return {"score": self.score, "verdict": "partial", "feedback": "דרך טובה, טעות בחילוק", "tip": "בדקו את החילוק", "parts": parts}
 
@@ -209,3 +211,23 @@ def test_final_boxes_of_plain_answers():
     assert photoq.final_box("$x = 4$") == {"label": "x =", "unit": ""} and photoq.final_box("$75°$") == {"label": "", "unit": "°"}
     assert photoq.final_box('BP = 12 ס"מ') == {"label": "BP =", "unit": 'ס"מ'} and photoq.final_box("$x = 2y + 3$") is None
     assert photoq.finals("$x = 4$") == [{"part": "", "label": "x =", "unit": ""}] and photoq.parts_of("$x = 4$") == []
+
+
+def test_a_geometry_question_is_answered_in_a_claim_reason_table_the_board_optional(world):
+    world.app.state.reviewer.parts = world.app.state.reviewer.proof = True
+    q = photograph(world).json()
+    assert q["layout"] == "proof" and q["proof_parts"] == ["א", "ב", "ג"] and q["proof_rows"] == []
+    submit = lambda body: world.post(f"/api/photo-questions/{q['id']}/submit", headers=auth(KID), json=body)
+    assert submit({"proof": [{"part": "א", "claim": " ", "reason": ""}]}).status_code == 422                  # an empty table is not a solution
+    rows = [{"part": "א", "claim": r"\angle B = \angle C", "reason": "במשולש שווה־שוקיים זוויות הבסיס שוות"}, {"part": "ב", "claim": "AP = 9", "reason": ""}]
+    done = submit({"proof": rows, "typed": "א=30"}).json()                                                   # no board: fine for a table
+    assert done["state"] == "checked" and done["proof_rows"][0]["claim"] == "∠ B = ∠ C" and done["review"]["layout"] == "proof"
+    sent = world.app.state.reviewer.graded[-1]
+    assert sent["board"] == 0 and "סעיף א, שורה 1: ∠ B = ∠ C | נימוק: במשולש" in sent["proof"] and "סעיף ב, שורה 1: AP = 9 | נימוק: (חסר)" in sent["proof"]
+    teacher = world.get("/api/teaching/photo-questions", headers=auth(TEACHER)).json()[0]
+    assert teacher["layout"] == "proof" and len(teacher["proof_rows"]) == 2
+    help_(world, q, "ask", "למה ירדו לי נקודות?")
+    assert "שורה 1" in world.app.state.reviewer.tutored[-1]["context"]["review"]["proof_text"]               # the tutor sees the table
+    world.post(f"/api/teaching/photo-questions/{q['id']}", headers=auth(TEACHER), json={"action": "approve"})
+    copy = world.post(f"/api/photo-questions/from-bank/{q['id']}", headers=auth(KID2)).json()
+    assert copy["layout"] == "proof" and copy["proof_rows"] == []                                            # a classmate's copy has a table too, empty

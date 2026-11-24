@@ -57,7 +57,8 @@ READ_INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט בישר
 - question: נוסח השאלה בעברית, מלא ומדויק כפי שהוא בתמונה, נוסחאות בתוך $...$: הנתונים, ואחריהם כל הסעיפים, כל סעיף בשורה משלו שמתחילה באות שלו (למשל "א. מצאו את גודלה של ∠B."). אם יש שרטוט, תארו במילים מה שנחוץ לפתרון. אם בתמונה יש כמה שאלות, קראו רק את השאלה השלמה שבמרכז התמונה.
 - העתיקו את כל הנתונים במלואם, גם מה שכתוב בתוך סוגריים (למשל "משולש שווה־שוקיים ($AB = AC$)"). אל תשאירו סוגריים ריקים.
 - answer: התשובה הסופית הנכונה, קצרה (למשל $x = 5$). בשאלה עם סעיפים: שורה לכל סעיף שמתחילה באות שלו (למשל "א. $∠B = 30°$"), ובסעיף הוכחה "הוכחה".
-- steps: שלבי הפתרון, 2 עד 6 שלבים קצרים. בשאלה עם סעיפים: עד 10 שלבים, וכל שלב מתחיל באות הסעיף שלו (למשל "ב. ...").
+- steps: שלבי הפתרון, 2 עד 6 שלבים קצרים. בשאלה עם סעיפים: עד 10 שלבים, וכל שלב מתחיל באות הסעיף שלו (למשל "ב. ..."). כש־proof הוא true: כל שלב הוא שורה בטבלה, "טענה | נימוק" (למשל "א. ∠B = ∠C | במשולש שווה־שוקיים זוויות הבסיס שוות").
+- proof: true אם זו שאלה בגיאומטריה שפותרים בטבלת טענה ונימוק (הוכחה, או מציאת זווית או אורך בעזרת משפטים), אחרת false.
 - skill: המזהה של המיומנות מהרשימה שהשאלה הכי מתאימה לה, או מחרוזת ריקה אם אף אחת לא מתאימה (שאלה "חיצונית").
 - כתבו סימנים מתמטיים כתווים רגילים: △ ∠ ⊥ ∥ ° √ ≤ ≥ ≠ ± π ² ³ ₁ ₂, ושבר כ־a/b. אסור לכתוב פקודות LaTeX כמו \\triangle, \\angle, \\frac, \\text או ^\\circ.
 אל תמציאו: אם משהו בתמונה לא ברור, readable = false."""
@@ -69,6 +70,7 @@ GRADE_INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט ביש�
 - verdict: "correct", "partial", "wrong" או "unclear" (אי אפשר לקרוא את הלוח).
 - feedback: משפט או שניים לתלמיד, בעברית, בפנייה ברבים (אתם), חם וענייני: מה טוב בדרך, ואיפה הטעות הראשונה אם יש.
 - tip: טיפ אחד קצר לפעם הבאה.
+- טבלת טענה/נימוק: אם התלמיד מילא טבלה, היא הפתרון, והלוח (אם יש) הוא שרטוט וחישובי עזר. בדקו כל שורה: הטענה נכונה ונובעת מהקודמות, והנימוק נכון ומדויק (נתון, הגדרה או משפט). נימוק חסר או לא מדויק מוריד נקודות, גם כשהטענה נכונה. במשוב הפנו לשורה לפי המספר שלה.
 - parts: רק בשאלה עם סעיפים: לכל סעיף label (האות שלו), verdict ו־feedback של משפט אחד. בשאלה בלי סעיפים: רשימה ריקה.
 אסור לכתוב את התשובה הסופית הנכונה או את המספר שלה. נוסחאות בתוך $...$."""
 
@@ -82,7 +84,8 @@ TUTOR_INSTRUCTIONS = """אתם מורים למתמטיקה סבלניים וחמ
 TUTOR_SCHEMA = {"type": "OBJECT", "properties": {"reply": {"type": "STRING"}}, "required": ["reply"]}
 
 READ_SCHEMA = {"type": "OBJECT", "properties": {"readable": {"type": "BOOLEAN"}, "question": {"type": "STRING"}, "answer": {"type": "STRING"},
-                                              "steps": {"type": "ARRAY", "items": {"type": "STRING"}}, "skill": {"type": "STRING"}},
+                                              "steps": {"type": "ARRAY", "items": {"type": "STRING"}}, "skill": {"type": "STRING"},
+                                              "proof": {"type": "BOOLEAN"}},
                "required": ["readable", "question", "answer", "steps", "skill"]}
 GRADE_SCHEMA = {"type": "OBJECT", "properties": {"score": {"type": "INTEGER"}, "verdict": {"type": "STRING", "enum": list(VERDICTS)},
                                                "feedback": {"type": "STRING"}, "tip": {"type": "STRING"},
@@ -176,12 +179,16 @@ class GeminiReviewer:
                           {"text": f"\n\nהמקצוע: {subject or 'מתמטיקה'}\nהמיומנויות (מזהה: שם):\n{listed}\n\nהתמונה:"},
                           {"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(_small(image)).decode()}}], READ_SCHEMA, lambda *a, **k: None)
 
-    def grade_open(self, question: str, answer: str, typed: str | None, board: bytes) -> dict:
-        """A student's board for an open question -> {score, verdict, feedback, tip}."""
+    def grade_open(self, question: str, answer: str, typed: str | None, board: bytes | None, proof: str | None = None) -> dict:
+        """A student's work on an open question (the board, a claim/reason table, or both) -> {score, verdict, feedback, tip, parts}."""
         final = f"התשובה הסופית שהתלמיד הקליד (בשאלה עם סעיפים: אות=תשובה): {typed}" if typed else "התלמיד לא הקליד תשובה סופית"
-        return self._ask([{"text": GRADE_INSTRUCTIONS},
-                          {"text": f"\n\nהשאלה:\n{question}\nהתשובה הנכונה (לא לגלות): {answer}\n{final}\nהלוח של התלמיד:"},
-                          {"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(_small(board)).decode()}}], GRADE_SCHEMA, lambda *a, **k: None)
+        table = f"\nטבלת הטענה/נימוק של התלמיד:\n{proof}\n" if proof else ""
+        parts = [{"text": GRADE_INSTRUCTIONS},
+                 {"text": f"\n\nהשאלה:\n{question}\nהתשובה הנכונה (לא לגלות): {answer}\n{final}\n{table}"
+                          + ("הלוח של התלמיד:" if board else "התלמיד לא כתב בלוח.")}]
+        if board:
+            parts.append({"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(_small(board)).decode()}})
+        return self._ask(parts, GRADE_SCHEMA, lambda *a, **k: None)
 
     def tutor_reply(self, context: dict, history: list[dict], message: str, board: bytes | None = None) -> str:
         """One reply of the help conversation. `context`: question, answer, steps (all, for the tutor), shown (how many steps the student
@@ -194,7 +201,8 @@ class GeminiReviewer:
         parts = [{"text": TUTOR_INSTRUCTIONS},
                  {"text": f"\n\nהשאלה:\n{context.get('question', '')}\nהתשובה הנכונה (רק בשבילכם): {context.get('answer', '')}\n"
                           f"שלבי הפתרון (רק בשבילכם):\n{steps}\n{known}\n"
-                          + (f"הבדיקה של הלוח: {review.get('verdict', '')}. {review.get('feedback', '')}\n" if review else "")
+                          + (f"הבדיקה של הלוח: {review.get('verdict', '')}. {review.get('feedback', '')}\n" if review.get("verdict") else "")
+                          + (f"הטבלה שהתלמיד הגיש:\n{review['proof_text']}\n" if review.get("proof_text") else "")
                           + (f"\nהשיחה עד עכשיו:\n{talk}\n" if talk else "") + f"\nהתלמיד כותב עכשיו: {message}"}]
         if board:
             parts += [{"text": "הלוח שהתלמיד הגיש:"}, {"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(_small(board)).decode()}}]

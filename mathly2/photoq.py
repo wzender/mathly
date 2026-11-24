@@ -106,7 +106,8 @@ def read_job(app, question_id: str) -> None:
         ids = {s["id"] for s in skills}
         skill = got.get("skill") if got.get("skill") in ids else None
         store.save_photo_question(question_id, state="ready", question=tidy(str(got["question"]))[:4000], answer=tidy(str(got.get("answer", "")))[:1000],
-                                  steps=[tidy(str(x))[:400] for x in (got.get("steps") or [])][:12], suggested_skill=skill, skill_id=skill)
+                                  steps=[tidy(str(x))[:400] for x in (got.get("steps") or [])][:12], suggested_skill=skill, skill_id=skill,
+                                  review={"layout": "proof"} if got.get("proof") else None)
     except Exception as exc:
         log.warning("reading a photographed question failed: %s", getattr(exc, "reason", type(exc).__name__))
         try:
@@ -121,14 +122,14 @@ def check_job(app, question_id: str) -> None:
     row = store.get_photo_question(question_id)
     try:
         work = store.work_of(row["user_id"], REF + row["id"])
-        picture = store.get_picture(work[KEY])
-        board = app.state.pictures.get(picture["path"])
-        got = reviewer(app).grade_open(row["question"], row["answer"], row["typed"] or None, board)
+        board = app.state.pictures.get(store.get_picture(work[KEY])["path"]) if KEY in work else None     # a proof table may come without one
+        kept = {k: v for k, v in (row["review"] or {}).items() if k in ("layout", "proof")}
+        got = reviewer(app).grade_open(row["question"], row["answer"], row["typed"] or None, board, proof_text(kept.get("proof")))
         raw = max(0, min(100, int(got.get("score", 0))))
         score = min(raw, row.get("max_grade", 100))                         # help taken lowers what the question can reach
         verdict = got.get("verdict") if got.get("verdict") in ("correct", "partial", "wrong", "unclear") else "unclear"
         fields = {"state": "checked", "grade": score, "checked_at": clock.now(), "reason": None,
-                  "review": {"verdict": verdict, "feedback": tidy(str(got.get("feedback", "")))[:600], "tip": tidy(str(got.get("tip", "")))[:300],
+                  "review": {**kept, "verdict": verdict, "feedback": tidy(str(got.get("feedback", "")))[:600], "tip": tidy(str(got.get("tip", "")))[:300],
                              "checks": _checks(row), "raw": raw,
                              "parts": [{"label": str(x.get("label", ""))[:4], "feedback": tidy(str(x.get("feedback", "")))[:300],
                                         "verdict": x.get("verdict") if x.get("verdict") in ("correct", "partial", "wrong", "unclear") else "unclear"}
@@ -145,6 +146,24 @@ def check_job(app, question_id: str) -> None:
 
 
 # ---- what the student sees ----
+
+def is_proof(row: dict) -> bool:
+    """A geometry question answered in a claim/reason table (טענה/נימוק): the AI marks it when it reads the photo."""
+    return isinstance(row.get("review"), dict) and row["review"].get("layout") == "proof"
+
+
+def proof_text(rows: list[dict] | None) -> str | None:
+    """The student's table as lines for the AI: "סעיף א, שורה 1: <claim> | נימוק: <reason>"."""
+    if not rows:
+        return None
+    numbers: dict[str, int] = {}
+    lines = []
+    for row in rows:
+        numbers[row.get("part", "")] = numbers.get(row.get("part", ""), 0) + 1
+        where = f"סעיף {row['part']}, " if row.get("part") else ""
+        lines.append(f"{where}שורה {numbers[row.get('part', '')]}: {row.get('claim', '')} | נימוק: {row.get('reason', '') or '(חסר)'}")
+    return "\n".join(lines)
+
 
 def _checks(row: dict) -> int:
     return int((row.get("review") or {}).get("checks", 0)) if isinstance(row.get("review"), dict) else 0
@@ -164,7 +183,9 @@ def student_view(request: Request, row: dict, user: dict) -> dict:
            "typed": row["typed"], "grade": row["grade"], "review": row["review"] if checked else None, "bank": row["bank"],
            "from_bank": bool(row["source_id"]), "checks_left": max(0, CHECKS - _checks(row)),
            "reason": REASONS.get(row["reason"]) if row["reason"] else None, "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-           "help": help_state(row)}
+           "help": help_state(row), "layout": "proof" if is_proof(row) else "board",
+           "proof_parts": [p["label"] for p in parts_of(row["answer"])] or [""] if is_proof(row) else [],
+           "proof_rows": (row["review"] or {}).get("proof") or [] if is_proof(row) else []}
     if checked:
         out["answer"], out["steps"] = tidy(row["answer"]), [tidy(x) for x in row["steps"] or []]
     return out
@@ -182,9 +203,16 @@ class NewQuestion(BaseModel):
     subject: str = Field("math", max_length=40)
 
 
+class ProofRow(BaseModel):
+    part: str = Field("", max_length=2)
+    claim: str = Field("", max_length=200)
+    reason: str = Field("", max_length=200)
+
+
 class HandIn(BaseModel):
     skill_id: str | None = Field(None, max_length=80)                # None or "": external
     typed: str = Field("", max_length=40)
+    proof: list[ProofRow] = Field(default_factory=list, max_length=40)       # the claim/reason table of a geometry question
 
 
 @router.get("/photo-questions")
@@ -235,7 +263,8 @@ def from_bank(question_id: str, request: Request, user: dict = Depends(learner))
         raise HTTPException(503, REASONS["no_ai"])
     row = store.create_photo_question(user["id"], clock.now(), class_id=source["class_id"], subject_id=source["subject_id"], source_id=source["id"],
                                       state="ready", question=source["question"], answer=source["answer"], steps=source["steps"],
-                                      suggested_skill=source["skill_id"], skill_id=source["skill_id"])
+                                      suggested_skill=source["skill_id"], skill_id=source["skill_id"],
+                                      review={"layout": "proof"} if is_proof(source) else None)
     return student_view(request, row, user)
 
 
@@ -255,14 +284,18 @@ def hand_in(question_id: str, body: HandIn, request: Request, user: dict = Depen
         raise HTTPException(409, f"הגשתם את השאלה הזו {CHECKS} פעמים. נסו שאלה אחרת!")
     if reviewer(request) is None:
         raise HTTPException(503, REASONS["no_ai"])
-    if KEY not in store.work_of(user["id"], REF + row["id"]):
+    rows = [{"part": x.part.strip(), "claim": tidy(x.claim.strip()), "reason": tidy(x.reason.strip())} for x in body.proof if x.claim.strip()]
+    if is_proof(row):
+        if not rows:
+            raise HTTPException(422, "קודם ממלאים את הטבלה: טענה ונימוק בכל שורה")
+    elif KEY not in store.work_of(user["id"], REF + row["id"]):
         raise HTTPException(422, "קודם כותבים את הפתרון בלוח")
     skill = body.skill_id or None
     if skill is not None:
         from .skills import visible_lesson_ids
         if skill not in {s["id"] for s in subject_skills(request.app.state.bank, row["subject_id"], visible_lesson_ids(request, user))}:
             raise HTTPException(422, "מיומנות לא מוכרת")
-    review = {**(row["review"] or {}), "checks": _checks(row) + 1}
+    review = {**(row["review"] or {}), "checks": _checks(row) + 1, **({"proof": rows} if is_proof(row) else {})}
     store.save_photo_question(row["id"], state="checking", skill_id=skill, typed=body.typed.strip(), review=review, reason=None)
     _run(request.app, check_job, row["id"])
     return student_view(request, store.get_photo_question(row["id"]), user)
@@ -372,7 +405,7 @@ def _tutor(tutor, row: dict, message: str, board: bytes | None = None) -> str:
     checked = row["state"] == "checked"
     context = {"question": row["question"], "answer": row["answer"], "steps": row.get("steps") or [], "shown": row.get("revealed", 0),
                "full": checked or row.get("revealed", 0) >= len(row.get("steps") or []) > 0,
-               "review": (row.get("review") or {}) if checked else None}
+               "review": {**(row.get("review") or {}), "proof_text": proof_text((row.get("review") or {}).get("proof"))} if checked else None}
     try:
         reply = tutor.tutor_reply(context, row.get("chat") or [], message, board)
     except ReviewFailure as exc:
@@ -406,7 +439,8 @@ def teacher_view(request: Request, row: dict, emails: dict[str, str]) -> dict:
             "steps": [tidy(x) for x in row["steps"] or []], "picture_id": row["picture_id"], "board_id": work.get(KEY), "suggested_skill": row["suggested_skill"],
             "skill": {"id": row["skill_id"], "name": names.get(row["skill_id"], "")} if row["skill_id"] else None, "grade": row["grade"],
             "review": row["review"], "bank": row["bank"], "skills": subject_skills(bank, row["subject_id"], None),
-            "chat": _chat(row), "max_grade": row.get("max_grade", 100),
+            "chat": _chat(row), "max_grade": row.get("max_grade", 100), "layout": "proof" if is_proof(row) else "board",
+            "proof_rows": (row["review"] or {}).get("proof") or [],
             "created_at": row["created_at"].isoformat() if row["created_at"] else None}
 
 

@@ -20,6 +20,8 @@ function item(r) {
     <label>התשובה (אפשר לתקן)</label><textarea data-field="answer" rows="${Math.min(4, (r.answer || "").split("\n").length)}" dir="auto">${esc(r.answer)}</textarea>
     ${r.steps?.length ? `<details><summary>הפתרון של ה־AI</summary><ol>${r.steps.map(s => `<li dir="auto">${fmt(s)}</li>`).join("")}</ol></details>` : ""}
     ${r.review?.feedback ? `<p class="muted">משוב לתלמיד: ${fmt(r.review.feedback)}</p>` : ""}
+    ${r.proof_rows?.length ? `<details open><summary>טבלת הטענה/נימוק של התלמיד</summary><table class="pq-table"><thead><tr><th scope="col">#</th><th scope="col">טענה</th><th scope="col">נימוק</th></tr></thead><tbody>
+      ${r.proof_rows.map((x, n) => `<tr><td>${x.part ? `${esc(x.part)}${n + 1}` : n + 1}</td><td dir="auto">${fmt(x.claim)}</td><td dir="auto">${fmt(x.reason || "—")}</td></tr>`).join("")}</tbody></table></details>` : ""}
     ${r.review?.parts?.length ? `<ul class="muted pq-parts">${r.review.parts.map(p => `<li>סעיף ${esc(p.label)} · ${esc(p.verdict)}: ${fmt(p.feedback)}</li>`).join("")}</ul>` : ""}
     ${r.max_grade < 100 ? `<p class="muted">התלמיד/ה נעזר/ה ברמזים: הציון המקסימלי ירד ל־${r.max_grade}${r.review?.raw !== undefined ? ` (בלי העזרה: ${r.review.raw})` : ""}.</p>` : ""}
     ${r.chat?.length ? `<details class="pq-t-chat"><summary>השיחה עם ה־AI (${r.chat.filter(m => m.role === "student").length} הודעות)</summary>

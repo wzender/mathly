@@ -864,6 +864,17 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .pq-finals .qz-final-row { display: flex; align-items: center; gap: 6px; }
 .pq-finals .qz-final-row .tag { flex: none; }
 .pq-parts { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 6px; }
+.pq-proof { margin: 10px 0; }
+.pq-proof-part { font-size: 16px; margin: 10px 0 4px; }
+.pq-symbols { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; position: sticky; top: 0; z-index: 2; background: var(--surface, #141a33); padding: 4px 0; }
+.pq-symbols button { min-width: 40px; min-height: 40px; padding: 4px 8px; font-size: 18px; }
+.pq-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.pq-table th, .pq-table td { border: 1px solid var(--line); padding: 4px; vertical-align: top; text-align: start; }
+.pq-table th:first-child, .pq-table td:first-child { width: 1.8em; text-align: center; }
+.pq-table th:last-child:not(:nth-child(3)), .pq-table td:last-child:not(:nth-child(3)) { width: 2.6em; }
+.pq-table input { width: 100%; box-sizing: border-box; min-height: 40px; font-size: 16px; padding: 6px; }
+.pq-del { min-height: 40px; min-width: 36px; padding: 0; }
+.pq-add { margin-top: 6px; }
 .pq-photo img, .pq-pics img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
 .pq-photo { margin: 4px 0 8px; }
 .pq-photo summary { cursor: pointer; font-weight: 600; }
