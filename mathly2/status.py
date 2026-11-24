@@ -35,6 +35,20 @@ def _database(store, supabase_on: bool) -> dict:
     return _check("database", "מסד הנתונים", OK, f"Supabase ענה תוך {round((time.monotonic() - started) * 1000)} אלפיות שנייה")
 
 
+def _schema(store, supabase_on: bool) -> dict:
+    """Whether the database has what the recent migrations add; the missing migrations by name, to run in Supabase."""
+    if not supabase_on:
+        return _check("schema", "טבלאות במסד הנתונים", OK, "בזיכרון: הכול קיים")
+    raw = getattr(store, "_store", store)
+    try:
+        missing = raw.schema_missing()
+    except Exception as exc:
+        return _check("schema", "טבלאות במסד הנתונים", ERROR, f"לא הצלחנו לבדוק ({type(exc).__name__})")
+    if missing:
+        return _check("schema", "טבלאות במסד הנתונים", ERROR, "חסר: " + ", ".join(f"{m}.sql" for m in missing))
+    return _check("schema", "טבלאות במסד הנתונים", OK, "כל הטבלאות והעמודות של העדכונים האחרונים קיימות")
+
+
 def _push(pusher, key: str) -> dict:
     if not key:
         return _check("push", "התראות לטלפון", OFF, "אין מפתח: ההתראות כבויות")
@@ -48,10 +62,13 @@ def checks(app) -> list[dict]:
     bank = state.bank
     return [
         _database(state.store, s.supabase_on),
+        _schema(state.store, s.supabase_on),
         _check("sign_in", "התחברות", OK if s.supabase_on else WARN,
                "Google דרך Supabase" if s.supabase_on else "כניסת פיתוח עם כתובת מייל בלבד"),
         _check("bank", "מאגר השאלות", OK, f"{len(bank.lessons)} שיעורים, {len(bank.skills)} מיומנויות"),
         _check("ai", "עזרת AI", OK if s.anthropic_key else OFF, "מפתח מוגדר" if s.anthropic_key else "אין מפתח: העזרה כבויה"),
+        _check("gemini", "Gemini (צילום שאלות, בדיקת דרך)", OK if s.gemini_key else OFF,
+               "מפתח מוגדר" if s.gemini_key else "אין מפתח: צילום שאלות ובדיקת הדרך כבויים"),
         _push(state.pusher, s.vapid_private_key),
         _check("pictures", "תמונות תשובה", OK if s.supabase_on else WARN,
                f"דלי פרטי {s.answer_bucket}" if s.supabase_on else "בזיכרון בלבד"),

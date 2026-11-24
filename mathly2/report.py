@@ -57,7 +57,12 @@ def build(store, day: date) -> dict:
         people[r["day"]] += 1 if (r["answers"] or r["attempts"]) else 0
     days = [day - timedelta(days=i) for i in range(6, -1, -1)]
     total = sum(answers_by.values())
-    return {"day": day.isoformat(), "answers": total, "correct": sum(correct.values()), "people": len(active),
+    raw = getattr(store, "_store", store)
+    try:
+        schema_missing = raw.schema_missing()
+    except Exception:
+        schema_missing = None                                       # could not tell
+    return {"schema_missing": schema_missing, "day": day.isoformat(), "answers": total, "correct": sum(correct.values()), "people": len(active),
             "kinds": kinds, "classes": sorted(classes, key=lambda c: -c["answers"]),
             "week": [{"day": d.isoformat(), "people": people[d], "answers": per_day[d]} for d in days]}
 

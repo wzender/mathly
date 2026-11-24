@@ -34,7 +34,8 @@ def test_only_a_developer_reads_it():
 def test_without_supabase_the_memory_parts_are_warnings_and_unset_keys_are_off():
     got = client().get("/api/dev/status", headers=auth(DEV)).json()
     states = {c["key"]: c["state"] for c in got["checks"]}
-    assert states == {"database": "warn", "sign_in": "warn", "bank": "ok", "ai": "off", "push": "off", "pictures": "warn", "cleanup": "off"}
+    assert states == {"database": "warn", "schema": "ok", "sign_in": "warn", "bank": "ok", "ai": "off", "gemini": "off", "push": "off",
+                      "pictures": "warn", "cleanup": "off"}
     assert got["overall"] == "warn"
     bank = next(c for c in got["checks"] if c["key"] == "bank")
     assert "24 שיעורים" in bank["detail"]
@@ -188,3 +189,31 @@ def test_the_supabase_store_reads_the_activity_view_in_pages_after_the_last_row_
                                                                    ("2026-11-10", "u5"), ("2026-11-11", "u2")]   # each once, none skipped
     assert asked == [None, "(day.gt.2026-11-10,and(day.eq.2026-11-10,user_id.gt.u1))",
                      "(day.gt.2026-11-10,and(day.eq.2026-11-10,user_id.gt.u5))"]
+
+
+def test_the_schema_check_names_the_migrations_the_database_lacks():
+    import urllib.error
+    from mathly2.store import SCHEMA_PROBES, SupabaseStore
+
+    class Partial(SupabaseStore):
+        def __init__(self, missing_tables):
+            self.missing_tables, self.asked = missing_tables, []
+
+        def _request(self, method, table, params=None, body=None, **kw):
+            self.asked.append((table, params["select"]))
+            if table in self.missing_tables or (table, params["select"]) in self.missing_tables:
+                raise urllib.error.HTTPError("u", 404, "missing", {}, None)
+            return []
+
+    every = Partial(set())
+    assert every.schema_missing() == [] and len(every.asked) == len(SCHEMA_PROBES)
+    some = Partial({"m2_feedback", ("m2_photo_requests", "purpose")})
+    assert some.schema_missing() == ["20261123090000_m2_feedback", "20261125090000_m2_photo_questions"]
+    found = status._schema(some, True)
+    assert found["state"] == "error" and "20261123090000_m2_feedback.sql" in found["detail"]
+    assert status._schema(every, True)["state"] == "ok" and status._schema(InMemoryStore(), False)["state"] == "ok"
+
+
+def test_the_gemini_key_is_reported_set_or_not():
+    states = {c["key"]: c["state"] for c in client(gemini_key="g-secret").get("/api/dev/status", headers=auth(DEV)).json()["checks"]}
+    assert states["gemini"] == "ok"
