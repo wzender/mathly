@@ -16,10 +16,11 @@ function item(r) {
     <div class="pq-pics">${r.picture_id ? `<figure><img data-picture="${esc(r.picture_id)}" alt="התמונה שצולמה" hidden><figcaption>התמונה</figcaption></figure>` : ""}
       ${r.board_id ? `<figure><img data-picture="${esc(r.board_id)}" alt="הלוח של התלמיד" hidden><figcaption>הלוח</figcaption></figure>` : ""}</div>
     <label>השאלה (אפשר לתקן)</label><textarea data-field="question" rows="3" dir="auto">${esc(r.question)}</textarea>
-    <p class="muted pq-preview" dir="auto">${fmt(r.question)}</p>
-    <label>התשובה (אפשר לתקן)</label><input data-field="answer" value="${esc(r.answer)}" dir="auto">
+    <p class="muted pq-preview pq-lines" dir="auto">${fmt(r.question)}</p>
+    <label>התשובה (אפשר לתקן)</label><textarea data-field="answer" rows="${Math.min(4, (r.answer || "").split("\n").length)}" dir="auto">${esc(r.answer)}</textarea>
     ${r.steps?.length ? `<details><summary>הפתרון של ה־AI</summary><ol>${r.steps.map(s => `<li dir="auto">${fmt(s)}</li>`).join("")}</ol></details>` : ""}
     ${r.review?.feedback ? `<p class="muted">משוב לתלמיד: ${fmt(r.review.feedback)}</p>` : ""}
+    ${r.review?.parts?.length ? `<ul class="muted pq-parts">${r.review.parts.map(p => `<li>סעיף ${esc(p.label)} · ${esc(p.verdict)}: ${fmt(p.feedback)}</li>`).join("")}</ul>` : ""}
     ${r.max_grade < 100 ? `<p class="muted">התלמיד/ה נעזר/ה ברמזים: הציון המקסימלי ירד ל־${r.max_grade}${r.review?.raw !== undefined ? ` (בלי העזרה: ${r.review.raw})` : ""}.</p>` : ""}
     ${r.chat?.length ? `<details class="pq-t-chat"><summary>השיחה עם ה־AI (${r.chat.filter(m => m.role === "student").length} הודעות)</summary>
       <div class="pq-chat">${r.chat.map(m => `<p class="pq-msg ${m.role === "ai" ? "ai" : "me"}" dir="auto">${m.role === "ai" ? "🤖 " : "🧑‍🎓 "}${fmt(m.text).replace(/\n/g, "<br>")}</p>`).join("")}</div></details>` : ""}

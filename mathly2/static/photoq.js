@@ -160,16 +160,15 @@ function draw() {
       <p><button type="button" class="primary" id="pq-again">📸 לצלם שוב</button> <button type="button" data-list>לרשימה</button></p>`);
   }
   const checked = d.state === "checked", checking = d.state === "checking";
-  const box = d.final && !checked ? `<p class="qz-final"><label for="pq-final">התשובה הסופית:</label><span class="qz-final-row" dir="ltr">${d.final.label ? `<span>${esc(d.final.label)}</span>` : ""}
-      <input id="pq-final" inputmode="decimal" maxlength="40" autocomplete="off" value="${esc(d.typed || "")}">${d.final.unit ? `<span>${esc(d.final.unit)}</span>` : ""}</span></p>` : "";
+  const box = checked ? "" : boxes(d);
   const result = checked ? `<section class="pq-result" id="pq-result"><p class="qz-grade" aria-label="הציון ${d.grade}"><b>${d.grade}</b><span>מתוך 100</span></p>
       ${d.review ? `<p><span class="tag"><span aria-hidden="true">${VERDICT[d.review.verdict]?.[0] || ""}</span> ${VERDICT[d.review.verdict]?.[1] || ""}</span></p>
-        <p>${fmt(d.review.feedback)}</p>${d.review.tip ? `<p class="muted">💡 ${fmt(d.review.tip)}</p>` : ""}` : ""}
-      <details><summary>הפתרון המלא</summary><ol>${(d.steps || []).map(s => `<li dir="auto">${fmt(s)}</li>`).join("")}</ol><p>תשובה: <b dir="auto">${fmt(d.answer || "")}</b></p></details>
+        <p>${fmt(d.review.feedback)}</p>${partsHtml(d.review.parts)}${d.review.tip ? `<p class="muted">💡 ${fmt(d.review.tip)}</p>` : ""}` : ""}
+      <details><summary>הפתרון המלא</summary><ol>${(d.steps || []).map(s => `<li dir="auto">${fmt(s)}</li>`).join("")}</ol><p>תשובה: <b dir="auto" class="pq-lines">${fmt(d.answer || "")}</b></p></details>
       ${d.bank === "pending" ? `<p class="muted">📬 השאלה נשלחה למורה. אם יאשר/תאשר, היא תיכנס לשאלות של הכיתה.</p>` : d.bank === "approved" ? `<p class="muted">✓ השאלה נמצאת בשאלות של הכיתה.</p>` : ""}</section>` : "";
   sheet(`${heading(d.from_bank ? "שאלה מהכיתה" : "שאלה מצולמת", !checked)}
     ${photo(d)}
-    <div class="mx-q" id="pq-q"><p class="ex-text" dir="auto">${fmt(d.question)}</p>${skillPick(d, checked || checking)}
+    <div class="mx-q" id="pq-q"><p class="ex-text pq-lines" dir="auto">${fmt(d.question)}</p>${skillPick(d, checked || checking)}
       ${checked ? "" : `<p class="muted">✏️ פתרו בלוח, כמו במבחן. הבודק רואה את הדרך, לא רק את התשובה.</p>`}${box}</div>
     ${checking ? "" : helpHtml(d)}
     ${checking ? `<p class="pq-wait" role="status">🧐 בודקים את הפתרון…</p>` : ""}
@@ -181,6 +180,34 @@ function draw() {
   if (!checked && !checking) window.MathlyBoard?.mount(layer, boardKey(d.id), { question: () => q("#pq-q") });
 }
 
+// The final-answer boxes: one for a plain question, one per sub-part whose answer is a number. The typed answers go as "א=30;ב=12".
+function typedOf(d) {
+  const text = d.typed || "", out = {};
+  for (const piece of text.split(";")) { const [k, ...v] = piece.split("="); if (v.length && /^[א-ט]$/.test(k)) out[k] = v.join("="); }
+  return Object.keys(out).length ? out : { "": text };
+}
+
+function boxes(d) {
+  const list = d.finals || [], typed = typedOf(d);
+  if (!list.length) return "";
+  const many = list.some(f => f.part);
+  return `<div class="qz-final pq-finals"><p><b>${many ? "התשובות הסופיות:" : "התשובה הסופית:"}</b></p>${list.map((f, i) => `<p class="qz-final-row" dir="ltr">
+      ${f.part ? `<span class="tag" dir="rtl">סעיף ${esc(f.part)}</span>` : ""}${f.label ? `<span>${esc(f.label)}</span>` : ""}
+      <input data-final="${esc(f.part)}" id="${i ? `pq-final-${i}` : "pq-final"}" aria-label="${f.part ? `התשובה של סעיף ${esc(f.part)}` : "התשובה הסופית"}" inputmode="decimal"
+        maxlength="${many ? 10 : 40}" autocomplete="off" value="${esc(typed[f.part] || "")}">${f.unit ? `<span>${esc(f.unit)}</span>` : ""}</p>`).join("")}</div>`;
+}
+
+function typedNow() {
+  const inputs = [...(layer?.querySelectorAll("[data-final]") || [])];
+  if (inputs.length === 1 && !inputs[0].dataset.final) return inputs[0].value.trim();
+  return inputs.filter(i => i.value.trim()).map(i => `${i.dataset.final}=${i.value.trim().replace(/[;=]/g, "")}`).join(";").slice(0, 40);
+}
+
+function partsHtml(parts) {
+  if (!parts?.length) return "";
+  return `<ul class="pq-parts">${parts.map(p => `<li><span class="tag">סעיף ${esc(p.label)} <span aria-hidden="true">${VERDICT[p.verdict]?.[0] || ""}</span></span> ${fmt(p.feedback)}</li>`).join("")}</ul>`;
+}
+
 async function submit() {
   const d = current, button = q("#pq-submit"), msg = q("#pq-msg");
   if (!hasWork(boardKey(d.id))) { msg.innerHTML = `<span class="error">✏️ קודם כותבים את הפתרון בלוח</span>`; window.MathlyBoard?.show?.(0); return; }
@@ -188,7 +215,7 @@ async function submit() {
   msg.textContent = "שולחים את הלוח…";
   try {
     if (!await sendWork(boardKey(d.id), `pq:${d.id}`, "q")) throw new Error("הלוח לא נשלח, נסו שוב");
-    await api(`/api/photo-questions/${d.id}/submit`, { method: "POST", body: { skill_id: q("#pq-skill")?.value || "", typed: q("#pq-final")?.value || "" } });
+    await api(`/api/photo-questions/${d.id}/submit`, { method: "POST", body: { skill_id: q("#pq-skill")?.value || "", typed: typedNow() } });
     open(d.id);
   } catch (error) { button.disabled = false; msg.innerHTML = `<span class="error">${esc(error.message || "ההגשה נכשלה")}</span>`; }
 }

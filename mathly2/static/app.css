@@ -857,6 +857,13 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 /* Photographed questions (photoq.js, teacher_photoq.js). */
 .pq-list .pq-item { display: flex; flex-direction: column; align-items: stretch; gap: 2px; width: 100%; text-align: start; padding: 10px 12px; min-height: 44px; }
 .pq-wait { font-size: 18px; font-weight: 700; }
+.pq-lines { white-space: pre-line; }
+.ex-text.pq-lines { text-align: start; }
+.pq-finals { display: block; }
+.pq-finals p { margin: 4px 0; }
+.pq-finals .qz-final-row { display: flex; align-items: center; gap: 6px; }
+.pq-finals .qz-final-row .tag { flex: none; }
+.pq-parts { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 6px; }
 .pq-photo img, .pq-pics img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
 .pq-photo { margin: 4px 0 8px; }
 .pq-photo summary { cursor: pointer; font-weight: 600; }
