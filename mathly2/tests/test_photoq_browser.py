@@ -189,3 +189,32 @@ def test_a_geometry_question_is_solved_in_the_claim_reason_table(browser):
         assert "שורה 1: AB = AC | נימוק: נתון" in sent["proof"] and "שורה 2: ∠B = ∠C" in sent["proof"]
         assert "הטבלה שהגשתם" in page.inner_text(".pq-layer") and page.locator("[data-col]").count() == 0
         assert page.errors == []
+
+
+def test_the_teacher_reads_the_practice_chats_in_the_ai_tab(browser):
+    from mathly2 import practice_tutor
+    practice_tutor._counts.clear()
+    bank, store = load_bank(), InMemoryStore()
+    lessons = [l["id"] for l in bank.lessons][:3]
+    klass = store.create_class("setup", "ט", lessons=lessons, teacher_email=TEACHER)
+    store.add_member(klass["id"], KID)
+    store.add_member(klass["id"], "kid2@school.test")
+    app = create_app(Settings(teachers=frozenset({TEACHER})), bank=bank, store=store, reviewer=FakeAI())
+    from fastapi.testclient import TestClient
+    api = TestClient(app)
+    skill = next(s["id"] for s in bank.skills if s["unit"] in lessons and bank.practice_keys(s["id"]))
+    for who, text in ((KID, "איך מתחילים?"), ("kid2@school.test", "מה זה כפל מקוצר?")):
+        api.get("/api/me", headers=auth(who))
+        key = api.get(f"/api/skills/{skill}", headers=auth(who)).json()["question"]["key"]
+        assert api.post(f"/api/skills/{skill}/tutor", headers=auth(who), json={"question_key": key, "message": text}).status_code == 200
+    with running(app) as url:
+        teacher = sign_in(browser, url, TEACHER)
+        teacher.wait_for_selector("#teaching")
+        teacher.click("#teacher-tabs [data-tab=ai]")
+        teacher.wait_for_selector("#tt-list .tt-chat")
+        assert teacher.locator("#tt-list .tt-chat").count() == 2 and "לפני התשובה" in teacher.inner_text("#tt-list")
+        teacher.select_option("#tt-who", KID)
+        teacher.wait_for_function("document.querySelectorAll('#tt-list .tt-chat').length === 1")
+        teacher.click("#tt-list summary")
+        assert "איך מתחילים?" in teacher.inner_text("#tt-list .pq-msg.me") and "לבודד" in teacher.inner_text("#tt-list .pq-msg.ai")
+        assert teacher.errors == []

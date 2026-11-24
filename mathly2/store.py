@@ -142,7 +142,19 @@ SCHEMA_PROBES = [
     ("20261125090000_m2_photo_questions", "m2_photo_questions", "id"),
     ("20261125090000_m2_photo_questions", "m2_photo_requests", "purpose"),
     ("20261126090000_m2_photo_help", "m2_photo_questions", "chat,revealed,max_grade"),
+    ("20261127090000_m2_tutor_chats", "m2_tutor_chats", "messages,helped"),
 ]
+
+
+def _tutor_chat_row(r: dict) -> dict:
+    day = r.get("day")
+    return {**r, "id": str(r["id"]), "user_id": str(r["user_id"]), "day": date.fromisoformat(day) if isinstance(day, str) else day,
+            "messages": list(r.get("messages") or []), "helped": bool(r.get("helped")),
+            "created_at": _when(r.get("created_at")), "updated_at": _when(r.get("updated_at"))}
+
+
+def _student_messages(rows) -> int:
+    return sum(1 for r in rows for m in r.get("messages") or [] if m.get("role") == "student")
 
 
 PHOTO_QUESTION_FIELDS = {"class_id", "subject_id", "picture_id", "source_id", "state", "question", "answer", "steps", "suggested_skill", "skill_id",
@@ -182,6 +194,7 @@ class InMemoryStore:
         self._answers: list[dict] = []
         self._feedback: list[dict] = []
         self._photo_questions: dict[str, dict] = {}
+        self._tutor_chats: dict[tuple, dict] = {}
         self._comets: dict[str, dict[str, str]] = {}       # user_id -> {comet_id: caught_at}
         self._attempts: dict[str, dict] = {}                # attempt id -> row
         self._work: dict[tuple, dict] = {}                  # (user id, ref, question key) -> the board's picture for that answer
@@ -455,6 +468,32 @@ class InMemoryStore:
         """Photographed questions (not ones taken from the bank) since `since`: the daily limit."""
         with self._lock:
             return sum(1 for r in self._photo_questions.values() if r["user_id"] == user_id and r["picture_id"] and r["created_at"] >= since)
+
+    # --- the AI tutor's conversations on practice questions (practice_tutor.py) ---
+
+    def add_tutor_messages(self, user_id: str, skill_id: str, question_key: str, day: date, messages: list[dict], helped: bool, at: datetime) -> dict:
+        """Add messages to the student's conversation on this question today (made on the first one)."""
+        key = (user_id, skill_id, question_key, day)
+        with self._lock:
+            row = self._tutor_chats.get(key)
+            if row is None:
+                row = self._tutor_chats[key] = {"id": str(uuid.uuid4()), "user_id": user_id, "skill_id": skill_id, "question_key": question_key,
+                                                "day": day, "messages": [], "helped": False, "created_at": at, "updated_at": at}
+            row["messages"] = row["messages"] + [dict(m) for m in messages]
+            row["helped"] = row["helped"] or helped
+            row["updated_at"] = at
+            return copy.deepcopy(row)
+
+    def tutor_chats_of(self, user_ids, since: date, limit: int = 300) -> list[dict]:
+        wanted = set(user_ids)
+        with self._lock:
+            rows = [copy.deepcopy(r) for r in self._tutor_chats.values() if r["user_id"] in wanted and r["day"] >= since]
+        return sorted(rows, key=lambda r: r["updated_at"], reverse=True)[:limit]
+
+    def tutor_messages_on(self, user_id: str, day: date) -> int:
+        """The student's messages to the tutor that day: the daily limit."""
+        with self._lock:
+            return _student_messages(r for r in self._tutor_chats.values() if r["user_id"] == user_id and r["day"] == day)
 
     # --- suggestions and feedback (feedback.py) ---
 
@@ -1959,6 +1998,30 @@ class SupabaseStore:
         rows = self._request("GET", "m2_photo_questions", {"user_id": self._eq(user_id), "picture_id": "not.is.null",
                                                            "created_at": f"gte.{since.isoformat()}", "select": "id"})
         return len(rows)
+
+    def add_tutor_messages(self, user_id: str, skill_id: str, question_key: str, day: date, messages: list[dict], helped: bool, at: datetime) -> dict:
+        where = {"user_id": self._eq(user_id), "skill_id": self._eq(skill_id), "question_key": self._eq(question_key), "day": self._eq(day.isoformat())}
+        found = self._request("GET", "m2_tutor_chats", {**where, "select": "id,messages,helped"})
+        if found:
+            body = {"messages": list(found[0].get("messages") or []) + list(messages), "helped": bool(found[0].get("helped")) or helped,
+                    "updated_at": at.isoformat()}
+            rows = self._request("PATCH", "m2_tutor_chats", {"id": self._eq(found[0]["id"])}, body, returning=True)
+        else:
+            rows = self._request("POST", "m2_tutor_chats", None, {"user_id": user_id, "skill_id": skill_id, "question_key": question_key,
+                                                                 "day": day.isoformat(), "messages": list(messages), "helped": helped,
+                                                                 "created_at": at.isoformat(), "updated_at": at.isoformat()}, returning=True)
+        return _tutor_chat_row(rows[0])
+
+    def tutor_chats_of(self, user_ids, since: date, limit: int = 300) -> list[dict]:
+        ids = sorted(set(str(u) for u in user_ids))
+        if not ids:
+            return []
+        rows = self._request("GET", "m2_tutor_chats", {"user_id": f"in.({','.join(ids)})", "day": f"gte.{since.isoformat()}", "select": "*",
+                                                       "order": "updated_at.desc", "limit": str(limit)})
+        return [_tutor_chat_row(r) for r in rows]
+
+    def tutor_messages_on(self, user_id: str, day: date) -> int:
+        return _student_messages(self._request("GET", "m2_tutor_chats", {"user_id": self._eq(user_id), "day": self._eq(day.isoformat()), "select": "messages"}))
 
     def add_feedback(self, user_id: str, email: str, roles: list[str], kind: str, body: str, page: str, at: datetime) -> dict:
         rows = self._request("POST", "m2_feedback", None, {"user_id": user_id, "email": email, "roles": list(roles), "kind": kind,

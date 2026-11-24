@@ -13,7 +13,7 @@ from mathly2.store import InMemoryStore
 from mathly2.tests.test_boardwork_api import auth
 from mathly2.tests.test_photoq_api import FakeAI
 
-KID = "kid@school.test"
+KID, KID2, TEACHER, OTHER = "kid@school.test", "kid2@school.test", "t@school.test", "t2@school.test"
 
 
 @pytest.fixture
@@ -21,11 +21,14 @@ def world():
     practice_tutor._counts.clear()
     bank, store = load_bank(), InMemoryStore()
     lessons = [l["id"] for l in bank.lessons][:3]
-    klass = store.create_class("setup", "ט", lessons=lessons, teacher_email="t@school.test")
+    klass = store.create_class("setup", "ט", lessons=lessons, teacher_email=TEACHER)
+    store.create_class("setup", "ח", lessons=lessons, teacher_email=OTHER)
     store.add_member(klass["id"], KID)
+    store.add_member(klass["id"], KID2)
     ai = FakeAI()
-    client = TestClient(create_app(Settings(teachers=frozenset({"t@school.test"})), bank=bank, store=store, reviewer=ai))
-    client.get("/api/me", headers=auth(KID))
+    client = TestClient(create_app(Settings(teachers=frozenset({TEACHER, OTHER})), bank=bank, store=store, reviewer=ai))
+    for who in (KID, KID2, TEACHER, OTHER):
+        client.get("/api/me", headers=auth(who))
     client.ai, client.bank = ai, bank
     client.skill = next(s["id"] for s in bank.skills if s["unit"] in lessons and bank.practice_keys(s["id"]))
     return client
@@ -87,3 +90,30 @@ def test_limits_and_no_ai(world):
     world.app.state.reviewer = None
     assert world.get(f"/api/skills/{world.skill}", headers=auth(KID)).json()["tutor"] is False
     assert ask(world, key).status_code == 503
+
+
+def test_the_teacher_reads_the_conversations_of_their_classes(world):
+    key = world.get(f"/api/skills/{world.skill}", headers=auth(KID)).json()["question"]["key"]
+    ask(world, key, "איך מתחילים?")
+    ask(world, key, "ומה אחר כך?")
+    got = world.get("/api/teaching/tutor-chats", headers=auth(TEACHER)).json()
+    assert got["days"] == 7 and len(got["chats"]) == 1                                   # one row a student, question and day
+    chat = got["chats"][0]
+    assert chat["student"] == KID and chat["helped"] is True and chat["question"] and chat["skill"]
+    assert [m["role"] for m in chat["messages"]] == ["student", "ai", "student", "ai"] and chat["messages"][2]["text"] == "ומה אחר כך?"
+    assert world.get("/api/teaching/tutor-chats", headers=auth(OTHER)).json()["chats"] == []          # another class's teacher sees nothing
+    assert world.get("/api/teaching/tutor-chats", headers=auth(KID)).status_code == 403
+    practice_tutor._counts.clear()                                                       # the limit is counted from the kept conversations
+    assert ask(world, key).json()["left"] == practice_tutor.MESSAGES_A_DAY - 3
+
+
+def test_without_the_table_the_tutor_still_answers_and_the_teacher_is_told(world, monkeypatch):
+    def missing(*a, **k):
+        raise RuntimeError("relation m2_tutor_chats does not exist")
+    store = world.app.state.store
+    for name in ("add_tutor_messages", "tutor_chats_of", "tutor_messages_on"):
+        monkeypatch.setattr(store, name, missing)
+    key = world.get(f"/api/skills/{world.skill}", headers=auth(KID)).json()["question"]["key"]
+    assert ask(world, key).status_code == 200 and ask(world, key).json()["left"] == practice_tutor.MESSAGES_A_DAY - 2
+    got = world.get("/api/teaching/tutor-chats", headers=auth(TEACHER))
+    assert got.status_code == 503 and "20261127090000_m2_tutor_chats" in got.json()["detail"]

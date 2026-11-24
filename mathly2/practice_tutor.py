@@ -3,9 +3,10 @@
 The student asks about the question on screen or the one just answered. Before answering, the tutor guides without saying which choice
 is right, and the answer will not count for mastery (as when help is opened). After answering, it may explain the right answer and the
 mistake. Which of the two is decided here: the question still on screen (progress.current_key) has not been answered; one of the round's
-answered questions has. The conversation lives in the browser and comes with each message (the last HISTORY ones); only a count of the
-day's messages is kept, in memory (it starts again when the server restarts). Nothing personal goes to the AI: the question, its
-choices, the right answer, the student's mistake and the conversation."""
+answered questions has. The conversation comes from the browser with each message (the last HISTORY ones), and is kept in m2_tutor_chats
+(a row a student, question and day) for the class's teacher, who reads it in the AI tab (GET /api/teaching/tutor-chats); the daily limit is
+counted there. Before that migration is run, the tutor still works: the count is kept in memory and nothing is saved. Nothing personal
+goes to the AI: the question, its choices, the right answer, the student's mistake and the conversation."""
 from __future__ import annotations
 
 import logging
@@ -16,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from . import clock
-from .access import learner
+from .access import learner, need
 from .mathtext import tidy
 from .photoq import reviewer
 from .writtentest import right_text
@@ -42,9 +43,12 @@ class Ask(BaseModel):
     history: list[Said] = Field(default_factory=list, max_length=40)
 
 
-def used_today(user_id: str) -> int:
-    with _lock:
-        return _counts.get((user_id, clock.school_day().isoformat()), 0)
+def used_today(store, user_id: str) -> int:
+    try:
+        return store.tutor_messages_on(user_id, clock.school_day())
+    except Exception:                                                     # the table is not there yet: the count in memory
+        with _lock:
+            return _counts.get((user_id, clock.school_day().isoformat()), 0)
 
 
 def _count(user_id: str) -> int:
@@ -94,7 +98,8 @@ def ask_tutor(skill_id: str, body: Ask, request: Request, user: dict = Depends(l
         answered = next((r for r in reversed(store.answers_of(user["id"], skill_id)) if r["question_key"] == body.question_key), None)
         if answered is None:
             raise HTTPException(409, "השאלה הזו כבר לא על המסך")
-    if used_today(user["id"]) >= MESSAGES_A_DAY:
+    used = used_today(store, user["id"])
+    if used >= MESSAGES_A_DAY:
         raise HTTPException(429, f"אפשר לשאול את ה־AI עד {MESSAGES_A_DAY} שאלות ביום. נמשיך מחר!")
     history = [{"role": m.role, "text": m.text} for m in body.history[-HISTORY:]]
     try:
@@ -102,8 +107,40 @@ def ask_tutor(skill_id: str, body: Ask, request: Request, user: dict = Depends(l
     except Exception as exc:
         log.warning("the practice tutor failed: %s", getattr(exc, "reason", type(exc).__name__))
         raise HTTPException(503, "ה־AI לא ענה כרגע, נסו שוב בעוד רגע")
-    helped = on_screen
+    helped, reply = on_screen, tidy(str(reply))[:1500]
     if on_screen and not progress.get("current_helped"):
         store.save_progress(user["id"], skill_id, current_helped=True)           # as with help: this answer will not count for mastery
-    left = MESSAGES_A_DAY - _count(user["id"])
-    return {"reply": tidy(str(reply))[:1500], "helped": helped, "left": max(0, left)}
+    _count(user["id"])
+    now = clock.now()
+    try:
+        store.add_tutor_messages(user["id"], skill_id, body.question_key, clock.school_day(),
+                                 [{"role": "student", "text": message, "at": now.isoformat()}, {"role": "ai", "text": reply, "at": now.isoformat()}], helped, now)
+    except Exception as exc:                                                  # never lose the reply for the bookkeeping
+        log.warning("could not keep the tutor conversation: %s", type(exc).__name__)
+    return {"reply": reply, "helped": helped, "left": max(0, MESSAGES_A_DAY - used - 1)}
+
+
+# ---- the teacher reads the conversations ----
+
+@router.get("/teaching/tutor-chats")
+def teaching_chats(request: Request, user: dict = Depends(need("class.teach")), days: int = 7) -> dict:
+    """The conversations of the taught classes' students with the tutor in the last `days` days, the newest first: the student, the skill,
+    the question, whether it was asked before answering, and the messages."""
+    from datetime import timedelta
+    from .photoq import _taught_ids
+    store, bank = request.app.state.store, request.app.state.bank
+    days = max(1, min(days, 60))
+    emails = {m["user_id"]: m["email"] for i in _taught_ids(request, user) for m in store.members(i) if m.get("user_id")}
+    try:
+        rows = store.tutor_chats_of(list(emails), clock.school_day() - timedelta(days=days - 1))
+    except Exception:
+        raise HTTPException(503, "השיחות עוד לא נשמרות: צריך להריץ את המיגרציה 20261127090000_m2_tutor_chats.sql")
+    out = []
+    for r in rows:
+        skill = bank.skill(r["skill_id"]) or {}
+        served = bank.practice_question(r["skill_id"], r["question_key"]) or {}
+        out.append({"id": r["id"], "student": emails.get(r["user_id"], ""), "skill": skill.get("name", r["skill_id"]), "skill_id": r["skill_id"],
+                    "question": served.get("question", ""), "day": r["day"].isoformat(), "helped": r["helped"],
+                    "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
+                    "messages": [{"role": m.get("role"), "text": tidy(m.get("text"))} for m in r["messages"]]})
+    return {"days": days, "chats": out}
