@@ -20,6 +20,9 @@ function item(r) {
     <label>התשובה (אפשר לתקן)</label><input data-field="answer" value="${esc(r.answer)}" dir="auto">
     ${r.steps?.length ? `<details><summary>הפתרון של ה־AI</summary><ol>${r.steps.map(s => `<li dir="auto">${fmt(s)}</li>`).join("")}</ol></details>` : ""}
     ${r.review?.feedback ? `<p class="muted">משוב לתלמיד: ${fmt(r.review.feedback)}</p>` : ""}
+    ${r.max_grade < 100 ? `<p class="muted">התלמיד/ה נעזר/ה ברמזים: הציון המקסימלי ירד ל־${r.max_grade}${r.review?.raw !== undefined ? ` (בלי העזרה: ${r.review.raw})` : ""}.</p>` : ""}
+    ${r.chat?.length ? `<details class="pq-t-chat"><summary>השיחה עם ה־AI (${r.chat.filter(m => m.role === "student").length} הודעות)</summary>
+      <div class="pq-chat">${r.chat.map(m => `<p class="pq-msg ${m.role === "ai" ? "ai" : "me"}" dir="auto">${m.role === "ai" ? "🤖 " : "🧑‍🎓 "}${fmt(m.text).replace(/\n/g, "<br>")}</p>`).join("")}</div></details>` : ""}
     <label>סיווג</label><select data-field="skill">${options.join("")}</select>
     <p class="actions">${r.bank !== "approved" ? `<button type="button" class="primary" data-decide="approve">✓ אישור למאגר הכיתה</button>` : ""}
       ${r.bank !== "rejected" ? `<button type="button" data-decide="reject">דחייה</button>` : ""}

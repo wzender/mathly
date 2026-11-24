@@ -258,7 +258,7 @@ function draw(view, data, assignments, ai) {
   const onTheGo = data.onthego >= 10;                // practice on the go: in the test strip beside the tests, else in the status row
   const go = onTheGo && !first ? `<a class="hchip" id="home-onthego" href="#/onthego" title="שאלות שעונים עליהן בראש, בלי לוח">🚌 תרגול בנסיעה</a>` : "";
   const photo = data.photoq && !first ? `<a class="hchip" id="home-photoq" href="#/photoq" title="צלמו שאלה, פתרו בלוח וקבלו ציון ומשוב">📸 צילום שאלה</a>` : "";
-  const chips = go + photo + assignmentsChip(assignments) + aiChips(ai);
+  const chips = go + photo + assignmentsChip(assignments) + (data.photoq ? "" : aiChips(ai));   // photo help is the photographed question now
   view(`${tabs("home")}${backToSubjects()}
     ${quest(data.map, chips, data.next_step, first?.forecast)}
     ${first ? testStrip(first, onTheGo, data.photoq) : ""}

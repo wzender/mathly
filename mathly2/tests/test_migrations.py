@@ -591,3 +591,11 @@ def test_a_photo_request_for_a_question_has_no_assignment_and_photo_questions_ar
     for role in ("authenticated", "anon"):
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             as_role(db, role, "select * from public.m2_photo_questions")
+
+
+def test_a_photographed_question_keeps_its_conversation_and_the_grade_it_can_reach(db):
+    u = "00000000-0000-0000-0000-0000000000af"
+    as_role(db, "service_role", f"insert into public.m2_photo_questions(user_id) values ('{u}')")
+    assert as_role(db, "service_role", f"select chat::text, revealed, max_grade from public.m2_photo_questions where user_id = '{u}'") == [("[]", 0, 100)]
+    with pytest.raises(psycopg.errors.CheckViolation):
+        as_role(db, "service_role", f"insert into public.m2_photo_questions(user_id, max_grade) values ('{u}', 120)")

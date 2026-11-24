@@ -75,3 +75,40 @@ def test_a_student_photographs_solves_and_gets_a_grade_and_the_teacher_approves(
         teacher.click("#pq-filter [data-filter=approved]")
         teacher.wait_for_selector("#pq-teacher-list [data-pq]")
         assert teacher.errors == []
+
+
+def test_help_gives_a_direction_and_a_step_answers_a_question_and_caps_the_grade(browser):
+    bank, store = load_bank(), InMemoryStore()
+    klass = store.create_class("setup", "ט", lessons=[l["id"] for l in bank.lessons][:3], teacher_email=TEACHER)
+    store.add_member(klass["id"], KID)
+    app = create_app(Settings(teachers=frozenset({TEACHER})), bank=bank, store=store, reviewer=FakeAI(score=95))
+    app.state.run_photoq = lambda target, app_, *args: target(app_, *args)
+    from fastapi.testclient import TestClient
+    api = TestClient(app)
+    api.get("/api/me", headers=auth(KID))
+    req = api.post("/api/photo-requests", headers=auth(KID), json={"purpose": "question", "device": "pc"}).json()
+    pic = api.post(f"/api/photo-requests/{req['id']}/picture", content=png(), headers={**auth(KID), "Content-Type": "image/png"}).json()
+    qid = api.post("/api/photo-questions", headers=auth(KID), json={"picture_id": pic["picture_id"]}).json()["id"]
+    with running(app) as url:
+        page = sign_in(browser, url, KID)
+        board_written(page, pictures=True)
+        page.wait_for_selector(".subject-card")
+        page.evaluate(f"location.hash = '#/photoq/{qid}'")
+        page.wait_for_selector("#pq-help-open")
+        page.click("#pq-help-open")
+        page.wait_for_selector("#pq-rungs")
+        assert "(מקסימום 90)" in page.inner_text("#pq-rungs") and page.inner_text("#pq-cap b") == "100"
+        page.click("[data-help=direction]")
+        page.wait_for_function("document.querySelector('#pq-cap b').textContent === '90'")
+        page.click("[data-help=step]")
+        page.wait_for_function("document.querySelector('#pq-cap b').textContent === '75'")
+        assert "צעד 1" in page.inner_text("#pq-chat")
+        page.fill("#pq-ask-text", "למה מחסירים 3?")
+        page.click("#pq-ask button[type=submit]")
+        page.wait_for_function("document.querySelectorAll('#pq-chat .pq-msg').length === 6")
+        assert "נסו לבודד" in page.inner_text("#pq-chat") and "המורה יכול/ה לראות את השיחה" in page.inner_text("#pq-help")
+        page.click("#pq-submit")
+        page.wait_for_selector("#pq-result")
+        assert page.inner_text("#pq-result .qz-grade b") == "75"                              # 95 from the check, capped by the help taken
+        page.wait_for_selector("#pq-help-open, #pq-chat")
+        assert page.errors == []

@@ -10,7 +10,7 @@ import { pictureUrl, prepare, sendPicture } from "./media.js";
 import { hasWork, sendWork } from "./boardwork.js";
 import { currentSubject, homeHref } from "./ui.js";
 
-let layer = null, current = null, timer = null;
+let layer = null, current = null, timer = null, helpOpen = new Set();      // the questions whose help panel is open
 const q = selector => layer?.querySelector(selector);
 const boardKey = id => `pq:${id}`;
 const VERDICT = { correct: ["✓", "דרך נכונה"], partial: ["◐", "חלק מהדרך נכון"], wrong: ["✗", "הדרך לא נכונה"], unclear: ["?", "לא הצלחנו לקרוא את הלוח"] };
@@ -21,6 +21,12 @@ function ensureLayer() {
     layer.className = "mx-layer pq-layer";
     document.body.append(layer);
     layer.addEventListener("click", onClick);
+    layer.addEventListener("submit", event => {
+      if (!event.target.closest("#pq-ask")) return;
+      event.preventDefault();
+      const text = q("#pq-ask-text").value.trim();
+      if (text) askHelp("ask", text);
+    });
   }
   layer.innerHTML = `<div class="mx-scrim" data-close></div><div class="mx-sheet" role="dialog" aria-modal="true" aria-labelledby="pq-title"></div>`;
 }
@@ -110,6 +116,41 @@ function skillPick(data, locked) {
   return `<p class="pq-skill"><label for="pq-skill">סיווג:</label> <select id="pq-skill"${locked ? " disabled" : ""}>${options.join("")}</select></p>`;
 }
 
+/** Help (עזרה): the conversation with the AI tutor, the ladder of hints with what each costs, and a box for any question. */
+function helpHtml(d) {
+  const h = d.help;
+  if (!h) return "";
+  const open = helpOpen.has(d.id) || h.chat.length > 0;
+  const rung = (kind, label, cap) => cap === null || cap === undefined ? ""
+    : `<button type="button" data-help="${kind}">${label} <small>(מקסימום ${cap})</small></button>`;
+  const before = d.state === "ready";
+  return `<section class="pq-help" id="pq-help">
+    ${open ? `${before ? `<p class="pq-cap" id="pq-cap">🎯 הציון שאפשר להגיע אליו בשאלה הזו: <b>${h.max_grade}</b></p>` : ""}
+      ${h.chat.length ? `<div class="pq-chat" id="pq-chat" aria-live="polite">${h.chat.map(m => `<p class="pq-msg ${m.role === "ai" ? "ai" : "me"}" dir="auto">${m.role === "ai" ? "🤖 " : ""}${fmt(m.text).replace(/\n/g, "<br>")}</p>`).join("")}</div>` : ""}
+      ${before ? `<p class="pq-rungs" id="pq-rungs">${rung("direction", "🧭 איך מתחילים?", h.rungs.direction)}${rung("step", "👣 הצעד הבא", h.rungs.step)}${rung("full", "📖 הפתרון המלא", h.rungs.full)}</p>` : ""}
+      ${h.can_ask ? `<form class="pq-ask" id="pq-ask"><label for="pq-ask-text" class="mx-sr">שאלה ל־AI</label>
+        <input id="pq-ask-text" maxlength="500" dir="auto" placeholder="${before ? "מה לא ברור? למשל: מה זה שוקיים?" : "למשל: למה קיבלתי את הציון הזה?"}" autocomplete="off">
+        <button type="submit">שליחה</button></form>
+        <p class="muted pq-note">נשארו ${h.left} הודעות בשאלה הזו · המורה יכול/ה לראות את השיחה</p>` : `<p class="muted">הגעתם למספר ההודעות בשאלה הזו.</p>`}
+      <p id="pq-help-msg" role="status"></p>`
+    : `<p><button type="button" id="pq-help-open">💬 עזרה</button> <span class="muted">${before ? "רמזים בהדרגה, או שאלה חופשית ל־AI" : "לא הבנתם את הבדיקה? שאלו"}</span></p>`}</section>`;
+}
+
+async function askHelp(kind, text = "") {
+  const msg = q("#pq-help-msg");
+  layer.querySelectorAll("#pq-help button").forEach(b => { b.disabled = true; });
+  if (msg) msg.textContent = kind === "ask" || kind === "direction" ? "🤖 חושב…" : "";
+  try {
+    current = await api(`/api/photo-questions/${current.id}/help`, { method: "POST", body: { kind, text } });
+    helpOpen.add(current.id);
+    draw();
+    q("#pq-chat")?.lastElementChild?.scrollIntoView({ block: "nearest" });
+  } catch (error) {
+    layer.querySelectorAll("#pq-help button").forEach(b => { b.disabled = false; });
+    if (q("#pq-help-msg")) q("#pq-help-msg").innerHTML = `<span class="error">${esc(error.message)}</span>`;
+  }
+}
+
 function draw() {
   const d = current;
   if (d.state === "reading") return sheet(`${heading("שאלה מצולמת")}<p class="pq-wait" role="status">🔎 קוראים את השאלה…</p>${photo(d)}`);
@@ -128,6 +169,7 @@ function draw() {
   sheet(`${heading(d.from_bank ? "שאלה מהכיתה" : "שאלה מצולמת", !checked)}
     <div class="mx-q" id="pq-q"><p class="ex-text" dir="auto">${fmt(d.question)}</p>${skillPick(d, checked || checking)}
       ${checked ? "" : `<p class="muted">✏️ פתרו בלוח, כמו במבחן. הבודק רואה את הדרך, לא רק את התשובה.</p>`}${box}</div>
+    ${checking ? "" : helpHtml(d)}
     ${photo(d)}
     ${checking ? `<p class="pq-wait" role="status">🧐 בודקים את הפתרון…</p>` : ""}
     ${result}
@@ -162,11 +204,21 @@ function onClick(event) {
   if (t.closest("[data-list]")) { location.hash = "#/photoq"; showList(); return; }
   if (t.closest("#pq-new") || t.closest("#pq-again")) { showCapture(); return; }
   if (t.closest("#pq-submit")) { submit(); return; }
+  if (t.closest("#pq-help-open")) { helpOpen.add(current.id); draw(); q("#pq-ask-text")?.focus(); return; }
+  const rung = t.closest("[data-help]")?.dataset.help;
+  if (rung) { askHelp(rung); return; }
   if (t.closest("#pq-retry")) { current = { ...current, state: "ready" }; draw(); return; }
   const mine = t.closest("[data-open]")?.dataset.open;
   if (mine) { location.hash = `#/photoq/${mine}`; return; }
   const bank = t.closest("[data-bank]")?.dataset.bank;
   if (bank) fromBank(bank);
+}
+
+let availability = null;
+/** Is photographing questions on (the AI is set up)? Asked once a page load. */
+export function available() {
+  availability ||= api(`/api/photo-questions?subject=${encodeURIComponent(currentSubject())}`).then(d => !!d.on).catch(() => false);
+  return availability;
 }
 
 window.addEventListener("mathly:leave", close);
