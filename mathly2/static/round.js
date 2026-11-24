@@ -8,9 +8,11 @@ import { loadBoard } from "./exercise.js";
 import { forSubject, homeHref, pathHref, shuffled } from "./ui.js";
 import { countUp, forecastMeter } from "./home.js";
 import { sendWorkQuietly } from "./boardwork.js";
+import { TutorChat, button as chatButton } from "./tutor_chat.js";
 
 const COUNTDOWN = 2;   // seconds before the next question after a right answer
 let layer = null, round = null, timer = null, streak = 0;
+const chat = new TutorChat(() => `/api/rounds/${encodeURIComponent(round.id)}/tutor`);    // 💬 the AI tutor on the question on screen
 
 const q = selector => layer?.querySelector(selector);
 const stop = () => { clearTimeout(timer); timer = null; };
@@ -44,6 +46,12 @@ export async function show(data) {
     layer.className = "mx-layer round-layer";
     document.body.append(layer);
     layer.addEventListener("click", onClick);
+    layer.addEventListener("submit", event => {
+      if (!event.target.closest("#ex-chat-form")) return;
+      event.preventDefault();
+      const text = q("#ex-chat-text").value.trim();
+      if (text && round?.question) chat.send(layer, text, answeredNow);
+    });
   }
   layer.innerHTML = `<div class="mx-scrim" data-close></div><div class="mx-sheet" role="dialog" aria-modal="true" aria-labelledby="rd-title"></div>`;
   render();
@@ -56,10 +64,11 @@ export function close() {
   window.MathlyBoard?.closeFull?.();
   layer.remove();
   layer = round = null;
+  chat.reset();
 }
 
 const heading = () => `<div class="mx-shtop"><div><span class="ex-chip">${isOnTheGo() ? "🚌 בלי לוח, בראש" : isRetry() ? "חזרה על הטעויות" : "סבב שיעור"}</span><h3 id="rd-title">${fmt(round.lesson.name)}</h3></div>
-  <div class="mx-shacts">${isOnTheGo() ? "" : window.MathlyBoard?.button() || ""}<button type="button" class="mx-x" data-close aria-label="סגירה">✕</button></div></div>`;
+  <div class="mx-shacts">${isOnTheGo() ? "" : window.MathlyBoard?.button() || ""}${chatOn() ? chatButton(chat.open) : ""}<button type="button" class="mx-x" data-close aria-label="סגירה">✕</button></div></div>`;
 
 const dots = () => Array.from({ length: round.total }, (_, i) => {
   const r = round.results[i];
@@ -147,9 +156,21 @@ function mountBoard() {
 
 function render(notice = "") {
   q(".mx-sheet").innerHTML = `${heading()}${notice ? `<p class="ex-note" role="status">${esc(notice)}</p>` : ""}${progress()}
-    ${round.state === "done" ? resultHtml() : questionHtml()}`;
+    ${round.state === "done" ? resultHtml() : questionHtml() + (chatOn() ? chat.html(round.question.key, false) : "")}`;
   mountBoard();
   if (round.state === "done" && !isRetry()) showForecast(round.id);
+}
+
+// ---- 💬 the AI tutor (practice_tutor.py) ----
+const chatOn = () => !!round?.tutor && round.state !== "done" && !!round.question;
+const answeredNow = () => !!q("#ex-fb")?.children.length && !q(".ex-thinking");
+const drawChat = () => chat.draw(layer, chatOn() ? round.question.key : null, answeredNow(), q("#ex-q"));
+
+function toggleChat() {
+  chat.open = !chat.open;
+  if (chat.open && timer) { stop(); const c = q("#ex-countdown"); if (c) c.textContent = ""; }   // talking: no countdown to the next question
+  drawChat();
+  if (chat.open) { q("#ex-chat")?.scrollIntoView({ block: "nearest" }); q("#ex-chat-text")?.focus({ preventScroll: true }); }
 }
 
 function updateProgress() {
@@ -208,7 +229,7 @@ async function answer(button) {
     feedback.innerHTML = `<div class="ex-ok"><b>${CHEERS[(streak - 1) % CHEERS.length]} ✓</b>${streak >= 3 ? ` <span>🔥 ${streak} ברצף</span>` : ""}${mastered}
       <div class="ex-actions">${last ? `<button type="button" class="primary" id="rd-next">לתוצאות ✨</button>`
         : `<span id="ex-countdown"></span><button type="button" id="rd-next">לשאלה הבאה</button>`}</div></div>`;
-    if (!last) countdown(next);
+    if (!last && !chat.open) countdown(next);                           // the chat is open: the next question waits for the button
   } else {
     streak = 0;
     button.classList.add("wrong");
@@ -218,6 +239,7 @@ async function answer(button) {
       <div class="ex-actions"><button type="button" id="rd-next">${last ? "לתוצאות" : "לשאלה הבאה"}</button></div></div>`;
   }
   q("#rd-next").addEventListener("click", next);
+  if (chat.open) drawChat();                                       // now the tutor may explain: the note says so
 }
 
 async function again() {
@@ -238,6 +260,7 @@ function onClick(event) {
   if (target.closest("[data-close]")) { location.hash = leaveTo(); return; }
   if (target.closest("[data-board-toggle]")) { window.MathlyBoard?.toggle(); return; }
   if (target.closest("#rd-again")) { again(); return; }
+  if (target.closest("[data-chat]")) { toggleChat(); return; }
   const choice = target.closest(".ex-choice");
   if (choice && !choice.disabled) answer(choice);
 }

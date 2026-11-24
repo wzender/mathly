@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from . import attempts, clock, onthego, quiz, reads, writtentest
+from . import attempts, clock, onthego, practice_tutor, quiz, reads, writtentest
 from .access import learner
 from .learning import MASTERED, record_practice_answer, skill_state
 
@@ -119,7 +119,8 @@ def view(request: Request, row: dict) -> dict:
         lesson = next((l for l in bank.lessons if l["id"] == row["scope"]), {"id": row["scope"], "name": row["scope"]})
     done = _graded(bank, row)
     base = {"id": row["id"], "kind": row["kind"], "lesson": {"id": lesson["id"], "name": lesson["name"]}, "subject_id": lesson.get("subject_id", "math"),
-            "total": len(row["questions"]), "results": [right for _, right, _ in done], "source": _public(source)}
+            "total": len(row["questions"]), "results": [right for _, right, _ in done], "source": _public(source),
+            "tutor": hasattr(getattr(request.app.state, "reviewer", None), "tutor_reply")}                  # 💬 (practice_tutor.py)
     if attempts.is_open(row):
         nxt = row["questions"][len(done)] if len(done) < len(row["questions"]) else None
         served = bank.practice_question(nxt["skill_id"], nxt["key"]) if nxt else None
@@ -295,7 +296,8 @@ def answer(round_id: str, body: RoundAnswer, request: Request, user: dict = Depe
         raise HTTPException(409, "הסבב כבר הסתיים")
     skill_id, correct, mistake = expected["skill_id"], graded["correct"], graded["mistake"]
     before = store.get_progress(uid, skill_id)
-    progress = record_practice_answer(store, uid, skill_id, body.key, correct, True, mistake["id"] if mistake else None,
+    counted = not practice_tutor.was_helped(store, uid, skill_id, body.key)           # asked the AI before answering: not for mastery
+    progress = record_practice_answer(store, uid, skill_id, body.key, correct, counted, mistake["id"] if mistake else None,
                                       clock.school_day(), clock.now().isoformat())
     mastered_now = not (before or {}).get("mastered_at") and bool(progress.get("mastered_at"))
     if not correct:

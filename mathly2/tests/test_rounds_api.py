@@ -109,3 +109,32 @@ def test_the_map_names_the_next_lesson_open_round_first(world):
     start(client, later)
     home, row = map_row(client, later)
     assert home["next"] == later and row["round_open"] is True
+
+
+# --- 💬 the AI tutor in a round (practice_tutor.py) ---
+
+def test_the_tutor_in_a_round_guides_the_question_on_screen_and_explains_an_answered_one(world):
+    from mathly2 import practice_tutor
+    from mathly2.tests.test_photoq_api import FakeAI
+    client, store, bank = world
+    practice_tutor._counts.clear()
+    practice_tutor._helped.clear()
+    client.app.state.reviewer = ai = FakeAI()
+    rnd = start(client, a_lesson(bank))
+    assert rnd["tutor"] is True
+    ask = lambda key, text="איך מתחילים?": client.post(f"/api/rounds/{rnd['id']}/tutor", headers=auth(), json={"question_key": key, "message": text})
+    first, second = [q["key"] for q in store.get_attempt(rnd["id"])["questions"][:2]]
+    assert ask(second).status_code == 409                                                   # not on screen yet
+    got = ask(first)
+    assert got.status_code == 200 and got.json()["helped"] is True and ai.tutored[-1]["context"]["full"] is False
+    skill = store.get_attempt(rnd["id"])["questions"][0]["skill_id"]
+    answered = play(client, bank, rnd, [True])
+    assert answered["correct"] is True
+    assert store.answers_of(KID_ID, skill)[-1]["counted"] is False                         # asked before answering: not for mastery
+    got = ask(first, "למה?")
+    assert got.json()["helped"] is False and ai.tutored[-1]["context"]["full"] is True and ai.tutored[-1]["context"]["review"]["verdict"] == "correct"
+    play(client, bank, answered["round"], [True])
+    assert store.answers_of(KID_ID, store.get_attempt(rnd["id"])["questions"][1]["skill_id"])[-1]["counted"] is True   # no question: counted
+    assert client.post("/api/rounds/nope/tutor", headers=auth(), json={"question_key": first, "message": "x"}).status_code == 404
+    client.app.state.reviewer = None
+    assert client.get(f"/api/rounds/{rnd['id']}", headers=auth()).json()["tutor"] is False
