@@ -169,7 +169,7 @@ def test_the_developer_screen_shows_the_system_status_version_and_update_date(br
         assert page.inner_text("#st-title-change") == "מקצועות ודפי עבודה (#6)"                # the change's name beside the version
         assert "2026" in page.inner_text("#st-updated") and "07:37" in page.inner_text("#st-updated")   # shown in Israel's time
         keys = [li.get_attribute("data-key") for li in page.locator("#st-checks li").all()]
-        assert keys == ["database", "sign_in", "bank", "ai", "push", "pictures", "cleanup"]
+        assert keys == ["database", "schema", "sign_in", "bank", "ai", "gemini", "push", "pictures", "cleanup"]
         asked = []
         page.on("request", lambda r: asked.append(r.url) if r.url.endswith("/api/dev/status") else None)
         page.evaluate("document.getElementById('st-body').innerHTML = ''")

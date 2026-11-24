@@ -41,6 +41,7 @@ def test_yesterdays_practice_in_counts_by_kind_and_class_with_the_week():
     assert len(got["week"]) == 7 and got["week"][-1] == {"day": yesterday.isoformat(), "people": 1, "answers": 6}
     assert got["week"][-3]["answers"] == 1
     assert KID not in str(got) and KID2 not in str(got)                                        # counts only
+    assert got["schema_missing"] == []                                                        # the database has every recent table
 
 
 def test_the_token_or_the_developer_and_nobody_else():

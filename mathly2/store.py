@@ -128,6 +128,22 @@ def _submission_row(row: dict) -> dict:
     return {**_stamped(row, "handed_at", "checked_at"), "pictures": [str(x) for x in (row.get("pictures") or [])]}
 
 
+# What each recent migration added, as the status card asks the database for it: (migration, table or view, columns to read).
+SCHEMA_PROBES = [
+    ("20261116090000_m2_activity", "m2_activity", "day"),
+    ("20261117090000_m2_subjects", "m2_subjects", "id"),
+    ("20261117090000_m2_subjects", "m2_lessons", "id"),
+    ("20261119090000_m2_prompter", "m2_prompter_texts", "id"),
+    ("20261120090000_m2_board_work", "m2_work", "picture_id"),
+    ("20261120090000_m2_board_work", "m2_attempts", "credit,checked_at"),
+    ("20261121090000_m2_board_review", "m2_attempts", "review"),
+    ("20261123090000_m2_feedback", "m2_feedback", "id"),
+    ("20261124090000_m2_daily_practice", "m2_daily_practice", "seconds"),
+    ("20261125090000_m2_photo_questions", "m2_photo_questions", "id"),
+    ("20261125090000_m2_photo_questions", "m2_photo_requests", "purpose"),
+]
+
+
 PHOTO_QUESTION_FIELDS = {"class_id", "subject_id", "picture_id", "source_id", "state", "question", "answer", "steps", "suggested_skill", "skill_id",
                          "typed", "grade", "review", "reason", "bank", "decided_by", "decided_at", "checked_at"}
 PHOTO_QUESTION_DEFAULTS = {"class_id": None, "subject_id": "math", "picture_id": None, "source_id": None, "state": "reading", "question": "",
@@ -392,6 +408,10 @@ class InMemoryStore:
         with self._lock:
             return [{k: a[k] for k in ("question_key", "correct", "counted", "day", "mistake_id")} for a in self._answers
                     if a["user_id"] == user_id and a["skill_id"] == skill_id]
+
+    def schema_missing(self) -> list[str]:
+        """The migrations whose tables or columns the database lacks (memory has everything)."""
+        return []
 
     # --- photographed questions (photoq.py) ---
 
@@ -1876,6 +1896,22 @@ class SupabaseStore:
         rows = self._request("GET", "m2_answers", {"user_id": self._eq(user_id), "skill_id": self._eq(skill_id),
                                                    "select": "question_key,correct,counted,day,mistake_id", "order": "id"})
         return [{**r, "day": date.fromisoformat(r["day"])} for r in rows]
+
+    def schema_missing(self) -> list[str]:
+        """Ask for each table or view and column the recent migrations added (one small read each, together); the migrations behind any
+        that the database refuses (it does not exist yet), in order."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        def missing(probe) -> str | None:
+            migration, table, columns = probe
+            try:
+                self._request("GET", table, {"select": columns, "limit": "1"})
+                return None
+            except urllib.error.HTTPError as exc:
+                return migration if exc.code in (400, 404) else None          # 400/404: no such table, view or column
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            found = [m for m in pool.map(missing, SCHEMA_PROBES) if m]
+        return sorted(set(found))
 
     def create_photo_question(self, user_id: str, at: datetime, **fields) -> dict:
         unknown = set(fields) - PHOTO_QUESTION_FIELDS
