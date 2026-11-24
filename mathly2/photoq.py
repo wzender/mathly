@@ -25,6 +25,9 @@ router = APIRouter(prefix="/api")
 
 DAILY_LIMIT = 5
 CHECKS = 3
+# Help (עזרה): a ladder and a conversation. Each rung lowers the grade the question can still reach.
+DIRECTION_CAP, FIRST_STEP_CAP, STEP_COST, FULL_CAP = 90, 75, 10, 40
+MESSAGES_A_QUESTION, MESSAGES_A_DAY = 15, 40
 REF = "pq:"                                   # board work's ref for a photographed question (boardwork.py)
 KEY = "q"
 REASONS = {"unreadable": "לא הצלחנו לקרוא שאלה בתמונה. צלמו שוב: שאלה אחת, ישר, מקרוב ובאור טוב.",
@@ -97,11 +100,12 @@ def check_job(app, question_id: str) -> None:
         picture = store.get_picture(work[KEY])
         board = app.state.pictures.get(picture["path"])
         got = reviewer(app).grade_open(row["question"], row["answer"], row["typed"] or None, board)
-        score = max(0, min(100, int(got.get("score", 0))))
+        raw = max(0, min(100, int(got.get("score", 0))))
+        score = min(raw, row.get("max_grade", 100))                         # help taken lowers what the question can reach
         verdict = got.get("verdict") if got.get("verdict") in ("correct", "partial", "wrong", "unclear") else "unclear"
         fields = {"state": "checked", "grade": score, "checked_at": clock.now(), "reason": None,
                   "review": {"verdict": verdict, "feedback": str(got.get("feedback", ""))[:600], "tip": str(got.get("tip", ""))[:300],
-                             "checks": _checks(row)}}
+                             "checks": _checks(row), "raw": raw}}
         if row["picture_id"] and row["bank"] == "none" and row["class_id"]:
             fields["bank"] = "pending"                                       # the teacher decides whether it joins the class's bank
         store.save_photo_question(question_id, **fields)
@@ -131,7 +135,8 @@ def student_view(request: Request, row: dict, user: dict) -> dict:
            "skills": skills, "final": final_box(row["answer"]) if row["state"] in ("ready", "checking", "checked") else None,
            "typed": row["typed"], "grade": row["grade"], "review": row["review"] if checked else None, "bank": row["bank"],
            "from_bank": bool(row["source_id"]), "checks_left": max(0, CHECKS - _checks(row)),
-           "reason": REASONS.get(row["reason"]) if row["reason"] else None, "created_at": row["created_at"].isoformat() if row["created_at"] else None}
+           "reason": REASONS.get(row["reason"]) if row["reason"] else None, "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+           "help": help_state(row)}
     if checked:
         out["answer"], out["steps"] = row["answer"], row["steps"]
     return out
@@ -235,6 +240,117 @@ def hand_in(question_id: str, body: HandIn, request: Request, user: dict = Depen
     return student_view(request, store.get_photo_question(row["id"]), user)
 
 
+# ---- help: a ladder of hints and a conversation with the AI ----
+
+def _said(row: dict) -> int:
+    return sum(1 for m in row.get("chat") or [] if m.get("role") == "student")
+
+
+def next_step_cap(row: dict) -> int:
+    """The grade the question can reach after one more step is revealed."""
+    revealed = row.get("revealed", 0)
+    return max(FULL_CAP, FIRST_STEP_CAP - STEP_COST * revealed)
+
+
+def help_state(row: dict) -> dict:
+    """What the help panel shows: the conversation, the grade the question can still reach, and which rungs are left (with their cost)."""
+    steps, revealed, open_ = len(row.get("steps") or []), row.get("revealed", 0), row["state"] in ("ready",)
+    asked_direction = any(m.get("kind") == "direction" for m in row.get("chat") or [])
+    full = revealed >= steps and steps > 0
+    return {"chat": [{k: m.get(k) for k in ("role", "text", "kind")} for m in row.get("chat") or []], "max_grade": row.get("max_grade", 100),
+            "revealed": revealed, "steps": steps, "full": full, "left": max(0, MESSAGES_A_QUESTION - _said(row)),
+            "rungs": {"direction": min(row.get("max_grade", 100), DIRECTION_CAP) if open_ and not asked_direction and revealed == 0 else None,
+                      "step": min(row.get("max_grade", 100), next_step_cap(row)) if open_ and not full else None,
+                      "full": min(row.get("max_grade", 100), FULL_CAP) if open_ and not full else None},
+            "can_ask": row["state"] in ("ready", "checked") and _said(row) < MESSAGES_A_QUESTION}
+
+
+class Help(BaseModel):
+    kind: Literal["direction", "step", "full", "ask"]
+    text: str = Field("", max_length=500)
+
+
+def _said_today(store, user_id: str) -> int:
+    since = (clock.now() - timedelta(days=1)).isoformat()
+    return sum(1 for r in store.photo_questions_of(user_id, limit=200) for m in r.get("chat") or []
+               if m.get("role") == "student" and (m.get("at") or "") >= since)
+
+
+@router.post("/photo-questions/{question_id}/help")
+def ask_help(question_id: str, body: Help, request: Request, user: dict = Depends(learner)) -> dict:
+    """One rung of the ladder (a direction, the next step, the full solution; each lowers the grade the question can reach) or a free
+    question to the AI tutor. Before the check the tutor never gives what was not revealed; after it, it explains the solution and the check."""
+    store = request.app.state.store
+    row = _mine(request, user, question_id)
+    state = help_state(row)
+    if row["state"] not in ("ready", "checked") or (body.kind != "ask" and row["state"] != "ready"):
+        raise HTTPException(409, "העזרה פתוחה כשהשאלה מוכנה לפתרון")
+    if not state["can_ask"]:
+        raise HTTPException(429, f"אפשר לכתוב עד {MESSAGES_A_QUESTION} הודעות בשאלה אחת")
+    if _said_today(store, user["id"]) >= MESSAGES_A_DAY:
+        raise HTTPException(429, "הגעתם למספר ההודעות להיום. נמשיך מחר!")
+    tutor = reviewer(request)
+    if tutor is None:
+        raise HTTPException(503, REASONS["no_ai"])
+    now = clock.now().isoformat()
+    steps = row.get("steps") or []
+    fields: dict = {}
+    if body.kind == "direction":
+        if state["rungs"]["direction"] is None:
+            raise HTTPException(409, "את הכיוון כבר קיבלתם")
+        asked, reply = "🧭 איך מתחילים?", _tutor(tutor, row, "תנו לי רק כיוון: מאיפה מתחילים ובאיזו שיטה, בלי מספרים ובלי התשובה.")
+        fields["max_grade"] = state["rungs"]["direction"]
+    elif body.kind == "step":
+        if state["rungs"]["step"] is None:
+            raise HTTPException(409, "כל הצעדים כבר נחשפו")
+        k = row["revealed"]
+        asked, reply = "👣 הצעד הבא", f"צעד {k + 1}: {steps[k]}"
+        fields.update(revealed=k + 1, max_grade=state["rungs"]["step"])
+    elif body.kind == "full":
+        if state["rungs"]["full"] is None:
+            raise HTTPException(409, "הפתרון כבר נחשף")
+        asked = "📖 הפתרון המלא"
+        reply = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps)) + f"\nתשובה: {row['answer']}"
+        fields.update(revealed=len(steps), max_grade=state["rungs"]["full"])
+    else:
+        text = body.text.strip()
+        if not text:
+            raise HTTPException(422, "כתבו מה לא ברור")
+        asked, reply = text, _tutor(tutor, row, text, _board(request.app, row) if row["state"] == "checked" else None)
+    chat = list(row.get("chat") or []) + [{"role": "student", "text": asked, "kind": body.kind, "at": now},
+                                          {"role": "ai", "text": reply[:1500], "kind": body.kind, "at": now}]
+    store.save_photo_question(row["id"], chat=chat, **fields)
+    return student_view(request, store.get_photo_question(row["id"]), user)
+
+
+def _board(app, row: dict) -> bytes | None:
+    """The board the student handed in for this question (after the check), or None."""
+    store = app.state.store
+    try:
+        pid = store.work_of(row["user_id"], REF + row["id"]).get(KEY)
+        picture = store.get_picture(pid) if pid else None
+        return app.state.pictures.get(picture["path"]) if picture and not picture["deleted_at"] else None
+    except Exception:
+        return None
+
+
+def _tutor(tutor, row: dict, message: str, board: bytes | None = None) -> str:
+    """The AI tutor's reply, with the question, its hidden answer and steps, what was revealed, and after the check the board and feedback."""
+    from .boardreview import ReviewFailure
+    checked = row["state"] == "checked"
+    context = {"question": row["question"], "answer": row["answer"], "steps": row.get("steps") or [], "shown": row.get("revealed", 0),
+               "full": checked or row.get("revealed", 0) >= len(row.get("steps") or []) > 0,
+               "review": (row.get("review") or {}) if checked else None}
+    try:
+        reply = tutor.tutor_reply(context, row.get("chat") or [], message, board)
+    except ReviewFailure as exc:
+        raise HTTPException(503, "העזרה לא זמינה כרגע. נסו שוב בעוד דקה.") from exc
+    except Exception as exc:
+        log.warning("the tutor failed: %s", type(exc).__name__)
+        raise HTTPException(503, "העזרה לא זמינה כרגע. נסו שוב בעוד דקה.") from exc
+    return reply or "לא הצלחתי לענות הפעם. נסו לנסח אחרת."
+
+
 # ---- the teacher: approve into the class's bank ----
 
 class Decision(BaseModel):
@@ -258,6 +374,7 @@ def teacher_view(request: Request, row: dict, emails: dict[str, str]) -> dict:
             "steps": row["steps"], "picture_id": row["picture_id"], "board_id": work.get(KEY), "suggested_skill": row["suggested_skill"],
             "skill": {"id": row["skill_id"], "name": names.get(row["skill_id"], "")} if row["skill_id"] else None, "grade": row["grade"],
             "review": row["review"], "bank": row["bank"], "skills": subject_skills(bank, row["subject_id"], None),
+            "chat": [{k: m.get(k) for k in ("role", "text", "kind")} for m in row.get("chat") or []], "max_grade": row.get("max_grade", 100),
             "created_at": row["created_at"].isoformat() if row["created_at"] else None}
 
 

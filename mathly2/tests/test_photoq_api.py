@@ -18,7 +18,7 @@ KID, KID2, TEACHER, OTHER_TEACHER = "kid@school.test", "kid2@school.test", "t@sc
 class FakeAI:
     def __init__(self, readable=True, skill=None, score=80, fail=False):
         self.readable, self.skill, self.score, self.fail = readable, skill, score, fail
-        self.read, self.graded = [], []
+        self.read, self.graded, self.tutored = [], [], []
 
     def read_question(self, image, skills, subject=""):
         self.read.append({"skills": [s["id"] for s in skills], "subject": subject, "bytes": len(image)})
@@ -26,6 +26,12 @@ class FakeAI:
             raise RuntimeError("down")
         return {"readable": self.readable, "question": "פתרו: $2x + 3 = 11$", "answer": "$x = 4$", "steps": ["$2x = 8$", "$x = 4$"],
                 "skill": self.skill if self.skill is not None else skills[0]["id"]}
+
+    def tutor_reply(self, context, history, message, board=None):
+        self.tutored.append({"context": context, "history": len(history), "message": message, "board": bool(board)})
+        if self.fail:
+            raise RuntimeError("down")
+        return "נסו לבודד את $x$: מה עושים קודם?"
 
     def grade_open(self, question, answer, typed, board):
         self.graded.append({"question": question, "answer": answer, "typed": typed, "board": len(board)})
@@ -126,3 +132,45 @@ def test_a_question_is_handed_in_at_most_three_times_and_only_by_its_student(wor
         assert got.status_code == 200 and got.json()["checks_left"] == photoq.CHECKS - n - 1
     assert world.post(f"/api/photo-questions/{q['id']}/submit", headers=auth(KID), json={}).status_code == 409
     assert world.post(f"/api/photo-questions/{q['id']}/submit", headers=auth(KID), json={"skill_id": "nope"}).status_code in (409, 422)
+
+
+
+def help_(client, q, kind, text="", who=KID):
+    return client.post(f"/api/photo-questions/{q['id']}/help", headers=auth(who), json={"kind": kind, "text": text})
+
+
+def test_the_help_ladder_lowers_the_grade_it_can_reach_and_the_tutor_never_gets_ahead(world):
+    q = photograph(world).json()
+    assert q["help"]["max_grade"] == 100 and q["help"]["rungs"] == {"direction": 90, "step": 75, "full": 40}
+    got = help_(world, q, "direction").json()["help"]
+    assert got["max_grade"] == 90 and got["rungs"]["direction"] is None and [m["role"] for m in got["chat"]] == ["student", "ai"]
+    got = help_(world, q, "step").json()["help"]
+    assert got["max_grade"] == 75 and got["revealed"] == 1 and got["chat"][-1]["text"] == "צעד 1: $2x = 8$" and got["rungs"]["step"] == 65
+    ask = help_(world, q, "ask", "למה מחסירים 3?").json()["help"]
+    sent = world.app.state.reviewer.tutored[-1]
+    assert sent["context"]["shown"] == 1 and sent["context"]["full"] is False and sent["board"] is False and sent["message"] == "למה מחסירים 3?"
+    assert ask["chat"][-1]["role"] == "ai" and ask["max_grade"] == 75                         # a question costs nothing
+    got = help_(world, q, "full").json()["help"]
+    assert got["max_grade"] == 40 and got["full"] and "תשובה: $x = 4$" in got["chat"][-1]["text"] and got["rungs"] == {"direction": None, "step": None, "full": None}
+    send_work(world, f"pq:{q['id']}", "q")
+    done = world.post(f"/api/photo-questions/{q['id']}/submit", headers=auth(KID), json={}).json()
+    assert done["grade"] == 40 and done["review"]["raw"] == 80                                # the check said 80; help capped it at 40
+    after = help_(world, q, "ask", "לא הבנתי את המשוב").json()
+    sent = world.app.state.reviewer.tutored[-1]
+    assert sent["context"]["full"] is True and sent["board"] is True and sent["context"]["review"]["feedback"]
+    assert help_(world, q, "step").status_code == 409                                         # no rungs after the check
+    teacher = world.get("/api/teaching/photo-questions", headers=auth(TEACHER)).json()[0]
+    assert teacher["max_grade"] == 40 and len(teacher["chat"]) == len(after["help"]["chat"])   # the teacher sees the conversation
+
+
+def test_help_has_limits_and_says_when_the_ai_is_down(world):
+    from mathly2 import photoq
+    q = photograph(world).json()
+    assert help_(world, q, "ask", "  ").status_code == 422
+    world.app.state.reviewer.fail = True
+    assert help_(world, q, "ask", "עזרה").status_code == 503
+    assert world.get(f"/api/photo-questions/{q['id']}", headers=auth(KID)).json()["help"]["chat"] == []     # nothing kept on a failure
+    world.app.state.reviewer.fail = False
+    for _ in range(photoq.MESSAGES_A_QUESTION):
+        assert help_(world, q, "ask", "עוד שאלה").status_code == 200
+    assert help_(world, q, "ask", "ועוד").status_code == 429

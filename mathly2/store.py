@@ -141,14 +141,16 @@ SCHEMA_PROBES = [
     ("20261124090000_m2_daily_practice", "m2_daily_practice", "seconds"),
     ("20261125090000_m2_photo_questions", "m2_photo_questions", "id"),
     ("20261125090000_m2_photo_questions", "m2_photo_requests", "purpose"),
+    ("20261126090000_m2_photo_help", "m2_photo_questions", "chat,revealed,max_grade"),
 ]
 
 
 PHOTO_QUESTION_FIELDS = {"class_id", "subject_id", "picture_id", "source_id", "state", "question", "answer", "steps", "suggested_skill", "skill_id",
-                         "typed", "grade", "review", "reason", "bank", "decided_by", "decided_at", "checked_at"}
+                         "typed", "grade", "review", "reason", "bank", "decided_by", "decided_at", "checked_at", "chat", "revealed", "max_grade"}
 PHOTO_QUESTION_DEFAULTS = {"class_id": None, "subject_id": "math", "picture_id": None, "source_id": None, "state": "reading", "question": "",
                            "answer": "", "steps": [], "suggested_skill": None, "skill_id": None, "typed": "", "grade": None, "review": None,
-                           "reason": None, "bank": "none", "decided_by": None, "decided_at": None, "checked_at": None}
+                           "reason": None, "bank": "none", "decided_by": None, "decided_at": None, "checked_at": None, "chat": [],
+                           "revealed": 0, "max_grade": 100}
 
 
 def _photo_question_row(r: dict) -> dict:

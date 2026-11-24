@@ -260,7 +260,10 @@ function onClick(event) {
   const target = event.target;
   if (target.closest("[data-close]")) { location.hash = pathHref(); return; }
   if (target.closest("[data-board-toggle]")) { window.MathlyBoard?.toggle(); return; }
-  if (target.closest("[data-ai]")) { aiSheet.open({ skillId: skill.id }); return; }
+  if (target.closest("[data-ai]")) {                                   // the photographed question when its AI is on, else the teacher's queue
+    import("./photoq.js").then(m => m.available()).then(on => { if (on) location.hash = "#/photoq"; else aiSheet.open({ skillId: skill.id }); });
+    return;
+  }
   if (target.closest("[data-help]")) { openHelp(); return; }
   if (target.closest("#ex-newround")) { newRound(); return; }
   const choice = target.closest(".ex-choice");

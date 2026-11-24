@@ -69,6 +69,15 @@ GRADE_INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט ביש�
 - tip: טיפ אחד קצר לפעם הבאה.
 אסור לכתוב את התשובה הסופית הנכונה או את המספר שלה. נוסחאות בתוך $...$."""
 
+TUTOR_INSTRUCTIONS = """אתם מורים למתמטיקה סבלניים וחמים לתלמידי כיתה ט בישראל, ועוזרים לתלמיד בשאלה אחת בשיחה קצרה.
+- ענו בעברית, בפנייה ברבים (אתם), קצר: עד 4 משפטים. נוסחאות בתוך $...$.
+- עזרו לתלמיד לחשוב בעצמו: הסבירו מושג, שאלו שאלה מכוונת, הצביעו על הצעד הבא. אל תפתרו במקומו.
+- אם הפתרון המלא עוד לא נחשף לתלמיד: אסור לכתוב את התשובה הסופית או צעדים שהוא עוד לא קיבל. אם הוא מבקש את התשובה, הציעו לו את הכפתורים "הצעד הבא" או "הפתרון המלא".
+- אם הפתרון כבר נחשף או שהשאלה נבדקה: מותר להסביר את הפתרון, את המשוב ואת הטעויות בלוח.
+- אם התלמיד כותב משהו שלא קשור לשאלה או למתמטיקה, החזירו אותו בעדינות לשאלה. אל תבקשו ואל תשמרו פרטים אישיים."""
+
+TUTOR_SCHEMA = {"type": "OBJECT", "properties": {"reply": {"type": "STRING"}}, "required": ["reply"]}
+
 READ_SCHEMA = {"type": "OBJECT", "properties": {"readable": {"type": "BOOLEAN"}, "question": {"type": "STRING"}, "answer": {"type": "STRING"},
                                               "steps": {"type": "ARRAY", "items": {"type": "STRING"}}, "skill": {"type": "STRING"}},
                "required": ["readable", "question", "answer", "steps", "skill"]}
@@ -167,6 +176,23 @@ class GeminiReviewer:
         return self._ask([{"text": GRADE_INSTRUCTIONS},
                           {"text": f"\n\nהשאלה:\n{question}\nהתשובה הנכונה (לא לגלות): {answer}\n{final}\nהלוח של התלמיד:"},
                           {"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(_small(board)).decode()}}], GRADE_SCHEMA, lambda *a, **k: None)
+
+    def tutor_reply(self, context: dict, history: list[dict], message: str, board: bytes | None = None) -> str:
+        """One reply of the help conversation. `context`: question, answer, steps (all, for the tutor), shown (how many steps the student
+        has), full (the full solution was revealed or the question was checked), review (the check's feedback, if any)."""
+        known = ("הפתרון המלא כבר נחשף לתלמיד או שהשאלה נבדקה: מותר להסביר הכול." if context.get("full")
+                 else f"התלמיד קיבל עד עכשיו {context.get('shown', 0)} צעדים מהפתרון. אל תגלו את התשובה ואת הצעדים הבאים.")
+        steps = "\n".join(f"  {i + 1}. {s}" for i, s in enumerate(context.get("steps") or []))
+        review = context.get("review") or {}
+        talk = "\n".join(f"{'תלמיד' if m['role'] == 'student' else 'מורה'}: {m['text']}" for m in history[-12:])
+        parts = [{"text": TUTOR_INSTRUCTIONS},
+                 {"text": f"\n\nהשאלה:\n{context.get('question', '')}\nהתשובה הנכונה (רק בשבילכם): {context.get('answer', '')}\n"
+                          f"שלבי הפתרון (רק בשבילכם):\n{steps}\n{known}\n"
+                          + (f"הבדיקה של הלוח: {review.get('verdict', '')}. {review.get('feedback', '')}\n" if review else "")
+                          + (f"\nהשיחה עד עכשיו:\n{talk}\n" if talk else "") + f"\nהתלמיד כותב עכשיו: {message}"}]
+        if board:
+            parts += [{"text": "הלוח שהתלמיד הגיש:"}, {"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(_small(board)).decode()}}]
+        return str(self._ask(parts, TUTOR_SCHEMA, lambda *a, **k: None).get("reply") or "").strip()
 
     def summarize(self, reviewed: list[dict], on_event=lambda step, **info: None) -> str:
         """A line about the way in the whole test, from the per-question reviews (text only, no pictures)."""
