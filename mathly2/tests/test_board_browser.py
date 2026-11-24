@@ -320,3 +320,33 @@ def test_the_right_button_erases_with_the_chosen_eraser_size_and_leaves_the_ques
         right_drag(page, x - 20, y, x + 320, y)
         page.mouse.move(box["x"] + 5, box["y"] + box["height"] - 5)
         assert png(page) == blank                                                   # all of it gone; the question's copy untouched
+
+
+def test_the_right_button_pressed_during_a_stroke_switches_to_the_eraser_and_back(browser):
+    with running(create_app()) as url:
+        page = board_page(browser, url, DESKTOP)
+        page.click("[data-board-toggle]")
+        page.wait_for_selector(".mx-board canvas")
+        page.click(".mx-board [data-tool='pen']")
+        blank = png(page)
+        box = page.locator(".mx-board canvas").bounding_box()
+        x, y = box["x"] + 60, box["y"] + 120
+        page.mouse.move(x, y)
+        page.mouse.down()                                                           # the left button draws...
+        page.mouse.move(x + 120, y + 60, steps=10)
+        page.mouse.down(button="right")                                             # ...the right one added on the way erases from there
+        page.mouse.move(x - 40, y - 20, steps=24)                                   # back over the line, past its start
+        page.mouse.up(button="right")
+        page.mouse.up()
+        page.mouse.move(box["x"] + 5, box["y"] + box["height"] - 5)
+        assert png(page) == blank                                                   # the line is gone: the eraser, not more pen
+        page.mouse.move(x, y + 200)
+        page.mouse.down()
+        page.mouse.move(x + 60, y + 200, steps=5)
+        page.mouse.down(button="right")
+        page.mouse.move(x + 70, y + 200, steps=2)
+        page.mouse.up(button="right")                                               # let go of the right one: the pen goes on
+        page.mouse.move(x + 200, y + 260, steps=10)
+        page.mouse.up()
+        page.mouse.move(box["x"] + 5, box["y"] + box["height"] - 5)
+        assert png(page) != blank and page.get_attribute(".mx-board", "data-tool") == "pen" and page.errors == []
