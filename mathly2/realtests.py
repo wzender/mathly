@@ -333,6 +333,7 @@ def home(request: Request, user: dict = Depends(learner), subject: str = Query("
                                                       rounds.onthego_lessons(request, user, subject)).values())
     return {"tests": cards, "next_step": _next_step(request, uid, tests[0] if tests else None, cards[0] if cards else None, the_map, today),
             "onthego": on_the_go,                                       # how many questions need no board (practice on the go)
+            "photoq": getattr(request.app.state, "reviewer", None) is not None,   # photographing a question (photoq.py) is on
             "next_skill": {"id": next_id, "name": next_skill_row["name"]} if next_skill_row else None,
             "behind": behind_lessons(request, user, subject), "subject": subject, "map": the_map}
 

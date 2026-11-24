@@ -41,6 +41,13 @@ async def upload_work(request: Request, ref: str = Query(..., max_length=64), ke
     store, bank = request.app.state.store, request.app.state.bank
     if ref == PRACTICE:
         skill_id = _skill_of_key(bank, key)
+    elif ref.startswith("pq:"):                                         # a photographed question (photoq.py): one board, key "q"
+        question = store.get_photo_question(ref[3:])
+        if question is None or question["user_id"] != user["id"] or key != "q":
+            raise HTTPException(404, "השאלה לא נמצאה")
+        if question["state"] not in ("ready", "checked"):
+            raise HTTPException(409, "השאלה לא פתוחה להגשה")
+        skill_id = question["skill_id"] or "external"
     else:
         row = store.get_attempt(ref)
         if row is None or row["user_id"] != user["id"]:

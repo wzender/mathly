@@ -51,6 +51,13 @@ NEEDS = {   # (method, path) -> permission
     ("DELETE", "/api/tests/{test_id}"): "class.teach",
     ("GET", "/api/home"): "path.use",
     ("POST", "/api/onthego/start"): "path.use",
+    ("GET", "/api/photo-questions"): "path.use",
+    ("POST", "/api/photo-questions"): "path.use",
+    ("POST", "/api/photo-questions/from-bank/{question_id}"): "path.use",
+    ("GET", "/api/photo-questions/{question_id}"): "path.use",
+    ("POST", "/api/photo-questions/{question_id}/submit"): "path.use",
+    ("GET", "/api/teaching/photo-questions"): "class.teach",
+    ("POST", "/api/teaching/photo-questions/{question_id}"): "class.teach",
     ("GET", "/api/forecast"): "path.use",
     ("POST", "/api/lessons/{lesson_id}/round/start"): "path.use",
     ("GET", "/api/rounds/{round_id}"): "path.use",
@@ -152,7 +159,7 @@ def world():
 
 
 def call(client, method, path, email):
-    url = path.format(skill_id="t_ext", lesson_id="t", attempt_id="x", round_id="x", test_id="1", number="1", picture_id="x", assignment_id="1", submission_id="1", request_id="x", class_id="1", subject_id="math", index="0", text_id="00000000-0000-0000-0000-000000000000", feedback_id="1", email="someone@school.test", role="teacher")
+    url = path.format(skill_id="t_ext", lesson_id="t", attempt_id="x", round_id="x", test_id="1", number="1", picture_id="x", assignment_id="1", submission_id="1", request_id="x", class_id="1", subject_id="math", index="0", text_id="00000000-0000-0000-0000-000000000000", feedback_id="1", question_id="00000000-0000-0000-0000-000000000000", email="someone@school.test", role="teacher")
     sends = method in ("POST", "PUT", "PATCH")
     return client.request(method, url, headers={"Authorization": f"Bearer dev:{email}"}, json={} if sends else None)
 

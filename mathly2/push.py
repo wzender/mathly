@@ -49,6 +49,8 @@ def public_key(private: str) -> str:
 def request_payload(request: dict, assignment: dict | None) -> dict:
     """What the service worker shows for a photo request. No question text or name: it may show on a locked screen. The tag is the assignment's,
     so a newer request for the same answer replaces the older notification."""
+    if request.get("assignment_id") is None:                           # a photographed question (photoq.py)
+        return {"title": "📷 בקשת צילום מהמחשב", "body": f"קוד {request['code']} · צלמו את השאלה ושלחו למחשב.", "url": "/#/", "tag": "photo-question"}
     return {"title": "📷 בקשת צילום מהמחשב", "body": f"קוד {request['code']} · צלמו את התשובה ושלחו למחשב.",
             "url": f"/#/assignment/{request['assignment_id']}", "tag": f"photo-{request['assignment_id']}"}
 

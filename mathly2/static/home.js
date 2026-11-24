@@ -109,8 +109,8 @@ export { countUp };
 
 /** The nearest test in one compact block (the home is one screen): the readiness number with its level and the days left (a link to the
  *  test's page, with all its tests and grades), the bar, and the two buttons that raise it, each with the most it can add now. */
-function testStrip(test, onTheGo = false) {
-  if (test.forecast) return forecastStrip(test, onTheGo);
+function testStrip(test, onTheGo = false, photo = false) {
+  if (test.forecast) return forecastStrip(test, onTheGo, photo);
   const r = test.readiness, add = r.can_add, sim = test.simulation.open, from = lastSeen(test);
   return `<section class="strip test-strip" id="nearest-test" data-test="${test.id}">
     <div class="readiness" data-readiness data-from="${from ?? ""}" data-to="${r.number}">
@@ -125,13 +125,14 @@ function testStrip(test, onTheGo = false) {
 
 /** The nearest test as a game: finding the league, or the league with the next one to reach and the forecast grade (the top row links to
  *  the test's page, where the readiness number is), and the practice test and the simulation. */
-function forecastStrip(test, onTheGo = false) {
-  const sim = test.simulation.open;
+function forecastStrip(test, onTheGo = false, photo = false) {
+  const sim = test.simulation.open, many = onTheGo || photo, four = onTheGo && photo;
   return `<section class="strip test-strip" id="nearest-test" data-test="${test.id}">
     ${forecastMeter(test.forecast, test.id, { id: "home-forecast", compact: true, link: `#/test/${test.id}`, days: daysText(test.days_left) })}
-    <div class="test-btns"><a class="test-btn" id="home-practice" href="#/test/${test.id}/practice" aria-label="מבחן תרגול">📝 ${onTheGo ? "תרגול" : "מבחן תרגול"}</a>
-      <a class="test-btn sim" id="home-sim" href="#/sim/${test.id}${sim ? `/${esc(sim)}` : ""}" aria-label="${sim ? "להמשיך סימולציה" : "מבחן סימולציה"}">⏱ ${sim ? "להמשיך" : onTheGo ? "סימולציה" : "מבחן סימולציה"}</a>
-      ${onTheGo ? `<a class="test-btn go" id="home-onthego" href="#/onthego" title="שאלות שעונים עליהן בראש, בלי לוח">🚌 בנסיעה</a>` : ""}</div></section>`;
+    <div class="test-btns${four ? " four" : ""}"><a class="test-btn" id="home-practice" href="#/test/${test.id}/practice" aria-label="מבחן תרגול">📝 ${many ? "תרגול" : "מבחן תרגול"}</a>
+      <a class="test-btn sim" id="home-sim" href="#/sim/${test.id}${sim ? `/${esc(sim)}` : ""}" aria-label="${sim ? "להמשיך סימולציה" : "מבחן סימולציה"}">⏱ ${sim ? "להמשיך" : many ? "סימולציה" : "מבחן סימולציה"}</a>
+      ${onTheGo ? `<a class="test-btn go" id="home-onthego" href="#/onthego" title="שאלות שעונים עליהן בראש, בלי לוח" aria-label="תרגול בנסיעה">🚌 ${four ? "נסיעה" : "בנסיעה"}</a>` : ""}
+      ${photo ? `<a class="test-btn go" id="home-photoq" href="#/photoq" title="צלמו שאלה, פתרו בלוח וקבלו ציון ומשוב" aria-label="צילום שאלה">📸 צילום</a>` : ""}</div></section>`;
 }
 
 /** An assignment's state in a symbol and a word (never colour alone). */
@@ -256,10 +257,11 @@ function draw(view, data, assignments, ai) {
   const [first] = data.tests;
   const onTheGo = data.onthego >= 10;                // practice on the go: in the test strip beside the tests, else in the status row
   const go = onTheGo && !first ? `<a class="hchip" id="home-onthego" href="#/onthego" title="שאלות שעונים עליהן בראש, בלי לוח">🚌 תרגול בנסיעה</a>` : "";
-  const chips = go + assignmentsChip(assignments) + aiChips(ai);
+  const photo = data.photoq && !first ? `<a class="hchip" id="home-photoq" href="#/photoq" title="צלמו שאלה, פתרו בלוח וקבלו ציון ומשוב">📸 צילום שאלה</a>` : "";
+  const chips = go + photo + assignmentsChip(assignments) + aiChips(ai);
   view(`${tabs("home")}${backToSubjects()}
     ${quest(data.map, chips, data.next_step, first?.forecast)}
-    ${first ? testStrip(first, onTheGo) : ""}
+    ${first ? testStrip(first, onTheGo, data.photoq) : ""}
     ${board(data.map)}`);
   countUp();
   document.getElementById("ai-new")?.addEventListener("click", () => aiSheet.open());

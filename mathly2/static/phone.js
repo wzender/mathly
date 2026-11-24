@@ -15,14 +15,16 @@ const everyPhone = () => window.__photoPollPhone ?? 5000;             // the pho
 
 let runs = 0;       // a newer request (or leaving the page) stops the older one's looking
 
-/** Ask the student's phone for a photo of this assignment's answer. `onPicture(id)` is called when the picture arrives. */
+/** Ask the student's phone for a photo of this assignment's answer (or, with no assignment, of a question: photoq.js). `onPicture(id)` is
+ *  called when the picture arrives. */
 export async function askFromComputer(assignment, onPicture, panel) {
   const mine = ++runs;
   const old = [...panel.querySelectorAll(".photo-request[data-code]")].map(el => `<li data-state="superseded">קוד ${esc(el.dataset.code)}: ${WORDS.superseded}</li>`).join("")
     + (panel.querySelector(".old-requests")?.innerHTML || "");
   let request;
   try {
-    request = await api("/api/photo-requests", { method: "POST", body: { assignment_id: assignment.id, device: deviceId() } });
+    request = await api("/api/photo-requests", { method: "POST", body: assignment ? { assignment_id: assignment.id, device: deviceId() }
+      : { purpose: "question", device: deviceId() } });
   } catch (error) {
     panel.innerHTML = `<p class="error" role="alert">${esc(error.message || "משהו השתבש")}</p>`;
     return;
@@ -30,7 +32,7 @@ export async function askFromComputer(assignment, onPicture, panel) {
   const draw = state => {
     panel.innerHTML = `<div class="photo-request" id="photo-request" data-code="${esc(request.code)}" data-state="${esc(state)}">
       <p>הקוד של הבקשה: <b class="code" id="request-code" dir="ltr">${esc(request.code)}</b></p>
-      <p class="muted">פתחו את האפליקציה בטלפון. אם הקוד שם זהה, צלמו את התשובה.</p>
+      <p class="muted">פתחו את האפליקציה בטלפון. אם הקוד שם זהה, צלמו את ${assignment ? "התשובה" : "השאלה"}.</p>
       <p class="status" id="request-state" role="status"><b>${WORDS[state] || state}</b></p></div>${old ? `<ul class="plain old-requests">${old}</ul>` : ""}`;
   };
   draw(request.state);
@@ -59,7 +61,8 @@ function windowHtml(request) {
   return `<div class="photo-window" id="photo-window" role="dialog" aria-modal="true" aria-labelledby="pw-title" data-request="${esc(request.id)}">
     <div class="sheet"><h3 id="pw-title">📷 בקשת צילום מהמחשב</h3>
       <p>הקוד שבמחשב: <b class="code" id="phone-code" dir="ltr">${esc(request.code)}</b></p>
-      <p class="muted">אם הקוד זהה למה שרואים במחשב, צלמו את התשובה: ${fmt(request.assignment.title)}</p>
+      <p class="muted">${request.assignment ? `אם הקוד זהה למה שרואים במחשב, צלמו את התשובה: ${fmt(request.assignment.title)}`
+        : "אם הקוד זהה למה שרואים במחשב, צלמו את השאלה (שאלה אחת, ישר ומקרוב)."}</p>
       <p class="status" id="phone-state" role="status"></p>
       <p><label class="button primary file" id="phone-camera">📷 צילום<input type="file" accept="image/*" capture="environment" hidden data-photo></label>
         <button type="button" id="phone-later">לא עכשיו</button></p></div></div>`;

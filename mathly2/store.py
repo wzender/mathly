@@ -128,6 +128,18 @@ def _submission_row(row: dict) -> dict:
     return {**_stamped(row, "handed_at", "checked_at"), "pictures": [str(x) for x in (row.get("pictures") or [])]}
 
 
+PHOTO_QUESTION_FIELDS = {"class_id", "subject_id", "picture_id", "source_id", "state", "question", "answer", "steps", "suggested_skill", "skill_id",
+                         "typed", "grade", "review", "reason", "bank", "decided_by", "decided_at", "checked_at"}
+PHOTO_QUESTION_DEFAULTS = {"class_id": None, "subject_id": "math", "picture_id": None, "source_id": None, "state": "reading", "question": "",
+                           "answer": "", "steps": [], "suggested_skill": None, "skill_id": None, "typed": "", "grade": None, "review": None,
+                           "reason": None, "bank": "none", "decided_by": None, "decided_at": None, "checked_at": None}
+
+
+def _photo_question_row(r: dict) -> dict:
+    return {**PHOTO_QUESTION_DEFAULTS, **r, "created_at": _when(r.get("created_at")), "decided_at": _when(r.get("decided_at")),
+            "checked_at": _when(r.get("checked_at"))}
+
+
 def _feedback_row(r: dict) -> dict:
     return {**r, "created_at": _when(r.get("created_at")), "handled_at": _when(r.get("handled_at"))}
 
@@ -151,6 +163,7 @@ class InMemoryStore:
         self._progress: dict[tuple[str, str], dict] = {}   # (user_id, skill_id) -> row
         self._answers: list[dict] = []
         self._feedback: list[dict] = []
+        self._photo_questions: dict[str, dict] = {}
         self._comets: dict[str, dict[str, str]] = {}       # user_id -> {comet_id: caught_at}
         self._attempts: dict[str, dict] = {}                # attempt id -> row
         self._work: dict[tuple, dict] = {}                  # (user id, ref, question key) -> the board's picture for that answer
@@ -379,6 +392,47 @@ class InMemoryStore:
         with self._lock:
             return [{k: a[k] for k in ("question_key", "correct", "counted", "day", "mistake_id")} for a in self._answers
                     if a["user_id"] == user_id and a["skill_id"] == skill_id]
+
+    # --- photographed questions (photoq.py) ---
+
+    def create_photo_question(self, user_id: str, at: datetime, **fields) -> dict:
+        unknown = set(fields) - PHOTO_QUESTION_FIELDS
+        if unknown:
+            raise ValueError(f"unknown photo question fields {sorted(unknown)}")
+        with self._lock:
+            row = {**PHOTO_QUESTION_DEFAULTS, **fields, "id": str(uuid.uuid4()), "user_id": user_id, "created_at": at}
+            self._photo_questions[row["id"]] = row
+            return dict(row)
+
+    def get_photo_question(self, question_id: str) -> dict | None:
+        with self._lock:
+            row = self._photo_questions.get(str(question_id))
+            return dict(row) if row else None
+
+    def save_photo_question(self, question_id: str, **fields) -> dict:
+        unknown = set(fields) - PHOTO_QUESTION_FIELDS
+        if unknown:
+            raise ValueError(f"unknown photo question fields {sorted(unknown)}")
+        with self._lock:
+            row = self._photo_questions[str(question_id)]
+            row.update(fields)
+            return dict(row)
+
+    def photo_questions_of(self, user_id: str, limit: int = 30) -> list[dict]:
+        with self._lock:
+            mine = [dict(r) for r in self._photo_questions.values() if r["user_id"] == user_id]
+        return sorted(mine, key=lambda r: r["created_at"], reverse=True)[:limit]
+
+    def photo_questions_of_classes(self, class_ids, bank: str | None = None) -> list[dict]:
+        wanted = set(class_ids)
+        with self._lock:
+            rows = [dict(r) for r in self._photo_questions.values() if r["class_id"] in wanted and (bank is None or r["bank"] == bank)]
+        return sorted(rows, key=lambda r: r["created_at"], reverse=True)
+
+    def photo_question_count_since(self, user_id: str, since: datetime) -> int:
+        """Photographed questions (not ones taken from the bank) since `since`: the daily limit."""
+        with self._lock:
+            return sum(1 for r in self._photo_questions.values() if r["user_id"] == user_id and r["picture_id"] and r["created_at"] >= since)
 
     # --- suggestions and feedback (feedback.py) ---
 
@@ -712,14 +766,16 @@ class InMemoryStore:
 
     # --- photo requests and push subscriptions ---
 
-    def create_photo_request(self, user_id: str, assignment_id: int, device: str, code: str, created_at: datetime, expires_at: datetime) -> dict:
-        """A new request; the student's earlier waiting request for the same assignment becomes superseded."""
+    def create_photo_request(self, user_id: str, assignment_id: int | None, device: str, code: str, created_at: datetime, expires_at: datetime,
+                             purpose: str = "assignment") -> dict:
+        """A new request (for an assignment's answer, or a photographed question with no assignment); the student's earlier waiting
+        request for the same assignment (or for a question) becomes superseded."""
         with self._lock:
             for r in self._requests.values():
-                if r["user_id"] == user_id and r["assignment_id"] == assignment_id and r["state"] == "waiting":
+                if r["user_id"] == user_id and r["assignment_id"] == assignment_id and r.get("purpose", "assignment") == purpose and r["state"] == "waiting":
                     r["state"] = "superseded"
             row = {"id": str(uuid.uuid4()), "user_id": user_id, "assignment_id": assignment_id, "device": device, "code": code, "state": "waiting",
-                   "created_at": created_at, "expires_at": expires_at, "picture_id": None}
+                   "created_at": created_at, "expires_at": expires_at, "picture_id": None, "purpose": purpose}
             self._requests[row["id"]] = row
             return dict(row)
 
@@ -1538,11 +1594,15 @@ class SupabaseStore:
 
     # --- photo requests and push subscriptions ---
 
-    def create_photo_request(self, user_id: str, assignment_id: int, device: str, code: str, created_at: datetime, expires_at: datetime) -> dict:
-        self._request("PATCH", "m2_photo_requests", {"user_id": self._eq(user_id), "assignment_id": self._eq(assignment_id), "state": "eq.waiting"},
-                      {"state": "superseded"})
-        rows = self._request("POST", "m2_photo_requests", body={"user_id": user_id, "assignment_id": assignment_id, "device": device, "code": code,
-                                                                "created_at": created_at.isoformat(), "expires_at": expires_at.isoformat()}, returning=True)
+    def create_photo_request(self, user_id: str, assignment_id: int | None, device: str, code: str, created_at: datetime, expires_at: datetime,
+                             purpose: str = "assignment") -> dict:
+        which = {"assignment_id": self._eq(assignment_id)} if assignment_id is not None else {"assignment_id": "is.null", "purpose": self._eq(purpose)}
+        self._request("PATCH", "m2_photo_requests", {"user_id": self._eq(user_id), **which, "state": "eq.waiting"}, {"state": "superseded"})
+        body = {"user_id": user_id, "assignment_id": assignment_id, "device": device, "code": code,
+                "created_at": created_at.isoformat(), "expires_at": expires_at.isoformat()}
+        if purpose != "assignment":
+            body["purpose"] = purpose
+        rows = self._request("POST", "m2_photo_requests", body=body, returning=True)
         return _stamped(rows[0], "created_at", "expires_at")
 
     def get_photo_request(self, request_id: str) -> dict | None:
@@ -1816,6 +1876,51 @@ class SupabaseStore:
         rows = self._request("GET", "m2_answers", {"user_id": self._eq(user_id), "skill_id": self._eq(skill_id),
                                                    "select": "question_key,correct,counted,day,mistake_id", "order": "id"})
         return [{**r, "day": date.fromisoformat(r["day"])} for r in rows]
+
+    def create_photo_question(self, user_id: str, at: datetime, **fields) -> dict:
+        unknown = set(fields) - PHOTO_QUESTION_FIELDS
+        if unknown:
+            raise ValueError(f"unknown photo question fields {sorted(unknown)}")
+        body = {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in fields.items()}
+        rows = self._request("POST", "m2_photo_questions", None, {**body, "user_id": user_id, "created_at": at.isoformat()}, returning=True)
+        return _photo_question_row(rows[0])
+
+    def get_photo_question(self, question_id: str) -> dict | None:
+        try:
+            rows = self._request("GET", "m2_photo_questions", {"id": self._eq(question_id), "select": "*"})
+        except urllib.error.HTTPError as exc:
+            if exc.code in (400, 404):                          # not a uuid
+                return None
+            raise
+        return _photo_question_row(rows[0]) if rows else None
+
+    def save_photo_question(self, question_id: str, **fields) -> dict:
+        unknown = set(fields) - PHOTO_QUESTION_FIELDS
+        if unknown:
+            raise ValueError(f"unknown photo question fields {sorted(unknown)}")
+        body = {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in fields.items()}
+        rows = self._request("PATCH", "m2_photo_questions", {"id": self._eq(question_id)}, body, returning=True)
+        if not rows:
+            raise KeyError(question_id)
+        return _photo_question_row(rows[0])
+
+    def photo_questions_of(self, user_id: str, limit: int = 30) -> list[dict]:
+        rows = self._request("GET", "m2_photo_questions", {"user_id": self._eq(user_id), "select": "*", "order": "created_at.desc", "limit": str(limit)})
+        return [_photo_question_row(r) for r in rows]
+
+    def photo_questions_of_classes(self, class_ids, bank: str | None = None) -> list[dict]:
+        ids = sorted(set(class_ids))
+        if not ids:
+            return []
+        params = {"class_id": f"in.({','.join(str(i) for i in ids)})", "select": "*", "order": "created_at.desc", "limit": "500"}
+        if bank:
+            params["bank"] = self._eq(bank)
+        return [_photo_question_row(r) for r in self._request("GET", "m2_photo_questions", params)]
+
+    def photo_question_count_since(self, user_id: str, since: datetime) -> int:
+        rows = self._request("GET", "m2_photo_questions", {"user_id": self._eq(user_id), "picture_id": "not.is.null",
+                                                           "created_at": f"gte.{since.isoformat()}", "select": "id"})
+        return len(rows)
 
     def add_feedback(self, user_id: str, email: str, roles: list[str], kind: str, body: str, page: str, at: datetime) -> dict:
         rows = self._request("POST", "m2_feedback", None, {"user_id": user_id, "email": email, "roles": list(roles), "kind": kind,

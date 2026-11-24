@@ -28,6 +28,8 @@ function withPreview(me, view) {
   };
 }
 
+let photoq = null;                    // the photographed-question sheet, once loaded
+
 export async function show(me, rawView) {
   const view = withPreview(me, rawView);
   if (!me.classes.length && me.roles.every(r => r === "student")) {
@@ -42,6 +44,7 @@ export async function show(me, rawView) {
     const raw = location.hash.replace(/^#/, "");
     const where = raw.startsWith("/") ? raw : "/";          // no address, or the sign-in service's "#access_token=…": the first screen
     if (!where.startsWith("/round/") && !where.startsWith("/retry/") && where !== "/onthego") lessonRound.close();
+    if (!where.startsWith("/photoq")) photoq?.close();
     try {
       if (where.startsWith("/round/")) {                                     // a lesson's round over the home (a link or a reload: the home first)
         exercise.close(); quiz.close();
@@ -49,6 +52,11 @@ export async function show(me, rawView) {
         setSubject(data.subject_id);
         if (!document.getElementById("lesson-map")) await home.show(view);
         await lessonRound.show(data);
+      } else if (where === "/photoq" || where.startsWith("/photoq/")) {        // a photographed question (photoq.js), over the home
+        exercise.close(); quiz.close();
+        photoq = await import("./photoq.js");
+        if (!document.getElementById("lesson-map")) await home.show(view);
+        if (where === "/photoq") await photoq.showList(); else await photoq.open(decodeURIComponent(where.slice(8)));
       } else if (where === "/onthego") {                                     // practice on the go: questions that need no board, over the home
         exercise.close(); quiz.close();
         const data = await lessonRound.startOnTheGo();

@@ -4,6 +4,8 @@ from __future__ import annotations
 import secrets
 from datetime import timedelta
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
@@ -62,6 +64,10 @@ def can_read_picture(request: Request, user: dict, picture: dict) -> bool:
     if picture["kind"] == "work":                                       # the board of an answer: the teachers of the student's classes
         from .boardwork import teaches_student
         return teaches_student(request, user, picture["owner_id"])
+    if picture["kind"] == "answer":                                     # a photographed question's photo: the teachers of the student's classes
+        from .boardwork import teaches_student
+        if any(q["picture_id"] == picture["id"] for q in store.photo_questions_of(picture["owner_id"])) and teaches_student(request, user, picture["owner_id"]):
+            return True
     classes = _class_ids_of(request, picture)
     if not classes:
         return False
@@ -116,7 +122,8 @@ REQUEST_MESSAGES = {"expired": "בקשת הצילום פגה. צרו בקשה ח
 
 
 class NewRequest(BaseModel):
-    assignment_id: int
+    assignment_id: int | None = None
+    purpose: Literal["assignment", "question"] = "assignment"          # "question": a photographed question (photoq.py), no assignment
     device: str = Field(min_length=1, max_length=100)
 
 
@@ -141,7 +148,7 @@ def _my_request(request: Request, user: dict, request_id: str) -> dict:
 
 def request_view(row: dict) -> dict:
     return {"id": row["id"], "state": row["state"], "code": row["code"], "assignment_id": row["assignment_id"], "picture_id": row["picture_id"],
-            "expires_at": row["expires_at"].isoformat()}
+            "purpose": row.get("purpose") or "assignment", "expires_at": row["expires_at"].isoformat()}
 
 
 @router.post("/photo-requests", status_code=201)
@@ -149,10 +156,20 @@ def create_photo_request(body: NewRequest, request: Request, user: dict = Depend
     """The computer asks for a photo of an answer: a 4-digit code (the phone shows the same one), valid for ten minutes. An older waiting
     request for the same assignment is replaced."""
     from .assignments import _my_assignment
+    now = clock.now()
+    if body.purpose == "question":                                   # a photographed question: no assignment
+        row = None
+        made = request.app.state.store.create_photo_request(user["id"], None, body.device, _new_code(request), now,
+                                                            now + timedelta(minutes=REQUEST_MINUTES), purpose="question")
+        notify = getattr(request.app.state, "notify_request", None)
+        if notify:
+            notify(request, user, made, None)
+        return request_view(made)
+    if body.assignment_id is None:
+        raise HTTPException(422, "חסרה המשימה")
     row = _my_assignment(request, user, body.assignment_id)
     if row["kind"] == "exercise_test":
         raise HTTPException(422, "מבחן תרגול לא מגישים בתמונה")
-    now = clock.now()
     made = request.app.state.store.create_photo_request(user["id"], body.assignment_id, body.device, _new_code(request), now, now + timedelta(minutes=REQUEST_MINUTES))
     notify = getattr(request.app.state, "notify_request", None)
     if notify:
@@ -168,6 +185,9 @@ def open_photo_requests(request: Request, device: str = "", user: dict = Depends
     for row in store.open_photo_requests(user["id"]):
         row = _settled(request, row)
         if row["state"] in ("waiting", "uploading") and row["device"] != device:
+            if row["assignment_id"] is None:                                  # a photographed question
+                found.append({**request_view(row), "assignment": None, "title": "שאלה לצילום"})
+                continue
             assignment = store.get_assignment(row["assignment_id"])
             found.append({**request_view(row), "assignment": {"id": row["assignment_id"], "title": assignment["title"] if assignment else ""}})
     return found

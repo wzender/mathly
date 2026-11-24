@@ -853,3 +853,16 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .act-bars i { display: block; width: 5px; min-height: 0; background: var(--sky-aurora, #6fd3ff); border-radius: 2px 2px 0 0; }
 .act-days-box { position: sticky; inset-inline-start: 0; max-width: min(560px, calc(100vw - 72px)); }
 .act-day-table { margin: 4px 0; width: 100%; }
+
+/* Photographed questions (photoq.js, teacher_photoq.js). */
+.pq-list .pq-item { display: flex; flex-direction: column; align-items: stretch; gap: 2px; width: 100%; text-align: start; padding: 10px 12px; min-height: 44px; }
+.pq-wait { font-size: 18px; font-weight: 700; }
+.pq-photo img, .pq-pics img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
+.pq-pics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.pq-pics figure { margin: 0; }
+.pq-skill select { min-height: 40px; }
+.pq-result .qz-grade b { font-size: 44px; }
+.pq-t textarea, .pq-t input { width: 100%; }
+/* Four ways beside the test (a photographed question too): four equal buttons, a little smaller. */
+.test-btns.four { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.test-btns.four .test-btn { font-size: 13.5px; padding-inline: 4px; }
