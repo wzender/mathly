@@ -9,7 +9,8 @@
    corner where two lines meet shows the arc; a click adds it and asks for its words, and a number gets a degree
    sign), typed math (the math keyboard, static/board-math.js), and a
    copy of the question (its text and figures), which is placed at the top by itself the first time a question's sketch is shown.
-   Holding the right mouse button (or a pen's barrel button) erases, whatever tool is chosen.
+   Holding the right mouse button (or a pen's barrel button) erases, whatever tool is chosen, also when pressed in the middle of a stroke
+   (the stroke ends there and the eraser goes on; let go of it with the left still down and the tool goes on).
    Line ends and circle centers snap to the ends and centers already drawn, so a triangle closes neatly;
    lines that meet that way move together. The eraser removes the lines and circles it touches and cuts pen strokes;
    it leaves the question's copy alone (select it and delete it instead).
@@ -690,11 +691,31 @@ function down(e){
     if(!selection.includes(m)) select(group(m));
     drag={id:e.pointerId,last:p,before:null}; return paint();
   }
-  if(use==="eraser"){ rub={id:e.pointerId,last:p,before:copy(marks()),changed:rubOut(p)}; if(tool!=="eraser") canvas.style.cursor=cursorFor("eraser"); return paint(); }
+  if(use==="eraser") return startRub(e.pointerId,p);
+  startDraft(e.pointerId,p,use);
+}
+function startRub(id,p){ rub={id,last:p,before:copy(marks()),changed:rubOut(p)}; if(tool!=="eraser") canvas.style.cursor=cursorFor("eraser"); paint(); }
+function endRub(){ if(rub.changed) remember(rub.before); rub=null; canvas.style.cursor=cursorFor(tool); paint(); if(pages>1) drawPages(); }   // back to the chosen tool's cursor
+function startDraft(id,p,use){
   remember();
   draft=use==="pen"?{kind:"free",color:ink,pts:[p]}:{kind:use,color:ink,a:snap(p),b:null};
   if(draft.b===null) draft.b=[...draft.a];
-  draft.id=e.pointerId; marks().push(draft); paint();
+  draft.id=id; marks().push(draft); paint();
+}
+function endDraft(){
+  const m=draft; draft=null; delete m.id; delete m.drawn;
+  if(m.kind!=="free"&&dist(m.a,m.b)<3||m.resumed&&m.pts.length<3){ marks().splice(marks().indexOf(m),1); sketch().past.pop(); }   // a tap, not a shape; or a pen that came back after the eraser and never moved
+  delete m.resumed; paint(); if(pages>1) drawPages();
+}
+// A mouse or a pen sends no new pointerdown for a second button pressed while the first is held: its move carries the new buttons.
+// The right button (or the pen's barrel / eraser end) pressed during a stroke ends the stroke and erases from there; let go of it while
+// the left is still down, and the chosen tool goes on.
+function switchMid(e){
+  if(e.pointerType==="touch"||!e.buttons) return false;
+  const erase=(e.buttons&(2|32))>0;
+  if(erase&&draft&&e.pointerId===draft.id){ endDraft(); startRub(e.pointerId,at(e)); return true; }
+  if(!erase&&(e.buttons&1)&&rub&&e.pointerId===rub.id&&["pen","line","circle"].includes(tool)){ endRub(); startDraft(e.pointerId,at(e),tool); draft.resumed=true; return true; }
+  return false;
 }
 function move(e){
   if(palms.has(e.pointerId)) return;
@@ -702,6 +723,7 @@ function move(e){
     touches.set(e.pointerId,[e.clientX,e.clientY]);
     if(pan){ if(touches.size>=2){ const [fx,fy]=fingers(); scrollTo(pan.x-(fx-pan.at[0]),pan.y-(fy-pan.at[1])); } return; }
   }
+  if(switchMid(e)) return;
   if(slide&&e.pointerId===slide.id) return scrollTo(slide.x-(e.clientX-slide.at[0]),slide.y-(e.clientY-slide.at[1]));
   if(tool==="move"&&!drag&&!e.buttons) canvas.style.cursor=hit(at(e))?"move":"grab";
   if(tool==="angle"&&!e.buttons&&e.pointerType!=="touch"){   // a mouse or a pen over a corner: its arc, dashed
@@ -734,11 +756,9 @@ function up(e){
   if(touches.delete(e.pointerId)&&pan){ if(!touches.size) pan=null; return; }
   if(slide&&e.pointerId===slide.id){ slide=null; canvas.style.cursor="grab"; return; }
   if(drag&&e.pointerId===drag.id){ drag=null; return paint(); }
-  if(rub&&e.pointerId===rub.id){ if(rub.changed) remember(rub.before); rub=null; canvas.style.cursor=cursorFor(tool); paint(); return pages>1&&drawPages(); }   // back to the chosen tool's cursor
+  if(rub&&e.pointerId===rub.id) return endRub();
   if(!draft||e.pointerId!==draft.id) return;
-  const m=draft; draft=null; delete m.id; delete m.drawn;
-  if(m.kind!=="free"&&dist(m.a,m.b)<3){ marks().pop(); sketch().past.pop(); }   // a tap, not a shape
-  paint(); if(pages>1) drawPages();
+  endDraft();
 }
 function undo(){ const s=sketch(); if(!s.past.length) return; s.marks=s.past.pop(); reset(); paint(); if(pages>1) drawPages(); }
 function removeSelection(){
