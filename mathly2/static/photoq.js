@@ -107,7 +107,8 @@ export async function open(id) {
 function photo(data) {
   if (!data.picture_id) return "";
   pictureUrl(data.picture_id).then(url => { const img = q("#pq-photo"); if (img) { img.src = url; img.hidden = false; } }).catch(() => {});
-  return `<details class="pq-photo"><summary>התמונה שצילמתם</summary><img id="pq-photo" alt="התמונה של השאלה" hidden></details>`;
+  return `<details class="pq-photo" open><summary>התמונה שצילמתם</summary>
+    <button type="button" class="pq-photo-btn" id="pq-photo-btn" aria-label="הגדלת התמונה"><img id="pq-photo" alt="התמונה של השאלה" hidden></button></details>`;
 }
 
 function skillPick(data, locked) {
@@ -167,10 +168,10 @@ function draw() {
       <details><summary>הפתרון המלא</summary><ol>${(d.steps || []).map(s => `<li dir="auto">${fmt(s)}</li>`).join("")}</ol><p>תשובה: <b dir="auto">${fmt(d.answer || "")}</b></p></details>
       ${d.bank === "pending" ? `<p class="muted">📬 השאלה נשלחה למורה. אם יאשר/תאשר, היא תיכנס לשאלות של הכיתה.</p>` : d.bank === "approved" ? `<p class="muted">✓ השאלה נמצאת בשאלות של הכיתה.</p>` : ""}</section>` : "";
   sheet(`${heading(d.from_bank ? "שאלה מהכיתה" : "שאלה מצולמת", !checked)}
+    ${photo(d)}
     <div class="mx-q" id="pq-q"><p class="ex-text" dir="auto">${fmt(d.question)}</p>${skillPick(d, checked || checking)}
       ${checked ? "" : `<p class="muted">✏️ פתרו בלוח, כמו במבחן. הבודק רואה את הדרך, לא רק את התשובה.</p>`}${box}</div>
     ${checking ? "" : helpHtml(d)}
-    ${photo(d)}
     ${checking ? `<p class="pq-wait" role="status">🧐 בודקים את הפתרון…</p>` : ""}
     ${result}
     <p id="pq-msg" role="status">${d.reason && d.state === "ready" ? `<span class="error">${esc(d.reason)}</span>` : ""}</p>
@@ -204,6 +205,8 @@ function onClick(event) {
   if (t.closest("[data-list]")) { location.hash = "#/photoq"; showList(); return; }
   if (t.closest("#pq-new") || t.closest("#pq-again")) { showCapture(); return; }
   if (t.closest("#pq-submit")) { submit(); return; }
+  const zoom = t.closest("#pq-photo-btn");
+  if (zoom) { const big = zoom.classList.toggle("big"); zoom.setAttribute("aria-label", big ? "הקטנת התמונה" : "הגדלת התמונה"); return; }
   if (t.closest("#pq-help-open")) { helpOpen.add(current.id); draw(); q("#pq-ask-text")?.focus(); return; }
   const rung = t.closest("[data-help]")?.dataset.help;
   if (rung) { askHelp(rung); return; }

@@ -858,6 +858,12 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .pq-list .pq-item { display: flex; flex-direction: column; align-items: stretch; gap: 2px; width: 100%; text-align: start; padding: 10px 12px; min-height: 44px; }
 .pq-wait { font-size: 18px; font-weight: 700; }
 .pq-photo img, .pq-pics img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
+.pq-photo { margin: 4px 0 8px; }
+.pq-photo summary { cursor: pointer; font-weight: 600; }
+.pq-photo-btn { display: block; padding: 0; margin-top: 4px; border: 0; background: none; cursor: zoom-in; min-height: 0; width: auto; max-width: 100%; }
+.pq-photo-btn img { display: block; max-height: 30vh; object-fit: contain; }
+.pq-photo-btn.big { cursor: zoom-out; width: 100%; }
+.pq-photo-btn.big img { max-height: none; width: 100%; }
 .pq-pics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
 .pq-pics figure { margin: 0; }
 .pq-skill select { min-height: 40px; }
