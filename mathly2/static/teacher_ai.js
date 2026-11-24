@@ -46,6 +46,7 @@ function html(ctx, data) {
       <ul class="plain" id="ai-waiting">${waiting.map(waitingItem).join("")}</ul>` : `<p class="muted" id="ai-empty">אין בקשות שמחכות.</p>`}
     ${rest.length ? `<h3>בטיפול, נכשלו והושלמו היום</h3><ul class="plain" id="ai-rest">${rest.map(otherItem).join("")}</ul>` : ""}
     <section class="card" id="pq-teacher"></section>
+    <section class="card" id="tt-teacher"></section>
     <section class="card"><h3>עזרה מתמונה לעצמי</h3>
       <p class="muted">${data.own ? `נשארו ${Math.max(data.own.allowance - data.own.used, 0)} מתוך ${data.own.allowance} בקשות אישיות היום.` : "למפתחים אין הגבלה."}</p>
       <label class="button file">📷 צילום או בחירת תמונה<input type="file" accept="image/jpeg,image/png,image/webp" hidden id="ai-own-file"></label></section></section>`;
@@ -57,6 +58,7 @@ export async function show(ctx, notice = "") {
   ctx.draw(html(ctx, data));
   ctx.wire();
   import("./teacher_photoq.js").then(m => m.mount(document.getElementById("pq-teacher"))).catch(() => {});
+  import("./teacher_tutor.js").then(m => m.mount(document.getElementById("tt-teacher"))).catch(() => {});
   const root = document.getElementById("ai-queue");
   if (notice) { const m = root.querySelector("#ai-message"); m.textContent = notice; m.hidden = false; }
   root.querySelectorAll("img[data-picture]").forEach(async img => { try { img.src = await pictureUrl(img.dataset.picture); img.hidden = false; } catch { img.remove(); } });

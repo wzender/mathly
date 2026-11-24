@@ -599,3 +599,16 @@ def test_a_photographed_question_keeps_its_conversation_and_the_grade_it_can_rea
     assert as_role(db, "service_role", f"select chat::text, revealed, max_grade from public.m2_photo_questions where user_id = '{u}'") == [("[]", 0, 100)]
     with pytest.raises(psycopg.errors.CheckViolation):
         as_role(db, "service_role", f"insert into public.m2_photo_questions(user_id, max_grade) values ('{u}', 120)")
+
+
+# --- the AI tutor's conversations on practice questions (20261127090000) ---
+
+def test_a_tutor_conversation_is_one_row_a_student_question_and_day_and_server_only(db):
+    u = "00000000-0000-0000-0000-0000000000b0"
+    as_role(db, "service_role", f"insert into public.m2_tutor_chats(user_id, skill_id, question_key, day) values ('{u}', 's', 's:1', '2026-11-24')")
+    assert as_role(db, "service_role", f"select messages::text, helped from public.m2_tutor_chats where user_id = '{u}'") == [("[]", False)]
+    with pytest.raises(psycopg.errors.UniqueViolation):
+        as_role(db, "service_role", f"insert into public.m2_tutor_chats(user_id, skill_id, question_key, day) values ('{u}', 's', 's:1', '2026-11-24')")
+    for role in ("authenticated", "anon"):
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            as_role(db, role, "select * from public.m2_tutor_chats")

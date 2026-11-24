@@ -670,3 +670,26 @@ def test_supabase_a_math_class_or_test_sends_no_subject_so_it_works_before_the_m
     s2.create_class("m@x.test", "A", subjects=["science"])
     s2.create_test(1, date(2026, 12, 1), ["w"], "t@x.test", subject_id="science")
     assert s2.calls[0][3]["subjects"] == ["science"] and s2.calls[1][3]["subject_id"] == "science"
+
+
+# --- the AI tutor's conversations (practice_tutor.py, 20261127090000) ---
+
+def test_supabase_tutor_chat_requests():
+    from datetime import date, datetime, timezone
+    at, day = datetime(2026, 11, 24, 9, tzinfo=timezone.utc), date(2026, 11, 24)
+    said = [{"role": "student", "text": "איך?"}, {"role": "ai", "text": "נסו"}]
+    row = {"id": "c1", "user_id": U, "skill_id": "s1", "question_key": "s1:a", "day": "2026-11-24", "messages": said, "helped": True,
+           "created_at": at.isoformat(), "updated_at": at.isoformat()}
+    s = Recorder([[], [row], [{"id": "c1", "messages": said, "helped": True}], [{**row, "messages": said * 2}], [row], [{"messages": said}, {"messages": said}]])
+    first = s.add_tutor_messages(U, "s1", "s1:a", day, said, True, at)
+    assert first["day"] == day and first["helped"] is True and len(first["messages"]) == 2
+    again = s.add_tutor_messages(U, "s1", "s1:a", day, said, False, at)
+    assert len(again["messages"]) == 4
+    assert s.tutor_chats_of([U], day)[0]["id"] == "c1" and s.tutor_messages_on(U, day) == 2
+    find, post, find2, patch, listing, count = s.calls
+    assert find[:2] == ("GET", "m2_tutor_chats") and find[2]["day"] == "eq.2026-11-24" and find[2]["question_key"] == "eq.s1:a"
+    assert post[:2] == ("POST", "m2_tutor_chats") and post[3]["helped"] is True and post[3]["messages"] == said
+    assert patch[:3] == ("PATCH", "m2_tutor_chats", {"id": "eq.c1"}) and len(patch[3]["messages"]) == 4 and patch[3]["helped"] is True
+    assert listing[2]["user_id"] == f"in.({U})" and listing[2]["day"] == "gte.2026-11-24" and listing[2]["order"] == "updated_at.desc"
+    assert count[2] == {"user_id": f"eq.{U}", "day": "eq.2026-11-24", "select": "messages"}
+    assert s.tutor_chats_of([], day) == []
