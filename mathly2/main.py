@@ -15,7 +15,7 @@ from .access import RoleResolver, learner, permissions_of, preview_classes
 from .auth import DevAuthenticator, SupabaseAuthenticator, current_user
 from .bank import Bank, load_bank
 
-from . import feedback, onthego, photoq, report, accounts, ai, ai_help, assignments, boardreview, boardwork, classes, cleanup, content, progress, prompter, quizzes, reads, realtests, review, rounds, skills, status, subjects, worksheets, written
+from . import feedback, onthego, photoq, practice_tutor, report, accounts, ai, ai_help, assignments, boardreview, boardwork, classes, cleanup, content, progress, prompter, quizzes, reads, realtests, review, rounds, skills, status, subjects, worksheets, written
 from .config import Settings, load_settings
 from .cached import CachedStore
 from .store import InMemoryStore, StoreUnavailable, SupabaseStore
@@ -101,6 +101,7 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     app.include_router(feedback.router)
     app.include_router(report.router)
     app.include_router(photoq.router)
+    app.include_router(practice_tutor.router)
     status.setup(app)
 
     @app.get("/api/health")
