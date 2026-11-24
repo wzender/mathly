@@ -116,3 +116,34 @@ def test_help_gives_a_direction_and_a_step_answers_a_question_and_caps_the_grade
         assert page.inner_text("#pq-result .qz-grade b") == "75"                              # 95 from the check, capped by the help taken
         page.wait_for_selector("#pq-help-open, #pq-chat")
         assert page.errors == []
+
+
+def test_a_question_with_sub_parts_shows_them_all_with_a_box_a_part(browser):
+    bank, store = load_bank(), InMemoryStore()
+    klass = store.create_class("setup", "ט", lessons=[l["id"] for l in bank.lessons][:3], teacher_email=TEACHER)
+    store.add_member(klass["id"], KID)
+    ai = FakeAI(parts=True)
+    app = create_app(Settings(teachers=frozenset({TEACHER})), bank=bank, store=store, reviewer=ai)
+    app.state.run_photoq = lambda target, app_, *args: target(app_, *args)
+    from fastapi.testclient import TestClient
+    api = TestClient(app)
+    with running(app) as url:
+        page = sign_in(browser, url, KID)
+        board_written(page, pictures=True)
+        page.click(".subject-card")
+        page.click("#home-photoq")
+        page.click("#pq-new")
+        page.wait_for_selector("#request-code")
+        phone = api.get("/api/photo-requests/open?device=phone", headers=auth(KID)).json()[0]
+        api.post(f"/api/photo-requests/{phone['id']}/picture", content=png(), headers={**auth(KID), "Content-Type": "image/png"})
+        page.wait_for_selector("#pq-q")
+        text = page.inner_text("#pq-q .ex-text")
+        assert "א. מצאו" in text and "ב. מצאו" in text and "ג. הוכיחו" in text and len(text.splitlines()) >= 4   # each part on its own line
+        assert page.locator("[data-final]").count() == 2 and "סעיף א" in page.inner_text(".pq-finals")
+        page.fill("[data-final='א']", "30")
+        page.fill("[data-final='ב']", "12")
+        page.click("#pq-submit")
+        page.wait_for_selector("#pq-result")
+        assert ai.graded[-1]["typed"] == "א=30;ב=12"
+        assert "סעיף ב" in page.inner_text("#pq-result .pq-parts") and "בדקו את" in page.inner_text("#pq-result .pq-parts")
+        assert page.errors == []

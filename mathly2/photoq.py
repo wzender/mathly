@@ -10,6 +10,7 @@ the feature says it is not available. Nothing here sends a name or an email to t
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from datetime import timedelta
 from typing import Literal
@@ -17,7 +18,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from . import clock, writtentest
+from . import clock
 from .mathtext import tidy
 from .access import allowed, learner, my_classes, need
 
@@ -57,13 +58,35 @@ def subject_skills(bank, subject: str, lesson_ids: set[str] | None) -> list[dict
     return [{"id": s["id"], "name": s["name"]} for s in bank.skills if s["unit"] in units]
 
 
+PART = re.compile(r"^\s*\(?([א-ט])[.)]\s*(.*)$")
+
+
+def parts_of(answer: str) -> list[dict]:
+    """A question with sub-parts keeps its answer as a line a part ("א. $∠B = 30°$"): [{label, answer}], or [] for a question without parts."""
+    found = [PART.match(line) for line in str(answer or "").splitlines() if line.strip()]
+    return [{"label": m[1], "answer": m[2].strip()} for m in found] if len(found) >= 2 and all(found) else []
+
+
+def finals(answer: str) -> list[dict]:
+    """The final-answer boxes: one per part whose answer is a plain number (with its part's letter), or the one box of a plain question."""
+    parts = parts_of(answer)
+    if not parts:
+        box = final_box(answer)
+        return [{"part": "", **box}] if box else []
+    return [{"part": p["label"], **box} for p in parts if (box := final_box(p["answer"]))]
+
+
+FINAL = re.compile(r"^(?:(?P<var>[^=\d\s][^=]{0,7}?)\s*=\s*)?(?P<num>[-−]?\d+(?:[.,]\d+)?(?:/\d+)?)\s*"
+                   r"(?P<unit>°|ס[\"״]מ|סמ[\"״]ר|מ[\"״]ר|מטר|מ'|ק[\"״]מ|שקלים|₪|%)?\s*\.?$")
+
+
 def final_box(answer: str) -> dict | None:
-    """A box for the final answer when the AI's answer is a plain number (as in the written simulation)."""
-    ref = {"skill_id": "", "key": ""}
-    fake = type("B", (), {"practice_question": lambda self, s, k: {"choices": [{"index": 0, "text": answer}]},
-                          "grade": lambda self, s, k, i: {"correct": True}})()
-    found = writtentest.final_of(fake, ref) if answer else None
-    return {"label": found["label"], "unit": found["unit"]} if found else None
+    """A box for the final answer when the AI's answer is a plain number ("$x = 4$", "∠B = 30°", "BP = 12 ס"מ"): its label and unit."""
+    found = FINAL.match(str(answer or "").replace("$", "").strip())
+    if not found:
+        return None
+    var = re.sub(r"\s+", "", found["var"] or "")
+    return {"label": f"{var} =" if var else "", "unit": found["unit"] or ""}
 
 
 # ---- the background work ----
@@ -83,7 +106,7 @@ def read_job(app, question_id: str) -> None:
         ids = {s["id"] for s in skills}
         skill = got.get("skill") if got.get("skill") in ids else None
         store.save_photo_question(question_id, state="ready", question=tidy(str(got["question"]))[:4000], answer=tidy(str(got.get("answer", "")))[:1000],
-                                  steps=[tidy(str(x))[:400] for x in (got.get("steps") or [])][:8], suggested_skill=skill, skill_id=skill)
+                                  steps=[tidy(str(x))[:400] for x in (got.get("steps") or [])][:12], suggested_skill=skill, skill_id=skill)
     except Exception as exc:
         log.warning("reading a photographed question failed: %s", getattr(exc, "reason", type(exc).__name__))
         try:
@@ -106,7 +129,10 @@ def check_job(app, question_id: str) -> None:
         verdict = got.get("verdict") if got.get("verdict") in ("correct", "partial", "wrong", "unclear") else "unclear"
         fields = {"state": "checked", "grade": score, "checked_at": clock.now(), "reason": None,
                   "review": {"verdict": verdict, "feedback": tidy(str(got.get("feedback", "")))[:600], "tip": tidy(str(got.get("tip", "")))[:300],
-                             "checks": _checks(row), "raw": raw}}
+                             "checks": _checks(row), "raw": raw,
+                             "parts": [{"label": str(x.get("label", ""))[:4], "feedback": tidy(str(x.get("feedback", "")))[:300],
+                                        "verdict": x.get("verdict") if x.get("verdict") in ("correct", "partial", "wrong", "unclear") else "unclear"}
+                                       for x in (got.get("parts") or [])[:8] if isinstance(x, dict)]}}
         if row["picture_id"] and row["bank"] == "none" and row["class_id"]:
             fields["bank"] = "pending"                                       # the teacher decides whether it joins the class's bank
         store.save_photo_question(question_id, **fields)
@@ -133,7 +159,8 @@ def student_view(request: Request, row: dict, user: dict) -> dict:
     names = {s["id"]: s["name"] for s in bank.skills}
     out = {"id": row["id"], "state": row["state"], "question": tidy(row["question"]), "picture_id": row["picture_id"], "subject_id": row["subject_id"],
            "suggested_skill": row["suggested_skill"], "skill": {"id": row["skill_id"], "name": names.get(row["skill_id"], "")} if row["skill_id"] else None,
-           "skills": skills, "final": final_box(tidy(row["answer"])) if row["state"] in ("ready", "checking", "checked") else None,
+           "skills": skills, "final": final_box(tidy(row["answer"])) if row["state"] in ("ready", "checking", "checked") and not parts_of(row["answer"]) else None,
+           "finals": finals(tidy(row["answer"])) if row["state"] in ("ready", "checking", "checked") else [],
            "typed": row["typed"], "grade": row["grade"], "review": row["review"] if checked else None, "bank": row["bank"],
            "from_bank": bool(row["source_id"]), "checks_left": max(0, CHECKS - _checks(row)),
            "reason": REASONS.get(row["reason"]) if row["reason"] else None, "created_at": row["created_at"].isoformat() if row["created_at"] else None,

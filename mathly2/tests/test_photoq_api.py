@@ -16,14 +16,18 @@ KID, KID2, TEACHER, OTHER_TEACHER = "kid@school.test", "kid2@school.test", "t@sc
 
 
 class FakeAI:
-    def __init__(self, readable=True, skill=None, score=80, fail=False):
-        self.readable, self.skill, self.score, self.fail = readable, skill, score, fail
+    def __init__(self, readable=True, skill=None, score=80, fail=False, parts=False):
+        self.readable, self.skill, self.score, self.fail, self.parts = readable, skill, score, fail, parts
         self.read, self.graded, self.tutored = [], [], []
 
     def read_question(self, image, skills, subject=""):
         self.read.append({"skills": [s["id"] for s in skills], "subject": subject, "bytes": len(image)})
         if self.fail:
             raise RuntimeError("down")
+        if self.parts:
+            return {"readable": True, "question": "נתון: △ABC שווה־שוקיים ($AB = AC$), ∠A₁ = 30°, PC = 18 ס\"מ.\nא. מצאו את ∠B.\nב. מצאו את BP.\nג. הוכיחו: FP = BC/6.",
+                    "answer": "א. $∠B = 30°$\nב. $BP = 12$ ס\"מ\nג. הוכחה", "steps": ["א. $∠B = (180° − 120°)/2$", "ב. $AP = PC/2$", "ג. $FP = BP/2$"],
+                    "skill": self.skill if self.skill is not None else skills[0]["id"]}
         return {"readable": self.readable, "question": "פתרו: $2x + 3 = 11$", "answer": "$x = 4$", "steps": ["$2x = 8$", "$x = 4$"],
                 "skill": self.skill if self.skill is not None else skills[0]["id"]}
 
@@ -35,7 +39,8 @@ class FakeAI:
 
     def grade_open(self, question, answer, typed, board):
         self.graded.append({"question": question, "answer": answer, "typed": typed, "board": len(board)})
-        return {"score": self.score, "verdict": "partial", "feedback": "דרך טובה, טעות בחילוק", "tip": "בדקו את החילוק"}
+        parts = [{"label": "א", "verdict": "correct", "feedback": "נכון"}, {"label": "ב", "verdict": "wrong", "feedback": "בדקו את $AP$"}] if self.parts else []
+        return {"score": self.score, "verdict": "partial", "feedback": "דרך טובה, טעות בחילוק", "tip": "בדקו את החילוק", "parts": parts}
 
 
 @pytest.fixture
@@ -186,3 +191,21 @@ def test_latex_from_the_ai_is_shown_as_symbols_even_on_a_question_already_kept(w
     world.post(f"/api/photo-questions/{q['id']}/submit", headers=auth(KID), json={})
     teacher = world.get("/api/teaching/photo-questions", headers=auth(TEACHER)).json()[0]
     assert teacher["answer"] == "$∠ B = 75°$" and teacher["steps"] == ["$(180 - 30)/2 = 75$"] and "\\" not in json.dumps(teacher, ensure_ascii=False)
+
+
+def test_a_question_with_sub_parts_has_a_box_a_part_and_feedback_a_part(world):
+    world.app.state.reviewer.parts = True
+    q = photograph(world).json()
+    assert q["question"].count("\n") == 3 and q["final"] is None
+    assert q["finals"] == [{"part": "א", "label": "∠B =", "unit": "°"}, {"part": "ב", "label": "BP =", "unit": 'ס"מ'}]   # no box for the proof
+    send_work(world, f"pq:{q['id']}", "q")
+    done = world.post(f"/api/photo-questions/{q['id']}/submit", headers=auth(KID), json={"typed": "א=30;ב=12"}).json()
+    assert world.app.state.reviewer.graded[-1]["typed"] == "א=30;ב=12" and done["typed"] == "א=30;ב=12"
+    assert [p["label"] for p in done["review"]["parts"]] == ["א", "ב"] and done["review"]["parts"][1]["verdict"] == "wrong"
+    assert done["answer"].splitlines()[1] == 'ב. $BP = 12$ ס"מ'
+
+
+def test_final_boxes_of_plain_answers():
+    assert photoq.final_box("$x = 4$") == {"label": "x =", "unit": ""} and photoq.final_box("$75°$") == {"label": "", "unit": "°"}
+    assert photoq.final_box('BP = 12 ס"מ') == {"label": "BP =", "unit": 'ס"מ'} and photoq.final_box("$x = 2y + 3$") is None
+    assert photoq.finals("$x = 4$") == [{"part": "", "label": "x =", "unit": ""}] and photoq.parts_of("$x = 4$") == []
