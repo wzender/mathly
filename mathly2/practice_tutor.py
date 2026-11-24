@@ -29,6 +29,7 @@ MESSAGES_A_DAY = 30
 HISTORY = 12
 LETTERS = "אבגדהוזח"
 _counts: dict[tuple[str, str], int] = {}
+_helped: set[tuple[str, str, str, str]] = set()                          # (user, skill, question, day): asked before answering
 _lock = threading.Lock()
 
 
@@ -77,18 +78,56 @@ def context_of(bank, skill: dict, key: str, answered: dict | None) -> dict:
     return context
 
 
-@router.post("/skills/{skill_id}/tutor")
-def ask_tutor(skill_id: str, body: Ask, request: Request, user: dict = Depends(learner)) -> dict:
-    """One message to the tutor about a practice question: {reply, helped (this answer will not count), left (messages left today)}."""
-    from .skills import _skill
+def _converse(request: Request, user: dict, skill: dict, key: str, on_screen: bool, answered: dict | None, body: Ask) -> dict:
+    """One exchange with the tutor about a practice question (on screen: guide; answered: explain), kept for the teacher."""
     bank, store = request.app.state.bank, request.app.state.store
-    skill = _skill(request, skill_id, user)
     tutor = reviewer(request)
     if tutor is None or not hasattr(tutor, "tutor_reply"):
         raise HTTPException(503, "ה־AI לא זמין כרגע")
     message = body.message.strip()
     if not message:
         raise HTTPException(422, "כתבו שאלה")
+    used = used_today(store, user["id"])
+    if used >= MESSAGES_A_DAY:
+        raise HTTPException(429, f"אפשר לשאול את ה־AI עד {MESSAGES_A_DAY} שאלות ביום. נמשיך מחר!")
+    history = [{"role": m.role, "text": m.text} for m in body.history[-HISTORY:]]
+    try:
+        reply = tutor.tutor_reply(context_of(bank, skill, key, answered), history, message, None)
+    except Exception as exc:
+        log.warning("the practice tutor failed: %s", getattr(exc, "reason", type(exc).__name__))
+        raise HTTPException(503, "ה־AI לא ענה כרגע, נסו שוב בעוד רגע")
+    reply, day, now = tidy(str(reply))[:1500], clock.school_day(), clock.now()
+    _count(user["id"])
+    if on_screen:
+        with _lock:
+            _helped.add((user["id"], skill["id"], key, day.isoformat()))
+    try:
+        store.add_tutor_messages(user["id"], skill["id"], key, day,
+                                 [{"role": "student", "text": message, "at": now.isoformat()}, {"role": "ai", "text": reply, "at": now.isoformat()}], on_screen, now)
+    except Exception as exc:                                                  # never lose the reply for the bookkeeping
+        log.warning("could not keep the tutor conversation: %s", type(exc).__name__)
+    return {"reply": reply, "helped": on_screen, "left": max(0, MESSAGES_A_DAY - used - 1)}
+
+
+def was_helped(store, user_id: str, skill_id: str, key: str) -> bool:
+    """Did the student ask the tutor about this question today before answering it? (then a round's answer does not count for mastery)"""
+    day = clock.school_day()
+    with _lock:
+        if (user_id, skill_id, key, day.isoformat()) in _helped:
+            return True
+    try:
+        row = store.tutor_chat(user_id, skill_id, key, day)
+    except Exception:
+        return False
+    return bool(row and row["helped"])
+
+
+@router.post("/skills/{skill_id}/tutor")
+def ask_tutor(skill_id: str, body: Ask, request: Request, user: dict = Depends(learner)) -> dict:
+    """One message to the tutor about a question of the skill's sheet: {reply, helped (this answer will not count), left (messages left today)}."""
+    from .skills import _skill
+    bank, store = request.app.state.bank, request.app.state.store
+    skill = _skill(request, skill_id, user)
     if bank.practice_question(skill_id, body.question_key) is None:
         raise HTTPException(404, "השאלה לא נמצאה")
     progress = store.get_progress(user["id"], skill_id)
@@ -98,26 +137,33 @@ def ask_tutor(skill_id: str, body: Ask, request: Request, user: dict = Depends(l
         answered = next((r for r in reversed(store.answers_of(user["id"], skill_id)) if r["question_key"] == body.question_key), None)
         if answered is None:
             raise HTTPException(409, "השאלה הזו כבר לא על המסך")
-    used = used_today(store, user["id"])
-    if used >= MESSAGES_A_DAY:
-        raise HTTPException(429, f"אפשר לשאול את ה־AI עד {MESSAGES_A_DAY} שאלות ביום. נמשיך מחר!")
-    history = [{"role": m.role, "text": m.text} for m in body.history[-HISTORY:]]
-    try:
-        reply = tutor.tutor_reply(context_of(bank, skill, body.question_key, answered), history, message, None)
-    except Exception as exc:
-        log.warning("the practice tutor failed: %s", getattr(exc, "reason", type(exc).__name__))
-        raise HTTPException(503, "ה־AI לא ענה כרגע, נסו שוב בעוד רגע")
-    helped, reply = on_screen, tidy(str(reply))[:1500]
+    got = _converse(request, user, skill, body.question_key, on_screen, answered, body)
     if on_screen and not progress.get("current_helped"):
         store.save_progress(user["id"], skill_id, current_helped=True)           # as with help: this answer will not count for mastery
-    _count(user["id"])
-    now = clock.now()
-    try:
-        store.add_tutor_messages(user["id"], skill_id, body.question_key, clock.school_day(),
-                                 [{"role": "student", "text": message, "at": now.isoformat()}, {"role": "ai", "text": reply, "at": now.isoformat()}], helped, now)
-    except Exception as exc:                                                  # never lose the reply for the bookkeeping
-        log.warning("could not keep the tutor conversation: %s", type(exc).__name__)
-    return {"reply": reply, "helped": helped, "left": max(0, MESSAGES_A_DAY - used - 1)}
+    return got
+
+
+@router.post("/rounds/{round_id}/tutor")
+def ask_tutor_in_round(round_id: str, body: Ask, request: Request, user: dict = Depends(learner)) -> dict:
+    """The same about a question of a lesson round, a mistakes round or a round on the go: the round's next question (guide; its answer
+    will not count for mastery) or one it has answered (explain)."""
+    from . import attempts
+    from .rounds import _graded, _mine
+    bank = request.app.state.bank
+    row = _mine(request, user, round_id)
+    item = next((q for q in row["questions"] if q["key"] == body.question_key), None)
+    if item is None or bank.practice_question(item["skill_id"], item["key"]) is None:
+        raise HTTPException(404, "השאלה לא נמצאה")
+    done = _graded(bank, row)
+    nxt = row["questions"][len(done)] if attempts.is_open(row) and len(done) < len(row["questions"]) else None
+    on_screen = nxt is not None and nxt["key"] == body.question_key
+    answered = None
+    if not on_screen:
+        found = next(((right, mistake) for q, right, mistake in done if q["key"] == body.question_key), None)
+        if found is None:
+            raise HTTPException(409, "השאלה הזו כבר לא על המסך")
+        answered = {"correct": found[0], "mistake_id": found[1]["id"] if found[1] else None}
+    return _converse(request, user, bank.skill(item["skill_id"]), body.question_key, on_screen, answered, body)
 
 
 # ---- the teacher reads the conversations ----

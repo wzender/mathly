@@ -490,6 +490,11 @@ class InMemoryStore:
             rows = [copy.deepcopy(r) for r in self._tutor_chats.values() if r["user_id"] in wanted and r["day"] >= since]
         return sorted(rows, key=lambda r: r["updated_at"], reverse=True)[:limit]
 
+    def tutor_chat(self, user_id: str, skill_id: str, question_key: str, day: date) -> dict | None:
+        with self._lock:
+            row = self._tutor_chats.get((user_id, skill_id, question_key, day))
+            return copy.deepcopy(row) if row else None
+
     def tutor_messages_on(self, user_id: str, day: date) -> int:
         """The student's messages to the tutor that day: the daily limit."""
         with self._lock:
@@ -2019,6 +2024,11 @@ class SupabaseStore:
         rows = self._request("GET", "m2_tutor_chats", {"user_id": f"in.({','.join(ids)})", "day": f"gte.{since.isoformat()}", "select": "*",
                                                        "order": "updated_at.desc", "limit": str(limit)})
         return [_tutor_chat_row(r) for r in rows]
+
+    def tutor_chat(self, user_id: str, skill_id: str, question_key: str, day: date) -> dict | None:
+        rows = self._request("GET", "m2_tutor_chats", {"user_id": self._eq(user_id), "skill_id": self._eq(skill_id),
+                                                       "question_key": self._eq(question_key), "day": self._eq(day.isoformat()), "select": "*"})
+        return _tutor_chat_row(rows[0]) if rows else None
 
     def tutor_messages_on(self, user_id: str, day: date) -> int:
         return _student_messages(self._request("GET", "m2_tutor_chats", {"user_id": self._eq(user_id), "day": self._eq(day.isoformat()), "select": "messages"}))

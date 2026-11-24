@@ -554,3 +554,36 @@ def test_a_league_is_held_through_a_small_dip_and_going_up_is_cheered(browser, b
         revealed = page.evaluate(show, [60, {"grade": 40, "league": -1, "done": 14}])
         assert revealed["league"] == 1 and "נחשפה הליגה שלך" in revealed["cheer"]
         assert page.errors == []
+
+
+def test_the_ai_chat_is_in_the_lesson_round_too(browser, bank):
+    from mathly2 import practice_tutor
+    from mathly2.tests.test_photoq_api import FakeAI
+    practice_tutor._counts.clear()
+    practice_tutor._helped.clear()
+    app, store, _, lessons = world(bank)
+    app.state.reviewer = ai = FakeAI()
+    with running(app) as url:
+        page = sign_in(browser, url, f"#/round/{lessons[0]}")
+        page.wait_for_selector(".round-layer #ex-q")
+        assert page.is_hidden(".round-layer #ex-chat")
+        page.click(".round-layer [data-chat]")
+        page.fill("#ex-chat-text", "איך מתחילים?")
+        page.press("#ex-chat-text", "Enter")
+        page.wait_for_selector(".round-layer #ex-chat-log .pq-msg.ai")
+        assert ai.tutored[-1]["context"]["full"] is False and "בלי לגלות" in page.inner_text("#ex-chat-note")
+        first = page.get_attribute("#ex-q", "data-key")
+        page.locator(".round-layer .ex-choice").first.click()
+        page.wait_for_selector(".round-layer .ex-ok, .round-layer .ex-bad")
+        page.wait_for_timeout(2600)                                                   # the chat is open: no countdown
+        assert page.get_attribute("#ex-q", "data-key") == first and "איפה הטעות" in page.inner_text("#ex-chat-note")
+        page.fill("#ex-chat-text", "למה?")
+        page.press("#ex-chat-text", "Enter")
+        page.wait_for_function("document.querySelectorAll('#ex-chat-log .pq-msg').length === 4")
+        assert ai.tutored[-1]["context"]["full"] is True
+        page.click("#rd-next")
+        page.wait_for_function("(k) => document.getElementById('ex-q')?.dataset.key !== k", arg=first)
+        assert page.locator("#ex-chat-log .pq-msg").count() == 0 and page.errors == []
+    import uuid
+    kept = store.tutor_chats_of([str(uuid.uuid5(uuid.NAMESPACE_DNS, KID))], clock.school_day())     # what the teacher reads
+    assert len(kept) == 1 and len(kept[0]["messages"]) == 4 and kept[0]["helped"] is True

@@ -693,3 +693,11 @@ def test_supabase_tutor_chat_requests():
     assert listing[2]["user_id"] == f"in.({U})" and listing[2]["day"] == "gte.2026-11-24" and listing[2]["order"] == "updated_at.desc"
     assert count[2] == {"user_id": f"eq.{U}", "day": "eq.2026-11-24", "select": "messages"}
     assert s.tutor_chats_of([], day) == []
+
+
+def test_supabase_one_tutor_chat_request():
+    from datetime import date
+    s = Recorder([[], [{"id": "c1", "user_id": U, "skill_id": "s1", "question_key": "s1:a", "day": "2026-11-24", "messages": [], "helped": True}]])
+    assert s.tutor_chat(U, "s1", "s1:a", date(2026, 11, 24)) is None
+    assert s.tutor_chat(U, "s1", "s1:a", date(2026, 11, 24))["helped"] is True
+    assert s.calls[0][2] == {"user_id": f"eq.{U}", "skill_id": "eq.s1", "question_key": "eq.s1:a", "day": "eq.2026-11-24", "select": "*"}
