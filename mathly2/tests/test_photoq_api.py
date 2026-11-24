@@ -174,3 +174,15 @@ def test_help_has_limits_and_says_when_the_ai_is_down(world):
     for _ in range(photoq.MESSAGES_A_QUESTION):
         assert help_(world, q, "ask", "עוד שאלה").status_code == 200
     assert help_(world, q, "ask", "ועוד").status_code == 429
+
+
+def test_latex_from_the_ai_is_shown_as_symbols_even_on_a_question_already_kept(world):
+    q = photograph(world).json()
+    world.store.save_photo_question(q["id"], question=r"נתון: \triangle ABC, \angle A_1 = 30^\circ. מצאו את \angle B.", answer=r"$\angle B = 75^\circ$",
+                                    steps=[r"$\frac{180 - 30}{2} = 75$"], chat=[{"role": "ai", "text": r"חשבו את \angle B", "kind": "ask"}])
+    got = world.get(f"/api/photo-questions/{q['id']}", headers=auth(KID)).json()
+    assert got["question"] == "נתון: △ ABC, ∠ A₁ = 30°. מצאו את ∠ B." and got["help"]["chat"][0]["text"] == "חשבו את ∠ B"
+    send_work(world, f"pq:{q['id']}", "q")
+    world.post(f"/api/photo-questions/{q['id']}/submit", headers=auth(KID), json={})
+    teacher = world.get("/api/teaching/photo-questions", headers=auth(TEACHER)).json()[0]
+    assert teacher["answer"] == "$∠ B = 75°$" and teacher["steps"] == ["$(180 - 30)/2 = 75$"] and "\\" not in json.dumps(teacher, ensure_ascii=False)

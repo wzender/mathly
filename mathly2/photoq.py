@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from . import clock, writtentest
+from .mathtext import tidy
 from .access import allowed, learner, my_classes, need
 
 log = logging.getLogger("mathly2.photoq")
@@ -81,8 +82,8 @@ def read_job(app, question_id: str) -> None:
             return
         ids = {s["id"] for s in skills}
         skill = got.get("skill") if got.get("skill") in ids else None
-        store.save_photo_question(question_id, state="ready", question=str(got["question"])[:4000], answer=str(got.get("answer", ""))[:1000],
-                                  steps=[str(x)[:400] for x in (got.get("steps") or [])][:8], suggested_skill=skill, skill_id=skill)
+        store.save_photo_question(question_id, state="ready", question=tidy(str(got["question"]))[:4000], answer=tidy(str(got.get("answer", "")))[:1000],
+                                  steps=[tidy(str(x))[:400] for x in (got.get("steps") or [])][:8], suggested_skill=skill, skill_id=skill)
     except Exception as exc:
         log.warning("reading a photographed question failed: %s", getattr(exc, "reason", type(exc).__name__))
         try:
@@ -104,7 +105,7 @@ def check_job(app, question_id: str) -> None:
         score = min(raw, row.get("max_grade", 100))                         # help taken lowers what the question can reach
         verdict = got.get("verdict") if got.get("verdict") in ("correct", "partial", "wrong", "unclear") else "unclear"
         fields = {"state": "checked", "grade": score, "checked_at": clock.now(), "reason": None,
-                  "review": {"verdict": verdict, "feedback": str(got.get("feedback", ""))[:600], "tip": str(got.get("tip", ""))[:300],
+                  "review": {"verdict": verdict, "feedback": tidy(str(got.get("feedback", "")))[:600], "tip": tidy(str(got.get("tip", "")))[:300],
                              "checks": _checks(row), "raw": raw}}
         if row["picture_id"] and row["bank"] == "none" and row["class_id"]:
             fields["bank"] = "pending"                                       # the teacher decides whether it joins the class's bank
@@ -130,15 +131,15 @@ def student_view(request: Request, row: dict, user: dict) -> dict:
     skills = subject_skills(bank, row["subject_id"], visible_lesson_ids(request, user))
     checked = row["state"] == "checked"
     names = {s["id"]: s["name"] for s in bank.skills}
-    out = {"id": row["id"], "state": row["state"], "question": row["question"], "picture_id": row["picture_id"], "subject_id": row["subject_id"],
+    out = {"id": row["id"], "state": row["state"], "question": tidy(row["question"]), "picture_id": row["picture_id"], "subject_id": row["subject_id"],
            "suggested_skill": row["suggested_skill"], "skill": {"id": row["skill_id"], "name": names.get(row["skill_id"], "")} if row["skill_id"] else None,
-           "skills": skills, "final": final_box(row["answer"]) if row["state"] in ("ready", "checking", "checked") else None,
+           "skills": skills, "final": final_box(tidy(row["answer"])) if row["state"] in ("ready", "checking", "checked") else None,
            "typed": row["typed"], "grade": row["grade"], "review": row["review"] if checked else None, "bank": row["bank"],
            "from_bank": bool(row["source_id"]), "checks_left": max(0, CHECKS - _checks(row)),
            "reason": REASONS.get(row["reason"]) if row["reason"] else None, "created_at": row["created_at"].isoformat() if row["created_at"] else None,
            "help": help_state(row)}
     if checked:
-        out["answer"], out["steps"] = row["answer"], row["steps"]
+        out["answer"], out["steps"] = tidy(row["answer"]), [tidy(x) for x in row["steps"] or []]
     return out
 
 
@@ -168,7 +169,7 @@ def my_questions(request: Request, user: dict = Depends(learner), subject: str =
     solved = {r["source_id"] for r in mine if r["source_id"]}
     approved = [r for r in store.photo_questions_of_classes(class_ids, "approved") if r["user_id"] != user["id"] and r["subject_id"] == subject]
     names = {s["id"]: s["name"] for s in request.app.state.bank.skills}
-    brief = lambda r: {"id": r["id"], "question": r["question"][:160], "state": r["state"], "grade": r["grade"], "bank": r["bank"],
+    brief = lambda r: {"id": r["id"], "question": tidy(r["question"])[:160], "state": r["state"], "grade": r["grade"], "bank": r["bank"],
                        "skill": names.get(r["skill_id"], "") if r["skill_id"] else "", "solved": r["id"] in solved}
     since = clock.now() - timedelta(days=1)
     return {"on": reviewer(request) is not None, "left_today": max(0, DAILY_LIMIT - store.photo_question_count_since(user["id"], since)),
@@ -252,12 +253,16 @@ def next_step_cap(row: dict) -> int:
     return max(FULL_CAP, FIRST_STEP_CAP - STEP_COST * revealed)
 
 
+def _chat(row: dict) -> list[dict]:
+    return [{"role": m.get("role"), "text": tidy(m.get("text")), "kind": m.get("kind")} for m in row.get("chat") or []]
+
+
 def help_state(row: dict) -> dict:
     """What the help panel shows: the conversation, the grade the question can still reach, and which rungs are left (with their cost)."""
     steps, revealed, open_ = len(row.get("steps") or []), row.get("revealed", 0), row["state"] in ("ready",)
     asked_direction = any(m.get("kind") == "direction" for m in row.get("chat") or [])
     full = revealed >= steps and steps > 0
-    return {"chat": [{k: m.get(k) for k in ("role", "text", "kind")} for m in row.get("chat") or []], "max_grade": row.get("max_grade", 100),
+    return {"chat": _chat(row), "max_grade": row.get("max_grade", 100),
             "revealed": revealed, "steps": steps, "full": full, "left": max(0, MESSAGES_A_QUESTION - _said(row)),
             "rungs": {"direction": min(row.get("max_grade", 100), DIRECTION_CAP) if open_ and not asked_direction and revealed == 0 else None,
                       "step": min(row.get("max_grade", 100), next_step_cap(row)) if open_ and not full else None,
@@ -318,7 +323,7 @@ def ask_help(question_id: str, body: Help, request: Request, user: dict = Depend
             raise HTTPException(422, "כתבו מה לא ברור")
         asked, reply = text, _tutor(tutor, row, text, _board(request.app, row) if row["state"] == "checked" else None)
     chat = list(row.get("chat") or []) + [{"role": "student", "text": asked, "kind": body.kind, "at": now},
-                                          {"role": "ai", "text": reply[:1500], "kind": body.kind, "at": now}]
+                                          {"role": "ai", "text": tidy(reply)[:1500], "kind": body.kind, "at": now}]
     store.save_photo_question(row["id"], chat=chat, **fields)
     return student_view(request, store.get_photo_question(row["id"]), user)
 
@@ -370,11 +375,11 @@ def teacher_view(request: Request, row: dict, emails: dict[str, str]) -> dict:
     store, bank = request.app.state.store, request.app.state.bank
     names = {s["id"]: s["name"] for s in bank.skills}
     work = store.work_of(row["user_id"], REF + row["id"])
-    return {"id": row["id"], "student": emails.get(row["user_id"], ""), "class_id": row["class_id"], "question": row["question"], "answer": row["answer"],
-            "steps": row["steps"], "picture_id": row["picture_id"], "board_id": work.get(KEY), "suggested_skill": row["suggested_skill"],
+    return {"id": row["id"], "student": emails.get(row["user_id"], ""), "class_id": row["class_id"], "question": tidy(row["question"]), "answer": tidy(row["answer"]),
+            "steps": [tidy(x) for x in row["steps"] or []], "picture_id": row["picture_id"], "board_id": work.get(KEY), "suggested_skill": row["suggested_skill"],
             "skill": {"id": row["skill_id"], "name": names.get(row["skill_id"], "")} if row["skill_id"] else None, "grade": row["grade"],
             "review": row["review"], "bank": row["bank"], "skills": subject_skills(bank, row["subject_id"], None),
-            "chat": [{k: m.get(k) for k in ("role", "text", "kind")} for m in row.get("chat") or []], "max_grade": row.get("max_grade", 100),
+            "chat": _chat(row), "max_grade": row.get("max_grade", 100),
             "created_at": row["created_at"].isoformat() if row["created_at"] else None}
 
 

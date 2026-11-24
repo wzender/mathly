@@ -58,6 +58,10 @@ def test_a_student_photographs_solves_and_gets_a_grade_and_the_teacher_approves(
         api.post(f"/api/photo-requests/{phone['id']}/picture", content=png(), headers={**auth(KID), "Content-Type": "image/png"})
         page.wait_for_selector("#pq-q")
         assert "2x + 3 = 11" in page.inner_text("#pq-q") and page.locator("#pq-final").count() == 1
+        page.wait_for_selector("#pq-photo:not([hidden])")                                                       # the photo, open above the question
+        assert page.eval_on_selector(".pq-photo", "d => d.open && d.compareDocumentPosition(document.querySelector('#pq-q')) & 4")
+        page.click("#pq-photo-btn")
+        assert "big" in page.get_attribute("#pq-photo-btn", "class")
         assert "(הצעה)" in page.inner_text("#pq-skill") and page.locator(".pq-layer [data-board-toggle]").count() == 1
         page.fill("#pq-final", "4")
         page.click("#pq-submit")
