@@ -52,6 +52,30 @@ WRITTEN_INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט בי�
 אסור לכתוב את התשובה הסופית הנכונה או את המספר שלה. אם התלמיד טעה, כוונו אותו לשלב, אל תפתרו בשבילו.
 נוסחאות כתבו בתוך $...$."""
 
+READ_INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט בישראל. קיבלתם תמונה של שאלה שתלמיד צילם (מדף עבודה, ספר או מבחן).
+- readable: האם רואים בתמונה שאלה במתמטיקה אחת שאפשר לקרוא ולפתור.
+- question: נוסח השאלה בעברית, מלא ומדויק כפי שהוא בתמונה, נוסחאות בתוך $...$. אם יש כמה סעיפים, כתבו רק את הראשון. אם יש שרטוט, תארו במילים מה שנחוץ לפתרון.
+- answer: התשובה הסופית הנכונה, קצרה (למשל $x = 5$).
+- steps: שלבי הפתרון, 2 עד 6 שלבים קצרים.
+- skill: המזהה של המיומנות מהרשימה שהשאלה הכי מתאימה לה, או מחרוזת ריקה אם אף אחת לא מתאימה (שאלה "חיצונית").
+אל תמציאו: אם משהו בתמונה לא ברור, readable = false."""
+
+GRADE_INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט בישראל ובודקים פתרון של תלמיד לשאלה פתוחה. קיבלתם את השאלה, התשובה הנכונה (רק בשבילכם), \
+התשובה הסופית שהתלמיד הקליד (אם יש) ותמונה של הלוח שלו.
+- score: ציון מ־0 עד 100 לפתרון כולו, כמו בבדיקת מבחן: דרך נכונה ותשובה נכונה 100; דרך נכונה עם טעות חישוב 60 עד 85; התחלה נכונה בלבד 20 עד 50; \
+שיטה שגויה או לוח בלי פתרון 0 עד 15. תשובה סופית נכונה בלי דרך בלוח לא מקבלת יותר מ־30.
+- verdict: "correct", "partial", "wrong" או "unclear" (אי אפשר לקרוא את הלוח).
+- feedback: משפט או שניים לתלמיד, בעברית, בפנייה ברבים (אתם), חם וענייני: מה טוב בדרך, ואיפה הטעות הראשונה אם יש.
+- tip: טיפ אחד קצר לפעם הבאה.
+אסור לכתוב את התשובה הסופית הנכונה או את המספר שלה. נוסחאות בתוך $...$."""
+
+READ_SCHEMA = {"type": "OBJECT", "properties": {"readable": {"type": "BOOLEAN"}, "question": {"type": "STRING"}, "answer": {"type": "STRING"},
+                                              "steps": {"type": "ARRAY", "items": {"type": "STRING"}}, "skill": {"type": "STRING"}},
+               "required": ["readable", "question", "answer", "steps", "skill"]}
+GRADE_SCHEMA = {"type": "OBJECT", "properties": {"score": {"type": "INTEGER"}, "verdict": {"type": "STRING", "enum": list(VERDICTS)},
+                                               "feedback": {"type": "STRING"}, "tip": {"type": "STRING"}},
+                "required": ["score", "verdict", "feedback", "tip"]}
+
 SUMMARY_INSTRUCTIONS = """אתם מורים למתמטיקה בכיתה ט. לפניכם הערכות של הדרך של תלמיד בשאלות של מבחן אחד (לכל שאלה: הנושא, הערכה ומשוב).
 כתבו summary: משפט או שניים לתלמיד, בעברית, בפנייה ברבים (אתם): חוזקה אחת בדרך ודבר אחד לשפר. בלי תשובות נכונות ובלי מספרים של תשובות."""
 
@@ -129,6 +153,20 @@ class GeminiReviewer:
     def review_one(self, item: dict, on_event=lambda step, **info: None) -> dict:
         """One question with its board -> {verdict, feedback, tip}."""
         return self._ask(self._parts(item), SCHEMA, on_event)
+
+    def read_question(self, image: bytes, skills: list[dict], subject: str = "") -> dict:
+        """A photographed question -> {readable, question, answer, steps, skill} (skill: an id of `skills`, or "" for external)."""
+        listed = "\n".join(f"  {s['id']}: {s['name']}" for s in skills)
+        return self._ask([{"text": READ_INSTRUCTIONS},
+                          {"text": f"\n\nהמקצוע: {subject or 'מתמטיקה'}\nהמיומנויות (מזהה: שם):\n{listed}\n\nהתמונה:"},
+                          {"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(_small(image)).decode()}}], READ_SCHEMA, lambda *a, **k: None)
+
+    def grade_open(self, question: str, answer: str, typed: str | None, board: bytes) -> dict:
+        """A student's board for an open question -> {score, verdict, feedback, tip}."""
+        final = f"התשובה הסופית שהתלמיד הקליד: {typed}" if typed else "התלמיד לא הקליד תשובה סופית"
+        return self._ask([{"text": GRADE_INSTRUCTIONS},
+                          {"text": f"\n\nהשאלה:\n{question}\nהתשובה הנכונה (לא לגלות): {answer}\n{final}\nהלוח של התלמיד:"},
+                          {"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(_small(board)).decode()}}], GRADE_SCHEMA, lambda *a, **k: None)
 
     def summarize(self, reviewed: list[dict], on_event=lambda step, **info: None) -> str:
         """A line about the way in the whole test, from the per-question reviews (text only, no pictures)."""

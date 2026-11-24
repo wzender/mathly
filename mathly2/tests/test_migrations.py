@@ -575,3 +575,19 @@ def test_daily_practice_counts_answers_right_ones_and_the_time_from_the_gaps(db)
     assert rows == [("2026-11-20", 5, 4, 60 + 30 + 60 + 60 + 20), ("2026-11-21", 1, 1, 60)]
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         as_role(db, "authenticated", "select * from public.m2_daily_practice")
+
+
+# --- photographed questions (20261125090000) ---
+
+def test_a_photo_request_for_a_question_has_no_assignment_and_photo_questions_are_server_only(db):
+    u = "00000000-0000-0000-0000-0000000000ae"
+    as_role(db, "service_role", f"insert into public.m2_photo_requests(user_id, device, code, expires_at, purpose) values ('{u}', 'pc', '1234', now() + interval '10 minutes', 'question')")
+    with pytest.raises(psycopg.errors.CheckViolation):              # a question request with an assignment, or an assignment request without one
+        as_role(db, "service_role", f"insert into public.m2_photo_requests(user_id, device, code, expires_at) values ('{u}', 'pc', '1234', now() + interval '10 minutes')")
+    as_role(db, "service_role", f"insert into public.m2_photo_questions(user_id, question, answer, state, bank) values ('{u}', 'פתרו', '$x = 4$', 'checked', 'pending')")
+    assert as_role(db, "service_role", "select state, bank, grade from public.m2_photo_questions") == [("checked", "pending", None)]
+    with pytest.raises(psycopg.errors.CheckViolation):
+        as_role(db, "service_role", f"insert into public.m2_photo_questions(user_id, grade) values ('{u}', 101)")
+    for role in ("authenticated", "anon"):
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            as_role(db, role, "select * from public.m2_photo_questions")
