@@ -544,7 +544,7 @@ def test_browser_roles_cannot_read_prompter_texts(db, role):
 
 # --- the kinds of attempts (20261122090000) ---
 
-@pytest.mark.parametrize("kind", ["lesson_round", "mistakes_round", "onthego_round"])
+@pytest.mark.parametrize("kind", ["lesson_round", "mistakes_round", "onthego_round", "gaps_round"])
 def test_rounds_of_every_kind_are_kept(db, kind):
     as_role(db, "service_role", f"insert into public.m2_attempts(user_id, kind, scope, due_at) values ('00000000-0000-0000-0000-0000000000ab', '{kind}', 'math', now() + interval '1 day')")
     with pytest.raises(psycopg.errors.CheckViolation):

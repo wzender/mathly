@@ -138,3 +138,30 @@ def test_the_tutor_in_a_round_guides_the_question_on_screen_and_explains_an_answ
     assert client.post("/api/rounds/nope/tutor", headers=auth(), json={"question_key": first, "message": "x"}).status_code == 404
     client.app.state.reviewer = None
     assert client.get(f"/api/rounds/{rnd['id']}", headers=auth()).json()["tutor"] is False
+
+
+# --- closing the gaps (השלמת פערים) ---
+
+def test_closing_the_gaps_draws_five_a_behind_lesson_and_a_perfect_lesson_is_no_longer_behind(world):
+    from datetime import timedelta
+    from mathly2 import clock, rounds
+    from mathly2.difficulty import level
+    client, store, bank = world
+    assert client.post("/api/gaps/start", headers=auth()).status_code == 409                # nothing behind: nothing to close
+    two = [l["id"] for l in bank.lessons if skills_of(bank, l["id"])][:2]
+    store.set_lesson_dates({lid: clock.school_day() - timedelta(days=3) for lid in two})
+    assert [l["id"] for l in client.get("/api/home", headers=auth()).json()["behind"]] == two
+    rnd = client.post("/api/gaps/start", headers=auth()).json()
+    assert rnd["kind"] == rounds.GAPS and rnd["lesson"]["name"] == "השלמת פערים" and rnd["total"] == 2 * rounds.GAP_PER_LESSON
+    questions = store.get_attempt(rnd["id"])["questions"]
+    unit = {s["id"]: s["unit"] for s in bank.skills}
+    assert [unit[q["skill_id"]] for q in questions] == [two[0]] * 5 + [two[1]] * 5             # the earliest lesson first, five each
+    assert [level(q["key"]) for q in questions[:5]] == sorted(level(q["key"]) for q in questions[:5])
+    assert client.post("/api/gaps/start", headers=auth()).json()["id"] == rnd["id"]           # an open one resumes
+    done = play(client, bank, rnd, [True] * 5 + [True, True, True, True, False])["round"]
+    gaps = done["result"]["gaps"]
+    assert [(g["id"], g["right"], g["closed"]) for g in gaps] == [(two[0], 5, True), (two[1], 4, False)]   # 4/5 = 80: not above 90
+    assert all(store.get_progress(KID_ID, s)["mastered_at"] for s in skills_of(bank, two[0]))
+    assert [l["id"] for l in client.get("/api/home", headers=auth()).json()["behind"]] == [two[1]]   # the first is no longer behind
+    again = client.post("/api/gaps/start", headers=auth()).json()
+    assert again["id"] != rnd["id"] and again["total"] == rounds.GAP_PER_LESSON                # only what is left

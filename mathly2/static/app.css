@@ -906,3 +906,46 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .ex-chat .pq-chat { list-style: none; margin: 6px 0; }
 .pq-ask input { flex: 1; min-width: 0; min-height: 44px; }
 .pq-note { margin: 0; font-size: 12.5px; }
+
+/* Closing the gaps (round.js): a row a lesson with its score. */
+.gap-list { display: grid; gap: 6px; margin: 8px 0; }
+.gap-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.gap-row.closed { border-color: color-mix(in srgb, var(--good, #3fb27f) 60%, transparent); }
+
+/* Home's big buttons (home.js quest): the current lesson, closing the gaps, and quick practice / a photographed question side by side. */
+.quest .play + .play { margin-top: 8px; }
+.play.act-lesson { min-height: 56px; }
+.play.act-gaps { background: linear-gradient(130deg, color-mix(in srgb, var(--warn, #fbbf6a) 92%, #fff), var(--warn, #fbbf6a)); box-shadow: 0 4px 0 #c9852a; min-height: 52px; }
+.act-gaps .ns-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12px; font-weight: 700; }
+.act-gaps .ns-chip { padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sky-on-accent) 85%, transparent); color: var(--text); }
+.act-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.act-row.one { grid-template-columns: 1fr; }
+.act { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; min-height: 52px; padding: 8px 12px;
+  border-radius: 16px; text-decoration: none; color: var(--text); border: 2px solid var(--sky-accent);
+  background: linear-gradient(130deg, color-mix(in srgb, var(--sky-accent) 20%, var(--surface)), var(--surface)); }
+.act > span { grid-row: 1 / 3; font-size: 22px; }
+.act b { font-size: 16px; line-height: 1.15; }
+.act small { font-size: 12px; color: var(--muted); }
+.act:active { transform: translateY(2px); }
+
+/* The nearest test as the home's hero (home.js forecastStrip): the days left and the forecast grade big; the pressure by phase. */
+.fc-hero-strip { --phase: var(--sky-accent); border: 2px solid var(--phase); background: linear-gradient(160deg, color-mix(in srgb, var(--phase) 16%, var(--surface)), var(--surface)); }
+.fc-hero-strip.phase-calm { --phase: var(--sky-accent); }
+.fc-hero-strip.phase-warm { --phase: var(--sky-gold); }
+.fc-hero-strip.phase-hot { --phase: #f59e4b; }
+.fc-hero-strip.phase-sprint, .fc-hero-strip.phase-today { --phase: #f472b6; }
+.fc-hero { display: grid !important; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px !important; }
+.fc-days, .fc-grade, .fc-way { display: flex; flex-direction: column; align-items: center; line-height: 1.05; text-align: center; }
+.fc-days b { font-size: 30px; color: var(--phase); }
+.fc-days small, .fc-grade small, .fc-way small { font-size: 11.5px; color: var(--muted); }
+.fc-grade .fc-num { font-size: 44px; font-weight: 900; letter-spacing: -1px; }
+.fc-grade .fc-hidden { color: var(--muted); }
+.fc-grade .fc-rise { color: var(--ok, #6ee7a0); font-weight: 800; font-size: 13px; }
+.fc-way b { font-size: 24px; color: var(--ok, #6ee7a0); }
+.fc-way b::before { content: "↗ "; font-size: 16px; }
+.fc-mission { margin: 0; font-size: 13.5px; text-align: center; }
+.fc-mission b { color: var(--phase); }
+@media (prefers-reduced-motion: no-preference) {
+  .fc-hero-strip.phase-sprint { animation: fc-pulse 2.4s ease-in-out infinite; }
+  @keyframes fc-pulse { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--phase) 30%, transparent); } }
+}

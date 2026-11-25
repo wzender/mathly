@@ -148,9 +148,10 @@ def test_home_shows_the_current_lesson_and_folds_the_past_and_the_coming_ones(br
     with running(app) as url:
         page = sign_in(browser, url)
         to_home(page)
-        page.wait_for_selector("#lesson-now")
-        assert page.locator("#lesson-now .lnode").get_attribute("data-lesson") == lessons[2]
-        assert "השיעור הנוכחי" in page.inner_text("#lesson-now")
+        page.wait_for_selector("#lesson-map")
+        assert page.locator("#play").get_attribute("href") == f"#/round/{lessons[2]}"            # the current lesson is the big button
+        assert "השיעור הנוכחי" in page.inner_text("#play") and page.locator("#lesson-now").count() == 0   # and not again below it
+        assert "שיעור אחד בפיגור" in page.inner_text("#home-gaps") and page.get_attribute("#home-gaps", "href") == "#/gaps"
         past = page.locator("#lessons-past")
         assert [n.get_attribute("data-lesson") for n in past.locator(".lnode").all()] == lessons[:2]
         assert "שיעורים שעברו (2)" in past.locator("summary").inner_text() and "⏰ 1 בפיגור" in past.locator("summary").inner_text()
@@ -159,7 +160,6 @@ def test_home_shows_the_current_lesson_and_folds_the_past_and_the_coming_ones(br
         assert past.locator(".lnode").first.is_visible()
         later = page.locator("#lessons-later")
         assert [n.get_attribute("data-lesson") for n in later.locator(".lnode").all()] == lessons[3:5]
-        assert page.locator("#play").get_attribute("href") == f"#/round/{lessons[1]}"            # the behind lesson is still played first
         no_sideways_scroll(page)
         shot(page, "home-by-date")
         assert page.errors == []
@@ -172,7 +172,7 @@ def test_practice_on_the_go_from_home_has_no_board_and_ends_with_another_round(b
         to_home(page)
         page.click("#home-onthego")
         page.wait_for_selector(".round-layer #ex-q")
-        assert "תרגול בנסיעה" in page.inner_text("#rd-title") and "בלי לוח" in page.inner_text(".round-layer .ex-chip")
+        assert "תרגול מהיר" in page.inner_text("#rd-title") and "בלי לוח" in page.inner_text(".round-layer .ex-chip")
         assert page.locator(".round-layer [data-board-toggle]").count() == 0                       # no board on the go
         keys = app.state.onthego
         for n in range(10):
@@ -183,8 +183,34 @@ def test_practice_on_the_go_from_home_has_no_board_and_ends_with_another_round(b
             if n < 9:
                 page.wait_for_function(f"document.querySelector('#rd-count').textContent.includes('{n + 2} מתוך')")
         page.wait_for_selector("#rd-result[data-kind='onthego']")
-        assert "עוד סבב בנסיעה" in page.inner_text("#rd-again") and page.locator(".rd-bigstars").count() == 0
+        assert "עוד תרגול מהיר" in page.inner_text("#rd-again") and page.locator(".rd-bigstars").count() == 0
         shot(page, "onthego-result")
         page.click("#rd-again")
         page.wait_for_selector(".round-layer #ex-q")
         assert len(store.attempts_of(KID_ID, "onthego_round", "math")) == 2 and page.errors == []
+
+
+def test_closing_the_gaps_from_home_and_a_perfect_lesson_is_no_longer_behind(browser, bank):
+    app, store, small, lessons = world(bank)
+    store.set_lesson_dates({lessons[1]: clock.school_day() - timedelta(days=3)})               # lesson 2 behind
+    with running(app) as url:
+        page = sign_in(browser, url)
+        to_home(page)
+        assert "שיעור אחד בפיגור" in page.inner_text("#home-gaps") and "5 שאלות" in page.inner_text("#home-gaps")
+        page.click("#home-gaps")
+        page.wait_for_selector(".round-layer #ex-q")
+        assert "השלמת פערים" in page.inner_text(".round-layer .ex-chip") and "מתוך 5" in page.inner_text("#rd-count")
+        for n in range(5):
+            page.click(f".round-layer .ex-choice[data-i='{right_index(small, page.get_attribute('.round-layer #ex-q', 'data-key'))}']")
+            page.wait_for_selector(".round-layer .ex-ok")
+            page.click("#rd-next")
+            if n < 4:
+                page.wait_for_function(f"document.querySelector('#rd-count').textContent.includes('{n + 2} מתוך')")
+        page.wait_for_selector("#rd-result[data-kind='gaps']")
+        assert "כל הפערים נסגרו" in page.inner_text("#rd-result") and "✓ הושלם" in page.inner_text("#rd-gaps")
+        shot(page, "gaps-result")
+        page.click("#rd-result [data-close]")
+        page.wait_for_function("!document.querySelector('.round-layer')")
+        page.wait_for_function("!document.querySelector('#home-gaps')")                             # nothing behind any more
+        assert all(store.get_progress(KID_ID, s["id"])["mastered_at"] for s in small.skills if s["unit"] == lessons[1])
+        assert page.errors == []

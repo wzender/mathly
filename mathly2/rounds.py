@@ -10,7 +10,11 @@ finished, else 0. Nothing here ever says which choice was right.
 
 A mistakes round (חזרה על הטעויות, kind `mistakes_round`, scope: the handed-in attempt's id) is the same sheet over the questions a handed-in
 quiz, exercise test or simulation got wrong (or left empty): answered again one by one with instant feedback, as practice. It has no stars and
-never changes the attempt's grade."""
+never changes the attempt's grade.
+
+Closing the gaps (השלמת פערים, kind `gaps_round`, scope: the subject) is the same sheet over GAP_PER_LESSON questions of each lesson behind
+the curriculum, the earliest first, easy to hard within each. When it ends, a lesson answered above GAP_PASS percent has every skill marked
+mastered, so it is completed and no longer behind."""
 from __future__ import annotations
 
 import logging
@@ -33,6 +37,9 @@ PER_SKILL = 3          # three right in a row is what mastery needs, so a skill 
 TWO_STARS = 80         # percent right in a finished round for the second star
 RETRY = "mistakes_round"
 RETRY_OF = ("quiz", "exercise_test", "simulation")
+GAPS = "gaps_round"
+GAP_PER_LESSON = 5
+GAP_PASS = 90          # percent right on a lesson, above which its gap is closed
 
 
 class RoundAnswer(BaseModel):
@@ -113,8 +120,10 @@ def view(request: Request, row: dict) -> dict:
     """An open round: its size, a result per answered question and the next question (without the right answer). A finished round: its result."""
     bank, store = request.app.state.bank, request.app.state.store
     source = _source_info(request, row) if row["kind"] == RETRY else None
-    if row["kind"] == onthego.KIND:                                      # on the go: the subject's questions that need no board
-        lesson = {"id": row["scope"], "name": "תרגול בנסיעה", "subject_id": row["scope"]}
+    if row["kind"] == onthego.KIND:                                      # quick practice: the subject's questions that need no board
+        lesson = {"id": row["scope"], "name": "תרגול מהיר", "subject_id": row["scope"]}
+    elif row["kind"] == GAPS:
+        lesson = {"id": row["scope"], "name": "השלמת פערים", "subject_id": row["scope"]}
     elif source:
         first = bank.skill(row["questions"][0]["skill_id"]) if row["questions"] else None
         lesson = next((l for l in bank.lessons if first and l["id"] == first["unit"]), {})
@@ -160,12 +169,37 @@ def view(request: Request, row: dict) -> dict:
     stars_now = _lesson_stars(request, uid, row["scope"], store.attempts_of(uid, KIND, row["scope"])) if row["kind"] == KIND else None
     return {**base, "state": "done", "question": None, "source": _public(source),
             "result": {"right": sum(base["results"]), "total": base["total"], "grade": row["grade"], "stars": stars_now,
-                       "mastered": mastered, "almost": almost, "missed": missed}}
+                       "mastered": mastered, "almost": almost, "missed": missed,
+                       **({"gaps": gap_results(bank, done)} if row["kind"] == GAPS else {})}}
+
+
+def gap_results(bank, done: list[tuple[dict, bool, dict | None]]) -> list[dict]:
+    """A closing-the-gaps round's result per lesson, in the round's order: right, total, and whether the gap is closed (above GAP_PASS)."""
+    by: dict[str, list[bool]] = {}
+    for q, right, _ in done:
+        skill = bank.skill(q["skill_id"])
+        if skill:
+            by.setdefault(skill["unit"], []).append(right)
+    names = {l["id"]: l["name"] for l in bank.lessons}
+    return [{"id": lid, "name": names.get(lid, lid), "right": sum(rs), "total": len(rs), "closed": 100 * sum(rs) > GAP_PASS * len(rs)}
+            for lid, rs in by.items()]
+
+
+def close_gaps(store, bank, uid: str, done: list[tuple[dict, bool, dict | None]]) -> None:
+    """Mark mastered every skill of each lesson whose gap the round closed: the lesson is completed and no longer behind."""
+    now = clock.now().isoformat()
+    for gap in gap_results(bank, done):
+        if not gap["closed"]:
+            continue
+        for skill in (s for s in bank.skills if s["unit"] == gap["id"]):
+            progress = store.get_progress(uid, skill["id"]) or {}
+            if not progress.get("mastered_at"):
+                store.save_progress(uid, skill["id"], started_at=progress.get("started_at") or now, mastered_at=now)
 
 
 def _mine(request: Request, user: dict, round_id: str) -> dict:
     row = request.app.state.store.get_attempt(round_id)
-    if row is None or row["user_id"] != user["id"] or row["kind"] not in (KIND, RETRY, onthego.KIND):
+    if row is None or row["user_id"] != user["id"] or row["kind"] not in (KIND, RETRY, onthego.KIND, GAPS):
         raise HTTPException(404, "הסבב לא נמצא")
     return row
 
@@ -251,9 +285,34 @@ def onthego_start(request: Request, user: dict = Depends(learner), subject: str 
     drawn = onthego.draw(bank, request.app.state.onthego, onthego_lessons(request, user, subject), states,
                          set(nearest["lessons"]) if nearest else set(), used, getattr(request.app.state, "quiz_rng", None))
     if not drawn:
-        raise HTTPException(409, "אין עדיין שאלות לתרגול בנסיעה בשיעורים שלך")
+        raise HTTPException(409, "אין עדיין שאלות לתרגול מהיר בשיעורים שלך")
     now = clock.now()
     return view(request, store.create_attempt(uid, onthego.KIND, subject, now, now + timedelta(days=365), drawn))
+
+
+@router.post("/gaps/start")
+def gaps_start(request: Request, user: dict = Depends(learner), subject: str = Query("math", max_length=40)) -> dict:
+    """Closing the gaps: resume the open round of this subject, else draw GAP_PER_LESSON questions on each lesson behind the curriculum."""
+    from .difficulty import level
+    from .skills import behind_lessons, subject_param
+    store, bank, here, uid = request.app.state.store, request.app.state.bank, reads.of(request), user["id"]
+    subject = subject_param(request, user, subject)
+    mine = here.attempts_of(uid, GAPS, subject)
+    for row in mine:
+        if attempts.is_open(row):
+            return view(request, row)
+    behind = behind_lessons(request, user, subject)
+    if not behind:
+        raise HTTPException(409, "אין שיעורים בפיגור: אין פערים להשלים")
+    used = Counter(q["key"] for row in mine for q in row["questions"])
+    rng = getattr(request.app.state, "quiz_rng", None)
+    drawn = []
+    for lesson in behind:                                                     # the earliest first; easy to hard within each
+        drawn += sorted(quiz.draw(bank, lesson["id"], used, rng, size=GAP_PER_LESSON), key=lambda q: level(q["key"]))
+    if not drawn:
+        raise HTTPException(409, "אין עדיין שאלות בשיעורים שבפיגור")
+    now = clock.now()
+    return view(request, store.create_attempt(uid, GAPS, subject, now, now + timedelta(days=365), drawn))
 
 
 @router.post("/lessons/{lesson_id}/round/start")
@@ -313,6 +372,8 @@ def answer(round_id: str, body: RoundAnswer, request: Request, user: dict = Depe
         right = sum(1 for _, r, _ in _graded(bank, saved) if r)
         saved = store.save_attempt(saved["id"], submitted_at=clock.now(), timed_out=False,
                                    grade=attempts.percent(right, len(saved["questions"])), answers=saved["answers"])
+        if saved["kind"] == GAPS:
+            close_gaps(store, bank, uid, _graded(bank, saved))
     if mistake and mistake.get("back"):
         back = bank.skill(mistake["back"])
         mistake = {**mistake, "back_name": back["name"] if back else None}
