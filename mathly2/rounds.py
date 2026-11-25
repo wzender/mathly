@@ -63,12 +63,16 @@ def facts(rows: list[dict]) -> dict[str, dict]:
 
 
 def draw(bank, lesson_id: str, states: dict[str, str], used: dict[str, int] | None = None, rng=None) -> list[dict]:
-    """The questions of a new round: from the skills not mastered (all of them when every one is), the least-used first."""
+    """The questions of a new round: from the skills not mastered (all of them when every one is), the least-used first, in order from
+    easy to hard (difficulty.py; mixed within a level)."""
+    from .difficulty import level
     skills = [s["id"] for s in bank.skills if s["unit"] == lesson_id and bank.question_keys(s["id"])]
     left = {s for s in skills if states.get(s) != MASTERED}
     if not left:
-        return quiz.draw(bank, lesson_id, used, rng, size=ROUND_SIZE)
-    return quiz.draw(bank, lesson_id, used, rng, size=min(ROUND_SIZE, PER_SKILL * len(left)), skill_ids=left)
+        drawn = quiz.draw(bank, lesson_id, used, rng, size=ROUND_SIZE)
+    else:
+        drawn = quiz.draw(bank, lesson_id, used, rng, size=min(ROUND_SIZE, PER_SKILL * len(left)), skill_ids=left)
+    return sorted(drawn, key=lambda q: level(q["key"]))
 
 
 def _lesson(request: Request, user: dict, lesson_id: str) -> dict:
