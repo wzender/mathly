@@ -949,3 +949,61 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
   .fc-hero-strip.phase-sprint { animation: fc-pulse 2.4s ease-in-out infinite; }
   @keyframes fc-pulse { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--phase) 30%, transparent); } }
 }
+
+/* ---------- Home, after a design review: one primary action (gold), the gaps a quiet "catch-up" card, quick practice and the photo
+   as neutral tiles, three blocks (actions, the test, the lessons) with 16px between them, a quiet current-lesson row, a compact header. */
+:root { --quiet: color-mix(in srgb, var(--sky-ink) 6%, transparent); --quiet-line: color-mix(in srgb, var(--sky-ink) 12%, transparent); }
+
+.play.act-lesson { min-height: 60px; }
+.play.act-lesson b { font-size: 18px; }
+.play .lstars { opacity: .6; font-size: 14px; }
+
+.play.act-gaps { min-height: 48px; padding: 6px 12px; gap: 10px; font-size: 15px; color: var(--text);
+  background: color-mix(in srgb, var(--warn) 11%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-inline-start: 4px solid var(--warn); box-shadow: none; }
+.play.act-gaps:active { transform: translateY(1px); box-shadow: none; }
+.play.act-gaps .play-icon { width: 32px; height: 32px; font-size: 16px; background: color-mix(in srgb, var(--warn) 22%, transparent); }
+.play.act-gaps small { color: var(--warn); opacity: 1; }
+.act-gaps .grow { min-width: 0; }
+.act-gaps .ns-side { flex: none; white-space: nowrap; color: var(--muted); font-weight: 600; font-size: 11.5px; }
+.act-gaps .ns-chip { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+
+.act { min-height: 46px; padding: 6px 10px; border-radius: 12px; border: 1px solid var(--quiet-line); background: var(--quiet); }
+.act > span { font-size: 18px; }
+.act b { font-size: 15px; }
+.act small { font-size: 11.5px; line-height: 1.2; }
+
+.quest { margin-block: 0; }
+#nearest-test { margin-block: 16px 0; }
+.lesson-groups { margin-block: 16px 0; gap: 6px; }
+
+#nearest-test.fc-hero-strip { padding: 10px 12px 12px; gap: 6px; border-radius: 16px; border-width: 1.5px; }
+.fc-hero-strip .test-btn { background: transparent; color: var(--text); border-color: color-mix(in srgb, var(--phase) 35%, var(--line)); }
+.fc-hero-strip .test-btn.sim { background: color-mix(in srgb, var(--phase) 22%, var(--surface)); border-color: var(--phase); color: var(--text); }
+.fc-grade .fc-num { font-size: 42px; }
+
+.lnow { min-height: 46px; padding: 4px 12px; gap: 10px; border-radius: 12px; background: var(--quiet); border: 0; border-inline-start: 3px solid var(--sky-aurora); }
+.lnow .lnode { min-width: 0; align-items: center; }
+.lnow .lnode .disc { width: 30px; height: 30px; font-size: 14px; box-shadow: none; animation: none; }
+.lnow .lnode .lname { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.lnow .lkick { font-size: 12px; font-weight: 600; color: var(--muted); line-height: 1.3; }
+.lnow .ltext { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lnow .lnode .lstars { font-size: 11px; color: var(--muted); }
+.lfold { background: var(--quiet); border: 1px solid var(--quiet-line); }
+.lfold > summary { min-height: 44px; padding: 8px 12px; font-size: 15px; }
+
+@media (max-width: 480px) {
+  body:has(#lesson-map) .top { padding-block: 8px; gap: 8px; }
+  body:has(#lesson-map) .top h1 { font-size: 18px; }
+  body:has(#lesson-map) #nav { gap: 6px; }
+  body:has(#lesson-map) #nav > .nav-email { display: none; }
+  body:has(#lesson-map) #nav > button { padding-inline: 10px; font-size: 14px; }
+}
+
+.quest-stats { justify-content: center; align-items: center; gap: 4px 12px; margin: 0 0 10px; }
+.quest-stats > span:not(.hchips) { padding: 0; border: 0; background: none; font-size: 14px; font-weight: 700; }
+.quest-stats .goal-chip.done { color: var(--sky-aurora); }
+.quest-stats .hchip { position: relative; border-color: var(--sky-accent); color: var(--sky-accent); background: color-mix(in srgb, var(--sky-accent) 12%, transparent); }
+.quest-stats .hchip::after { content: ""; position: absolute; inset: -7px -3px; }
+.lesson-groups > *, .lnow, .lnow .lnode, .lnow .lnode .lname { min-width: 0; }
+.lnow .lnode { overflow: hidden; }
