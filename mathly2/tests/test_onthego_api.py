@@ -26,7 +26,7 @@ def test_the_list_is_questions_of_the_bank_and_most_lessons_have_some():
 def test_a_round_draws_only_board_free_questions_two_a_skill_at_most_and_carries_no_answer(world):
     client, store, bank = world
     rnd = start(client)
-    assert rnd["kind"] == "onthego_round" and rnd["lesson"]["name"] == "תרגול בנסיעה" and rnd["total"] == onthego.ROUND_SIZE
+    assert rnd["kind"] == "onthego_round" and rnd["lesson"]["name"] == "תרגול מהיר" and rnd["total"] == onthego.ROUND_SIZE
     rows = store.get_attempt(rnd["id"])["questions"]
     keys = client.app.state.onthego
     assert all(q["key"] in keys for q in rows) and max(Counter(q["skill_id"] for q in rows).values()) <= onthego.PER_SKILL

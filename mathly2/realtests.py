@@ -79,7 +79,14 @@ def forecast_for(request: Request, user_id: str | None, facts: dict, today: date
     if not user_id:
         return None
     faded, answers = forecast_inputs(request, user_id, facts, today)
-    return forecast.compute(facts["covered"], facts["states"], faded, answers)
+    got = forecast.compute(facts["covered"], facts["states"], faded, answers)
+    if got:
+        unit = {s["id"]: s["unit"] for s in request.app.state.bank.skills}
+        groups: dict[str, list[str]] = {}
+        for s in facts["covered"]:
+            groups.setdefault(unit.get(s, ""), []).append(s)
+        got["boost"] = forecast.boost(facts["covered"], facts["states"], faded, answers, groups)       # the way up, shown beside the grade
+    return got
 
 
 def forecast_inputs(request: Request, user_id: str, facts: dict, today: date) -> tuple[set[str], dict]:

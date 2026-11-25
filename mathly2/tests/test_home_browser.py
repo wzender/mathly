@@ -404,42 +404,43 @@ def answer_in_browser(page, bank, store, kind, scope, rights):
 
 # --- readiness: the home's block, the test's page, practice tests by mode and simulations on request ---
 
-def test_home_finds_the_league_first_then_reveals_it_and_counts_up_after_practice(browser, bank):
+def test_home_shows_the_forecast_grade_big_after_placement_with_the_way_up_and_only_rises(browser, bank):
     app, store, klass, lessons = world(bank)
     test = add_test(store, klass, lessons, 2)
     skills = covered(bank, lessons)
     day = clock.school_day()
 
-    def answer(n, right=True):
+    def answer(n, right=True, start=0):
         for skill in skills:
-            for i in range(n):
+            for i in range(start, start + n):
                 store.add_answer(KID_ID, skill, f"{skill}:{i}", right, True, None, day)
 
     with running(app) as url:
         page = sign_in(browser, url)
         to_home(page)
         strip = page.locator("#nearest-test")
-        assert "מגלים את הליגה שלך" in strip.inner_text() and "מבחן בעוד 2 ימים" in strip.inner_text()   # no low number on day one
-        assert page.inner_text("#home-forecast .fc-count") == "0/15" and "עוד 15 תשובות" in strip.inner_text()
+        assert page.inner_text("#home-days b") == "2" and strip.get_attribute("data-phase") == "sprint"    # two days: the sprint
+        assert "ספרינט" in page.inner_text("#home-mission")
+        assert page.inner_text("#home-forecast .fc-num") == "?" and page.inner_text("#home-forecast .fc-count") == "0/15"   # no guess on day one
+        assert "עוד 15 תשובות" in page.inner_text("#home-mission") and page.locator("#home-way").count() == 0
         assert page.get_attribute("#nearest-test .strip-main", "href") == f"#/test/{test['id']}"
-        assert page.get_attribute("#home-practice", "aria-label") == "מבחן תרגול" and "+" not in page.inner_text("#home-sim")
-        assert page.get_attribute("#home-onthego", "href") == "#/onthego"                          # on the go, beside the tests
-        answer(1)                                                                                   # a few answers: the bar fills
+        assert page.get_attribute("#home-onthego", "href") == "#/onthego" and "תרגול מהיר" in page.inner_text("#home-onthego")
+        answer(2, right=False)                                                                      # enough answers, a weak start
         page.reload()
-        page.wait_for_selector("#home-forecast.placing")
-        page.wait_for_function(f"document.querySelector('#home-forecast .rd-num').textContent === '{len(skills)}'")   # counts up 0 -> 8
-        answer(4)                                                                                   # enough: the league is revealed
+        page.wait_for_selector("#home-forecast[data-grade]:not([data-grade=''])")
+        first = int(page.get_attribute("#home-forecast", "data-grade"))
+        assert page.inner_text("#home-forecast .fc-num") == str(first) and page.locator("#home-forecast .fc-rise").count() == 0
+        way = int(page.inner_text("#home-way b"))
+        assert way > first and "סבבים" in page.inner_text("#home-way") and "= +" in page.inner_text("#home-mission")   # a low grade comes with the way up
+        answer(6, start=2)                                                                          # right answers: the grade rises, with ▲
         page.reload()
-        page.wait_for_selector("#home-forecast[data-league]")
-        assert "נחשפה הליגה שלך" in page.inner_text(".fc-cheer") and "ליגת" in page.inner_text("#home-forecast .rd-label")
-        first = int(page.get_attribute("#home-forecast", "data-to"))
-        shown = page.inner_text("#home-forecast")
-        assert "צפוי" not in shown and f"{first}" not in shown.replace(f"עוד {55 - first}", "")   # the student never sees the forecast number
-        answer(8)                                                                                   # more right answers: up, with +N
+        page.wait_for_selector("#home-forecast .fc-rise")
+        grade = int(page.get_attribute("#home-forecast", "data-grade"))
+        assert grade > first and page.inner_text("#home-forecast .fc-rise") == f"▲ +{grade - first}"
+        answer(6, right=False, start=8)                                                             # a dip is not announced
         page.reload()
-        page.wait_for_selector("#home-forecast .rd-up")
-        grade = int(page.get_attribute("#home-forecast", "data-to"))
-        assert grade > first and page.inner_text("#home-forecast .rd-up") == f"+{grade - first}"
+        page.wait_for_selector("#home-forecast[data-grade]")
+        assert int(page.get_attribute("#home-forecast", "data-grade")) < grade and page.locator("#home-forecast .fc-rise").count() == 0
         page.click("#home-practice")                                                                # straight to choosing a practice test
         page.wait_for_selector("#practice .modes")
         no_sideways_scroll(page)

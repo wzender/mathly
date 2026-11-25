@@ -1,4 +1,4 @@
-"""Practice on the go (תרגול בנסיעה): a short round of questions that need no board, for a phone on a bus.
+"""Practice on the go (תרגול מהיר, once "תרגול בנסיעה"): a short round of questions that need no board, for a phone on a bus.
 
 Which questions qualify is decided once, by hand-checked criteria, into content/onthego.json: a question qualifies when a student who knows
 the topic can pick the answer in their head within about 30 seconds without writing anything (a definition, a property, which statement

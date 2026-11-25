@@ -29,6 +29,10 @@ export const start = lesson => api(`/api/lessons/${encodeURIComponent(lesson)}/r
 export const startOnTheGo = () => api(forSubject("/api/onthego/start"), { method: "POST" });
 const isOnTheGo = () => round?.kind === "onthego_round";
 
+/** Closing the gaps (rounds.py GAPS): 5 questions on each lesson behind the curriculum; above 90% a lesson's gap is closed. */
+export const startGaps = () => api(forSubject("/api/gaps/start"), { method: "POST" });
+const isGaps = () => round?.kind === "gaps_round";
+
 export const startRetry = attemptId => api(`/api/attempts/${encodeURIComponent(attemptId)}/retry/start`, { method: "POST" });
 
 const isRetry = () => !!round?.source;
@@ -67,7 +71,7 @@ export function close() {
   chat.reset();
 }
 
-const heading = () => `<div class="mx-shtop"><div><span class="ex-chip">${isOnTheGo() ? "🚌 בלי לוח, בראש" : isRetry() ? "חזרה על הטעויות" : "סבב שיעור"}</span><h3 id="rd-title">${fmt(round.lesson.name)}</h3></div>
+const heading = () => `<div class="mx-shtop"><div><span class="ex-chip">${isOnTheGo() ? "⚡ תרגול מהיר, בלי לוח" : isGaps() ? "🧩 השלמת פערים" : isRetry() ? "חזרה על הטעויות" : "סבב שיעור"}</span><h3 id="rd-title">${fmt(round.lesson.name)}</h3></div>
   <div class="mx-shacts">${isOnTheGo() ? "" : window.MathlyBoard?.button() || ""}${chatOn() ? chatButton(chat.open) : ""}<button type="button" class="mx-x" data-close aria-label="סגירה">✕</button></div></div>`;
 
 const dots = () => Array.from({ length: round.total }, (_, i) => {
@@ -108,17 +112,30 @@ function retryResultHtml() {
 function onTheGoResultHtml() {
   const r = round.result, names = list => list.map(s => fmt(s.name)).join(", ");
   return `<section class="rd-result" id="rd-result" data-kind="onthego">
-    <h4 class="rd-title">${r.right === r.total ? "מושלם! 🚌✨" : r.right * 10 >= r.total * 7 ? "כל הכבוד! ניצלתם את הנסיעה" : "סיימתם סבב בנסיעה!"}</h4>
+    <h4 class="rd-title">${r.right === r.total ? "מושלם! ⚡✨" : r.right * 10 >= r.total * 7 ? "כל הכבוד! סבב מהיר ומדויק" : "סיימתם תרגול מהיר!"}</h4>
     <p class="ex-score" id="rd-score"><b>${r.right}</b> מתוך ${r.total}</p>
     ${r.mastered.length ? `<p class="rd-mastered" id="rd-mastered">🎉 נשלטו: ${names(r.mastered)}</p>` : ""}
     ${r.missed.length ? `<h4>מה כדאי לחזק</h4><ol class="ex-missed" id="rd-missed">${r.missed.map(m => `<li><p class="muted">${fmt(m.skill_name)}</p><p class="ex-text" dir="auto">${fmt(m.question)}</p>
       ${m.mistake ? `<p><b>${esc(m.mistake.name)}</b>${m.mistake.tip ? `<br>${fmt(m.mistake.tip)}` : ""}</p>` : ""}</li>`).join("")}</ol>
       <p class="muted">השאלות האלה נכנסו לרשימת החזרה.</p>` : ""}
     <div id="rd-forecast" aria-live="polite"></div>
-    <p class="ex-actions"><button type="button" class="primary" id="rd-again">עוד סבב בנסיעה</button> <button type="button" data-close>חזרה לבית</button></p></section>`;
+    <p class="ex-actions"><button type="button" class="primary" id="rd-again">עוד תרגול מהיר</button> <button type="button" data-close>חזרה לבית</button></p></section>`;
+}
+
+/** The end of closing the gaps: each lesson with its score, closed (✓, no longer behind) or still open (another try). */
+function gapsResultHtml() {
+  const r = round.result, gaps = r.gaps || [], closed = gaps.filter(g => g.closed).length;
+  return `<section class="rd-result" id="rd-result" data-kind="gaps">
+    <p class="rd-bigstars" aria-hidden="true">${closed === gaps.length ? "🎉" : closed ? "💪" : "🧩"}</p>
+    <h4 class="rd-title">${closed === gaps.length ? "כל הפערים נסגרו!" : closed ? `נסגרו ${closed} מתוך ${gaps.length} פערים` : "עוד לא נסגרו פערים"}</h4>
+    <ul class="plain gap-list" id="rd-gaps">${gaps.map(g => `<li class="gap-row${g.closed ? " closed" : ""}"><span class="grow">${fmt(g.name)}</span>
+      <b>${g.right}/${g.total}</b><span class="tag">${g.closed ? "✓ הושלם" : "עוד ניסיון"}</span></li>`).join("")}</ul>
+    <p class="muted">שיעור עם יותר מ־90% נחשב שלם: כל המיומנויות שלו בשליטה, והוא כבר לא בפיגור.</p>
+    <p class="ex-actions">${closed < gaps.length ? `<button type="button" class="primary" id="rd-again">שוב על הפערים שנשארו</button> ` : ""}<button type="button" data-close>חזרה לבית</button></p></section>`;
 }
 
 function resultHtml() {
+  if (isGaps()) return gapsResultHtml();
   if (isOnTheGo()) return onTheGoResultHtml();
   if (isRetry()) return retryResultHtml();
   const r = round.result;
@@ -246,7 +263,7 @@ async function again() {
   const button = q("#rd-again");
   button.disabled = true;
   try {
-    round = await (isOnTheGo() ? startOnTheGo() : isRetry() ? startRetry(round.source.id) : start(round.lesson.id));
+    round = await (isGaps() ? startGaps() : isOnTheGo() ? startOnTheGo() : isRetry() ? startRetry(round.source.id) : start(round.lesson.id));
     streak = 0;
     render();
   } catch (error) {

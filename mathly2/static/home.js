@@ -109,8 +109,8 @@ export { countUp };
 
 /** The nearest test in one compact block (the home is one screen): the readiness number with its level and the days left (a link to the
  *  test's page, with all its tests and grades), the bar, and the two buttons that raise it, each with the most it can add now. */
-function testStrip(test, onTheGo = false, photo = false) {
-  if (test.forecast) return forecastStrip(test, onTheGo, photo);
+function testStrip(test) {
+  if (test.forecast) return forecastStrip(test);
   const r = test.readiness, add = r.can_add, sim = test.simulation.open, from = lastSeen(test);
   return `<section class="strip test-strip" id="nearest-test" data-test="${test.id}">
     <div class="readiness" data-readiness data-from="${from ?? ""}" data-to="${r.number}">
@@ -123,16 +123,48 @@ function testStrip(test, onTheGo = false, photo = false) {
       <a class="test-btn sim" id="home-sim" href="#/sim/${test.id}${sim ? `/${esc(sim)}` : ""}">⏱ ${sim ? "להמשיך סימולציה" : "מבחן סימולציה"}${add.simulation && !sim ? ` <small>+${add.simulation}</small>` : ""}</a></div></section>`;
 }
 
-/** The nearest test as a game: finding the league, or the league with the next one to reach and the forecast grade (the top row links to
- *  the test's page, where the readiness number is), and the practice test and the simulation. */
-function forecastStrip(test, onTheGo = false, photo = false) {
-  const sim = test.simulation.open, many = onTheGo || photo, four = onTheGo && photo;
-  return `<section class="strip test-strip" id="nearest-test" data-test="${test.id}">
-    ${forecastMeter(test.forecast, test.id, { id: "home-forecast", compact: true, link: `#/test/${test.id}`, days: daysText(test.days_left) })}
-    <div class="test-btns${four ? " four" : ""}"><a class="test-btn" id="home-practice" href="#/test/${test.id}/practice" aria-label="מבחן תרגול">📝 ${many ? "תרגול" : "מבחן תרגול"}</a>
-      <a class="test-btn sim" id="home-sim" href="#/sim/${test.id}${sim ? `/${esc(sim)}` : ""}" aria-label="${sim ? "להמשיך סימולציה" : "מבחן סימולציה"}">⏱ ${sim ? "להמשיך" : many ? "סימולציה" : "מבחן סימולציה"}</a>
-      ${onTheGo ? `<a class="test-btn go" id="home-onthego" href="#/onthego" title="שאלות שעונים עליהן בראש, בלי לוח" aria-label="תרגול בנסיעה">🚌 ${four ? "נסיעה" : "בנסיעה"}</a>` : ""}
-      ${photo ? `<a class="test-btn go" id="home-photoq" href="#/photoq" title="צלמו שאלה, פתרו בלוח וקבלו ציון ומשוב" aria-label="צילום שאלה">📸 צילום</a>` : ""}</div></section>`;
+/* ---------- the nearest test: the forecast grade and the days left, as big as the screen allows ---------- */
+
+/** How close the test is, for the pressure: the words, the icon and how many rounds today's mission asks for. */
+export function phaseOf(days) {
+  if (days <= 0) return { id: "today", icon: "💪", text: "המבחן היום! בהצלחה", rounds: 0 };
+  if (days <= 3) return { id: "sprint", icon: "🚀", text: "ספרינט אחרון!", rounds: 3 };
+  if (days <= 7) return { id: "hot", icon: "🔥", text: "שבוע אחרון", rounds: 2 };
+  if (days <= 14) return { id: "warm", icon: "⏳", text: "שבועיים אחרונים", rounds: 1 };
+  return { id: "calm", icon: "📅", text: "יש זמן להתכונן", rounds: 1 };
+}
+
+const GRADE_SEEN = "mathly2.grade.";
+/** The grade this device showed last for the test; only a rise is shown ("▲ +3"): a dip is not announced. */
+function gradeRise(testId, grade) {
+  let before = null;
+  try { before = JSON.parse(localStorage.getItem(GRADE_SEEN + testId) || "null"); localStorage.setItem(GRADE_SEEN + testId, JSON.stringify(grade)); } catch { /* private window */ }
+  return typeof before === "number" && grade > before ? grade - before : 0;
+}
+
+/** The nearest test as the home's hero: the days left and the forecast grade, big, with where good rounds take it ("אפשר להגיע ל־81"),
+ *  so a low grade always comes with the way up; until PLACEMENT answers, no number (a guess from a few answers), only how many are left.
+ *  The closer the test, the stronger the colours and the bigger today's mission. The practice test and the simulation under it. */
+function forecastStrip(test) {
+  const f = test.forecast, sim = test.simulation.open, phase = phaseOf(test.days_left), boost = f.boost || { gains: [], grade: f.grade };
+  const placing = f.placement, rise = placing ? 0 : gradeRise(test.id, f.grade);
+  const plus = boost.gains.slice(0, phase.rounds).reduce((a, b) => a + b, 0);
+  const mission = phase.id === "today" ? "נשמו עמוק, אתם מוכנים יותר ממה שנדמה."
+    : placing ? `עוד ${placing.need - placing.done} תשובות לחשיפת הציון`
+    : `היום: ${phase.rounds === 1 ? "סבב אחד" : `${phase.rounds} סבבים`}${plus ? ` = +${plus} לציון` : " לשמירה על הציון"}`;
+  const days = test.days_left <= 0 ? "היום" : test.days_left === 1 ? "מחר" : test.days_left;
+  const label = `המבחן ${daysText(test.days_left)}. ${placing ? `הציון המשוער ייחשף אחרי עוד ${placing.need - placing.done} תשובות`
+    : `ציון משוער ${f.grade}${boost.gains.length ? `, אפשר להגיע ל־${boost.grade}` : ""}`}`;
+  return `<section class="strip test-strip fc-hero-strip phase-${phase.id}" id="nearest-test" data-test="${test.id}" data-phase="${phase.id}">
+    <a class="strip-main fc-hero" href="#/test/${test.id}" aria-label="${esc(label)}">
+      <span class="fc-days" id="home-days"><b>${days}</b><small>${typeof days === "number" ? "ימים למבחן" : "המבחן"}</small></span>
+      <span class="fc-grade" id="home-forecast" data-grade="${placing ? "" : f.grade}"><small>ציון משוער</small>${placing
+        ? `<b class="fc-num fc-hidden">?</b><small class="fc-count">${placing.done}/${placing.need}</small>`
+        : `<b class="fc-num">${f.grade}</b>${rise ? `<small class="fc-rise">▲ +${rise}</small>` : ""}`}</span>
+      ${!placing && boost.gains.length ? `<span class="fc-way" id="home-way"><small>אפשר להגיע ל־</small><b>${boost.grade}</b><small>${boost.gains.length === 1 ? "בעוד סבב" : `בעוד ${boost.gains.length} סבבים`}</small></span>` : ""}</a>
+    <p class="fc-mission" id="home-mission"><span aria-hidden="true">${phase.icon}</span> <b>${phase.text}</b> · ${mission}</p>
+    <div class="test-btns"><a class="test-btn" id="home-practice" href="#/test/${test.id}/practice">📝 מבחן תרגול</a>
+      <a class="test-btn sim" id="home-sim" href="#/sim/${test.id}${sim ? `/${esc(sim)}` : ""}">⏱ ${sim ? "להמשיך סימולציה" : "מבחן סימולציה"}</a></div></section>`;
 }
 
 /** An assignment's state in a symbol and a word (never colour alone). */
@@ -183,69 +215,48 @@ function tile(l, next) {
 }
 
 /** The top: the stars collected, the lessons perfected, the streak and the daily goal, then the big play button for the next lesson. */
-/* ---------- the next step: one exercise to do now, and why it moves the student forward (nextstep.py) ---------- */
-
-/** The card's words by the kind of step: what it is, the main line, the chip (the reward) and one short line of why it helps.
- *  `f`: the nearest test's forecast. */
-function stepWords(step, f) {
-  const lesson = step.lesson ? fmt(step.lesson.name) : "";
-  const next = f && !f.placement ? f.leagues[f.league + 1] : null;
-  switch (step.kind) {
-    case "continue": return { icon: "▶", small: "להמשיך מאיפה שעצרתם", title: lesson, chip: "◐", why: "הסבב מחכה לכם: מסיימים וקולטים כוכבים." };
-    case "crown": return { icon: "👑", small: "עוד תשובה נכונה אחת", title: `ו"${fmt(step.skill.name)}" בשליטה`, chip: "⭐ +1",
-      why: "הכי קרוב לכתר: כתר = כוכב וקפיצה בליגה." };
-    case "behind": return { icon: "⏰", small: "להשלים", title: lesson, chip: `עד ${shortDate(step.due_date)}`, why: "היה אמור להסתיים: סבב אחד סוגר את הפער." };
-    case "test": return { icon: "📅", small: `במבחן ${daysText(step.days_left)}`, title: lesson,
-      chip: `~${step.in_test} ${step.in_test === 1 ? "שאלה" : "שאלות"}`, why: "הנושא הכי חלש שלכם במבחן: כאן מרוויחים נקודות." };
-    case "league": return f?.placement
-      ? { icon: "▶", small: "הצעד הבא שלך", title: `סבב: ${lesson}`, chip: "🔍 +10", why: `מקרב את גילוי הליגה (עוד ${f.placement.need - f.placement.done} תשובות).` }
-      : { icon: "▶", small: "הצעד הבא שלך", title: `סבב: ${lesson}`, chip: `${(next || f?.leagues[f.league])?.icon || "🚀"} +${step.gain}`,
-          why: next ? `הכי מקרב לליגת ${next.icon} ${next.name}: סבב טוב = עוד ${step.gain} נקודות.` : "הכי שומר על הליגה הגבוהה ביותר." };
-    default: return { icon: "▶", small: step.stars ? "לעוד כוכב" : "השיעור הבא", title: lesson, chip: starsText(step.stars || 0),
-      why: "8 נכונות מתוך 10 = כוכב בשיעור." };
-  }
-}
-
-/** The next step as the first thing under the status line: one link with what it is, what it costs, why it moves the student forward
- *  and the reward; 🎯 when it completes today's goal. */
-function nextStepCard(step, f) {
-  const w = stepWords(step, f);
-  const cost = `⏱ ${step.minutes} דק׳`, size = step.questions === 1 ? "שאלה אחת" : `${step.questions} שאלות`;
-  return `<a class="play next-step step-${step.kind}" id="play" href="${esc(step.href)}" data-kind="${step.kind}"
-      aria-label="${esc(`${w.small}: ${plainText(w.title)}. ${w.why} ${cost}, ${size}${step.completes_goal ? ", משלים את היעד היומי" : ""}`)}">
-    <span class="ns-row"><span class="play-icon" aria-hidden="true">${w.icon}</span>
-      <span class="grow"><small>${w.small}</small><b>${w.title}</b></span>
-      <span class="ns-side"><span class="ns-chip">${w.chip}</span><span class="ns-cost" title="${size}">${cost}${step.completes_goal ? " · 🎯" : ""}</span></span></span>
-    <span class="ns-why">${w.why}</span></a>`;
-}
-
-function quest(map, chips = "", step = null, f = null) {
-  const next = map.lessons.find(l => l.id === map.next);
-  const play = step ? nextStepCard(step, f) : next ? `<a class="play" id="play" href="${roundHref(next.id)}"><span class="play-icon" aria-hidden="true">▶</span>
-      <span class="grow"><small>${next.round_open ? "להמשיך את הסבב" : next.behind ? "להשלים" : next.stars ? "לעוד כוכב" : "השיעור הבא"}</small><b>${fmt(next.name)}</b></span>
-      <span class="lstars" aria-label="${starsLabel(next.stars)}">${starsText(next.stars)}</span></a>`
+/** The status line (stars, crowns, streak, today's goal and the small buttons), then the big buttons: the current lesson (or the round left
+ *  open), closing the gaps when lessons are behind (5 questions each; above 90 closes a lesson's gap), and quick practice and a
+ *  photographed question side by side. */
+function quest(map, chips = "", data = {}) {
+  const open = map.lessons.find(l => l.round_open);
+  const lesson = open || map.lessons.find(l => l.id === map.current) || map.lessons.find(l => l.id === map.next);
+  const t = map.today, behind = data.behind || [];
+  const play = lesson ? `<a class="play act-lesson" id="play" href="${roundHref(lesson.id)}"><span class="play-icon" aria-hidden="true">▶</span>
+      <span class="grow"><small>${open ? "להמשיך את הסבב" : lesson.id === map.current ? `השיעור הנוכחי${lesson.due_date ? ` · עד ${esc(shortDate(lesson.due_date))}` : ""}` : lesson.stars ? "לעוד כוכב" : "השיעור הבא"}</small><b>${fmt(lesson.name)}</b></span>
+      <span class="lstars" aria-label="${starsLabel(lesson.stars)}">${starsText(lesson.stars)}</span></a>`
     : `<p class="all-perfect" id="play">👑 כל השיעורים מושלמים! אפשר להעמיק בלשונית העמקה.</p>`;
-  const t = map.today;
+  const gaps = behind.length ? `<a class="play act-gaps" id="home-gaps" href="#/gaps"><span class="play-icon" aria-hidden="true">🧩</span>
+      <span class="grow"><small>השלמת פערים</small><b>${behind.length === 1 ? "שיעור אחד בפיגור" : `${behind.length} שיעורים בפיגור`}</b></span>
+      <span class="ns-side"><span class="ns-chip">${5 * behind.length} שאלות</span><span class="ns-cost">מעל 90 = נסגר</span></span></a>` : "";
+  const quick = data.onthego >= 10 ? `<a class="act" id="home-onthego" href="#/onthego"><span aria-hidden="true">⚡</span><b>תרגול מהיר</b><small>בלי לוח</small></a>` : "";
+  const photo = data.photoq ? `<a class="act" id="home-photoq" href="#/photoq"><span aria-hidden="true">📸</span><b>צילום שאלה</b><small>ציון ומשוב</small></a>` : "";
   return `<section class="quest" id="quest" aria-label="המסע שלי">
     <p class="quest-stats"><span id="stars-count" aria-label="${map.stars} כוכבים מתוך ${map.max_stars}">⭐ ${map.stars}/${map.max_stars}</span><span id="perfect-count">👑 ${map.perfect}</span>
       ${map.streak ? `<span>🔥 ${map.streak}</span>` : ""}<span id="goal" class="goal-chip${t.reached ? " done" : ""}" title="יעד יומי">🎯 ${Math.min(t.done, t.goal)}/${t.goal}${t.reached ? " ✓" : ""}</span>
       ${chips ? `<span class="hchips" id="home-actions">${chips}</span>` : ""}</p>
-    ${play}</section>`;
+    ${play}${gaps}${quick || photo ? `<div class="act-row${quick && photo ? "" : " one"}" id="home-quick">${quick}${photo}</div>` : ""}</section>`;
 }
 
 /** The lessons. With dates in the curriculum: the current lesson (the first whose date is today or later) on its own, and the lessons
  *  whose date has passed and the coming ones folded under it, each with how many there are (and how many are behind). Without dates:
  *  every lesson as a tile. */
 function board(map) {
+  const played = map.lessons.find(l => l.round_open)?.id || map.current || map.next;      // the big button above already shows this one
   if (!map.lessons.length) return "";
   const tiles = list => `<div class="lesson-board">${list.map(l => tile(l, map.next)).join("")}</div>`;
-  if (!map.lessons.some(l => l.when)) return `<section class="lesson-board" id="lesson-map" aria-label="השיעורים">${map.lessons.map(l => tile(l, map.next)).join("")}</section>`;
+  if (!map.lessons.some(l => l.when)) {                     // no dates: the row of six around the next lesson, the rest folded (one screen)
+    const at = Math.max(0, map.lessons.findIndex(l => l.id === map.next)), from = Math.floor(at / 6) * 6;
+    const row = map.lessons.slice(from, from + 6), rest = map.lessons.filter(l => !row.includes(l));
+    return `<section class="lesson-groups" id="lesson-map" aria-label="השיעורים">${tiles(row)}
+      ${rest.length ? `<details class="lfold" id="lessons-rest"><summary><span class="grow">שאר השיעורים (${rest.length})</span></summary>${tiles(rest)}</details>` : ""}</section>`;
+  }
   const past = map.lessons.filter(l => l.when === "past"), later = map.lessons.filter(l => l.when === "later");
   const now = map.lessons.find(l => l.when === "current");
   const behind = past.filter(l => l.behind).length;
   const fold = (id, title, list, extra = "") => list.length ? `<details class="lfold" id="${id}"><summary><span class="grow">${title} (${list.length})</span>${extra}</summary>${tiles(list)}</details>` : "";
   return `<section class="lesson-groups" id="lesson-map" aria-label="השיעורים">
-    ${now ? `<div class="lnow" id="lesson-now"><h2 class="lnow-title">השיעור הנוכחי <span class="muted">עד ${esc(shortDate(now.due_date))}</span></h2>${tile(now, map.next)}</div>`
+    ${now && now.id === played ? "" : now ? `<div class="lnow" id="lesson-now"><h2 class="lnow-title">השיעור הנוכחי <span class="muted">עד ${esc(shortDate(now.due_date))}</span></h2>${tile(now, map.next)}</div>`
           : `<p class="muted" id="lesson-now">כל התאריכים בתוכנית כבר עברו.</p>`}
     ${fold("lessons-past", "שיעורים שעברו", past, behind ? `<span class="lfold-late">⏰ ${behind} בפיגור</span>` : "")}
     ${fold("lessons-later", "השיעורים הבאים", later)}</section>`;
@@ -255,13 +266,10 @@ export const show = view => swr([forSubject("/api/home"), "/api/assignments", "/
 
 function draw(view, data, assignments, ai) {
   const [first] = data.tests;
-  const onTheGo = data.onthego >= 10;                // practice on the go: in the test strip beside the tests, else in the status row
-  const go = onTheGo && !first ? `<a class="hchip" id="home-onthego" href="#/onthego" title="שאלות שעונים עליהן בראש, בלי לוח">🚌 תרגול בנסיעה</a>` : "";
-  const photo = data.photoq && !first ? `<a class="hchip" id="home-photoq" href="#/photoq" title="צלמו שאלה, פתרו בלוח וקבלו ציון ומשוב">📸 צילום שאלה</a>` : "";
-  const chips = go + photo + assignmentsChip(assignments) + (data.photoq ? "" : aiChips(ai));   // photo help is the photographed question now
+  const chips = assignmentsChip(assignments) + (data.photoq ? "" : aiChips(ai));   // photo help is the photographed question now
   view(`${tabs("home")}${backToSubjects()}
-    ${quest(data.map, chips, data.next_step, first?.forecast)}
-    ${first ? testStrip(first, onTheGo, data.photoq) : ""}
+    ${quest(data.map, chips, data)}
+    ${first ? testStrip(first) : ""}
     ${board(data.map)}`);
   countUp();
   document.getElementById("ai-new")?.addEventListener("click", () => aiSheet.open());

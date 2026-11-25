@@ -86,3 +86,15 @@ def test_home_carries_the_next_step_toward_the_tests_material(world):
     step = client.get("/api/home", headers=auth(KID)).json()["next_step"]
     assert step["kind"] in ("league", "next") and step["href"].startswith("#/round/") and step["questions"] == 10 and step["test"] is True
     assert step["lesson"]["id"] in lessons
+
+
+def test_the_way_up_picks_the_best_rounds_one_after_another():
+    from mathly2 import forecast
+    skills = ["a1", "a2", "b1", "b2"]
+    states = {"a1": "mastered", "a2": "mastered", "b1": "learning", "b2": "not_started"}
+    answers = {"b1": [(False, 1.0)] * 3}
+    got = forecast.boost(skills, states, set(), answers, {"A": ["a1", "a2"], "B": ["b1", "b2"]})
+    now = forecast.compute(skills, states, set(), answers)["grade"]
+    assert got["gains"] and got["gains"][0] == max(forecast.gain_of_round(skills, states, set(), answers, g) for g in (["a1", "a2"], ["b1", "b2"]))
+    assert got["grade"] == min(100, now + sum(got["gains"])) and len(got["gains"]) <= 3 and all(g > 0 for g in got["gains"])
+    assert forecast.boost(skills, states, set(), answers, {}) == {"gains": [], "grade": now}
