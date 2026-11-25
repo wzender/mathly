@@ -205,13 +205,13 @@ const starsLabel = n => n === 3 ? "שלושה כוכבים, מושלם" : n === 
 const plainText = text => String(text ?? "").replace(/\$/g, "");
 export const roundHref = id => `#/round/${encodeURIComponent(id)}`;
 
-function tile(l, next) {
+function tile(l, next, kicker = "") {
   const isNext = l.id === next, perfect = l.stars === 3;
   const label = `שיעור ${l.number}: ${plainText(l.name)}. ${starsLabel(l.stars)}${l.behind ? `. בפיגור, היה אמור להסתיים ב־${shortDate(l.due_date)}` : ""}${l.round_open ? ". באמצע סבב" : ""}${isNext ? ". ממשיכים כאן" : ""}`;
   return `<a class="lnode s${l.stars}${perfect ? " perfect" : ""}${isNext ? " next" : ""}${l.behind ? " behind" : ""}" href="${roundHref(l.id)}" data-lesson="${esc(l.id)}" data-stars="${l.stars}"
       aria-label="${esc(label)}" title="${esc(plainText(l.name))}">
     <span class="disc" aria-hidden="true">${perfect ? "👑" : l.number}${l.behind ? `<i class="badge late">⏰</i>` : l.round_open ? `<i class="badge open">◐</i>` : ""}</span>
-    <span class="lstars" aria-hidden="true">${starsText(l.stars)}</span><span class="lname" aria-hidden="true">${fmt(l.name)}</span></a>`;
+    <span class="lstars" aria-hidden="true">${starsText(l.stars)}</span><span class="lname" aria-hidden="true">${kicker ? `<small class="lkick">${kicker}</small><span class="ltext">${fmt(l.name)}</span>` : fmt(l.name)}</span></a>`;
 }
 
 /** The top: the stars collected, the lessons perfected, the streak and the daily goal, then the big play button for the next lesson. */
@@ -256,7 +256,7 @@ function board(map) {
   const behind = past.filter(l => l.behind).length;
   const fold = (id, title, list, extra = "") => list.length ? `<details class="lfold" id="${id}"><summary><span class="grow">${title} (${list.length})</span>${extra}</summary>${tiles(list)}</details>` : "";
   return `<section class="lesson-groups" id="lesson-map" aria-label="השיעורים">
-    ${now && now.id === played ? "" : now ? `<div class="lnow" id="lesson-now"><h2 class="lnow-title">השיעור הנוכחי <span class="muted">עד ${esc(shortDate(now.due_date))}</span></h2>${tile(now, map.next)}</div>`
+    ${now && now.id === played ? "" : now ? `<div class="lnow" id="lesson-now"><h2 class="lnow-title mx-sr">השיעור הנוכחי</h2>${tile(now, map.next, `השיעור הנוכחי · עד ${esc(shortDate(now.due_date))}`)}</div>`
           : `<p class="muted" id="lesson-now">כל התאריכים בתוכנית כבר עברו.</p>`}
     ${fold("lessons-past", "שיעורים שעברו", past, behind ? `<span class="lfold-late">⏰ ${behind} בפיגור</span>` : "")}
     ${fold("lessons-later", "השיעורים הבאים", later)}</section>`;
