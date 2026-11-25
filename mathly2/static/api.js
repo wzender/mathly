@@ -19,6 +19,17 @@ export function setViewClass(id) {
 let changes = 0;                                 // counts changes, so an answer to a read that began before one is not kept
 onSignOut(() => { remembered.clear(); changes++; });
 
+// After an update the server answers with a new build: the page's styles and scripts are old, so the app reloads itself at the next
+// change of screen (never in the middle of a question). The page's own build is in its config (main.py build_of).
+const PAGE_BUILD = (() => { try { return JSON.parse(document.getElementById("config")?.textContent || "{}").build || ""; } catch { return ""; } })();
+let stale = false;
+function noticeBuild(build) {
+  if (!build || !PAGE_BUILD || build === PAGE_BUILD || stale) return;
+  stale = true;
+  window.addEventListener("hashchange", () => location.reload(), { once: true });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") location.reload(); }, { once: true });
+}
+
 async function request(path, { method = "GET", body } = {}) {
   const started = changes;
   if (method !== "GET") { remembered.clear(); changes++; }      // after a change of theirs, no old answer is ever shown
@@ -26,6 +37,7 @@ async function request(path, { method = "GET", body } = {}) {
   if (viewClass()) headers["X-View-Class"] = viewClass();
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const response = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  noticeBuild(response.headers.get("X-Mathly-Build"));
   if (response.ok) {
     const data = response.status === 204 ? null : await response.json();
     if (method === "GET") { if (started === changes) remembered.set(path, data); }

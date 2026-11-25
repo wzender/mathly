@@ -1,4 +1,5 @@
 """Updates reach every device (serve-fresh-files): the page and its files are revalidated, unchanged files are a 304."""
+import pytest
 from fastapi.testclient import TestClient
 
 from mathly2.config import Settings
@@ -54,3 +55,35 @@ def test_the_page_loads_with_its_icon_and_no_failed_request_or_console_error():
         assert page.evaluate("fetch('/static/icons/icon-192.png').then(r => r.status)") == 200
         assert failed == [] and errors == []
         browser.close()
+
+
+def test_the_page_asks_for_this_builds_files_and_every_answer_carries_the_build(tmp_path):
+    from mathly2.main import build_of
+    c = client()
+    build = c.app.state.build
+    page = c.get("/").text
+    assert f"/static/app.css?v={build}" in page and f"/static/app.js?v={build}" in page and f'"build": "{build}"' in page
+    assert "__BUILD__" not in page
+    assert c.get("/api/health").headers["x-mathly-build"] == build
+    assert c.get("/static/app.css").headers["x-mathly-build"] == build
+    (tmp_path / "a.css").write_text("a{}")
+    one = build_of(tmp_path)
+    (tmp_path / "a.css").write_text("a{color:red}")
+    assert build_of(tmp_path) != one                                          # a changed file is a new build
+
+
+def test_an_app_left_open_after_an_update_reloads_at_the_next_screen():
+    playwright = pytest.importorskip("playwright.sync_api")
+    from mathly2.tests.serve import running
+    with running(create_app(Settings())) as url, playwright.sync_playwright() as p:
+        page = p.chromium.launch().new_page()
+        page.goto(url)
+        page.wait_for_selector("#email")
+        page.evaluate("window.__kept = 1")
+        page.route("**/api/**", lambda route: route.fulfill(response=route.fetch(), headers={**route.fetch().headers, "x-mathly-build": "newer"}))
+        page.fill("#email", "kid@school.test")
+        page.click("#dev button")                                               # an answer from a newer build: nothing happens yet
+        page.wait_for_timeout(500)
+        assert page.evaluate("window.__kept") == 1
+        page.evaluate("location.hash = '#/somewhere'")                          # the next screen: the page reloads with the new files
+        page.wait_for_function("window.__kept === undefined")

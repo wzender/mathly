@@ -25,6 +25,19 @@ from .push import Pusher, default_subject
 STATIC = Path(__file__).parent / "static"
 
 
+def build_of(folder: Path = STATIC) -> str:
+    """This build's version: a short hash of every file the browser loads. The page asks for its styles and scripts with it, and every
+    answer of the server carries it (X-Mathly-Build), so an app left open after an update reloads itself (api.js) instead of drawing new
+    screens with old styles."""
+    import hashlib
+    digest = hashlib.sha256()
+    for path in sorted(folder.rglob("*")):
+        if path.is_file():
+            digest.update(path.relative_to(folder).as_posix().encode())
+            digest.update(path.read_bytes())
+    return digest.hexdigest()[:12]
+
+
 class FreshStaticFiles(StaticFiles):
     """Static files the browser must check before reusing (`no-cache` keeps the ETag, so an unchanged file is a 304):
     after an update every device gets the new styles and scripts without clearing its cache."""
@@ -49,6 +62,14 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
             stop.set()
 
     app = FastAPI(title="Mathly 2", lifespan=lifespan)
+    app.state.build = build = build_of()
+
+    @app.middleware("http")
+    async def stamp_build(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Mathly-Build"] = build
+        return response
+
     app.state.settings = settings = (settings or load_settings()).check()
     app.state.bank = bank or load_bank()   # a broken bank stops the server from starting
     app.state.onthego = onthego.load_keys()   # the questions that need no board (practice on the go)
@@ -134,9 +155,9 @@ def create_app(settings: Settings | None = None, bank: Bank | None = None, store
     def index() -> HTMLResponse:
         # The browser needs only the public values: the Supabase URL and the publishable key. Never the secret key.
         config = {"supabaseUrl": settings.supabase_url, "supabaseKey": settings.supabase_key,
-                  "devSignIn": not settings.supabase_on}
+                  "devSignIn": not settings.supabase_on, "build": build}
         text = json.dumps(config).replace("<", "\\u003c")
-        html = (STATIC / "index.html").read_text(encoding="utf-8").replace("__CONFIG__", text)
+        html = (STATIC / "index.html").read_text(encoding="utf-8").replace("__CONFIG__", text).replace("__BUILD__", build)
         return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
     @app.get("/service-worker.js", include_in_schema=False)
