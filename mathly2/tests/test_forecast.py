@@ -97,7 +97,8 @@ def test_the_way_up_picks_the_best_rounds_one_after_another():
     now = forecast.compute(skills, states, set(), answers)["grade"]
     assert got["gains"] and got["gains"][0] == max(forecast.gain_of_round(skills, states, set(), answers, g) for g in (["a1", "a2"], ["b1", "b2"]))
     assert got["grade"] == min(100, now + sum(got["gains"])) and len(got["gains"]) <= 3 and all(g > 0 for g in got["gains"])
-    assert forecast.boost(skills, states, set(), answers, {}) == {"gains": [], "grade": now}
+    assert [r["gain"] for r in got["rounds"]] == got["gains"] and got["rounds"][0]["lesson"] in ("A", "B")
+    assert forecast.boost(skills, states, set(), answers, {}) == {"gains": [], "rounds": [], "grade": now}
 
 
 # --- the held grade: start high, keep it with the daily mission, meet the forecast by the test ---
