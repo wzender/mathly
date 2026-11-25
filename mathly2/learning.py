@@ -83,9 +83,14 @@ def current_round(keys: list[str], rows: list[dict], round_start: int | None) ->
 
 
 def next_in_round(left: list[str], just_answered: str | None = None, rng: random.Random | None = None) -> str | None:
-    """The next question of the round: one not answered yet, at random; none when the round is done."""
+    """The next question of the round: an easiest one not answered yet (difficulty.py: easy, then medium, then hard), at random among
+    those; none when the round is done."""
+    from .difficulty import level
     candidates = [k for k in left if k != just_answered]
-    return (rng or random).choice(candidates) if candidates else None
+    if not candidates:
+        return None
+    easiest = min(level(k) for k in candidates)
+    return (rng or random).choice([k for k in candidates if level(k) == easiest])
 
 
 def next_skill(order: list[str], states: dict[str, str], recent: list[str]) -> str | None:

@@ -450,7 +450,7 @@ def start_simulation(test_id: int, request: Request, user: dict = Depends(learne
         if attempts.is_open(row):
             return view(request, row)
     drawn = exam.draw(request.app.state.bank, test["lessons"], facts["states"], test["questions"], used=facts["used"], include_unstarted=True,
-                      rng=getattr(request.app.state, "quiz_rng", None))["questions"]
+                      rng=getattr(request.app.state, "quiz_rng", None), hard_share=exam.SIMULATION_HARD)["questions"]
     if not drawn:
         raise HTTPException(409, "אין עדיין שאלות בחומר של המבחן")
     return _new(request, user, test, "simulation", str(test_id), drawn)
