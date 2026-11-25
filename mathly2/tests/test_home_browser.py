@@ -378,6 +378,13 @@ def test_a_refused_test_shows_why_and_keeps_what_was_typed(browser, bank):
 
 # --- 5.1 the whole countdown ---
 
+def client_forecast(app, test):
+    """The student's forecast for the test, as the server computes it."""
+    from fastapi.testclient import TestClient
+    home = TestClient(app).get("/api/home", headers={"Authorization": f"Bearer dev:{KID}"}).json()
+    return next(t for t in home["tests"] if t["id"] == test["id"])["forecast"]
+
+
 def answer_in_browser(page, bank, store, kind, scope, rights):
     """Answer the open attempt on screen right or wrong, one flag per question, moving with "next"; then submit. The board counts as written on."""
     board_written(page)
@@ -404,7 +411,8 @@ def answer_in_browser(page, bank, store, kind, scope, rights):
 
 # --- readiness: the home's block, the test's page, practice tests by mode and simulations on request ---
 
-def test_home_shows_the_forecast_grade_big_after_placement_with_the_way_up_and_only_rises(browser, bank):
+def test_home_shows_the_held_grade_big_kept_by_the_daily_mission_and_warns_before_it_drops(browser, bank):
+    from mathly2 import forecast
     app, store, klass, lessons = world(bank)
     test = add_test(store, klass, lessons, 2)
     skills = covered(bank, lessons)
@@ -419,28 +427,19 @@ def test_home_shows_the_forecast_grade_big_after_placement_with_the_way_up_and_o
         page = sign_in(browser, url)
         to_home(page)
         strip = page.locator("#nearest-test")
-        assert page.inner_text("#home-days b") == "2" and strip.get_attribute("data-phase") == "sprint"    # two days: the sprint
-        assert "ספרינט" in page.inner_text("#home-mission")
-        assert page.inner_text("#home-forecast .fc-num") == "?" and page.inner_text("#home-forecast .fc-count") == "0/15"   # no guess on day one
-        assert "עוד 15 תשובות" in page.inner_text("#home-mission") and page.locator("#home-way").count() == 0
+        assert page.inner_text("#home-days b") == "2" and strip.get_attribute("data-phase") == "sprint"     # two days: the sprint
+        held = int(page.get_attribute("#home-forecast", "data-grade"))
+        real = client_forecast(app, test)["grade"]
+        assert held > real and page.inner_text("#home-forecast .fc-num") == str(held)                   # it starts above the forecast
+        assert "ספרינט" in page.inner_text("#home-mission") and "0/30 תשובות" in page.inner_text("#home-mission")
+        assert "בלי המשימה" in page.inner_text("#home-way") and "fc-risk" in page.get_attribute("#home-way", "class")
         assert page.get_attribute("#nearest-test .strip-main", "href") == f"#/test/{test['id']}"
         assert page.get_attribute("#home-onthego", "href") == "#/onthego" and "תרגול מהיר" in page.inner_text("#home-onthego")
-        answer(2, right=False)                                                                      # enough answers, a weak start
+        answer(4)                                                                                     # today's mission done
         page.reload()
-        page.wait_for_selector("#home-forecast[data-grade]:not([data-grade=''])")
-        first = int(page.get_attribute("#home-forecast", "data-grade"))
-        assert page.inner_text("#home-forecast .fc-num") == str(first) and page.locator("#home-forecast .fc-rise").count() == 0
-        way = int(page.inner_text("#home-way b"))
-        assert way > first and "סבבים" in page.inner_text("#home-way") and "= +" in page.inner_text("#home-mission")   # a low grade comes with the way up
-        answer(6, start=2)                                                                          # right answers: the grade rises, with ▲
-        page.reload()
-        page.wait_for_selector("#home-forecast .fc-rise")
-        grade = int(page.get_attribute("#home-forecast", "data-grade"))
-        assert grade > first and page.inner_text("#home-forecast .fc-rise") == f"▲ +{grade - first}"
-        answer(6, right=False, start=8)                                                             # a dip is not announced
-        page.reload()
-        page.wait_for_selector("#home-forecast[data-grade]")
-        assert int(page.get_attribute("#home-forecast", "data-grade")) < grade and page.locator("#home-forecast .fc-rise").count() == 0
+        page.wait_for_selector("#home-way.fc-safe")
+        assert "הציון נשמר" in page.inner_text("#home-way") and "הושלמה" in page.inner_text("#home-mission")
+        assert int(page.get_attribute("#home-forecast", "data-grade")) >= held                         # right answers: it can only go up
         page.click("#home-practice")                                                                # straight to choosing a practice test
         page.wait_for_selector("#practice .modes")
         no_sideways_scroll(page)
