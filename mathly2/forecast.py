@@ -80,11 +80,11 @@ def chances(skills: list[str], states: dict[str, str], faded: set[str], answers:
 def boost(skills: list[str], states: dict[str, str], faded: set[str], answers: dict[str, list[tuple[bool, float]]],
           groups: dict[str, list[str]], rounds: int = 3, size: int = 10) -> dict:
     """Where good rounds take the forecast: `rounds` times, the group of skills (a lesson) whose good round adds the most, each counted after
-    the ones before. {"gains": [points of each round], "grade": the grade after them}. What home shows beside the grade, so a low grade
-    always comes with the way up."""
+    the ones before. {"gains": [points of each round], "rounds": [{"lesson": group, "gain": points}], "grade": the grade after them}.
+    What home's "how to raise it" sheet lists."""
     now = {s: list(v) for s, v in answers.items()}
     grade = compute(skills, states, faded, now)["grade"] if skills else 0
-    gains = []
+    gains, steps = [], []
     for _ in range(rounds):
         if not groups:
             break
@@ -96,8 +96,9 @@ def boost(skills: list[str], states: dict[str, str], faded: set[str], answers: d
             s = groups[best][i % len(groups[best])]
             now[s] = [(True, 1.0)] + now.get(s, [])
         gains.append(gain)
+        steps.append({"lesson": best, "gain": gain})
         grade += gain
-    return {"gains": gains, "grade": min(100, grade)}
+    return {"gains": gains, "rounds": steps, "grade": min(100, grade)}
 
 
 def gain_of_round(skills: list[str], states: dict[str, str], faded: set[str], answers: dict[str, list[tuple[bool, float]]],

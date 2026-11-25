@@ -587,3 +587,27 @@ def test_the_ai_chat_is_in_the_lesson_round_too(browser, bank):
     import uuid
     kept = store.tutor_chats_of([str(uuid.uuid5(uuid.NAMESPACE_DNS, KID))], clock.school_day())     # what the teacher reads
     assert len(kept) == 1 and len(kept[0]["messages"]) == 4 and kept[0]["helped"] is True
+
+
+def test_the_raise_the_grade_button_lists_the_ways_with_their_points_and_links_to_them(browser, bank):
+    app, store, klass, lessons = world(bank)
+    test = add_test(store, klass, lessons, 10)
+    store.set_lesson_dates({lessons[0]: clock.school_day() - timedelta(days=3)})               # one lesson behind
+    with running(app) as url:
+        page = sign_in(browser, url)
+        to_home(page)
+        page.wait_for_selector("#home-improve")
+        assert "איך מעלים את הציון" in page.inner_text("#home-improve") and "+" in page.inner_text("#home-improve .imp-chip")
+        page.click("#home-improve")
+        page.wait_for_selector("#imp-list")
+        sheet = page.inner_text(".imp-layer")
+        assert "המשימה של היום" in sheet and "0/10 תשובות" in sheet and "השלמת פערים" in sheet
+        assert "מבחן תרגול" in sheet and "מבחן סימולציה" in sheet and "תרגול מהיר" in sheet
+        rounds = page.locator(".imp-item[href^='#/round/']")
+        assert rounds.count() >= 2 and "+" in rounds.nth(1).inner_text()                         # the rounds with their points
+        assert page.locator(f".imp-item[href='#/test/{test['id']}/practice']").count() == 1 and page.locator(".imp-item[href='#/gaps']").count() == 1
+        target = rounds.nth(1).get_attribute("href")
+        rounds.nth(1).click()
+        page.wait_for_selector(".round-layer #ex-q")
+        assert page.locator(".imp-layer").count() == 0 and page.evaluate("location.hash") == target
+        assert page.errors == []

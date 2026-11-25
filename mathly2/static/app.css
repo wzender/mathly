@@ -1013,3 +1013,23 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .fc-way.fc-risk b::before, .fc-way.fc-safe b::before { content: none; }
 .fc-way.fc-safe b { color: var(--ok, #6ee7a0); }
 .fc-hero-strip.at-risk .fc-mission { font-weight: 600; }
+
+/* "📈 איך מעלים את הציון?" (home.js, improve.js): the button in the test block and its sheet. */
+.fc-improve { width: 100%; min-height: 44px; border-radius: 12px; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; color: var(--text);
+  border: 1.5px dashed color-mix(in srgb, var(--ok, #6ee7a0) 70%, transparent); background: color-mix(in srgb, var(--ok, #6ee7a0) 12%, var(--surface)); }
+.imp-chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12.5px; font-weight: 800; white-space: nowrap;
+  color: var(--ok, #6ee7a0); background: color-mix(in srgb, var(--ok, #6ee7a0) 16%, transparent); }
+.imp-now { margin: 4px 0 8px; font-size: 15px; }
+.imp-now .imp-up { color: var(--ok, #6ee7a0); }
+.imp-list { display: grid; gap: 6px; }
+.imp-head { margin: 8px 0 0; font-size: 12.5px; font-weight: 800; color: var(--muted); }
+.imp-item { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px; border-radius: 12px; text-decoration: none; color: var(--text);
+  background: var(--quiet); border: 1px solid var(--quiet-line); }
+.imp-item .grow { display: flex; flex-direction: column; min-width: 0; }
+.imp-item small { color: var(--muted); font-size: 12.5px; line-height: 1.3; }
+.imp-icon { font-size: 20px; flex: none; }
+.imp-item.urgent { border-color: var(--warn, #fbbf6a); background: color-mix(in srgb, var(--warn, #fbbf6a) 10%, var(--surface)); }
+.imp-item.urgent .imp-chip { color: var(--warn, #fbbf6a); background: color-mix(in srgb, var(--warn, #fbbf6a) 18%, transparent); }
+.imp-item.done { border-color: color-mix(in srgb, var(--ok, #6ee7a0) 50%, transparent); }
+ul.plain.imp-list > li { display: block; border: 0; padding: 0; margin: 0; }
+ul.plain.imp-list > li.imp-head { padding-top: 6px; }

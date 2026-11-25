@@ -164,6 +164,7 @@ function forecastStrip(test) {
       <span class="fc-grade" id="home-forecast" data-grade="${h.grade}"><small>ציון משוער</small><b class="fc-num">${h.grade}</b>${rise ? `<small class="fc-rise">▲ +${rise}</small>` : ""}</span>
       ${side}</a>
     <p class="fc-mission" id="home-mission"><span aria-hidden="true">${phase.icon}</span> <b>${phase.text}</b> · ${mission}</p>
+    ${phase.id === "today" ? "" : `<button type="button" class="fc-improve" id="home-improve">📈 איך מעלים את הציון?${(f.boost?.gains || []).length ? ` <span class="imp-chip">עד <bdi dir="ltr">+${f.boost.gains.reduce((a, b) => a + b, 0)}</bdi></span>` : ""}</button>`}
     <div class="test-btns"><a class="test-btn" id="home-practice" href="#/test/${test.id}/practice">📝 מבחן תרגול</a>
       <a class="test-btn sim" id="home-sim" href="#/sim/${test.id}${sim ? `/${esc(sim)}` : ""}">⏱ ${sim ? "להמשיך סימולציה" : "מבחן סימולציה"}</a></div></section>`;
 }
@@ -273,6 +274,7 @@ function draw(view, data, assignments, ai) {
     ${first ? testStrip(first) : ""}
     ${board(data.map)}`);
   countUp();
+  document.getElementById("home-improve")?.addEventListener("click", () => import("./improve.js").then(m => m.open(first, data)));
   document.getElementById("ai-new")?.addEventListener("click", () => aiSheet.open());
   document.querySelectorAll("[data-ai-open]").forEach(b => b.addEventListener("click", () => aiSheet.open({ id: b.dataset.aiOpen })));
 }
