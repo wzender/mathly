@@ -170,6 +170,23 @@ def _title(row: dict) -> str:
     return "מבחן סימולציה" if row["kind"] == "simulation" else exam.TITLES[exam.mode_of_scope(row["scope"])]
 
 
+HELD_FROM = date(2026, 11, 25)          # the held grade began here: no test loses its lead for the days before it
+
+
+def _with_held(request: Request, user_id: str | None, test: dict, f: dict | None, today: date) -> dict | None:
+    """The student's forecast with the held grade (forecast.held): the lead kept by the daily mission since the test was set."""
+    if not f or not user_id:
+        return f
+    created = test.get("created_at")
+    start = max(HELD_FROM, created.date() if hasattr(created, "date") else today)
+    try:
+        rows = request.app.state.store.daily_practice([user_id], start)
+    except Exception:                                                     # no daily counts: a day with no answers for each
+        rows = []
+    by_day = {r["day"] if isinstance(r["day"], date) else date.fromisoformat(str(r["day"])): r["answers"] for r in rows}
+    return {**f, "held": forecast.held(f["grade"], min(start, today), test["date"], today, by_day)}
+
+
 def card(request: Request, user_id: str | None, test: dict, today: date) -> dict:
     """A test as its student sees it: the readiness number and what moves it, the practice tests by mode, the simulations, and the trail
     of handed-in tests with what each added."""
@@ -193,7 +210,7 @@ def card(request: Request, user_id: str | None, test: dict, today: date) -> dict
     lessons = {l["id"]: l["name"] for l in bank.lessons}
     return {"id": test["id"], "date": test["date"].isoformat(), "days_left": days_left, "note": test["note"], "subject_id": test.get("subject_id", "math"),
             "lessons": [{"id": i, "name": n} for i, n in zip(test["lessons"], lesson_names(request, test["lessons"]))],
-            "questions": test["questions"], "minutes": test["minutes"], "readiness": readiness_for(facts), "forecast": forecast_for(request, user_id, facts, today),
+            "questions": test["questions"], "minutes": test["minutes"], "readiness": readiness_for(facts), "forecast": _with_held(request, user_id, test, forecast_for(request, user_id, facts, today), today),
             "practice": {"balanced": {"number": exam.BALANCED, "size": test["questions"], "open": open_of(by_mode["balanced"])},
                          "focus": {"number": exam.FOCUS, "size": exam.FOCUS_SIZE, "open": open_of(by_mode["focus"]),
                                    "skills": [skill_row(i) for i in facts["focus_skills"]]},

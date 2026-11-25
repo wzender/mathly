@@ -142,26 +142,27 @@ function gradeRise(testId, grade) {
   return typeof before === "number" && grade > before ? grade - before : 0;
 }
 
-/** The nearest test as the home's hero: the days left and the forecast grade, big, with where good rounds take it ("אפשר להגיע ל־81"),
- *  so a low grade always comes with the way up; until PLACEMENT answers, no number (a guess from a few answers), only how many are left.
- *  The closer the test, the stronger the colours and the bigger today's mission. The practice test and the simulation under it. */
+/** The nearest test as the home's hero: the days left and the held grade big (forecast.held: it starts 25 above the forecast, the
+ *  daily mission keeps it, a day without it loses a quarter of the lead, and it meets the forecast by the test). Beside it, what today
+ *  decides: "✓ נשמר" once today's mission is done, else the grade tomorrow without it. The closer the test, the stronger the colours
+ *  and the bigger the mission. The practice test and the simulation under it. */
 function forecastStrip(test) {
-  const f = test.forecast, sim = test.simulation.open, phase = phaseOf(test.days_left), boost = f.boost || { gains: [], grade: f.grade };
-  const placing = f.placement, rise = placing ? 0 : gradeRise(test.id, f.grade);
-  const plus = boost.gains.slice(0, phase.rounds).reduce((a, b) => a + b, 0);
+  const f = test.forecast, sim = test.simulation.open, phase = phaseOf(test.days_left);
+  const h = f.held || { grade: f.grade, need: 0, done: 0, safe: true, tomorrow: f.grade };
+  const rise = gradeRise(test.id, h.grade), loss = h.grade - h.tomorrow;
+  const rounds = phase.rounds === 1 ? "סבב אחד" : `${phase.rounds} סבבים`;
   const mission = phase.id === "today" ? "נשמו עמוק, אתם מוכנים יותר ממה שנדמה."
-    : placing ? `עוד ${placing.need - placing.done} תשובות לחשיפת הציון`
-    : `היום: ${phase.rounds === 1 ? "סבב אחד" : `${phase.rounds} סבבים`}${plus ? ` = +${plus} לציון` : " לשמירה על הציון"}`;
+    : h.safe ? "המשימה של היום הושלמה 💪" : `היום: ${rounds} · ${Math.min(h.done, h.need)}/${h.need} תשובות`;
+  const side = phase.id === "today" ? ""
+    : h.safe ? `<span class="fc-way fc-safe" id="home-way"><small>היום</small><b>✓</b><small>הציון נשמר</small></span>`
+    : loss > 0 ? `<span class="fc-way fc-risk" id="home-way"><small>בלי המשימה</small><b>${h.tomorrow}</b><small>מחר, ${loss} פחות</small></span>` : "";
   const days = test.days_left <= 0 ? "היום" : test.days_left === 1 ? "מחר" : test.days_left;
-  const label = `המבחן ${daysText(test.days_left)}. ${placing ? `הציון המשוער ייחשף אחרי עוד ${placing.need - placing.done} תשובות`
-    : `ציון משוער ${f.grade}${boost.gains.length ? `, אפשר להגיע ל־${boost.grade}` : ""}`}`;
-  return `<section class="strip test-strip fc-hero-strip phase-${phase.id}" id="nearest-test" data-test="${test.id}" data-phase="${phase.id}">
+  const label = `המבחן ${daysText(test.days_left)}. ציון משוער ${h.grade}. ${h.safe ? "הציון נשמר היום." : loss > 0 ? `בלי המשימה של היום הוא יירד מחר ל־${h.tomorrow}.` : ""}`;
+  return `<section class="strip test-strip fc-hero-strip phase-${phase.id}${!h.safe && loss > 0 ? " at-risk" : ""}" id="nearest-test" data-test="${test.id}" data-phase="${phase.id}">
     <a class="strip-main fc-hero" href="#/test/${test.id}" aria-label="${esc(label)}">
       <span class="fc-days" id="home-days"><b>${days}</b><small>${typeof days === "number" ? "ימים למבחן" : "המבחן"}</small></span>
-      <span class="fc-grade" id="home-forecast" data-grade="${placing ? "" : f.grade}"><small>ציון משוער</small>${placing
-        ? `<b class="fc-num fc-hidden">?</b><small class="fc-count">${placing.done}/${placing.need}</small>`
-        : `<b class="fc-num">${f.grade}</b>${rise ? `<small class="fc-rise">▲ +${rise}</small>` : ""}`}</span>
-      ${!placing && boost.gains.length ? `<span class="fc-way" id="home-way"><small>אפשר להגיע ל־</small><b>${boost.grade}</b><small>${boost.gains.length === 1 ? "בעוד סבב" : `בעוד ${boost.gains.length} סבבים`}</small></span>` : ""}</a>
+      <span class="fc-grade" id="home-forecast" data-grade="${h.grade}"><small>ציון משוער</small><b class="fc-num">${h.grade}</b>${rise ? `<small class="fc-rise">▲ +${rise}</small>` : ""}</span>
+      ${side}</a>
     <p class="fc-mission" id="home-mission"><span aria-hidden="true">${phase.icon}</span> <b>${phase.text}</b> · ${mission}</p>
     <div class="test-btns"><a class="test-btn" id="home-practice" href="#/test/${test.id}/practice">📝 מבחן תרגול</a>
       <a class="test-btn sim" id="home-sim" href="#/sim/${test.id}${sim ? `/${esc(sim)}` : ""}">⏱ ${sim ? "להמשיך סימולציה" : "מבחן סימולציה"}</a></div></section>`;

@@ -1007,3 +1007,9 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .quest-stats .hchip::after { content: ""; position: absolute; inset: -7px -3px; }
 .lesson-groups > *, .lnow, .lnow .lnode, .lnow .lnode .lname { min-width: 0; }
 .lnow .lnode { overflow: hidden; }
+
+/* The held grade (home.js forecastStrip): what today decides, beside the grade. */
+.fc-way.fc-risk b { color: var(--warn, #fbbf6a); }
+.fc-way.fc-risk b::before, .fc-way.fc-safe b::before { content: none; }
+.fc-way.fc-safe b { color: var(--ok, #6ee7a0); }
+.fc-hero-strip.at-risk .fc-mission { font-weight: 600; }

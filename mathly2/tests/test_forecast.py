@@ -98,3 +98,33 @@ def test_the_way_up_picks_the_best_rounds_one_after_another():
     assert got["gains"] and got["gains"][0] == max(forecast.gain_of_round(skills, states, set(), answers, g) for g in (["a1", "a2"], ["b1", "b2"]))
     assert got["grade"] == min(100, now + sum(got["gains"])) and len(got["gains"]) <= 3 and all(g > 0 for g in got["gains"])
     assert forecast.boost(skills, states, set(), answers, {}) == {"gains": [], "grade": now}
+
+
+# --- the held grade: start high, keep it with the daily mission, meet the forecast by the test ---
+
+def test_the_held_grade_starts_25_above_and_loses_a_quarter_of_the_lead_a_day_without_the_mission():
+    from datetime import date, timedelta
+    from mathly2 import forecast
+    start, test = date(2026, 12, 1), date(2027, 1, 30)                 # far: the mission is one round (10 answers)
+    day = lambda n: start + timedelta(days=n)
+    assert forecast.held(60, start, test, start, {})["grade"] == 85
+    idle = forecast.held(60, start, test, day(2), {})
+    assert idle["grade"] == round(60 + 25 * 0.75 ** 2) and idle["need"] == 10 and not idle["safe"]
+    kept = forecast.held(60, start, test, day(2), {day(0): 10, day(1): 12, day(2): 10})
+    assert kept["grade"] == 85 and kept["safe"] and kept["done"] == 10                     # the mission each day keeps it
+    assert idle["tomorrow"] == round(60 + 25 * 0.75 ** 3)                                  # what is lost without today's mission
+    assert forecast.held(90, start, test, start, {})["grade"] == 100                     # never above 100
+    assert forecast.held(70, start, test, day(30), {})["grade"] >= 70                    # never below the forecast
+
+
+def test_the_held_grade_meets_the_forecast_by_the_test_and_the_mission_grows():
+    from datetime import date, timedelta
+    from mathly2 import forecast
+    test = date(2026, 12, 31)
+    every_day = {test - timedelta(days=n): 40 for n in range(40)}
+    far = forecast.held(60, test - timedelta(days=30), test, test - timedelta(days=20), every_day)
+    near = forecast.held(60, test - timedelta(days=30), test, test - timedelta(days=7), every_day)
+    on_the_day = forecast.held(60, test - timedelta(days=30), test, test, every_day)
+    assert far["grade"] == 85 and near["grade"] == round(60 + 25 * 7 / 14) and on_the_day["grade"] == 60
+    assert [forecast.mission_rounds(d) for d in (20, 10, 5, 2, 0)] == [1, 1, 2, 3, 0]
+    assert near["need"] == 20 and forecast.held(60, test - timedelta(days=30), test, test - timedelta(days=2), {})["need"] == 30

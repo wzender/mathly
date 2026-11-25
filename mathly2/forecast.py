@@ -111,3 +111,36 @@ def gain_of_round(skills: list[str], states: dict[str, str], faded: set[str], an
         s = round_skills[i % len(round_skills)]
         after[s] = [(True, 1.0)] + after.get(s, [])
     return compute(skills, states, faded, after)["grade"] - before
+
+
+# ---- the held grade (what the student sees on home): start high, keep it with the daily mission, lose a quarter of the lead a day
+# without it, and meet the forecast by the test ----
+HELD_START = 25                  # the lead over the forecast to begin with (the held grade is at most 100)
+HELD_DECAY = 0.25                # a day without the daily mission loses this share of the lead
+HELD_CLOSE = 14                  # within this many days of the test the lead is also capped, shrinking to 0 on the day
+ROUND_ANSWERS = 10               # the daily mission counts rounds of this many answers
+
+
+def mission_rounds(days_left: int) -> int:
+    """The daily mission by the days left (home.js phaseOf): 1 round, 1, 2 in the last week, 3 in the last three days, none on the day."""
+    return 0 if days_left <= 0 else 3 if days_left <= 3 else 2 if days_left <= 7 else 1
+
+
+def _cap(days_left: int) -> float:
+    return HELD_START * max(0.0, min(1.0, days_left / HELD_CLOSE))
+
+
+def held(real: int, start, test_day, today, answers_by_day: dict) -> dict:
+    """The held grade for a test: {"grade", "real", "need" (today's mission in answers), "done" (answers today), "safe" (the mission is
+    done), "tomorrow" (the grade tomorrow without the mission)}. `answers_by_day`: date -> answers that day, from `start` on."""
+    from datetime import timedelta
+    lead, day = float(HELD_START), start
+    while day < today:
+        if answers_by_day.get(day, 0) < mission_rounds((test_day - day).days) * ROUND_ANSWERS:
+            lead *= 1 - HELD_DECAY
+        day += timedelta(days=1)
+    left = (test_day - today).days
+    need, done = mission_rounds(left) * ROUND_ANSWERS, answers_by_day.get(today, 0)
+    grade = min(100, round(real + min(lead, _cap(left))))
+    tomorrow = min(100, round(real + min(lead * (1 - HELD_DECAY), _cap(left - 1))))
+    return {"grade": max(real, grade), "real": real, "need": need, "done": done, "safe": done >= need, "tomorrow": max(real, tomorrow)}
