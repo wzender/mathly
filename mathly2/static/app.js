@@ -102,7 +102,7 @@ async function boot() {
     await open(me, roles.includes(remembered()) ? remembered() : roles[0], { keepAddress: true });   // the first screen honours a link
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return signOutAndShow("ההתחברות פגה, יש להיכנס שוב");
-    if (error instanceof ApiError && error.status === 503) return showSignIn("שירות ההתחברות לא זמין כרגע.", true);
+    if (error instanceof ApiError && error.status === 503) return showSignIn(error.message || "שירות ההתחברות לא זמין כרגע.", true);   // the real reason: updating, or the server's
     view(`<section class="card"><p class="error" role="alert">${esc(error.message || "משהו השתבש")}</p></section>`);
   }
 }

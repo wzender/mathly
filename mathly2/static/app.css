@@ -1033,3 +1033,7 @@ body:has(#lesson-map) p:has(> #to-subjects) { margin-block: 0 4px; }
 .imp-item.done { border-color: color-mix(in srgb, var(--ok, #6ee7a0) 50%, transparent); }
 ul.plain.imp-list > li { display: block; border: 0; padding: 0; margin: 0; }
 ul.plain.imp-list > li.imp-head { padding-top: 6px; }
+
+/* The site is being updated (api.js): a quiet note while requests are sent again. */
+.updating-note { position: fixed; inset: 12px 50% auto auto; transform: translateX(50%); z-index: 90; margin: 0; padding: 8px 14px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--sky-gold); color: var(--text); font-weight: 700; font-size: 14px; box-shadow: 0 4px 16px rgb(0 0 0 / .35); }
