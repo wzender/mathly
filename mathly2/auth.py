@@ -75,7 +75,7 @@ def signed_in(request: Request) -> dict:
     try:
         user = request.app.state.authenticator.user(token)
     except AuthUnavailable:
-        raise HTTPException(503, "sign-in service unavailable, try again") from None
+        raise HTTPException(503, "שירות ההתחברות לא זמין כרגע, נסו שוב בעוד רגע") from None
     if not user:
         raise HTTPException(401, "sign in required")
     return user
